@@ -34,7 +34,7 @@ RUN workon giskardpy && \
 # Install qpSWIFT
 RUN cd ~ && \
     workon giskardpy && \
-    pip3 install pybind11 && \\
+    pip3 install pybind11 && \
     git clone https://github.com/SemRoCo/qpSWIFT && \
     cd qpSWIFT && \
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
