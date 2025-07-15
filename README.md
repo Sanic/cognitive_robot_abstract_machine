@@ -42,14 +42,9 @@ pip3 install -r requirements.txt
 pip3 install -e .                           
 ```
 
-### Install qpSWIFT
-[https://github.com/SemRoCo/qpSWIFT/wiki/2.Installation](https://github.com/SemRoCo/qpSWIFT.git)
-If you are using a venv, activate it before installing qpSWIFT.
+#### (Optional) Install alternative QP solvers
+Giskard supports alternative QP solvers, but they are all slower than qpSWIFT, which is the default.
 
-#### Alternative QP solvers
-Giskard supports alternative QP solvers, but they are all slower than qpSWIFT.
-
-- `qpalm`: Default solver, if qpSWIFT is not installed.
 - `gurobi`: Commercial solver. Useful for debugging during development.
   - ```sudo pip3 install gurobipy```
   - You can apply for a free academic license or buy one here: https://www.gurobi.com/academia/academic-program-and-licenses/
