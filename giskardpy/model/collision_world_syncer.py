@@ -17,7 +17,6 @@ from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionCheck,
 )
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 

@@ -1,5 +1,4 @@
 from dataclasses import field, dataclass
-from functools import cached_property
 from typing import Optional, List, Union, Dict, DefaultDict, TypeVar
 
 import numpy as np
@@ -18,11 +17,9 @@ from giskardpy.qp.constraint import (
     InequalityConstraint,
     DerivativeInequalityConstraint,
 )
-from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 WEIGHT_MAX = 10000.0
 WEIGHT_ABOVE_CA = 2500.0
@@ -96,7 +93,7 @@ class Task(MotionStatechartNode):
     def add_quadratic_weight_gain(
         self,
         name: str,
-        gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]],
+        gains: List[DefaultDict[Derivatives, Dict[DegreeOfFreedom, float]]],
     ):
         q_gain = QuadraticWeightGain(name=name, gains=gains)
         self.quadratic_gains.append(q_gain)
@@ -104,7 +101,7 @@ class Task(MotionStatechartNode):
     def add_linear_weight_gain(
         self,
         name: str,
-        gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]],
+        gains: List[DefaultDict[Derivatives, Dict[DegreeOfFreedom, float]]],
     ):
         q_gain = LinearWeightGain(name=name, gains=gains)
         self.linear_weight_gains.append(q_gain)

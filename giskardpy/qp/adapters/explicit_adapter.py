@@ -9,7 +9,6 @@ from line_profiler import profile
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.qp.adapters.qp_adapter import GiskardToQPAdapter
 from giskardpy.qp.qp_data import QPData
-from semantic_digital_twin.spatial_types.symbol_manager import SymbolManager
 
 if TYPE_CHECKING:
     pass
@@ -150,7 +149,7 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         goal_life_cycle_state: np.ndarray,
         external_collision_data: np.ndarray,
         self_collision_data: np.ndarray,
-        symbol_manager: SymbolManager,
+        symbol_manager,
     ) -> QPData:
         aux_substitutions = symbol_manager.resolve_symbols([self.aux_symbols])
 

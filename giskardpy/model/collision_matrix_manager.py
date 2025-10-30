@@ -1,22 +1,12 @@
 from __future__ import annotations
 
-import copy
-from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from itertools import product, combinations_with_replacement, chain
-from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable
+from typing import List, Optional, Set
 
-import numpy as np
-from line_profiler import profile
-
-from giskardpy.data_types.key_default_dict import KeyDefaultDict
 from giskardpy.god_map import god_map
-from giskardpy.qp.free_variable import FreeVariable
 from semantic_digital_twin.collision_checking.collision_detector import CollisionCheck
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.world_description.connections import ActiveConnection
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 

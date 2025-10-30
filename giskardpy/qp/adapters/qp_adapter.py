@@ -29,7 +29,6 @@ from giskardpy.utils.decorators import memoize
 from giskardpy.utils.math import mpc
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
-from semantic_digital_twin.spatial_types.symbol_manager import SymbolManager
 
 if TYPE_CHECKING:
     import scipy.sparse as sp
@@ -1940,7 +1939,7 @@ class GiskardToQPAdapter:
         goal_life_cycle_state: np.ndarray,
         external_collision_data: np.ndarray,
         self_collision_data: np.ndarray,
-        symbol_manager: SymbolManager,
+        symbol_manager,
     ) -> QPData:
         raise NotImplementedError()
 

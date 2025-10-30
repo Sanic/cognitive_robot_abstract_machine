@@ -14,7 +14,6 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -124,7 +123,7 @@ class DiffDriveBaseGoal(Goal):
             + cas.shortest_angular_distance(map_goal_angle2, angle_start) / 2
         )
 
-        middle_angle = symbol_manager.evaluate_expr(middle_angle)
+        middle_angle = middle_angle.evaluate()
         a = symbol_manager.evaluate_expr(
             cas.shortest_angular_distance(map_goal_angle_direction_f, middle_angle)
         )

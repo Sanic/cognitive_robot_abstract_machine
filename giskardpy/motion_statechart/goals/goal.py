@@ -12,7 +12,6 @@ from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
@@ -23,24 +22,6 @@ class Goal(MotionStatechartNode):
     tasks: List[Task] = field(default_factory=list, init=False)
     monitors: List[Monitor] = field(default_factory=list, init=False)
     goals: List[Goal] = field(default_factory=list, init=False)
-
-    @cached_property
-    def observation_state_symbol(self) -> cas.Symbol:
-        return symbol_manager.register_symbol_provider(
-            name=f"{self.name}.observation_state",
-            provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_observation_state(
-                n
-            ),
-        )
-
-    @cached_property
-    def life_cycle_state_symbol(self) -> cas.Symbol:
-        return symbol_manager.register_symbol_provider(
-            name=f"{self.name}.life_cycle_state",
-            provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_life_cycle_state(
-                n
-            ),
-        )
 
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0

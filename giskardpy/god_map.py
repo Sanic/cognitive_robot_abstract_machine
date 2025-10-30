@@ -2,21 +2,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Dict, Tuple
 
+import numpy as np
+
 from giskardpy.middleware import get_middleware
 from giskardpy.utils.utils import create_path
-from semantic_digital_twin.adapters.ros.world_synchronizer import ModelSynchronizer, StateSynchronizer
+from semantic_digital_twin.adapters.ros.world_synchronizer import (
+    ModelSynchronizer,
+    StateSynchronizer,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+    from semantic_digital_twin.world_description.degree_of_freedom import (
+        DegreeOfFreedom,
+    )
     from semantic_digital_twin.world import World
-    from giskardpy.qp.next_command import NextCommands
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPController
-    from giskardpy.motion_statechart.motion_statechart_manager import (
-        MotionStatechartManager,
-    )
     from giskardpy.debug_expression_manager import DebugExpressionManager
     from giskardpy.model.collision_world_syncer import (
         CollisionWorldSynchronizer,
@@ -32,7 +34,6 @@ class GodMap:
     qp_controller: QPController
 
     # %% managers
-    motion_statechart_manager: MotionStatechartManager
     debug_expression_manager: DebugExpressionManager
     model_synchronizer: ModelSynchronizer
     state_synchronizer: StateSynchronizer
@@ -42,7 +43,7 @@ class GodMap:
     time_symbol: cas.Symbol
     control_cycle_counter: int
     trajectory: Trajectory
-    qp_solver_solution: NextCommands
+    qp_solver_solution: np.ndarray
     added_collision_checks: Dict[Tuple[PrefixedName, PrefixedName], float]
     closest_point: Collisions
     motion_start_time: float
@@ -58,12 +59,6 @@ class GodMap:
             from semantic_digital_twin.world import World
 
             self.world = World()
-        elif item == "motion_statechart_manager":
-            from giskardpy.motion_statechart.motion_statechart_manager import (
-                MotionStatechartManager,
-            )
-
-            self.motion_statechart_manager = MotionStatechartManager()
         elif item == "debug_expression_manager":
             from giskardpy.debug_expression_manager import DebugExpressionManager
 

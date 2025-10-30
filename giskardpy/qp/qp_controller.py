@@ -21,11 +21,9 @@ from giskardpy.qp.constraint import (
     EqualityConstraint,
     DerivativeInequalityConstraint,
 )
-from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.utils.utils import create_path
-from semantic_digital_twin.spatial_types.symbol_manager import SymbolManager
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 if TYPE_CHECKING:
     from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -93,7 +91,7 @@ class QPController:
 
     def init(
         self,
-        degrees_of_freedom: List[FreeVariable] = None,
+        degrees_of_freedom: List[DegreeOfFreedom] = None,
         equality_constraints: List[EqualityConstraint] = None,
         inequality_constraints: List[InequalityConstraint] = None,
         derivative_constraints: List[DerivativeInequalityConstraint] = None,
@@ -159,7 +157,7 @@ class QPController:
                 print(array)
 
     @profile
-    def get_cmd(self, symbol_manager: SymbolManager) -> np.ndarray:
+    def get_cmd(self, symbol_manager) -> np.ndarray:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         """

@@ -10,7 +10,6 @@ from giskardpy.model.trajectory import Trajectory
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.spatial_types.symbol_manager import symbol_manager
 from semantic_digital_twin.world_description.world_state import WorldState
 
 
