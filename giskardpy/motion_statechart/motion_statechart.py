@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import IntEnum
 
 import numpy as np
 import rustworkx as rx
@@ -20,7 +21,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(repr=False)
 class State(MutableMapping[MotionStatechartNode, float]):
     motion_statechart: MotionStatechart
     default_value: float
@@ -72,15 +73,24 @@ class State(MutableMapping[MotionStatechartNode, float]):
             data=self.data.copy(),
         )
 
+    def __str__(self) -> str:
+        return str({str(symbol.name): value for symbol, value in self.items()})
 
-@dataclass
+    def __repr__(self) -> str:
+        return str(self)
+
+
+class LifeCycleValues(IntEnum):
+    NOT_STARTED = 0
+    RUNNING = 1
+    PAUSED = 2
+    DONE = 3
+
+
+@dataclass(repr=False)
 class LifeCycleState(State):
-    NOT_STARTED: ClassVar[float] = 0.0
-    RUNNING: ClassVar[float] = 1.0
-    PAUSED: ClassVar[float] = 2.0
-    DONE: ClassVar[float] = 3.0
 
-    default_value: float = NOT_STARTED
+    default_value: float = LifeCycleValues.NOT_STARTED
     _compiled_updater: cas.CompiledFunction = field(init=False)
 
     def compile(self):
@@ -90,56 +100,56 @@ class LifeCycleState(State):
 
             not_started_transitions = cas.if_else(
                 condition=cas.is_trinary_true(node.start_condition),
-                if_result=cas.Expression(LifeCycleState.RUNNING),
-                else_result=cas.Expression(LifeCycleState.NOT_STARTED),
+                if_result=cas.Expression(LifeCycleValues.RUNNING),
+                else_result=cas.Expression(LifeCycleValues.NOT_STARTED),
             )
             running_transitions = cas.if_cases(
                 cases=[
                     (
                         cas.is_trinary_true(node.reset_condition),
-                        cas.Expression(LifeCycleState.NOT_STARTED),
+                        cas.Expression(LifeCycleValues.NOT_STARTED),
                     ),
                     (
                         cas.is_trinary_true(node.end_condition),
-                        cas.Expression(LifeCycleState.DONE),
+                        cas.Expression(LifeCycleValues.DONE),
                     ),
                     (
                         cas.is_trinary_true(node.pause_condition),
-                        cas.Expression(LifeCycleState.PAUSED),
+                        cas.Expression(LifeCycleValues.PAUSED),
                     ),
                 ],
-                else_result=cas.Expression(LifeCycleState.RUNNING),
+                else_result=cas.Expression(LifeCycleValues.RUNNING),
             )
             pause_transitions = cas.if_cases(
                 cases=[
                     (
                         cas.is_trinary_true(node.reset_condition),
-                        cas.Expression(LifeCycleState.NOT_STARTED),
+                        cas.Expression(LifeCycleValues.NOT_STARTED),
                     ),
                     (
                         cas.is_trinary_true(node.end_condition),
-                        cas.Expression(LifeCycleState.DONE),
+                        cas.Expression(LifeCycleValues.DONE),
                     ),
                     (
                         cas.is_trinary_false(node.pause_condition),
-                        cas.Expression(LifeCycleState.RUNNING),
+                        cas.Expression(LifeCycleValues.RUNNING),
                     ),
                 ],
-                else_result=cas.Expression(LifeCycleState.PAUSED),
+                else_result=cas.Expression(LifeCycleValues.PAUSED),
             )
             ended_transitions = cas.if_else(
                 condition=cas.is_trinary_true(node.reset_condition),
-                if_result=cas.Expression(LifeCycleState.NOT_STARTED),
-                else_result=cas.Expression(LifeCycleState.DONE),
+                if_result=cas.Expression(LifeCycleValues.NOT_STARTED),
+                else_result=cas.Expression(LifeCycleValues.DONE),
             )
 
             state_machine = cas.if_eq_cases(
                 a=state_symbol,
                 b_result_cases=[
-                    (LifeCycleState.NOT_STARTED, not_started_transitions),
-                    (LifeCycleState.RUNNING, running_transitions),
-                    (LifeCycleState.PAUSED, pause_transitions),
-                    (LifeCycleState.DONE, ended_transitions),
+                    (LifeCycleValues.NOT_STARTED, not_started_transitions),
+                    (LifeCycleValues.RUNNING, running_transitions),
+                    (LifeCycleValues.PAUSED, pause_transitions),
+                    (LifeCycleValues.DONE, ended_transitions),
                 ],
                 else_result=cas.Expression(state_symbol),
             )
@@ -153,8 +163,16 @@ class LifeCycleState(State):
     def update_state(self, observation_state: np.ndarray):
         self.data = self._compiled_updater(observation_state, self.data)
 
+    def __str__(self) -> str:
+        return str(
+            {
+                str(symbol.name): LifeCycleValues(value).name
+                for symbol, value in self.items()
+            }
+        )
 
-@dataclass
+
+@dataclass(repr=False)
 class ObservationState(State):
     TrinaryFalse: ClassVar[float] = float(cas.TrinaryFalse.to_np())
     TrinaryUnknown: ClassVar[float] = float(cas.TrinaryUnknown.to_np())
@@ -170,9 +188,9 @@ class ObservationState(State):
             state_f = cas.if_eq_cases(
                 a=node.life_cycle_symbol,
                 b_result_cases=[
-                    (int(LifeCycleState.RUNNING), node.observation_expression),
+                    (int(LifeCycleValues.RUNNING), node.observation_expression),
                     (
-                        int(LifeCycleState.NOT_STARTED),
+                        int(LifeCycleValues.NOT_STARTED),
                         cas.TrinaryUnknown,
                     ),
                 ],
@@ -260,7 +278,7 @@ class MotionStatechart:
             self.life_cycle_state.data, self.world.state.data
         )
         for payload_monitor in self.get_nodes_by_type(PayloadMonitor):
-            if self.life_cycle_state[payload_monitor] == LifeCycleState.RUNNING:
+            if self.life_cycle_state[payload_monitor] == LifeCycleValues.RUNNING:
                 self.observation_state[payload_monitor] = (
                     payload_monitor.compute_observation()
                 )

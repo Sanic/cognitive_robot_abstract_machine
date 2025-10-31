@@ -25,12 +25,12 @@ class Goal(MotionStatechartNode):
 
     def apply_goal_conditions_to_children(self):
         for node in self.nodes:
-            if isinstance(node, Goal):
-                node.apply_goal_conditions_to_children()
             self.apply_start_condition_to_node(node)
             self.apply_pause_condition_to_node(node)
             self.apply_end_condition_to_node(node)
             self.apply_reset_condition_to_node(node)
+            if isinstance(node, Goal):
+                node.apply_goal_conditions_to_children()
 
     def apply_start_condition_to_node(self, node: MotionStatechartNode):
         if cas.is_trinary_true_symbol(node.start_condition):
