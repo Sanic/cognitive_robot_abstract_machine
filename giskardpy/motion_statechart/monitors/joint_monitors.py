@@ -1,10 +1,9 @@
-from dataclasses import field
+from dataclasses import field, dataclass
 from typing import Dict
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection,
@@ -12,7 +11,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 
 
-@validated_dataclass
+@dataclass
 class JointGoalReached(MotionStatechartNode):
     goal_state: Dict[ActiveConnection1DOF, float] = field(kw_only=True)
     threshold: float = 0.01
@@ -33,7 +32,7 @@ class JointGoalReached(MotionStatechartNode):
         self.observation_expression = expression
 
 
-@validated_dataclass
+@dataclass
 class JointPositionAbove(MotionStatechartNode):
     connection: ActiveConnection = field(kw_only=True)
     threshold: float = field(kw_only=True)

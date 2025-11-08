@@ -1,5 +1,5 @@
 from collections import defaultdict
-from dataclasses import field
+from dataclasses import field, dataclass
 from typing import Dict, Optional, List, Tuple
 
 from line_profiler import profile
@@ -8,13 +8,11 @@ import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.collision_matrix_manager import CollisionViewRequest
-from giskardpy.motion_statechart.graph_node import Goal
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.graph_node import Goal, MotionStatechartNode
 from giskardpy.motion_statechart.tasks.task import (
-    WEIGHT_ABOVE_CA,
-    WEIGHT_COLLISION_AVOIDANCE,
     Task,
 )
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.world import World
@@ -22,7 +20,7 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class ExternalCA(Goal):
     name: Optional[str] = field(kw_only=True, default=None)
     name_prefix: Optional[str] = field(kw_only=True, default=None)
@@ -142,9 +140,9 @@ class ExternalCA(Goal):
 
         # weight = cas.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
-        weight = cas.Expression(data=WEIGHT_COLLISION_AVOIDANCE).safe_division(
-            cas.min(number_of_external_collisions, self.max_avoided_bodies)
-        )
+        weight = cas.Expression(
+            data=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE
+        ).safe_division(cas.min(number_of_external_collisions, self.max_avoided_bodies))
         distance_monitor = MotionStatechartNode(
             name=f"collision distance {self.name}", _plot=False
         )
@@ -188,7 +186,7 @@ class ExternalCA(Goal):
         )
 
 
-@validated_dataclass
+@dataclass
 class SelfCA(Goal):
     body_a: Body = field(kw_only=True)
     body_b: Body = field(kw_only=True)
@@ -256,9 +254,9 @@ class SelfCA(Goal):
             cas.max(0, upper_slack),
         )
 
-        weight = cas.Expression(data=WEIGHT_COLLISION_AVOIDANCE).safe_division(
-            cas.min(number_of_self_collisions, self.max_avoided_bodies)
-        )
+        weight = cas.Expression(
+            data=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE
+        ).safe_division(cas.min(number_of_self_collisions, self.max_avoided_bodies))
         distance_monitor = MotionStatechartNode(
             name=f"collision distance {self.name}", _plot=False
         )
@@ -315,7 +313,7 @@ class CollisionAvoidanceHint(Goal):
         root_link: Optional[PrefixedName] = None,
         max_threshold: float = 0.05,
         spring_threshold: Optional[float] = None,
-        weight: float = WEIGHT_ABOVE_CA,
+        weight: float = DefaultWeights.WEIGHT_ABOVE_CA,
         name: Optional[str] = None,
     ):
         """
@@ -425,7 +423,7 @@ class CollisionAvoidanceHint(Goal):
 # avoid only something
 
 
-@validated_dataclass
+@dataclass
 class CollisionAvoidance(Goal):
     collision_entries: List[CollisionViewRequest] = field(default_factory=list)
 

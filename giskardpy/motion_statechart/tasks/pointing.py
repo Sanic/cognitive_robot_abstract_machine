@@ -2,13 +2,12 @@ from __future__ import division
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, Task
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class Pointing(Task):
     tip_link: Body
     goal_point: cas.Point3
@@ -72,7 +71,7 @@ class Pointing(Task):
         )
 
 
-@validated_dataclass
+@dataclass
 class PointingCone(Task):
     tip_link: Body
     goal_point: cas.Point3

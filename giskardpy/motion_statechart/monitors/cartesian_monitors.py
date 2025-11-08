@@ -1,13 +1,14 @@
+from dataclasses import dataclass
 from typing import List
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class InWorldSpace(MotionStatechartNode):
     tip_link: Body
     xyz: List[float]
@@ -39,7 +40,7 @@ class InWorldSpace(MotionStatechartNode):
         )
 
 
-@validated_dataclass
+@dataclass
 class PoseReached(MotionStatechartNode):
     root_link: Body
     tip_link: Body
@@ -81,7 +82,7 @@ class PoseReached(MotionStatechartNode):
         )
 
 
-@validated_dataclass
+@dataclass
 class PositionReached(MotionStatechartNode):
     root_link: Body
     tip_link: Body
@@ -108,7 +109,7 @@ class PositionReached(MotionStatechartNode):
         self.observation_expression = distance_to_goal < self.threshold
 
 
-@validated_dataclass
+@dataclass
 class OrientationReached(MotionStatechartNode):
     root_link: Body
     tip_link: Body
@@ -135,7 +136,7 @@ class OrientationReached(MotionStatechartNode):
         self.observation_expression = cas.abs(rotation_error) < self.threshold
 
 
-@validated_dataclass
+@dataclass
 class PointingAt(MotionStatechartNode):
     tip_link: Body
     goal_point: cas.Point3
@@ -167,7 +168,7 @@ class PointingAt(MotionStatechartNode):
         self.observation_expression = expr
 
 
-@validated_dataclass
+@dataclass
 class VectorsAligned(MotionStatechartNode):
     root_link: Body
     tip_link: Body
@@ -195,7 +196,7 @@ class VectorsAligned(MotionStatechartNode):
         self.observation_expression = expr
 
 
-@validated_dataclass
+@dataclass
 class DistanceToLine(MotionStatechartNode):
     root_link: Body
     tip_link: Body

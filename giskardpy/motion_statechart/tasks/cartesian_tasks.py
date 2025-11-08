@@ -1,18 +1,18 @@
-from dataclasses import field
+from dataclasses import field, dataclass
 from typing import Optional
 
 import numpy as np
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.tasks.task import Task, WEIGHT_ABOVE_CA
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class CartesianPosition(Task):
     default_reference_velocity = 0.2
     root_link: Body = field(kw_only=True)
@@ -20,7 +20,7 @@ class CartesianPosition(Task):
     goal_point: cas.Point3 = field(kw_only=True)
     threshold: float = 0.01
     reference_velocity: Optional[float] = None
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
     absolute: bool = False
 
     def __post_init__(self):
@@ -90,7 +90,7 @@ class CartesianPosition(Task):
         self.observation_expression = distance_to_goal < self.threshold
 
 
-@validated_dataclass
+@dataclass
 class CartesianPositionStraight(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
@@ -98,7 +98,7 @@ class CartesianPositionStraight(Task):
     threshold: float = 0.01
     reference_velocity: Optional[float] = CartesianPosition.default_reference_velocity
     absolute: bool = False
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         """
@@ -153,7 +153,11 @@ class CartesianPositionStraight(Task):
         self.add_equality_constraint_vector(
             reference_velocities=[self.reference_velocity] * 3,
             equality_bounds=[dist, 0, 0],
-            weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
+            weights=[
+                DefaultWeights.WEIGHT_ABOVE_CA,
+                DefaultWeights.WEIGHT_ABOVE_CA * 2,
+                DefaultWeights.WEIGHT_ABOVE_CA * 2,
+            ],
             task_expression=expr_p[:3],
             names=["line/x", "line/y", "line/z"],
         )
@@ -166,7 +170,7 @@ class CartesianPositionStraight(Task):
         self.observation_expression = dist < self.threshold
 
 
-@validated_dataclass
+@dataclass
 class CartesianOrientation(Task):
     default_reference_velocity = 0.2
     root_link: Body = field(kw_only=True)
@@ -174,7 +178,7 @@ class CartesianOrientation(Task):
     goal_orientation: cas.RotationMatrix = field(kw_only=True)
     threshold: float = 0.01
     reference_velocity: Optional[float] = None
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
     absolute: bool = False
     point_of_debug_matrix: Optional[cas.Point3] = None
 
@@ -234,7 +238,7 @@ class CartesianOrientation(Task):
         self.observation_expression = cas.abs(rotation_error) < self.threshold
 
 
-@validated_dataclass
+@dataclass
 class CartesianPose(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
@@ -247,7 +251,7 @@ class CartesianPose(Task):
     )
     threshold: float = field(default=0.01)
     absolute: bool = False
-    weight: float = field(default=WEIGHT_ABOVE_CA)
+    weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA)
 
     def __post_init__(self):
         """
@@ -261,7 +265,7 @@ class CartesianPose(Task):
         :param absolute: if False, the goal is updated when start_condition turns True.
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
-        :param weight: default WEIGHT_ABOVE_CA
+        :param weight: default DefaultWeights.WEIGHT_ABOVE_CA
         """
         self.goal_ref = self.goal_pose.reference_frame
         goal_orientation = self.goal_pose.to_rotation_matrix()
@@ -321,12 +325,12 @@ class CartesianPose(Task):
         )
 
 
-@validated_dataclass
+@dataclass
 class CartesianPositionVelocityLimit(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
     max_linear_velocity: float = 0.2
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         """
@@ -336,7 +340,7 @@ class CartesianPositionVelocityLimit(Task):
         :param tip_link: tip link of the kinematic chain
         :param max_linear_velocity: m/s
         :param max_angular_velocity: rad/s
-        :param weight: default WEIGHT_ABOVE_CA
+        :param weight: default DefaultWeights.WEIGHT_ABOVE_CA
         :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
         r_P_c = god_map.world.compose_forward_kinematics_expression(
@@ -349,11 +353,11 @@ class CartesianPositionVelocityLimit(Task):
         )
 
 
-@validated_dataclass
+@dataclass
 class CartesianRotationVelocityLimit(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
     max_velocity: Optional[float] = None
 
     def __post_init__(self):
@@ -373,13 +377,13 @@ class CartesianRotationVelocityLimit(Task):
         )
 
 
-@validated_dataclass
+@dataclass
 class CartesianVelocityLimit(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
     max_linear_velocity: float = 0.1
     max_angular_velocity: float = 0.5
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         """
@@ -389,7 +393,7 @@ class CartesianVelocityLimit(Task):
         :param tip_link: tip link of the kinematic chain
         :param max_linear_velocity: m/s
         :param max_angular_velocity: rad/s
-        :param weight: default WEIGHT_ABOVE_CA
+        :param weight: default DefaultWeights.WEIGHT_ABOVE_CA
         """
         r_T_c = god_map.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
@@ -408,14 +412,14 @@ class CartesianVelocityLimit(Task):
         )
 
 
-@validated_dataclass
+@dataclass
 class CartesianPositionVelocityTarget(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
     x_vel: float = field(kw_only=True)
     y_vel: float = field(kw_only=True)
     z_vel: float = field(kw_only=True)
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         """
@@ -427,7 +431,7 @@ class CartesianPositionVelocityTarget(Task):
         :param tip_group: if the tip_link is not unique, use this to say to which group the link belongs
         :param max_linear_velocity: m/s
         :param max_angular_velocity: rad/s
-        :param weight: default WEIGHT_ABOVE_CA
+        :param weight: default DefaultWeights.WEIGHT_ABOVE_CA
         :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
         r_P_c = god_map.world.compose_forward_kinematics_expression(
@@ -467,13 +471,13 @@ class CartesianPositionVelocityTarget(Task):
         )
 
 
-@validated_dataclass
+@dataclass
 class JustinTorsoLimitCart(Task):
     root_link: Body = field(kw_only=True)
     tip_link: Body = field(kw_only=True)
     forward_distance: float = field(kw_only=True)
     backward_distance: float = field(kw_only=True)
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         torso_root_T_torso_tip = god_map.world.compose_forward_kinematics_expression(

@@ -11,7 +11,6 @@ from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world import World
@@ -124,7 +123,7 @@ class JointPositionList(Task):
         return cas.limit(velocity, ll_vel, ul_vel)
 
 
-@validated_dataclass
+@dataclass
 class MirrorJointPosition(Task):
     mapping: Dict[Union[PrefixedName, str], str] = field(default_factory=lambda: dict)
     threshold: float = 0.01
@@ -181,7 +180,7 @@ class MirrorJointPosition(Task):
         self.observation_expression = joint_monitor.observation_expression
 
 
-@validated_dataclass
+@dataclass
 class JointPositionLimitList(Task):
     lower_upper_limits: Dict[Union[PrefixedName, str], Tuple[float, float]] = field(
         kw_only=True
@@ -257,7 +256,7 @@ class JointPositionLimitList(Task):
             )
 
 
-@validated_dataclass
+@dataclass
 class JustinTorsoLimit(Task):
     connection: ActiveConnection = field(kw_only=True)
     lower_limit: Optional[float] = None
@@ -303,7 +302,7 @@ class JustinTorsoLimit(Task):
         )
 
 
-@validated_dataclass
+@dataclass
 class JointVelocityLimit(Task):
     joints: List[ActiveConnection1DOF] = field(kw_only=True)
     weight: float = DefaultWeights.WEIGHT_BELOW_CA
@@ -347,7 +346,7 @@ class JointVelocityLimit(Task):
                 )
 
 
-@validated_dataclass
+@dataclass
 class JointVelocity(Task):
     connections: List[ActiveConnection1DOF] = field(kw_only=True)
     vel_goal: float = field(kw_only=True)
@@ -380,7 +379,7 @@ class JointVelocity(Task):
             )
 
 
-@validated_dataclass
+@dataclass
 class UnlimitedJointGoal(Task):
     connection: ActiveConnection1DOF = field(kw_only=True)
     goal_position: float = field(kw_only=True)
@@ -395,7 +394,7 @@ class UnlimitedJointGoal(Task):
         )
 
 
-@validated_dataclass
+@dataclass
 class AvoidJointLimits(Task):
     """
     Calls AvoidSingleJointLimits for each joint in joint_list

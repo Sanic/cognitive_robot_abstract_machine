@@ -1,21 +1,22 @@
 from __future__ import division
 
+from dataclasses import dataclass
 from typing import Optional
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class DiffDriveTangentialToPoint(Task):
     goal_point: cas.Point3
     forward: Optional[cas.Vector3] = None
     group_name: Optional[cas.Vector3] = None
-    weight: bool = WEIGHT_ABOVE_CA
+    weight: bool = DefaultWeights.WEIGHT_ABOVE_CA
     drive: bool = False
 
     def __post_init__(self):
@@ -78,14 +79,14 @@ class DiffDriveTangentialToPoint(Task):
             )
 
 
-@validated_dataclass
+@dataclass
 class KeepHandInWorkspace(Task):
     tip_link: Body
     base_footprint: Optional[Body] = None
     map_frame: Optional[Body] = None
     pointing_axis: Optional[cas.Vector3] = None
     max_velocity: float = 0.3
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         if self.base_footprint is None:
@@ -102,7 +103,7 @@ class KeepHandInWorkspace(Task):
             self.map_V_pointing_axis = cas.Vector3(1, 0, 0)
             self.map_V_pointing_axis.reference_frame = self.map_frame
 
-        weight = WEIGHT_ABOVE_CA
+        weight = DefaultWeights.WEIGHT_ABOVE_CA
         base_footprint_V_pointing_axis = cas.Vector3(self.map_V_pointing_axis)
         map_T_base_footprint = god_map.world.compose_forward_kinematics_expression(
             self.map_frame, self.base_footprint

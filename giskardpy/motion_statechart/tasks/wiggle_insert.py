@@ -1,16 +1,17 @@
 import random
+from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.tasks.task import Task, WEIGHT_ABOVE_CA
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class WiggleInsert(Task):
     root_link: Body
     tip_link: Body
@@ -25,7 +26,7 @@ class WiggleInsert(Task):
     angular_momentum_factor: float = 0.9
     center_pull_strength_angle: float = 0.1
     center_pull_strength_vector: float = 0.25
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         """
@@ -145,7 +146,7 @@ class WiggleInsert(Task):
         )
 
         dist = r_P_c.euclidean_distance(r_P_g)
-        end = dist <= threshold
+        end = dist <= self.threshold
 
         self.observation_expression = end
 

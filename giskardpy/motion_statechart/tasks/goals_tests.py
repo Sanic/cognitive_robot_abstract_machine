@@ -1,13 +1,14 @@
+from dataclasses import dataclass
+
 import numpy as np
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.tasks.task import Task
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
-@validated_dataclass
+@dataclass
 class DebugGoal(Task):
     def __post_init__(self):
         q = cas.Quaternion(reference_frame=god_map.world.root)
@@ -39,7 +40,7 @@ class DebugGoal(Task):
         god_map.debug_expression_manager.add_debug_expression("f", 23)
 
 
-@validated_dataclass
+@dataclass
 class CannotResolveSymbol(Task):
     joint_name: str
 

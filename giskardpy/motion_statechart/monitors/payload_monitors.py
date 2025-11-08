@@ -7,10 +7,9 @@ from line_profiler import profile
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.motion_statechart import ObservationState
-from giskardpy.utils.decorators import validated_dataclass
 
 
-@validated_dataclass
+@dataclass
 class CheckMaxTrajectoryLength(MotionStatechartNode):
     length: float
 
@@ -31,7 +30,7 @@ class Print(MotionStatechartNode):
         return ObservationState.TrinaryTrue
 
 
-@validated_dataclass
+@dataclass
 class Sleep(MotionStatechartNode):
     seconds: float
     start_time: Optional[float] = field(default=None, init=False)
@@ -45,7 +44,7 @@ class Sleep(MotionStatechartNode):
         return god_map.time - self.start_time >= self.seconds
 
 
-@validated_dataclass
+@dataclass
 class CollisionMatrixUpdater(MotionStatechartNode):
     new_collision_matrix: Dict[Tuple[str, str], float]
 
@@ -56,7 +55,7 @@ class CollisionMatrixUpdater(MotionStatechartNode):
         self.state = ObservationState.true
 
 
-@validated_dataclass
+@dataclass
 class PayloadAlternator(MotionStatechartNode):
     mod: int = 2
 
@@ -64,7 +63,7 @@ class PayloadAlternator(MotionStatechartNode):
         self.state = np.floor(god_map.time) % self.mod == 0
 
 
-@validated_dataclass
+@dataclass
 class Counter(MotionStatechartNode):
     number: int
     counter: int = field(default=0, init=False)
@@ -79,7 +78,7 @@ class Counter(MotionStatechartNode):
         self.counter += 1
 
 
-@validated_dataclass
+@dataclass
 class Pulse(MotionStatechartNode):
     after_ticks: int
     true_for_ticks: int = 1

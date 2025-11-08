@@ -1,25 +1,26 @@
 from __future__ import division
 
+from dataclasses import dataclass
+
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.graph_node import Goal
-from giskardpy.motion_statechart.monitors.monitors import TrueMonitor, CancelMotion
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.graph_node import Goal, CancelMotion
+from giskardpy.motion_statechart.monitors.monitors import TrueMonitor
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class GraspSequence(Goal):
     tip_link: Body
     root_link: Body
     gripper_joint: PrefixedName
     goal_pose: cas.TransformationMatrix
     max_velocity: float = 100
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         """
@@ -69,14 +70,14 @@ class GraspSequence(Goal):
         self.observation_expression = lift.observation_state_symbol
 
 
-@validated_dataclass
+@dataclass
 class Cutting(Goal):
     tip_link: Body
     root_link: Body
     depth: float
     right_shift: float
     max_velocity: float = 100
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         schnibble_down_pose = god_map.world.compute_forward_kinematics(

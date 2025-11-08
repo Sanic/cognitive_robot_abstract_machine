@@ -1,15 +1,17 @@
+from dataclasses import dataclass
+
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
+from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
     CartesianOrientation,
 )
-from giskardpy.motion_statechart.tasks.task import Task, WEIGHT_BELOW_CA
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class SpiralMixing(Task):
 
     end_time: float
@@ -20,7 +22,7 @@ class SpiralMixing(Task):
     radial_increment: float
     angle_increment: float
     upward_increment: float
-    weight: float = WEIGHT_BELOW_CA
+    weight: float = DefaultWeights.WEIGHT_BELOW_CA
 
     def __post_init__(self):
 

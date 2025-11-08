@@ -1,12 +1,14 @@
+from dataclasses import dataclass
+
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class AlignPlanes(Task):
     root_link: Body
     tip_link: Body
@@ -14,7 +16,7 @@ class AlignPlanes(Task):
     tip_normal: cas.Vector3
     threshold: float = 0.01
     reference_velocity: float = 0.5
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         """

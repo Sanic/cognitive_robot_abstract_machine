@@ -1,18 +1,19 @@
 from __future__ import division
 
+from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
+from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class InsertCylinder(Goal):
     cylinder_name: Body
     hole_point: cas.Point3
@@ -39,7 +40,7 @@ class InsertCylinder(Goal):
             target_frame=self.root, spatial_object=self.up
         )
 
-        self.weight = WEIGHT_ABOVE_CA
+        self.weight = DefaultWeights.WEIGHT_ABOVE_CA
 
         root_P_hole = self.root_P_hole
         root_V_up = self.root_V_up

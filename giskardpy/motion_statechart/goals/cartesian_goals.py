@@ -1,9 +1,12 @@
 from __future__ import division
 
+from dataclasses import dataclass
+
 import numpy as np
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
+from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
@@ -11,20 +14,19 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionStraight,
     CartesianPose,
 )
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class DiffDriveBaseGoal(Goal):
     root_link: Body
     tip_link: Body
     goal_pose: cas.TransformationMatrix
     max_linear_velocity: float = 0.1
     max_angular_velocity: float = 0.5
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
     pointing_axis = None
     always_forward: bool = False
 
@@ -193,14 +195,14 @@ class DiffDriveBaseGoal(Goal):
         )
 
 
-@validated_dataclass
+@dataclass
 class CartesianPoseStraight(Goal):
     root_link: Body
     tip_link: Body
     goal_pose: cas.TransformationMatrix
     reference_linear_velocity: float = CartesianPosition.default_reference_velocity
     reference_angular_velocity: float = CartesianOrientation.default_reference_velocity
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
     absolute: bool = False
 
     def __post_init__(self):
@@ -236,7 +238,7 @@ class CartesianPoseStraight(Goal):
         self.observation_expression = cas.logic_and(*obs_expressions)
 
 
-@validated_dataclass
+@dataclass
 class RelativePositionSequence(Goal):
     goal1: cas.TransformationMatrix
     goal2: cas.TransformationMatrix

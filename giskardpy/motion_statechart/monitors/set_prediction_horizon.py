@@ -1,13 +1,13 @@
+from dataclasses import dataclass
 from typing import Union
 
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.qp.solvers.qp_solver_ids import SupportedQPSolver
-from giskardpy.utils.decorators import validated_dataclass
 
 
-@validated_dataclass
+@dataclass
 class SetPredictionHorizon(MotionStatechartNode):
     prediction_horizon: int
 
@@ -25,7 +25,7 @@ class SetPredictionHorizon(MotionStatechartNode):
         self.state = True
 
 
-@validated_dataclass
+@dataclass
 class SetQPSolver(MotionStatechartNode):
     qp_solver_id: Union[SupportedQPSolver, int]
 

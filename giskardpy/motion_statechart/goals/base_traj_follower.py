@@ -1,27 +1,27 @@
 from __future__ import division
 
+from dataclasses import field, dataclass
+
 from line_profiler import profile
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
+from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.tasks.task import (
-    WEIGHT_ABOVE_CA,
-    WEIGHT_BELOW_CA,
     Task,
 )
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import Connection
 
 
-@validated_dataclass
+@dataclass
 class BaseTrajFollower(Goal):
-    connection: Connection
+    connection: Connection = field(kw_only=True)
     track_only_velocity: bool = False
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         self.joint: OmniDrive = self.connection
@@ -143,7 +143,7 @@ class BaseTrajFollower(Goal):
             else:
                 errors_x.append(map_P_vel[0])
                 errors_y.append(map_P_vel[1])
-        weight_vel = WEIGHT_ABOVE_CA
+        weight_vel = DefaultWeights.WEIGHT_ABOVE_CA
         lba_x = errors_x
         uba_x = errors_x
         lba_y = errors_y
@@ -193,7 +193,7 @@ class BaseTrajFollower(Goal):
         self.task.add_velocity_constraint(
             lower_velocity_limit=errors,
             upper_velocity_limit=errors,
-            weight=WEIGHT_BELOW_CA,
+            weight=DefaultWeights.WEIGHT_BELOW_CA,
             task_expression=self.joint.yaw.variables.position,
             velocity_limit=0.5,
             name="/rot",

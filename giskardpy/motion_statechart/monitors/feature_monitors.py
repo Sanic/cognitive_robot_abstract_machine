@@ -1,14 +1,13 @@
-from dataclasses import field
+from dataclasses import field, dataclass
 from typing import Union
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class FeatureMonitor(MotionStatechartNode):
     tip_link: Body
     root_link: Body
@@ -37,7 +36,7 @@ class FeatureMonitor(MotionStatechartNode):
             self.root_V_reference_feature = root_reference_feature
 
 
-@validated_dataclass
+@dataclass
 class HeightMonitor(FeatureMonitor):
     reference_point: cas.Point3
     tip_point: cas.Point3
@@ -59,7 +58,7 @@ class HeightMonitor(FeatureMonitor):
         self.observation_expression = expr
 
 
-@validated_dataclass
+@dataclass
 class PerpendicularMonitor(FeatureMonitor):
     reference_normal: cas.Vector3
     tip_normal: cas.Vector3
@@ -74,7 +73,7 @@ class PerpendicularMonitor(FeatureMonitor):
         self.observation_expression = cas.abs(expr) <= self.threshold
 
 
-@validated_dataclass
+@dataclass
 class DistanceMonitor(FeatureMonitor):
     reference_point: cas.Point3
     tip_point: cas.Point3
@@ -95,7 +94,7 @@ class DistanceMonitor(FeatureMonitor):
         )
 
 
-@validated_dataclass
+@dataclass
 class AngleMonitor(FeatureMonitor):
     reference_vector: cas.Vector3
     tip_vector: cas.Vector3

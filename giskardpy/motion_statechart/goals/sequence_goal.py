@@ -1,14 +1,14 @@
 from __future__ import division
 
+from dataclasses import dataclass
 from typing import Union, List
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.tasks.task import Task
-from giskardpy.utils.decorators import validated_dataclass
 
 
-@validated_dataclass
+@dataclass
 class SimpleSequenceGoal(Goal):
     sequence: List[List[Union[Goal, Task]]]
     """

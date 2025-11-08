@@ -6,14 +6,14 @@ import numpy as np
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
+from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
-from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, Task
-from giskardpy.utils.decorators import validated_dataclass
+from giskardpy.motion_statechart.tasks.task import Task
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class AlignToPushDoor(Goal):
     root_link: Body
     tip_link: Body
@@ -22,7 +22,7 @@ class AlignToPushDoor(Goal):
     tip_gripper_axis: cas.Vector3
     reference_linear_velocity: float = 0.1
     reference_angular_velocity: float = 0.5
-    weight: float = WEIGHT_BELOW_CA
+    weight: float = DefaultWeights.WEIGHT_BELOW_CA
 
     def __post_init__(self):
         """

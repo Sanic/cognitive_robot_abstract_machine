@@ -1,18 +1,18 @@
 from __future__ import division
 
+from dataclasses import dataclass
 from typing import Optional
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.utils.decorators import validated_dataclass
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@validated_dataclass
+@dataclass
 class Open(Goal):
     """
     Open a container in an environment.
@@ -30,7 +30,7 @@ class Open(Goal):
     goal_joint_state: Optional[float] = None
     """goal state for the container. default is maximum joint state."""
 
-    weight: float = WEIGHT_ABOVE_CA
+    weight: float = DefaultWeights.WEIGHT_ABOVE_CA
 
     def __post_init__(self):
         self.connection = self.environment_link.get_first_parent_connection_of_type(
@@ -66,7 +66,7 @@ class Open(Goal):
         )
 
 
-@validated_dataclass
+@dataclass
 class Close(Open):
     """
     Same as Open, but will use minimum value as default for goal_joint_state
