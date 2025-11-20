@@ -456,8 +456,12 @@ class CollisionAvoidance(Goal):
         robot: AbstractRobot
         # thresholds = god_map.collision_scene.matrix_manager.external_thresholds
         for robot in context.world.get_semantic_annotations_by_type(AbstractRobot):
-            for connection in robot.controlled_connections.union({robot.drive}):
-                if not connection or connection.frozen_for_collision_avoidance:
+            if robot.drive:
+                connection_list = robot.controlled_connections.union({robot.drive})
+            else:
+                connection_list = robot.controlled_connections
+            for connection in connection_list:
+                if connection.frozen_for_collision_avoidance:
                     continue
                 bodies = context.world.get_direct_child_bodies_with_collision(
                     connection
