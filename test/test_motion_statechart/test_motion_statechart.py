@@ -4,10 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from trimesh.geometry import vector_angle
-
 from giskardpy.executor import Executor
 from giskardpy.model.collision_matrix_manager import CollisionRequest
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
@@ -23,12 +20,14 @@ from giskardpy.motion_statechart.exceptions import (
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     CollisionAvoidance,
 )
-from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.goals.open_close import Open, Close
+from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
     CancelMotion,
 )
 from giskardpy.motion_statechart.graph_node import ThreadPayloadMonitor
+from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
@@ -38,6 +37,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     Print,
     Pulse,
     CountSeconds,
+    CountTicks,
 )
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -57,10 +57,19 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ConstFalseNode,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.utils.math import angle_between_vector
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     KinematicStructureEntityKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.factories import (
+    DoorFactory,
+    SemanticPositionDescription,
+    HandleFactory,
+    HorizontalSemanticDirection,
+    VerticalSemanticDirection,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from semantic_digital_twin.spatial_types import TransformationMatrix
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -74,8 +83,6 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body
-
-from giskardpy.utils.math import angle_between_vector
 
 
 def test_condition_to_str():
@@ -1379,6 +1386,17 @@ def test_counting():
     assert np.isclose(actual, seconds * 2, rtol=0.01)
 
 
+def test_count_ticks():
+    msc = MotionStatechart()
+    msc.add_node(counter := CountTicks(ticks=3))
+    msc.add_node(EndMotion.when_true(counter))
+    kin_sim = Executor(world=World())
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+    # ending tacks 2 ticks, one to turn EndMotion to Running and one more to turn it to true
+    assert kin_sim.control_cycles == 3 + 2
+
+
 def test_InvalidConditionError():
     msc = MotionStatechart()
     node = ConstTrueNode()
@@ -1465,3 +1483,123 @@ class TestEndMotion:
             kin_sim.tick_until_end()
         msc.draw("muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+
+
+class TestParallel:
+    def test_parallel(self):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                parallel := Parallel([CountTicks(ticks=3), CountTicks(ticks=5)]),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        # 5 (longest ticker) + 1 (for parallel to turn True) + 2 (for end to trigger)
+        assert kin_sim.control_cycles == 8
+
+
+class TestOpenClose:
+    def test_open(self, pr2_world):
+        factory = DoorFactory(
+            name=PrefixedName("door"),
+            handle_factory=HandleFactory(name=PrefixedName("handle")),
+            semantic_position=SemanticPositionDescription(
+                horizontal_direction_chain=[
+                    HorizontalSemanticDirection.RIGHT,
+                    HorizontalSemanticDirection.FULLY_CENTER,
+                ],
+                vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
+            ),
+        )
+        door_world = factory.create()
+        with pr2_world.modify_world():
+            lower_limits = DerivativeMap()
+            lower_limits.position = -np.pi / 2
+            lower_limits.velocity = -1
+            upper_limits = DerivativeMap()
+            upper_limits.position = np.pi / 2
+            upper_limits.velocity = 1
+            dof = DegreeOfFreedom(
+                lower_limits=lower_limits,
+                upper_limits=upper_limits,
+                name=PrefixedName("hinge"),
+            )
+            pr2_world.add_degree_of_freedom(dof)
+            root_T_door = RevoluteConnection(
+                dof_name=dof.name,
+                parent=pr2_world.root,
+                child=door_world.root,
+                axis=-cas.Vector3.Z(),
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                    x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world.root
+                ),
+            )
+            pr2_world.merge_world(door_world, root_connection=root_T_door)
+
+        r_tip = pr2_world.get_body_by_name("r_gripper_tool_frame")
+        handle = pr2_world.get_semantic_annotations_by_type(Handle)[0].body
+        open_goal = 1
+        close_goal = -1
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                Sequence(
+                    [
+                        CartesianPose(
+                            root_link=pr2_world.root,
+                            tip_link=r_tip,
+                            goal_pose=TransformationMatrix.from_xyz_rpy(
+                                yaw=np.pi, reference_frame=handle
+                            ),
+                        ),
+                        Parallel(
+                            [
+                                Open(
+                                    tip_link=r_tip,
+                                    environment_link=handle,
+                                    goal_joint_state=open_goal,
+                                ),
+                                opened := JointPositionReached(
+                                    connection=root_T_door,
+                                    position=open_goal,
+                                    name="opened",
+                                ),
+                            ]
+                        ),
+                        Parallel(
+                            [
+                                Close(
+                                    tip_link=r_tip,
+                                    environment_link=handle,
+                                    goal_joint_state=close_goal,
+                                ),
+                                closed := JointPositionReached(
+                                    connection=root_T_door,
+                                    position=close_goal,
+                                    name="closed",
+                                ),
+                            ]
+                        ),
+                    ]
+                ),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(msc.nodes[0]))
+
+        kin_sim = Executor(
+            world=pr2_world,
+            controller_config=QPControllerConfig.create_default_with_50hz(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        msc.draw("muh.pdf")
+
+        assert opened.observation_state == ObservationStateValues.TRUE
+        assert closed.observation_state == ObservationStateValues.TRUE

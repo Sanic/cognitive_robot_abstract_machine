@@ -665,6 +665,10 @@ class Goal(MotionStatechartNode):
         node.parent_node = self
         self.motion_statechart.add_node(node)
 
+    def add_nodes(self, nodes: List[MotionStatechartNode]) -> None:
+        for node in nodes:
+            self.add_node(node)
+
     def _apply_goal_conditions_to_children(self) -> None:
         """
         This method is called after expand() to link the conditions of this goal to its children.

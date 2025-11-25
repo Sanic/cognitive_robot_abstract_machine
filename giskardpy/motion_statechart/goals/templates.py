@@ -9,7 +9,10 @@ from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     NodeArtifacts,
 )
+from giskardpy.utils.utils import JsonSerializableEnum
 from typing_extensions import Optional
+
+from semantic_digital_twin.spatial_types.spatial_types import trinary_logic_and
 
 
 @dataclass(repr=False, eq=False)
@@ -32,3 +35,24 @@ class Sequence(Goal):
 
     def build(self, context: BuildContext) -> NodeArtifacts:
         return NodeArtifacts(observation=self.nodes[-1].observation_variable)
+
+
+@dataclass(repr=False, eq=False)
+class Parallel(Goal):
+    """
+    Takes a list of nodes and executes them in parallel.
+    This nodes' observation state turns True when all nodes are True.
+    """
+
+    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
+
+    def expand(self, context: BuildContext) -> None:
+        for node in self.nodes:
+            self.add_node(node)
+
+    def build(self, context: BuildContext) -> NodeArtifacts:
+        return NodeArtifacts(
+            observation=trinary_logic_and(
+                *[node.observation_variable for node in self.nodes]
+            )
+        )

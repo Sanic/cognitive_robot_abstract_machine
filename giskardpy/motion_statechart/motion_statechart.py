@@ -457,9 +457,9 @@ class MotionStatechart(SubclassJSONSerializer):
         self, node: MotionStatechartNode, context: BuildContext
     ):
         if isinstance(node, Goal):
-            node.build(context=context)
             for child_node in node.nodes:
                 self._build_and_apply_artifacts(child_node, context=context)
+            node.build(context=context)
         artifacts = node.build(context=context)
         node._constraint_collection = artifacts.constraints
         node._constraint_collection.link_to_motion_statechart_node(node)
