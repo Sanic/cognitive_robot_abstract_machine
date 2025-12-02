@@ -1,10 +1,12 @@
 import logging
 import os
 import traceback
+import uuid
 from dataclasses import is_dataclass
 
 import pytest
 import sqlalchemy
+from sqlalchemy import JSON
 from sqlalchemy.orm import Session, configure_mappers
 
 import krrood.entity_query_language.orm.model

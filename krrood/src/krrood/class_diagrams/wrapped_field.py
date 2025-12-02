@@ -178,7 +178,7 @@ class WrappedField:
 
     @cached_property
     def is_enum(self) -> bool:
-        if self.is_container:
+        if self.is_container or not inspect.isclass(self.resolved_type):
             return False
         if self.is_optional:
             return issubclass(self.contained_type, enum.Enum)
