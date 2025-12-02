@@ -722,9 +722,6 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
     _selected_variables: List[CanBehaveLikeAVariable[T]] = field(default_factory=list)
     _results_mapping: List[ResultMapping] = field(init=False, default_factory=list)
     _order_by: Optional[OrderByParams] = field(default=None, init=False)
-    _seen_results: SeenSet[Dict[int, HashedValue]] = field(
-        init=False, default_factory=SeenSet
-    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -776,20 +773,21 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         :param on: The variables to be used for distinctness.
         :return: This query object descriptor.
         """
+        on_ids = tuple([v._var_._id_ for v in on]) if on else tuple()
+        seen_results = SeenSet(keys=on_ids)
 
         def get_distinct_results(
             results_gen: Iterable[Dict[int, HashedValue]],
         ) -> Iterable[Dict[int, HashedValue]]:
-            on_ids = [v._var_._id_ for v in on] if on else []
             for res in results_gen:
                 bindings = (
                     res if not on else {k: v for k, v in res.items() if k in on_ids}
                 )
                 bindings = {k: v.value for k, v in bindings.items()}
-                if self._seen_results.check(bindings):
+                if seen_results.check(bindings):
                     continue
                 yield res
-                self._seen_results.add(bindings)
+                seen_results.add(bindings)
 
         self._results_mapping.append(get_distinct_results)
         return self
