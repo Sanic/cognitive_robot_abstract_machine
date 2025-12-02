@@ -11,17 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          path: "opt/ros/cognitive_robot_abstract_machine"
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: 'false'
+          submodules: 'recursive'
 
       - name: Install dependencies
         run: |
-          cd /opt/ros/cognitive_robot_abstract_machine
+          cd cognitive_robot_abstract_machine
           source /opt/ros/cram-venv/bin/activate
-          git submodule init
-          git submodule update
           poetry install
 
       - name: Run tests
