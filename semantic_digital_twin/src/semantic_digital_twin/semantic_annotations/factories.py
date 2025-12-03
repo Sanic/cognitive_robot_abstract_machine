@@ -8,13 +8,13 @@ from operator import or_
 
 from krrood.entity_query_language.entity import (
     let,
-    an,
     entity,
     not_,
     in_,
     From,
     for_all,
 )
+from krrood.entity_query_language.quantify_entity import an
 from numpy import ndarray
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_simple_event,

@@ -23,7 +23,7 @@ def test_position(session, database):
     session.add(p1dao)
     session.commit()
 
-    # test the content of the database
+    # krrood_test the content of the database
     queried_p1 = session.scalars(select(PositionDAO)).one()
 
     assert p1.x == queried_p1.x
@@ -46,7 +46,7 @@ def test_position4d(session, database):
     session.add(p4d_dao)
     session.commit()
 
-    # test the content of the database
+    # krrood_test the content of the database
     # Note: Polymorphic queries don't work correctly yet, so we query directly for Position4DDAO objects
     queried_p4d = session.scalars(select(PositionDAO)).one()
 
@@ -71,7 +71,7 @@ def test_orientation(session, database):
     session.add(o1dao)
     session.commit()
 
-    # test the content of the database
+    # krrood_test the content of the database
     queried_o1 = session.scalars(select(OrientationDAO)).one()
 
     assert o1.x == queried_o1.x
@@ -129,7 +129,7 @@ def test_entity_and_derived(session, database):
     session.add(derived_dao)
     session.commit()
 
-    # test the content of the database
+    # krrood_test the content of the database
     queried_entity = session.scalars(select(CustomEntityDAO)).first()
     queried_derived = session.scalars(select(DerivedEntityDAO)).first()
 
@@ -161,7 +161,7 @@ def test_parent_and_child(session, database):
     session.add(child_dao)
     session.commit()
 
-    # test the content of the database
+    # krrood_test the content of the database
     queried_parent = session.scalars(select(ParentDAO)).all()
     queried_child = session.scalars(select(ChildMappedDAO)).all()
 

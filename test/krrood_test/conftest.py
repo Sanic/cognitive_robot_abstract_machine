@@ -42,7 +42,7 @@ def generate_sqlalchemy_interface():
     Generate the SQLAlchemy interface file before tests run.
 
     This ensures the file exists before any imports attempt to use it,
-    solving test isolation issues when running all tests.
+    solving krrood_test isolation issues when running all tests.
     """
 
     # build the symbol graph
@@ -99,7 +99,7 @@ def generate_sqlalchemy_interface():
 
 def pytest_configure(config):
     """
-    Generate ormatic_interface.py before test collection.
+    Generate ormatic_interface.py before krrood_test collection.
 
     This hook runs before pytest collects tests and imports modules,
     ensuring the generated file exists before any module-level imports.
@@ -141,7 +141,7 @@ def doors_and_drawers_world() -> World:
 
 @pytest.fixture(autouse=True)
 def cleanup_after_test():
-    # Setup: runs before each test
+    # Setup: runs before each krrood_test
     SymbolGraph()
     yield
     SymbolGraph().clear()

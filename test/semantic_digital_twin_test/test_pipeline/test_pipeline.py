@@ -33,8 +33,8 @@ class PipelineTestCase(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.dummy_world = World()
-        b1 = Body(name=PrefixedName("body1", "test"))
-        b2 = Body(name=PrefixedName("body2", "test"))
+        b1 = Body(name=PrefixedName("body1", "krrood_test"))
+        b2 = Body(name=PrefixedName("body2", "krrood_test"))
         c1 = FixedConnection(b1, b2, TransformationMatrix())
         with cls.dummy_world.modify_world():
             cls.dummy_world.add_body(b1)
@@ -60,24 +60,24 @@ class PipelineTestCase(unittest.TestCase):
                 world.add_body(b1)
                 return world
 
-        pipeline = Pipeline(steps=[TestStep(body_name=PrefixedName("body1", "test"))])
+        pipeline = Pipeline(steps=[TestStep(body_name=PrefixedName("body1", "krrood_test"))])
 
         dummy_world = World()
 
         dummy_world = pipeline.apply(dummy_world)
 
         self.assertEqual(len(dummy_world.bodies), 1)
-        self.assertEqual(dummy_world.root.name, PrefixedName("body1", "test"))
+        self.assertEqual(dummy_world.root.name, PrefixedName("body1", "krrood_test"))
 
     def test_body_filter(self):
 
         pipeline = Pipeline(
-            steps=[BodyFilter(lambda x: x.name == PrefixedName("body1", "test"))]
+            steps=[BodyFilter(lambda x: x.name == PrefixedName("body1", "krrood_test"))]
         )
 
         filtered_world = pipeline.apply(self.dummy_world)
         self.assertEqual(len(filtered_world.bodies), 1)
-        self.assertEqual(filtered_world.root.name, PrefixedName("body1", "test"))
+        self.assertEqual(filtered_world.root.name, PrefixedName("body1", "krrood_test"))
 
     def test_center_local_geometry_and_preserve_world_pose(self):
         world = FBXParser(self.fbx_path).parse()

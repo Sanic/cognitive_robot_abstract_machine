@@ -1,0 +1,25 @@
+name: CI (matrix over libs)
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+  workflow_run:
+    workflows: [ "update_docker" ]
+    types: [ completed ]
+    branches: [ main ]
+
+jobs:
+  test_each_lib:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lib: giskardpy
+          - lib: krrood
+          - lib: pycram
+          - lib: semantic_digital_twin
+    uses: ./.github/workflows/ci_reusable.yml
+    with:
+      lib: ${{ matrix.lib }}

@@ -16,7 +16,7 @@ def test_symbol_graph_persistence(session, database):
     session.add(symbol_graph_dao)
     session.commit()
 
-    # # test the content of the database
+    # # krrood_test the content of the database
     queried_p1 = session.scalars(select(PositionDAO)).one()
 
     assert p1.x == queried_p1.x

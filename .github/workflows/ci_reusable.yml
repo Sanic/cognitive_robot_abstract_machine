@@ -1,0 +1,35 @@
+name: CI reusable
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+
+on:
+  workflow_call:
+    inputs:
+      lib:
+        description: "Library folder name (relative to repo root)"
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}:jazzy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: cognitive_robot_abstract_machine
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/cram-env/bin/activate
+          poetry install
+
+      - name: Run tests
+        run: |
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          python -m pytest -sv cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test

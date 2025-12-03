@@ -90,7 +90,7 @@ class MergerTestCaseBase(unittest.TestCase):
             raise AssertionError("Config File not found:{}".format(in_path))
 
 
-# Note: Can't test full functionality
+# Note: Can't krrood_test full functionality
 
 
 class MergeDatabaseTest(unittest.TestCase):
