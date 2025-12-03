@@ -35,7 +35,7 @@ from .symbolic import (
     Flatten,
     ForAll,
     Exists,
-    Literal, Selectable,
+    Literal, Selectable, Max, Min, Sum, Count, QueryObjectDescriptor,
 )
 
 from .predicate import (
@@ -284,64 +284,48 @@ def inference(
     )
 
 
-def max(variable: Union[T, Selectable[T]]) -> Union[T, Selectable[T]]:
+def max_(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Max[T]]:
     """
     Maps the variable values to their maximum value.
 
     :param variable: The variable for which the maximum value is to be found.
-    :return: The variable mapped to its maximum value.
+    :param key: A function that extracts a comparison key from each variable value.
+    :param default: The value returned when the iterable is empty.
+    :return: A Max object that can be evaluated to find the maximum value.
     """
-    variable = self._var_
-    key = lambda res: res[variable._id_].value
-
-    def get_max(results_gen):
-        try:
-            yield max(results_gen, key=key)
-        except ValueError:
-            yield {variable._id_: HashedValue(None)}
-
-    self._results_mapping.append(get_max)
-    return self
+    return Max(variable, _key_func_=key, _default_value_=default)
 
 
-def min(self, variable: Optional[CanBehaveLikeAVariable[T]] = None) -> Self:
+def min_(variable: Entity[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Min[T]]:
     """
     Add a result mapping that maps the results to the result that has the minimum
     value for the given variable.
 
-    :param variable: The variable for which the minimum value is to be found, if None, the first selected variable
-     is used.
-    :return: This query object descriptor.
+    :param variable: The variable for which the minimum value is to be found.
+    :param key: A function that extracts a comparison key from each variable value.
+    :param default: The value returned when the iterable is empty.
+    :return: A Min object that can be evaluated to find the minimum value.
     """
-    variable = self._var_
-    key = lambda res: res[variable._id_].value
-
-    def get_min(results_gen):
-        try:
-            yield min(results_gen, key=key)
-        except ValueError:
-            yield {variable._id_: HashedValue(None)}
-
-    self._results_mapping.append(get_min)
-    return self
+    return Min(variable, _key_func_=key, _default_value_=default)
 
 
-def sum(self, variable: Optional[CanBehaveLikeAVariable[T]] = None) -> Self:
+def sum_(variable: Entity[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Sum[T]]:
     """
     Computes the sum of values produced by the given variable.
-    If variable is None, tries to sum the rows directly (rare case).
+
+    :param variable: The variable for which the sum is calculated.
+    :param key: A function that extracts a comparison key from each variable value.
+    :param default: The value returned when the iterable is empty.
+    :return: A Sum object that can be evaluated to find the sum of values.
     """
-    variable = self._var_
-    map_to_var_val = lambda res: res[variable._id_].value
+    return Sum(variable, _key_func_=key, _default_value_=default)
 
-    def apply_sum(results_gen):
-        entered = False
-        sum_val = 0
-        for val in map(map_to_var_val, results_gen):
-            entered = True
-            sum_val += val
-        sum_val = HashedValue(sum_val if entered else None)
-        yield {variable._id_: sum_val}
 
-    self._results_mapping.append(apply_sum)
-    return self
+def count(variable: QueryObjectDescriptor[T]) -> Union[T, Count[T]]:
+    """
+    Count the number of values produced by the given variable.
+
+    :param variable: The variable for which the count is calculated.
+    :return: A Count object that can be evaluated to count the number of values.
+    """
+    return Count(variable)
