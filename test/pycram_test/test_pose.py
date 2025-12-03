@@ -131,7 +131,7 @@ class TestPose(ApartmentWorldTestCase):
         self.assertTrue(facing)
         self.assertAlmostEqual(angle, 0, delta=1e-6)
 
-        # now test Y alignment (should be 90 deg difference)
+        # now krrood_test Y alignment (should be 90 deg difference)
         facing_y, angle_y = a.is_facing_2d_axis(b, axis=AxisIdentifier.Y)
         self.assertFalse(facing_y)
         self.assertAlmostEqual(abs(angle_y), math.pi / 2, delta=1e-6)

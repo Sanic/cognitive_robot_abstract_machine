@@ -8,7 +8,7 @@ from semantic_digital_twin.world_description.geometry import FileMesh
 class STLAdapterTestCase(unittest.TestCase):
 
     def setUp(self):
-        # Set up any necessary resources or state before each test
+        # Set up any necessary resources or state before each krrood_test
         self.milk_path = os.path.join(
             os.path.dirname(__file__), "..", "..", "resources", "stl", "milk.stl"
         )

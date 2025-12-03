@@ -297,7 +297,7 @@ def test_is_body_in_gripper(
         else gripper[1]
     )
 
-    # Create test box between fingers
+    # Create krrood_test box between fingers
     test_box = Body(name=PrefixedName("test_box"))
     box_collision = Box(
         scale=Scale(0.05, 0.01, 0.05),

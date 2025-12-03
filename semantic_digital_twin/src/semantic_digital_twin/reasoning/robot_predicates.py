@@ -7,13 +7,12 @@ from typing import Optional, List
 import trimesh.sample
 from krrood.entity_query_language.entity import (
     let,
-    an,
     entity,
     and_,
     not_,
     contains,
-    the,
 )
+from krrood.entity_query_language.quantify_entity import an, the
 
 from ..collision_checking.collision_detector import Collision, CollisionCheck
 from ..collision_checking.trimesh_collision_detector import TrimeshCollisionDetector

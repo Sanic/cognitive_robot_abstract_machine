@@ -1,6 +1,7 @@
 import unittest
 
-from krrood.entity_query_language.entity import an, entity, let, and_, contains
+from krrood.entity_query_language.entity import entity, let, and_, contains
+from krrood.entity_query_language.quantify_entity import an, the
 
 from pycram.designator import EQLObjectDesignator, NamedObject
 from pycram.designators.object_designator import *

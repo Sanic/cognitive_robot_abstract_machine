@@ -24,7 +24,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 class GCSTestCase(unittest.TestCase):
     """
-    Testcase to test the navigation around a unit box.
+    Testcase to krrood_test the navigation around a unit box.
     """
 
     gcs: GraphOfConvexSets

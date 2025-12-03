@@ -369,7 +369,7 @@ def test_cancel_motion():
     msc = MotionStatechart()
     node1 = ConstTrueNode()
     msc.add_node(node1)
-    cancel = CancelMotion(exception=Exception("test"))
+    cancel = CancelMotion(exception=Exception("krrood_test"))
     msc.add_node(cancel)
     cancel.start_condition = node1.observation_variable
 

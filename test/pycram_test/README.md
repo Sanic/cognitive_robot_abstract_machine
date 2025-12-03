@@ -15,14 +15,14 @@ sudo pip3 install pytest
 Once `pytest` is installed, you can run all tests by running the following command:
 
 ```bash
-pytest -v test
+pytest -v krrood_test
 ```
 The -v flag is optional and stands for verbose. It will provide more information about the tests that are run.
 
 To run a specific test file, you can run the following command:
 
 ```bash
-pytest -v test/test_file.py
+pytest -v krrood_test/test_file.py
 ```
 
 ## Writing tests

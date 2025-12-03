@@ -258,7 +258,7 @@ class MujocoSimTestCase(unittest.TestCase):
                 file_path=self.test_urdf_2
             ).parse()
         except ParsingError:
-            self.skipTest("Skipping HSRB test due to URDF parsing error.")
+            self.skipTest("Skipping HSRB krrood_test due to URDF parsing error.")
         viewer = MultiverseViewer()
         multi_sim = MujocoSim(
             viewer=viewer, world=self.test_urdf_2_world, headless=headless

@@ -336,7 +336,7 @@ class ProcTHORTestCase(unittest.TestCase):
 
     def test_procthor_views(self):
         """
-        Simple test case to check that the ProcthorResolver works correctly with the additional_names attribute.
+        Simple krrood_test case to check that the ProcthorResolver works correctly with the additional_names attribute.
         """
         resolver = ProcthorResolver()
         resolver.classes = [Bread]

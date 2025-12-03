@@ -26,7 +26,7 @@ def test_no_collision(world_setup_simple):
     assert not collision
 
 
-@pytest.mark.skip(reason="Not my test not my problem.")
+@pytest.mark.skip(reason="Not my krrood_test not my problem.")
 def test_collision_matrix(world_setup_simple):
     world, body1, body2, body3, body4 = world_setup_simple
     tcd = TrimeshCollisionDetector(world)

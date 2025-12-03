@@ -1205,7 +1205,7 @@ class TestRotationMatrix:
         r2 = cas.RotationMatrix.from_rpy(0.2, 0.3, 0.4)
 
         result = r1 @ r2
-        # Frame handling depends on implementation, test basic structure
+        # Frame handling depends on implementation, krrood_test basic structure
         assert hasattr(result, "reference_frame")
 
     def test_to_conversions(self):
@@ -1228,7 +1228,7 @@ class TestRotationMatrix:
         q = r.to_quaternion()
         assert isinstance(q, cas.Quaternion)
 
-        # Round-trip test: R -> Q -> R should preserve rotation
+        # Round-trip krrood_test: R -> Q -> R should preserve rotation
         r_roundtrip = cas.RotationMatrix.from_quaternion(q)
         assert_allclose(r, r_roundtrip, atol=1e-10)
 
@@ -1252,7 +1252,7 @@ class TestRotationMatrix:
 
     @given(random_angle(), random_angle(), random_angle())
     def test_rpy_roundtrip(self, roll, pitch, yaw):
-        """Property-based test for RPY round-trip conversion"""
+        """Property-based krrood_test for RPY round-trip conversion"""
         # Avoid gimbal lock region
         assume(abs(pitch) < np.pi / 2 - 0.1)
 
@@ -1266,7 +1266,7 @@ class TestRotationMatrix:
 
     @given(unit_vector(length=3), random_angle())
     def test_axis_angle_properties(self, axis, angle):
-        """Property-based test for axis-angle rotation properties"""
+        """Property-based krrood_test for axis-angle rotation properties"""
         # Skip very small angles to avoid numerical issues
         assume(abs(angle) > 1e-6)
 
@@ -1612,7 +1612,7 @@ class TestPoint3:
 
     @given(vector(3), vector(3))
     def test_distance_property_based(self, p1_data, p2_data):
-        """Property-based test for point-to-point distance"""
+        """Property-based krrood_test for point-to-point distance"""
         p1 = cas.Point3.from_iterable(p1_data)
         p2 = cas.Point3.from_iterable(p2_data)
 
@@ -1923,7 +1923,7 @@ class TestVector3:
 
     @given(vector(3), vector(3))
     def test_dot_product_property_based(self, v1_data, v2_data):
-        """Property-based test for dot product"""
+        """Property-based krrood_test for dot product"""
         v1 = cas.Vector3.from_iterable(v1_data)
         v2 = cas.Vector3.from_iterable(v2_data)
 
@@ -1937,7 +1937,7 @@ class TestVector3:
 
     @given(vector(3))
     def test_norm_property_based(self, v_data):
-        """Property-based test for vector norm"""
+        """Property-based krrood_test for vector norm"""
         v = cas.Vector3.from_iterable(v_data)
         actual = v.norm()
 
@@ -2563,7 +2563,7 @@ class TestTransformationMatrix:
 
     @given(float_no_nan_no_inf(), float_no_nan_no_inf(), float_no_nan_no_inf())
     def test_pure_translation(self, x, y, z):
-        """Property-based test for pure translation matrices"""
+        """Property-based krrood_test for pure translation matrices"""
         t = cas.TransformationMatrix.from_xyz_rpy(x, y, z)
 
         # Should have identity rotation
@@ -2699,7 +2699,7 @@ class TestTransformationMatrix:
 
     @given(quaternion())
     def test_quaternion_consistency(self, q):
-        """Property-based test for quaternion consistency"""
+        """Property-based krrood_test for quaternion consistency"""
         # Create transformation from quaternion
         t = cas.TransformationMatrix.from_xyz_quaternion(
             pos_x=1,

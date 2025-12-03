@@ -5,7 +5,7 @@ def test_generation_process():
     """
     Test that the SQLAlchemy interface was generated correctly.
 
-    This test verifies that the ormatic_interface.py file was generated
+    This krrood_test verifies that the ormatic_interface.py file was generated
     by the pytest_configure hook and contains the expected content.
     The actual generation happens in conftest.py before tests run.
     """
