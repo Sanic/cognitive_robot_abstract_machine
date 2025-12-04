@@ -73,7 +73,15 @@ def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
 
 class GeomVisibilityAndCollisionType(IntEnum):
     """
-    Enum values representing different types of geometric visibility and collision properties.
+    Enumeration of geometric visibility and collision attributes.
+
+    - Use VISIBLE_AND_COLLIDABLE_1 or VISIBLE_AND_COLLIDABLE_2 for geometries that should be both visible and collidable. These two values are equivalent and can be used for grouping.
+    - Use ONLY_VISIBLE for geometries that are visible but not collidable (URDF: <visual>).
+    - Use ONLY_COLLIDABLE for geometries that are collidable but not visible (URDF: <collision>).
+    - UNDEFINED_1 and UNDEFINED_2 are placeholders used only when parsing from MuJoCo, and are treated as invisible by default.
+
+    For more information, see:
+    https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-geom
     """
 
     VISIBLE_AND_COLLIDABLE_1 = 0
