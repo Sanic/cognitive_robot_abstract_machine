@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, InitVar
 
-from typing_extensions import Optional
+from typing_extensions import Optional, Protocol
 
 from giskardpy.data_types.exceptions import (
     NoQPControllerConfigException,
@@ -27,24 +27,35 @@ from semantic_digital_twin.robots.abstract_robot import (
 from semantic_digital_twin.world import World
 
 
+class Pacer(Protocol):
+    control_dt: float
+    def sleep(self):
+        """
+        Sleeps according to the pacer's logic to make a loop run at 'control_dt' frequency.
+        """
+
+@dataclass
+class SimulationPacer:
+    control_dt: float
+    """
+    How long a cycle should take with real_time_factor=1.0.
+    """
+
+    real_time_factor: Optional[float] = None
+    """
+    Allows you to adjust the simulation speed.
+    If None, the pacer will not sleep at all.
+    If 1.0, the pacer will try to achieve the control_dt frequency, as long as the other code in the loop allows it.
+    """
+
+    def sleep(self):
+        ...
+
 @dataclass
 class Executor:
     """
     Represents the main execution entity that manages motion statecharts, collision
     scenes, and control cycles for the robot's operations.
-
-    :ivar tmp_folder: Temporary folder path used for auxiliary operations during execution.
-    :type tmp_folder: str
-    :ivar motion_statechart: The motion statechart describing the robot's motion logic.
-    :type motion_statechart: MotionStatechart
-    :ivar collision_scene: The collision scene synchronizer for managing robot collision states.
-    :type collision_scene: Optional[CollisionWorldSynchronizer]
-    :ivar auxiliary_variable_manager: Manages auxiliary symbolic variables for execution contexts.
-    :type auxiliary_variable_manager: AuxiliaryVariableManager
-    :ivar qp_controller: Optional quadratic programming controller used for motion control.
-    :type qp_controller: Optional[QPController]
-    :ivar control_cycles: Tracks the number of control cycles elapsed during execution.
-    :type control_cycles: int
     """
 
     world: World
@@ -147,7 +158,7 @@ class Executor:
         )
         self.world.apply_control_commands(
             next_cmd,
-            self.qp_controller.config.control_dt or self.qp_controller.config.mpc_dt,
+            self.qp_controller.config.control_dt,
             self.qp_controller.config.max_derivative,
         )
 
