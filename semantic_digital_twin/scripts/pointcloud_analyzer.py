@@ -467,6 +467,39 @@ def _estimate_mean_nearest_neighbor_distance(
         return 0.0
     return float(sum(distances) / len(distances))
 
+def compute_reconstruction_metrics(
+    pcd: o3d.geometry.PointCloud, mesh: o3d.geometry.TriangleMesh
+) -> Dict[str, float]:
+    """Compute distance metrics between original points and the reconstructed mesh.
+
+    This approximates the point-to-surface distance by sampling the mesh densely.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        return {}
+
+    # Sample the mesh to create a dense representation of the surface
+    # We sample enough points to ensure the surface is well represented
+    mesh_pcd = mesh.sample_points_uniformly(number_of_points=len(pcd.points) * 2)
+
+    # Compute distance from every original point to the closest point on the mesh surface
+    dists = pcd.compute_point_cloud_distance(mesh_pcd)
+    dists = np.asarray(dists)
+
+    if dists.size == 0:
+        return {"rmse": 0.0, "hausdorff": 0.0}
+
+    rmse = np.sqrt(np.mean(dists**2))
+    hausdorff = np.max(dists)
+    mean_dist = np.mean(dists)
+
+    return {
+        "rmse": float(rmse),
+        "hausdorff": float(hausdorff),
+        "mean": float(mean_dist),
+    }
+
 
 # ========== Visualization ==========
 
@@ -592,6 +625,12 @@ def analyze(config: AnalyzerConfig) -> None:
             mesh = reconstructor.reconstruct(pcd)
         except Exception as exc:
             raise ReconstructionError(f"{reconstructor.name()} reconstruction failed: {exc}") from exc
+
+        metrics = compute_reconstruction_metrics(pcd, mesh)
+        print(f"[{reconstructor.name()}] Reconstruction Metrics:")
+        for k, v in metrics.items():
+            print(f"  - {k:<10}: {v:.6f}")
+
         mesh.paint_uniform_color([0.7, 0.7, 0.7])
         geometries[f"{reconstructor.name()} Mesh"] = mesh
 
