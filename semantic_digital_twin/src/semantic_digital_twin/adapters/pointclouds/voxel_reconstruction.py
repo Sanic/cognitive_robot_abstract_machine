@@ -105,15 +105,6 @@ class VoxelProcessor(PointCloudProcessor):
             voxel_size, occupancy_grid
         )
 
-        # marching_cubes gives vertices in array index coordinates
-        # (z, y, x) by default; make sure axes line up with how you
-        # used occ. If you constructed occ as [x, y, z], you might
-        # need to swap axes or build occ in [z, y, x].
-        #
-        # Here we assume we built occ[x, y, z] and marching_cubes
-        # returned in (z, y, x) order, so we swap back:
-        vertices = vertices[:, [2, 1, 0]]
-
         # compensate for min_idx offset and add origin
         indices = np.array([v.grid_index for v in voxels], dtype=int)
         min_idx = indices.min(axis=0)
