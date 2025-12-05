@@ -28,6 +28,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass, field
+import numpy as np
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -100,6 +101,22 @@ class PyVistaConfig:
 
 
 @dataclass
+class MeshResidualVizConfig:
+    """Controls coloring meshes by distance to the input point cloud.
+
+    When enabled, per‑vertex nearest‑neighbor distances to the point cloud are
+    computed and mapped to colors for a heatmap visualization.
+    """
+
+    enabled: bool = False
+    max_residual: Optional[float] = None
+    colormap: str = "viridis"
+    threshold: Optional[float] = None
+    hide_above_threshold: bool = False
+    subsample_voxel: Optional[float] = None
+    report_area_over_threshold: bool = True
+
+@dataclass
 class VisualizationConfig:
     """Configuration for visualization preferences."""
 
@@ -110,6 +127,7 @@ class VisualizationConfig:
     show_meshes: bool = True
     background_color: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
     point_size: float = 3.0
+    mesh_residuals: MeshResidualVizConfig = field(default_factory=MeshResidualVizConfig)
 
 
 @dataclass
@@ -501,6 +519,105 @@ def compute_reconstruction_metrics(
     }
 
 
+# ========== Residuals (Mesh → PointCloud) ==========
+
+
+class MeshResidualComputer:
+    """Computes per‑vertex distances from a mesh to a point cloud.
+
+    The distance for each vertex is the nearest‑neighbor distance in the point cloud,
+    optionally after voxel subsampling the point cloud for performance.
+    """
+
+    def compute(
+        self,
+        mesh: o3d.geometry.TriangleMesh,
+        pcd: o3d.geometry.PointCloud,
+        subsample_voxel: Optional[float] = None,
+    ) -> Tuple[np.ndarray, Dict[str, float]]:
+        if len(mesh.vertices) == 0:
+            return np.zeros((0,), dtype=float), {"rmse": 0.0, "max": 0.0, "mean": 0.0, "median": 0.0}
+
+        cloud = pcd
+        if subsample_voxel is not None and subsample_voxel > 0.0:
+            cloud = pcd.voxel_down_sample(voxel_size=float(subsample_voxel))
+
+        if len(cloud.points) == 0:
+            # No reference points – mark all as inf to clearly indicate problem
+            verts = np.asarray(mesh.vertices)
+            residuals = np.full((len(verts),), float("inf"), dtype=float)
+            stats = {
+                "mean": float(np.mean(residuals)),
+                "rmse": float(np.sqrt(np.mean(residuals ** 2))),
+                "max": float(np.max(residuals)),
+                "median": float(np.median(residuals)),
+            }
+            return residuals, stats
+
+        kdtree = o3d.geometry.KDTreeFlann(cloud)
+        vertices = np.asarray(mesh.vertices)
+        residuals = np.empty((len(vertices),), dtype=float)
+        for i, v in enumerate(vertices):
+            _, _, d2 = kdtree.search_knn_vector_3d(v, 1)
+            residuals[i] = math.sqrt(d2[0]) if len(d2) else float("inf")
+
+        stats = {
+            "mean": float(np.mean(residuals)),
+            "rmse": float(np.sqrt(np.mean(residuals ** 2))),
+            "max": float(np.max(residuals)),
+            "median": float(np.median(residuals)),
+        }
+        return residuals, stats
+
+
+class ScalarColorizer:
+    """Maps scalar values in [0, vmax] to RGB colors using a fixed colormap.
+
+    Default colormap is a small built‑in Viridis‑like lookup table to avoid extra
+    dependencies. Values above vmax are clipped.
+    """
+
+    def __init__(self, colormap: str = "viridis") -> None:
+        self.colormap = colormap
+        self._lut = self._build_lut(colormap)
+
+    def _build_lut(self, name: str) -> np.ndarray:
+        # Compact viridis‑like 256‑entry LUT
+        if name.lower() == "viridis":
+            # A reduced table constructed from viridis samples; values in [0,1]
+            # For brevity include 64 entries and interpolate to 256
+            base = np.array([
+                [0.267, 0.004, 0.329], [0.282, 0.140, 0.457], [0.254, 0.265, 0.531], [0.207, 0.372, 0.553],
+                [0.164, 0.471, 0.558], [0.128, 0.567, 0.551], [0.135, 0.659, 0.518], [0.267, 0.748, 0.441],
+                [0.478, 0.821, 0.318], [0.741, 0.873, 0.150], [0.993, 0.906, 0.144], [0.993, 0.773, 0.188],
+                [0.990, 0.636, 0.285], [0.984, 0.503, 0.384], [0.969, 0.382, 0.494], [0.940, 0.278, 0.607],
+            ], dtype=float)
+            # Interpolate to 256 entries
+            x = np.linspace(0.0, 1.0, base.shape[0])
+            xi = np.linspace(0.0, 1.0, 256)
+            lut = np.zeros((256, 3), dtype=float)
+            for c in range(3):
+                lut[:, c] = np.interp(xi, x, base[:, c])
+            return np.clip(lut, 0.0, 1.0)
+        # Fallback to grayscale
+        g = np.linspace(0.0, 1.0, 256)
+        return np.stack([g, g, g], axis=1)
+
+    def map(self, values: np.ndarray, vmax: Optional[float] = None) -> np.ndarray:
+        if values.size == 0:
+            return np.zeros((0, 3), dtype=float)
+        if vmax is None or not np.isfinite(vmax) or vmax <= 0.0:
+            # Robust default: 95th percentile to reduce outlier influence
+            vmax = float(np.percentile(values[np.isfinite(values)], 95.0)) if np.any(np.isfinite(values)) else 1.0
+            if vmax <= 0.0:
+                vmax = 1.0
+        vals = np.asarray(values, dtype=float)
+        vals[~np.isfinite(vals)] = vmax
+        t = np.clip(vals / vmax, 0.0, 1.0)
+        idx = np.minimum((t * (len(self._lut) - 1)).astype(int), len(self._lut) - 1)
+        return self._lut[idx]
+
+
 # ========== Visualization ==========
 
 
@@ -634,6 +751,55 @@ def analyze(config: AnalyzerConfig) -> None:
         mesh.paint_uniform_color([0.7, 0.7, 0.7])
         geometries[f"{reconstructor.name()} Mesh"] = mesh
 
+        # Optional: add mesh→point residual heatmap as a separate geometry
+        if config.visualize.mesh_residuals.enabled:
+            residuals, rstats = MeshResidualComputer().compute(
+                mesh, pcd, config.visualize.mesh_residuals.subsample_voxel
+            )
+            vmax = (
+                config.visualize.mesh_residuals.max_residual
+                if config.visualize.mesh_residuals.max_residual is not None
+                else None
+            )
+            colors = ScalarColorizer(colormap=config.visualize.mesh_residuals.colormap).map(residuals, vmax=vmax)
+
+            # Create a colored copy of the mesh
+            verts = np.asarray(mesh.vertices)
+            tris = np.asarray(mesh.triangles)
+            mesh_res = o3d.geometry.TriangleMesh(
+                o3d.utility.Vector3dVector(verts.copy()),
+                o3d.utility.Vector3iVector(tris.copy()),
+            )
+            mesh_res.vertex_colors = o3d.utility.Vector3dVector(colors)
+
+            name = f"{reconstructor.name()} Mesh Residuals"
+
+            thr = config.visualize.mesh_residuals.threshold
+            if thr is not None and config.visualize.mesh_residuals.hide_above_threshold:
+                tri_idx = np.asarray(mesh.triangles)
+                tri_mean = residuals[tri_idx].mean(axis=1)
+                mask_remove = tri_mean > float(thr)
+                mesh_res.remove_triangles_by_mask(mask_remove.tolist())
+                mesh_res.remove_unreferenced_vertices()
+                name = f"{name} (≤ {thr:.3g})"
+
+            geometries[name] = mesh_res
+            print(
+                f"[{reconstructor.name()}] Mesh→Point residuals: rmse={rstats['rmse']:.6f}, "
+                f"mean={rstats['mean']:.6f}, max={rstats['max']:.6f}"
+            )
+            if (
+                config.visualize.mesh_residuals.report_area_over_threshold
+                and thr is not None
+                and len(tris) > 0
+            ):
+                tri_idx = np.asarray(mesh.triangles)
+                tri_mean = residuals[tri_idx].mean(axis=1)
+                over = int((tri_mean > float(thr)).sum())
+                total = int(len(tri_idx))
+                pct = (100.0 * over / total) if total > 0 else 0.0
+                print(f"  - triangles over threshold: {over}/{total} ({pct:.1f}%)")
+
     Visualizer(config.visualize).show(geometries)
 
 
@@ -726,6 +892,47 @@ def _build_arg_parser():
         help="Target triangle count for quadric decimation (optional)",
     )
 
+    # Mesh residual visualization (mesh → point cloud)
+    parser.add_argument(
+        "--show-mesh-residuals",
+        action="store_true",
+        help="Color reconstructed meshes by distance to the input point cloud",
+    )
+    parser.add_argument(
+        "--mesh-residual-max",
+        type=float,
+        default=None,
+        help="Clip residual colormap at this max value (auto if omitted)",
+    )
+    parser.add_argument(
+        "--mesh-residual-threshold",
+        type=float,
+        default=None,
+        help="Threshold (in distance units) for optional filtering/reporting",
+    )
+    parser.add_argument(
+        "--mesh-residual-hide-above-threshold",
+        action="store_true",
+        help="Hide triangles whose average vertex residual exceeds threshold",
+    )
+    parser.add_argument(
+        "--mesh-residual-colormap",
+        type=str,
+        default="viridis",
+        help="Colormap name for residuals (viridis|grayscale)",
+    )
+    parser.add_argument(
+        "--mesh-residual-subsample-voxel",
+        type=float,
+        default=None,
+        help="Voxel size to subsample the point cloud for KDTree (speeds up large clouds)",
+    )
+    parser.add_argument(
+        "--no-mesh-residual-area-report",
+        action="store_true",
+        help="Do not print fraction of triangles above threshold",
+    )
+
     return parser
 
 
@@ -745,6 +952,15 @@ def _args_to_config(args) -> AnalyzerConfig:
         show_meshes=not args.hide_meshes,
         point_size=args.point_size,
     )
+
+    # Wire mesh residual visualization options
+    vis_cfg.mesh_residuals.enabled = bool(args.show_mesh_residuals)
+    vis_cfg.mesh_residuals.max_residual = args.mesh_residual_max
+    vis_cfg.mesh_residuals.colormap = str(args.mesh_residual_colormap)
+    vis_cfg.mesh_residuals.threshold = args.mesh_residual_threshold
+    vis_cfg.mesh_residuals.hide_above_threshold = bool(args.mesh_residual_hide_above_threshold)
+    vis_cfg.mesh_residuals.subsample_voxel = args.mesh_residual_subsample_voxel
+    vis_cfg.mesh_residuals.report_area_over_threshold = not bool(args.no_mesh_residual_area_report)
 
     poi_cfg = PoissonConfig(
         enabled=args.poisson,
