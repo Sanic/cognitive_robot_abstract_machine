@@ -577,6 +577,7 @@ def compute_reconstruction_metrics(
 # ========== Residuals (Mesh → PointCloud) ==========
 
 
+@dataclass
 class MeshResidualComputer:
     """Computes per‑vertex distances from a mesh to a point cloud.
 
@@ -584,13 +585,44 @@ class MeshResidualComputer:
     optionally after voxel subsampling the point cloud for performance.
     """
 
+    mesh: o3d.geometry.TriangleMesh
+
+    config: AnalyzerConfig
+
+    def compute_full(self, name, pcd, geometries):
+        residuals, rstats = self.compute(
+            pcd, self.config.visualize.mesh_residuals.subsample_voxel
+        )
+
+        mesh_res = self.compute_mesh_from_residuals(residuals)
+
+        name = f"{name} Mesh Residuals"
+
+        thr = self.config.visualize.mesh_residuals.threshold
+        if (
+            thr is not None
+            and self.config.visualize.mesh_residuals.hide_above_threshold
+        ):
+            name, mesh_res = self.hide_above_threshold(
+                name=name, mesh_res=mesh_res, residuals=residuals, threshold=thr
+            )
+
+        geometries[name] = mesh_res
+
+        tris = np.asarray(self.mesh.triangles)
+        if (
+            self.config.visualize.mesh_residuals.report_area_over_threshold
+            and thr is not None
+            and len(tris) > 0
+        ):
+            self.report_area_over_threshold(name, rstats, residuals, thr)
+
     def compute(
         self,
-        mesh: o3d.geometry.TriangleMesh,
         pcd: o3d.geometry.PointCloud,
         subsample_voxel: Optional[float] = None,
     ) -> Tuple[np.ndarray, Dict[str, float]]:
-        if len(mesh.vertices) == 0:
+        if len(self.mesh.vertices) == 0:
             return np.zeros((0,), dtype=float), {
                 "rmse": 0.0,
                 "max": 0.0,
@@ -604,7 +636,7 @@ class MeshResidualComputer:
 
         if len(cloud.points) == 0:
             # No reference points – mark all as inf to clearly indicate problem
-            verts = np.asarray(mesh.vertices)
+            verts = np.asarray(self.mesh.vertices)
             residuals = np.full((len(verts),), float("inf"), dtype=float)
             stats = {
                 "mean": float(np.mean(residuals)),
@@ -615,7 +647,7 @@ class MeshResidualComputer:
             return residuals, stats
 
         kdtree = o3d.geometry.KDTreeFlann(cloud)
-        vertices = np.asarray(mesh.vertices)
+        vertices = np.asarray(self.mesh.vertices)
         residuals = np.empty((len(vertices),), dtype=float)
         for i, v in enumerate(vertices):
             _, _, d2 = kdtree.search_knn_vector_3d(v, 1)
@@ -628,6 +660,49 @@ class MeshResidualComputer:
             "median": float(np.median(residuals)),
         }
         return residuals, stats
+
+    def compute_mesh_from_residuals(self, residuals):
+        vmax = (
+            self.config.visualize.mesh_residuals.max_residual
+            if self.config.visualize.mesh_residuals.max_residual is not None
+            else None
+        )
+        colors = ScalarColorizer(
+            colormap=self.config.visualize.mesh_residuals.colormap
+        ).map(residuals, vmax=vmax)
+
+        # Create a colored copy of the mesh
+        verts = np.asarray(self.mesh.vertices)
+        tris = np.asarray(self.mesh.triangles)
+        mesh_res = o3d.geometry.TriangleMesh(
+            o3d.utility.Vector3dVector(verts.copy()),
+            o3d.utility.Vector3iVector(tris.copy()),
+        )
+        mesh_res.vertex_colors = o3d.utility.Vector3dVector(colors)
+
+        return mesh_res
+
+    def hide_above_threshold(self, name, mesh_res, residuals, threshold: float):
+
+        tri_idx = np.asarray(self.mesh.triangles)
+        tri_mean = residuals[tri_idx].mean(axis=1)
+        mask_remove = tri_mean > float(threshold)
+        mesh_res.remove_triangles_by_mask(mask_remove.tolist())
+        mesh_res.remove_unreferenced_vertices()
+        name = f"{name} (≤ {threshold:.3g})"
+        return name, mesh_res
+
+    def report_area_over_threshold(self, name, rstats, residuals, threshold: float):
+        print(
+            f"[{name}] Mesh→Point residuals: rmse={rstats['rmse']:.6f}, "
+            f"mean={rstats['mean']:.6f}, max={rstats['max']:.6f}"
+        )
+        tri_idx = np.asarray(self.mesh.triangles)
+        tri_mean = residuals[tri_idx].mean(axis=1)
+        over = int((tri_mean > float(threshold)).sum())
+        total = int(len(tri_idx))
+        pct = (100.0 * over / total) if total > 0 else 0.0
+        print(f"  - triangles over threshold: {over}/{total} ({pct:.1f}%)")
 
 
 class ScalarColorizer:
@@ -844,68 +919,41 @@ def analyze(config: AnalyzerConfig) -> None:
 
         # Optional: add mesh→point residual heatmap as a separate geometry
         if config.visualize.mesh_residuals.enabled:
-            residuals, rstats = MeshResidualComputer().compute(
-                mesh, pcd, config.visualize.mesh_residuals.subsample_voxel
+            MeshResidualComputer(mesh=mesh, config=config).compute_full(
+                reconstructor.name(), pcd, geometries
             )
-            vmax = (
-                config.visualize.mesh_residuals.max_residual
-                if config.visualize.mesh_residuals.max_residual is not None
-                else None
-            )
-            colors = ScalarColorizer(
-                colormap=config.visualize.mesh_residuals.colormap
-            ).map(residuals, vmax=vmax)
-
-            # Create a colored copy of the mesh
-            verts = np.asarray(mesh.vertices)
-            tris = np.asarray(mesh.triangles)
-            mesh_res = o3d.geometry.TriangleMesh(
-                o3d.utility.Vector3dVector(verts.copy()),
-                o3d.utility.Vector3iVector(tris.copy()),
-            )
-            mesh_res.vertex_colors = o3d.utility.Vector3dVector(colors)
-
-            name = f"{reconstructor.name()} Mesh Residuals"
-
-            thr = config.visualize.mesh_residuals.threshold
-            if thr is not None and config.visualize.mesh_residuals.hide_above_threshold:
-                tri_idx = np.asarray(mesh.triangles)
-                tri_mean = residuals[tri_idx].mean(axis=1)
-                mask_remove = tri_mean > float(thr)
-                mesh_res.remove_triangles_by_mask(mask_remove.tolist())
-                mesh_res.remove_unreferenced_vertices()
-                name = f"{name} (≤ {thr:.3g})"
-
-            geometries[name] = mesh_res
-            print(
-                f"[{reconstructor.name()}] Mesh→Point residuals: rmse={rstats['rmse']:.6f}, "
-                f"mean={rstats['mean']:.6f}, max={rstats['max']:.6f}"
-            )
-            if (
-                config.visualize.mesh_residuals.report_area_over_threshold
-                and thr is not None
-                and len(tris) > 0
-            ):
-                tri_idx = np.asarray(mesh.triangles)
-                tri_mean = residuals[tri_idx].mean(axis=1)
-                over = int((tri_mean > float(thr)).sum())
-                total = int(len(tri_idx))
-                pct = (100.0 * over / total) if total > 0 else 0.0
-                print(f"  - triangles over threshold: {over}/{total} ({pct:.1f}%)")
 
     poisson_mesh = PoissonReconstructionProcessor.from_pts_file(
         str(loader.file_path),
     ).construct_mesh()
-    geometries["PoissonProcessor Mesh"] = poisson_mesh
+    name = "PoissonProcessor Mesh"
+    geometries[name] = poisson_mesh
+
+    if config.visualize.mesh_residuals.enabled:
+        MeshResidualComputer(mesh=poisson_mesh, config=config).compute_full(
+            name, pcd, geometries
+        )
+
     ball_pivoting_mesh = BallPivotingProcessor.from_pts_file(
         str(loader.file_path)
     ).construct_mesh()
-    geometries["BallPivotProcessor Mesh"] = ball_pivoting_mesh
+    name = "BallPivotProcessor Mesh"
+    geometries[name] = ball_pivoting_mesh
+    if config.visualize.mesh_residuals.enabled:
+        MeshResidualComputer(mesh=ball_pivoting_mesh, config=config).compute_full(
+            name, pcd, geometries
+        )
+
     voxel_mesh = VoxelProcessor.from_pts_file(
         str(loader.file_path),
         closing_algorithm=MorphologicalClosing(),
     ).construct_mesh()
-    geometries["VoxelProcessor Mesh"] = voxel_mesh
+    name = "VoxelProcessor Mesh"
+    geometries[name] = voxel_mesh
+    if config.visualize.mesh_residuals.enabled:
+        MeshResidualComputer(mesh=voxel_mesh, config=config).compute_full(
+            name, pcd, geometries
+        )
     Visualizer(config.visualize).show(geometries)
 
 
