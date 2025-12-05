@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional, Self, List, Tuple
 
 import numpy as np
@@ -46,6 +47,8 @@ class VoxelProcessor(PointCloudProcessor):
     Constructs a mesh from a point cloud using voxelization and marching cubes.
     """
 
+    point_cloud_name: str = "Voxel"
+
     voxel_size: float = field(default=0.02)
     """
     Voxel size for voxelization method
@@ -59,7 +62,7 @@ class VoxelProcessor(PointCloudProcessor):
     @classmethod
     def from_pts_file(
         cls,
-        pts_file_path: str,
+        pts_file_path: Path,
         outlier_removal: Optional[OutlierRemoval] = None,
         closing_algorithm: Optional[MorphologicalClosing] = None,
         **kwargs,
@@ -76,7 +79,31 @@ class VoxelProcessor(PointCloudProcessor):
         processor.closing_algorithm = closing_algorithm
         return processor
 
-    def construct_mesh(self):
+    @classmethod
+    def from_nth_in_directory(
+        cls,
+        directory: Path,
+        n: int,
+        pattern: str = "*.pts",
+        sort_by_name: bool = True,
+        reverse: bool = False,
+        outlier_removal: Optional[OutlierRemoval] = None,
+        closing_algorithm: Optional[MorphologicalClosing] = None,
+        **kwargs,
+    ) -> Self:
+        processor = super().from_nth_in_directory(
+            directory,
+            n,
+            pattern,
+            sort_by_name,
+            reverse,
+            outlier_removal,
+            **kwargs,
+        )
+        processor.closing_algorithm = closing_algorithm
+        return processor
+
+    def _compute_mesh(self):
         """
         Constructs a mesh from the point cloud using voxelization and marching cubes.
         1. Voxelizes the point cloud.
