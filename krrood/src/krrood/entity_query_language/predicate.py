@@ -25,16 +25,8 @@ from .symbolic import (
     T,
     SymbolicExpression,
     Variable,
-    From,
     _any_of_the_kwargs_is_a_variable,
 )
-from .utils import is_iterable
-from ..utils import recursive_subclasses
-
-cls_args = {}
-"""
-Cache of class arguments.
-"""
 
 
 def symbolic_function(
@@ -165,7 +157,7 @@ def get_function_argument_names(function: Callable) -> List[str]:
 
 
 def merge_args_and_kwargs(
-    function: Callable, args, kwargs, ignore_first: bool = True
+    function: Callable, args, kwargs, ignore_first: bool = False
 ) -> Dict[str, Any]:
     """
     Merge the arguments and keyword-arguments of a function into a dict of keyword-arguments.

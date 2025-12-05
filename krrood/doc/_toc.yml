@@ -10,6 +10,7 @@ parts:
       sections:
         - file: eql/writing_queries
         - file: eql/result_quantifiers
+        - file: eql/result_processors
         - file: eql/logical_operators
         - file: eql/comparators
         - file: eql/domain_mapping

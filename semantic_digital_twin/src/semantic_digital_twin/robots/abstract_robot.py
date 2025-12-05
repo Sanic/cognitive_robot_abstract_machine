@@ -26,6 +26,7 @@ from ..world_description.connections import (
 from ..world_description.world_entity import (
     Body,
     RootedSemanticAnnotation,
+    Agent,
     Connection,
     CollisionCheckingConfig,
 )
@@ -358,7 +359,7 @@ class Torso(KinematicChain):
 
 
 @dataclass
-class AbstractRobot(RootedSemanticAnnotation, ABC):
+class AbstractRobot(Agent, ABC):
     """
     Specification of an abstract robot. A robot consists of:
     - a root body, which is the base of the robot

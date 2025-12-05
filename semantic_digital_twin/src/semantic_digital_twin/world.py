@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from copy import deepcopy, copy
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import wraps, lru_cache, cached_property
@@ -13,7 +13,6 @@ from uuid import UUID
 import numpy as np
 import rustworkx as rx
 import rustworkx.visualization
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from lxml import etree
 from rustworkx import NoEdgeBetweenNodes
 from typing_extensions import (
@@ -29,7 +28,6 @@ from typing_extensions import (
 from typing_extensions import List
 from typing_extensions import Type, Set
 
-from .adapters.world_entity_kwargs_tracker import KinematicStructureEntityKwargsTracker
 from .callbacks.callback import ModelChangeCallback
 from .collision_checking.collision_detector import CollisionDetector
 from .collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
@@ -57,6 +55,19 @@ from .world_description.connections import (
 from .world_description.connections import HasUpdateState
 from .world_description.degree_of_freedom import DegreeOfFreedom
 from .world_description.visitors import CollisionBodyCollector, ConnectionCollector
+from .world_description.world_entity import (
+    Connection,
+    SemanticAnnotation,
+    KinematicStructureEntity,
+    Region,
+    GenericKinematicStructureEntity,
+    GenericConnection,
+    CollisionCheckingConfig,
+    Body,
+    WorldEntity,
+    GenericWorldEntity,
+    Actuator,
+)
 from .world_description.world_modification import (
     WorldModelModification,
     WorldModelModificationBlock,
@@ -71,19 +82,6 @@ from .world_description.world_modification import (
     RemoveSemanticAnnotationModification,
     AddActuatorModification,
     RemoveActuatorModification,
-)
-from .world_description.world_entity import (
-    Connection,
-    SemanticAnnotation,
-    KinematicStructureEntity,
-    Region,
-    GenericKinematicStructureEntity,
-    GenericConnection,
-    CollisionCheckingConfig,
-    Body,
-    WorldEntity,
-    GenericWorldEntity,
-    Actuator,
 )
 from .world_description.world_state import WorldState
 

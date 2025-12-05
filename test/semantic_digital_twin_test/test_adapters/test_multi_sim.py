@@ -46,7 +46,8 @@ mjcf_dir = os.path.join(
     "resources",
     "mjcf",
 )
-headless = os.environ.get("CI", "false").lower() == "true"
+# headless = os.environ.get("CI", "false").lower() == "true"
+headless = True
 
 
 @unittest.skipIf(not multi_sim_found, "multisim could not be imported.")

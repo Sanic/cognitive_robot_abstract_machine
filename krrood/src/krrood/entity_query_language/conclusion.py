@@ -110,7 +110,7 @@ class Infer(ResultQuantifier[T]):
 
     def __post_init__(self):
         super().__post_init__()
-        for v in self._child_.selected_variables:
+        for v in self._child_._selected_variables:
             v._is_inferred_ = True
         self._node_.wrap_subtree = False
 

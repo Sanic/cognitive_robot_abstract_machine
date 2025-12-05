@@ -32,7 +32,7 @@ class RWXNode:
     wrap_alpha: float = field(default=0.08)
     # Visual emphasis options
     enclosed: bool = field(default=False)
-    id_: int = field(init=False)
+    id: int = field(init=False)
     _graph: ClassVar[rx.PyDAG] = rx.PyDAG()
     enclosed_name: ClassVar[str] = 'enclosed'
 

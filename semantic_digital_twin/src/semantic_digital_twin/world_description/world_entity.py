@@ -824,6 +824,31 @@ class RootedSemanticAnnotation(SemanticAnnotation):
             if body.has_collision() and not body.get_collision_config().disabled
         )
 
+@dataclass(eq=False)
+class Agent(RootedSemanticAnnotation):
+    """
+    Represents an entity in the world that can act, move, or be controlled.
+
+    Agents are dynamic bodies with semantic meaning — they may have intent,
+    behavior, or be controlled by external or internal logic. Examples include
+    robots, humans, or other autonomous actors.
+
+    """
+
+    ...
+
+@dataclass(eq=False)
+class Human(Agent):
+    """
+    Represents a human agent in the environment.
+
+    A Person is an Agent that is not robotically actuated and does not provide
+    kinematic chains, manipulators, or robot-specific components.
+
+    This class exists primarily for semantic distinction, so that algorithms
+    can treat human agents differently from robots if needed.
+    """
+    ...
 
 @dataclass(eq=False)
 class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
@@ -839,6 +864,8 @@ class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
         return set(
             self._world.get_kinematic_structure_entities_of_branch(self.root)
         ) | {self.root}
+
+
 
 
 @dataclass(eq=False)
@@ -1178,3 +1205,4 @@ class Actuator(WorldEntityWithID, SubclassJSONSerializer):
         :param dof: The degree of freedom to add.
         """
         self._dofs.append(dof)
+

@@ -43,7 +43,7 @@ from .failures import (
     GreaterThanExpectedNumberOfSolutions,
     LessThanExpectedNumberOfSolutions,
     InvalidEntityType,
-    UnSupportedOperand,
+    UnSupportedOperand, NonPositiveLimitValue, InvalidChildType, CannotProcessResultOfGivenChildType,
 )
 from .hashed_data import HashedValue, HashedIterable, T
 from .result_quantification_constraint import (
@@ -60,28 +60,6 @@ from ..class_diagrams.wrapped_field import WrappedField
 
 if TYPE_CHECKING:
     from .conclusion import Conclusion
-
-_symbolic_mode = contextvars.ContextVar("symbolic_mode", default=None)
-
-
-def _set_symbolic_mode(mode: EQLMode):
-    """
-    Set symbolic construction mode.
-
-    :param mode: Can be Query or Rule.
-    """
-    _symbolic_mode.set(mode)
-
-
-def in_symbolic_mode(mode: Optional[EQLMode] = None) -> bool:
-    """
-    Check whether symbolic construction mode is currently active.
-
-    :returns: True if symbolic mode is enabled, otherwise False.
-    """
-    current_mode = _symbolic_mode.get()
-    return current_mode == mode if mode else current_mode is not None
-
 
 id_generator = IDGenerator()
 
@@ -191,6 +169,18 @@ class SymbolicExpression(Generic[T], ABC):
 
     def _create_node_(self):
         self._node_ = RWXNode(self._name_, data=self, color=self._plot_color_)
+
+    def _process_result_(
+            self, result: OperationResult
+    ) -> TypingUnion[T, UnificationDict]:
+        """
+        Map the result to the correct output data structure for user usage. This returns the selected variables only.
+        This method should be implemented by subclasses that can be children of a ResultProcessor.
+
+        :param result: The result to be mapped.
+        :return: The mapped result.
+        """
+        raise CannotProcessResultOfGivenChildType(type(self))
 
     @abstractmethod
     def _evaluate__(
@@ -376,11 +366,17 @@ class SymbolicExpression(Generic[T], ABC):
     def __repr__(self):
         return self._name_
 
+ResultMapping = Callable[
+    [Iterable[Dict[int, HashedValue]]], Iterable[Dict[int, HashedValue]]
+]
+"""
+A function that maps the results of a query object descriptor to a new set of results.
+"""
 
 @dataclass(eq=False, repr=False)
 class Selectable(SymbolicExpression[T], ABC):
 
-    _var_: CanBehaveLikeAVariable = field(init=False, default=None)
+    _var_: Selectable[T] = field(init=False, default=None)
     """
     A variable that is used if the child class to this class want to provide a variable to be tracked other than 
     itself, this is specially useful for child classes that holds a variable instead of being a variable and want
@@ -388,6 +384,21 @@ class Selectable(SymbolicExpression[T], ABC):
     For example, this is the case for the ResultQuantifiers & QueryDescriptors that operate on a single selected
     variable.
     """
+    _type_: Type[T] = field(init=False, default=None)
+    """
+    The type of the variable.
+    """
+
+    def _process_result_(
+            self, result: OperationResult
+    ) -> T:
+        """
+        Map the result to the correct output data structure for user usage.
+
+        :param result: The result to be mapped.
+        :return: The mapped result.
+        """
+        return result[result.operand._id_].value
 
     @property
     def _is_iterable_(self):
@@ -400,22 +411,22 @@ class Selectable(SymbolicExpression[T], ABC):
             return self._var_._is_iterable_
         return False
 
+    @cached_property
+    def _type__(self):
+        return self._var_._type_ if self._var_ else None
+
+
 
 @dataclass(eq=False, repr=False)
 class CanBehaveLikeAVariable(Selectable[T], ABC):
     """
-    This class adds the monitoring/tracking behaviour on variables that tracks attribute access, calling,
+    This class adds the monitoring/tracking behavior on variables that tracks attribute access, calling,
     and comparison operations.
     """
 
     _path_: List[ClassRelation] = field(init=False, default_factory=list)
     """
     The path of the variable in the symbol graph as a sequence of relation instances.
-    """
-
-    _type_: Type[T] = field(init=False, default=None)
-    """
-    The type of the variable.
     """
 
     def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
@@ -425,10 +436,6 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
                 f"{self.__class__.__name__} object has no attribute {name}"
             )
         return Attribute(self, name, self._type__)
-
-    @cached_property
-    def _type__(self):
-        return self._var_._type_ if self._var_ else None
 
     def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:
         return Index(self, key)
@@ -459,23 +466,20 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         return super().__hash__()
 
 
-@dataclass(eq=False)
-class ResultQuantifier(CanBehaveLikeAVariable[T], ABC):
+@dataclass(eq=False, repr=False)
+class ResultProcessor(CanBehaveLikeAVariable[T], ABC):
     """
-    Base for quantifiers that return concrete results from entity/set queries
-    (e.g., An, The).
+    Base class for processors that return concrete results from queries, including quantifiers
+    (e.g., An, The) and aggregators (e.g., Count, Sum, Max, Min).
     """
 
-    _child_: QueryObjectDescriptor[T]
-    _quantification_constraint_: Optional[ResultQuantificationConstraint] = None
+    _child_: SymbolicExpression[T]
 
     def __post_init__(self):
-        if not isinstance(self._child_, QueryObjectDescriptor):
-            raise InvalidEntityType(type(self._child_))
         super().__post_init__()
         self._var_ = (
             self._child_._var_
-            if isinstance(self._child_, CanBehaveLikeAVariable)
+            if isinstance(self._child_, Selectable)
             else None
         )
         self._node_.wrap_subtree = True
@@ -492,14 +496,238 @@ class ResultQuantifier(CanBehaveLikeAVariable[T], ABC):
         return f"{self.__class__.__name__}()"
 
     def evaluate(
-        self,
+            self,
     ) -> Iterable[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression[T]], T]]]:
         """
         Evaluate the query and map the results to the correct output data structure.
         This is the exposed evaluation method for users.
         """
         SymbolGraph().remove_dead_instances()
-        yield from map(self._process_result_, self._evaluate__())
+        yield from map(self._child_._process_result_, self._evaluate__())
+
+    @cached_property
+    def _all_variable_instances_(self) -> List[Variable]:
+        return self._child_._all_variable_instances_
+
+    def _invert_(self):
+        raise UnsupportedNegation(self.__class__)
+
+    def visualize(
+            self,
+            figsize=(35, 30),
+            node_size=7000,
+            font_size=25,
+            spacing_x: float = 4,
+            spacing_y: float = 4,
+            layout: str = "tidy",
+            edge_style: str = "orthogonal",
+            label_max_chars_per_line: Optional[int] = 13,
+    ):
+        """
+        Visualize the query graph, for arguments' documentation see `rustworkx_utils.RWXNode.visualize`.
+        """
+        self._node_.visualize(
+            figsize=figsize,
+            node_size=node_size,
+            font_size=font_size,
+            spacing_x=spacing_x,
+            spacing_y=spacing_y,
+            layout=layout,
+            edge_style=edge_style,
+            label_max_chars_per_line=label_max_chars_per_line,
+        )
+
+@dataclass(eq=False, repr=False)
+class Aggregator(ResultProcessor[T], ABC):
+    _default_value_: T = field(kw_only=True, default=None)
+    """
+    The default value to be returned if the child results are empty.
+    """
+
+    def evaluate(
+            self,
+    ) -> Iterable[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression[T]], T]]]:
+        """
+        Evaluate the query and map the results to the correct output data structure.
+        This is the exposed evaluation method for users.
+        """
+        return list(super().evaluate())[0]
+
+    def _evaluate__(
+        self,
+        sources: Optional[Dict[int, HashedValue]] = None,
+        parent: Optional[SymbolicExpression] = None,
+    ) -> Iterable[OperationResult]:
+        sources = sources or {}
+        if self._id_ in sources:
+            yield OperationResult(sources, False, self)
+            return
+
+        values = self._apply_aggregation_function_(self._child_._evaluate__(sources))
+        if values:
+            yield OperationResult(values, False, self)
+        else:
+            yield OperationResult({self._id_: HashedValue(self._default_value_)}, False, self)
+
+    @abstractmethod
+    def _apply_aggregation_function_(self, child_results: Iterable[OperationResult]) -> Dict[int, HashedValue]:
+        """
+        Apply the aggregation function to the results of the child.
+
+        :param child_results: The results of the child.
+        """
+        ...
+
+    @property
+    def _plot_color_(self) -> ColorLegend:
+        return ColorLegend("Aggregator", "#F54927")
+
+    @_plot_color_.setter
+    def _plot_color_(self, value: ColorLegend):
+        self._plot_color__ = value
+        self._node_.color = value
+
+
+@dataclass(eq=False, repr=False)
+class Count(Aggregator[T]):
+    """
+    Count the number of child results.
+    """
+
+    def _apply_aggregation_function_(self, child_results: Iterable[OperationResult]) -> Dict[int, HashedValue]:
+        return {self._id_: HashedValue(len(list(child_results)))}
+
+
+@dataclass
+class EntityAggregator(Aggregator[T], ABC):
+
+    _child_: Selectable[T]
+    """
+    The child entity to be aggregated.
+    """
+    _key_func_: Callable = field(kw_only=True, default=lambda x: x)
+    """
+    An optional function that extracts the value to be used in the aggregation.
+    """
+
+    def __post_init__(self):
+        if not isinstance(self._child_, Selectable):
+            raise InvalidChildType(type(self._child_), [Selectable])
+        super().__post_init__()
+
+    def _get_child_value_from_result_(self, result: OperationResult) -> Any:
+        """
+        Extract the value of the child from the result dictionary and unwraps it from the HashedValue wrapper.
+         In addition, it applies the key function if given.
+        """
+        value = result[self._child_._var_._id_].value
+        if self._key_func_:
+            return self._key_func_(value)
+        return value
+
+
+@dataclass(eq=False, repr=False)
+class Sum(EntityAggregator[T]):
+    """
+    Calculate the sum of the child results. If given, make use of the key function to extract the value to be summed.
+    """
+
+    def _apply_aggregation_function_(self, child_results: Iterable[OperationResult]) -> Dict[int, HashedValue]:
+        entered = False
+        sum_val = 0
+        for val in map(self._get_child_value_from_result_, child_results):
+            entered = True
+            sum_val += val
+        if entered:
+            return {self._id_: HashedValue(sum_val)}
+        return {}
+
+
+@dataclass(eq=False, repr=False)
+class Average(EntityAggregator[T]):
+    """
+    Calculate the average of the child results. If given, make use of the key function to extract the value to be
+     averaged.
+    """
+
+    def _apply_aggregation_function_(self, child_results: Iterable[OperationResult]) -> Dict[int, HashedValue]:
+        sum_val = 0
+        count = 0
+        for val in map(self._get_child_value_from_result_, child_results):
+            sum_val += val
+            count += 1
+        if count:
+            return {self._id_: HashedValue(sum_val/count)}
+        return {}
+
+
+@dataclass(eq=False, repr=False)
+class Extreme(EntityAggregator[T], ABC):
+    """
+    Find and return the extreme value among the child results. If given, make use of the key function to extract
+     the value to be compared.
+    """
+
+
+    def _apply_aggregation_function_(self, child_results: Iterable[OperationResult]) -> Dict[int, HashedValue]:
+        try:
+            bindings_with_extreme_val = self._extreme_function_(child_results, key=self._get_child_value_from_result_).bindings
+            bindings_with_extreme_val[self._id_] = bindings_with_extreme_val[self._child_._var_._id_]
+            return bindings_with_extreme_val
+        except ValueError:
+            # Means that the child results were empty, so do not return any results,
+            # the default value will be returned instead (see Aggregator._evaluate__)
+            return {}
+
+    @property
+    @abstractmethod
+    def _extreme_function_(self) -> Callable:
+        ...
+
+
+@dataclass(eq=False, repr=False)
+class Max(Extreme[T]):
+    """
+    Find and return the maximum value among the child results. If given, make use of the key function to extract
+     the value to be compared.
+    """
+
+    @property
+    def _extreme_function_(self) -> Callable[[Any], Any]:
+        return max
+
+
+@dataclass(eq=False, repr=False)
+class Min(Extreme[T]):
+    """
+    Find and return the minimum value among the child results. If given, make use of the key function to extract
+     the value to be compared.
+    """
+
+    @property
+    def _extreme_function_(self) -> Callable[[Any], Any]:
+        return min
+
+
+@dataclass(eq=False)
+class ResultQuantifier(ResultProcessor[T], ABC):
+    """
+    Base for quantifiers that return concrete results from entity/set queries
+    (e.g., An, The).
+    """
+    _child_: QueryObjectDescriptor[T]
+    """
+    A child of a result quantifier. It must be a QueryObjectDescriptor.
+    """
+    _quantification_constraint_: Optional[ResultQuantificationConstraint] = None
+    """
+    The quantification constraint that must be satisfied by the result quantifier if present.
+    """
+
+    def __post_init__(self):
+        if not isinstance(self._child_, QueryObjectDescriptor):
+            raise InvalidEntityType(type(self._child_), [QueryObjectDescriptor])
+        super().__post_init__()
 
     def _evaluate__(
         self,
@@ -538,44 +766,13 @@ class ResultQuantifier(CanBehaveLikeAVariable[T], ABC):
             else HashedIterable()
         )
         child = self._child_
-        for var in child.selected_variables:
+        for var in child._selected_variables:
             projection.add(var)
             projection.update(var._unique_variables_)
         if when_true or (when_true is None):
             for conclusion in child._conclusion_:
                 projection.update(conclusion._unique_variables_)
         return projection
-
-    @cached_property
-    def _all_variable_instances_(self) -> List[Variable]:
-        return self._child_._all_variable_instances_
-
-    def _process_result_(
-        self, result: OperationResult
-    ) -> TypingUnion[T, UnificationDict]:
-        """
-        Map the result to the correct output data structure for user usage. This returns the selected variables only.
-        In case of Entity, it returns the value of the selected variable, and in case of SetOf, it returns a dictionary with the selected variables as keys and the values as values.
-
-        :param result: The result to be mapped.
-        :return: The mapped result.
-        """
-        if isinstance(self._child_, Entity):
-            return result[self._child_.selected_variable._id_].value
-        elif isinstance(self._child_, SetOf):
-            selected_variables_ids = [v._id_ for v in self._child_.selected_variables]
-            return UnificationDict(
-                {
-                    self._id_expression_map_[var_id]: value
-                    for var_id, value in result.bindings.items()
-                    if var_id in selected_variables_ids
-                }
-            )
-        else:
-            raise NotImplementedError(f"Unknown child type {type(self._child_)}")
-
-    def _invert_(self):
-        raise UnsupportedNegation(self.__class__)
 
     def _assert_satisfaction_of_quantification_constraints_(
         self, result_count: int, done: bool
@@ -597,31 +794,6 @@ class ResultQuantifier(CanBehaveLikeAVariable[T], ABC):
         if self._quantification_constraint_:
             name += f"({self._quantification_constraint_})"
         return name
-
-    def visualize(
-        self,
-        figsize=(35, 30),
-        node_size=7000,
-        font_size=25,
-        spacing_x: float = 4,
-        spacing_y: float = 4,
-        layout: str = "tidy",
-        edge_style: str = "orthogonal",
-        label_max_chars_per_line: Optional[int] = 13,
-    ):
-        """
-        Visualize the query graph, for arguments' documentation see `rustworkx_utils.RWXNode.visualize`.
-        """
-        self._node_.visualize(
-            figsize=figsize,
-            node_size=node_size,
-            font_size=font_size,
-            spacing_x=spacing_x,
-            spacing_y=spacing_y,
-            layout=layout,
-            edge_style=edge_style,
-            label_max_chars_per_line=label_max_chars_per_line,
-        )
 
     @property
     def _plot_color_(self) -> ColorLegend:
@@ -647,7 +819,24 @@ class UnificationDict(UserDict):
 class An(ResultQuantifier[T]):
     """Quantifier that yields all matching results one by one."""
 
-    ...
+    def evaluate(
+            self,
+            limit: Optional[int] = None,
+    ) -> Iterable[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression[T]], T]]]:
+        """
+        Evaluate the query and map the results to the correct output data structure.
+        This is the exposed evaluation method for users.
+        """
+        results = super().evaluate()
+        if limit is None:
+            yield from results
+        elif not isinstance(limit, int) or limit <= 0:
+            raise NonPositiveLimitValue(limit)
+        else:
+            for res_num, result in enumerate(results, 1):
+                yield result
+                if res_num == limit:
+                    return
 
 
 @dataclass(eq=False, repr=False)
@@ -678,6 +867,26 @@ class The(ResultQuantifier[T]):
             raise MultipleSolutionFound(self)
 
 
+@dataclass(frozen=True)
+class OrderByParams:
+    """
+    Parameters for ordering the results of a query object descriptor.
+    """
+    variable: Selectable
+    """
+    The variable to order by.
+    """
+    descending: bool = False
+    """
+    Whether to order the results in descending order.
+    """
+    key: Optional[Callable] = None
+    """
+    A function to extract the key from the variable value.
+    """
+
+
+
 @dataclass(eq=False, repr=False)
 class QueryObjectDescriptor(SymbolicExpression[T], ABC):
     """
@@ -686,13 +895,90 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
     """
 
     _child_: Optional[SymbolicExpression[T]] = field(default=None)
-    selected_variables: List[CanBehaveLikeAVariable[T]] = field(default_factory=list)
-    warned_vars: typing.Set = field(default_factory=set, init=False)
+    """
+    The child of the query object descriptor is the root of the conditions in the query/sub-query graph.
+    """
+    _selected_variables: List[CanBehaveLikeAVariable[T]] = field(default_factory=list)
+    """
+    The variables that are selected by the query object descriptor.
+    """
+    _order_by: Optional[OrderByParams] = field(default=None, init=False)
+    """
+    Parameters for ordering the results of the query object descriptor.
+    """
+    _results_mapping: List[ResultMapping] = field(init=False, default_factory=list)
+    """
+    Mapping functions that map the results of the query object descriptor to a new set of results.
+    """
 
     def __post_init__(self):
         super().__post_init__()
-        for variable in self.selected_variables:
+        for variable in self._selected_variables:
             variable._var_._node_.enclosed = True
+
+    def order_by(self, variable: Selectable, descending: bool = False, key: Optional[Callable] = None) -> Self:
+        """
+        Order the results by the given variable, using the given key function in descending or ascending order.
+
+        :param variable: The variable to order by.
+        :param descending: Whether to order the results in descending order.
+        :param key: A function to extract the key from the variable value.
+        """
+        self._order_by = OrderByParams(variable, descending, key)
+        return self
+
+    def _order(
+        self, results: Iterable[Dict[int, HashedValue]] = None
+    ) -> Iterable[Dict[int, HashedValue]]:
+        """
+        Order the results by the given order variable.
+
+        :param results: The results to be ordered.
+        :return: The ordered results.
+        """
+
+        def key(result: Dict[int, HashedValue]) -> Any:
+            variable_value = result[self._order_by.variable._var_._id_].value
+            if self._order_by.key:
+                return self._order_by.key(variable_value)
+            else:
+                return variable_value
+
+        results = sorted(
+            results,
+            key=key,
+            reverse=self._order_by.descending,
+        )
+        return results
+
+    def distinct(
+        self,
+        *on: Selectable[T],
+    ) -> Self:
+        """
+        Apply distinctness constraint to the query object descriptor results.
+
+        :param on: The variables to be used for distinctness.
+        :return: This query object descriptor.
+        """
+        on_ids = tuple([v._var_._id_ for v in on]) if on else tuple()
+        seen_results = SeenSet(keys=on_ids)
+
+        def get_distinct_results(
+            results_gen: Iterable[Dict[int, HashedValue]],
+        ) -> Iterable[Dict[int, HashedValue]]:
+            for res in results_gen:
+                bindings = (
+                    res if not on else {k: v for k, v in res.items() if k in on_ids}
+                )
+                bindings = {k: v.value for k, v in bindings.items()}
+                if seen_results.check(bindings):
+                    continue
+                yield res
+                seen_results.add(bindings)
+
+        self._results_mapping.append(get_distinct_results)
+        return self
 
     @lru_cache(maxsize=None)
     def _projection_(self, when_true: Optional[bool] = True) -> HashedIterable[int]:
@@ -706,8 +992,8 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
             if self._parent_
             else HashedIterable()
         )
-        projection.update(self.selected_variables)
-        for var in self.selected_variables:
+        projection.update(self._selected_variables)
+        for var in self._selected_variables:
             projection.update(var._unique_variables_)
         if self._child_ and (when_true or (when_true is None)):
             for conclusion in self._child_._conclusion_:
@@ -725,7 +1011,9 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
             self.evaluate_conclusions_and_update_bindings(values)
             if self.any_selected_variable_is_inferred_and_unbound(values):
                 continue
-            yield from self.evaluate_selected_variables(values.bindings)
+            selected_vars_bindings = self._evaluate_selected_variables(values.bindings)
+            for result in self._apply_results_mapping(selected_vars_bindings):
+                yield OperationResult({**sources, **result}, False, self)
 
     @staticmethod
     def variable_is_inferred(var: CanBehaveLikeAVariable[T]) -> bool:
@@ -748,7 +1036,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         """
         return any(
             not self.variable_is_bound_or_its_children_are_bound(var, values)
-            for var in self.selected_variables
+            for var in self._selected_variables
             if self.variable_is_inferred(var)
         )
 
@@ -804,9 +1092,9 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         else:
             yield from [OperationResult(sources, False, self)]
 
-    def evaluate_selected_variables(
-        self, sources: Dict[int, HashedValue]
-    ) -> Iterable[OperationResult]:
+    def _evaluate_selected_variables(
+            self, sources: Dict[int, HashedValue]
+    ) -> Iterable[Dict[int, HashedValue]]:
         """
         Evaluate the selected variables by generating combinations of values from their evaluation generators.
 
@@ -815,20 +1103,25 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
         """
         var_val_gen = {
             var: var._evaluate__(copy(sources), parent=self)
-            for var in self.selected_variables
+            for var in self._selected_variables
         }
         for sol in generate_combinations(var_val_gen):
-            var_val = {var._id_: sol[var][var._id_] for var in self.selected_variables}
-            self._is_false_ = self._is_false_ or any(
-                sol[var].is_false for var in self.selected_variables
-            )
-            yield OperationResult({**sources, **var_val}, self._is_false_, self)
+            yield {var._id_: sol[var][var._id_] for var in self._selected_variables}
+
+    def _apply_results_mapping(
+        self, results: Iterable[Dict[int, HashedValue]]
+    ) -> Iterable[Dict[int, HashedValue]]:
+        for result_mapping in self._results_mapping:
+            results = result_mapping(results)
+        if self._order_by:
+            results = self._order(results)
+        return results
 
     @cached_property
     def _all_variable_instances_(self) -> List[Variable]:
         vars = []
-        if self.selected_variables:
-            vars.extend(self.selected_variables)
+        if self._selected_variables:
+            vars.extend(self._selected_variables)
         if self._child_:
             vars.extend(self._child_._all_variable_instances_)
         return vars
@@ -842,7 +1135,7 @@ class QueryObjectDescriptor(SymbolicExpression[T], ABC):
 
     @property
     def _name_(self) -> str:
-        return f"({', '.join(var._name_ for var in self.selected_variables)})"
+        return f"({', '.join(var._name_ for var in self._selected_variables)})"
 
 
 @dataclass(eq=False, repr=False)
@@ -851,11 +1144,28 @@ class SetOf(QueryObjectDescriptor[T]):
     A query over a set of variables.
     """
 
-    ...
+    def _process_result_(
+            self, result: OperationResult
+    ) -> UnificationDict:
+        """
+        Map the result to the correct output data structure for user usage. This returns the selected variables only.
+        Return a dictionary with the selected variables as keys and the values as values.
+
+        :param result: The result to be mapped.
+        :return: The mapped result.
+        """
+        selected_variables_ids = [v._id_ for v in self._selected_variables]
+        return UnificationDict(
+            {
+                self._id_expression_map_[var_id]: value
+                for var_id, value in result.bindings.items()
+                if var_id in selected_variables_ids
+            }
+        )
 
 
 @dataclass(eq=False, repr=False)
-class Entity(QueryObjectDescriptor[T], CanBehaveLikeAVariable[T]):
+class Entity(QueryObjectDescriptor[T], Selectable[T]):
     """
     A query over a single variable.
     """
@@ -866,7 +1176,7 @@ class Entity(QueryObjectDescriptor[T], CanBehaveLikeAVariable[T]):
 
     @property
     def selected_variable(self):
-        return self.selected_variables[0] if self.selected_variables else None
+        return self._selected_variables[0] if self._selected_variables else None
 
 
 @dataclass
@@ -1225,6 +1535,9 @@ class Attribute(DomainMapping):
         """
 
         if not is_dataclass(self._owner_class_):
+            return None
+
+        if self._attr_name_ not in {f.name for f in fields(self._owner_class_)}:
             return None
 
         if self._wrapped_owner_class_:
@@ -1834,11 +2147,11 @@ def optimize_or(left: SymbolicExpression, right: SymbolicExpression) -> OR:
         return Union(left, right)
 
 
-def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
+def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, HashedValue]) -> bool:
     """
     :param bindings: A kwarg like dict mapping strings to objects
     :return: Rather any of the objects is a variable or not.
     """
     return any(
-        isinstance(binding, CanBehaveLikeAVariable) for binding in bindings.values()
+        isinstance(binding, Selectable) for binding in bindings.values()
     )
