@@ -32,6 +32,15 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+from semantic_digital_twin.adapters.pointclouds.normals_based_reconstruction import (
+    PoissonReconstructionProcessor,
+    BallPivotingProcessor,
+)
+from semantic_digital_twin.adapters.pointclouds.voxel_reconstruction import (
+    VoxelProcessor,
+    MorphologicalClosing,
+)
+
 try:
     import open3d as o3d  # type: ignore
 except Exception as exc:  # pragma: no cover - depends on environment
@@ -116,6 +125,7 @@ class MeshResidualVizConfig:
     subsample_voxel: Optional[float] = None
     report_area_over_threshold: bool = True
 
+
 @dataclass
 class VisualizationConfig:
     """Configuration for visualization preferences."""
@@ -134,7 +144,11 @@ class VisualizationConfig:
 class AnalyzerConfig:
     """Top-level configuration for a complete analysis run."""
 
-    file: Path = field(default=Path("/home/pmania/Downloads/archive/PartAnnotation/03001627-chair/points/1a6f615e8b1b5ae4dbbc9440457e303e.pts"))
+    file: Path = field(
+        default=Path(
+            "/home/pmania/Downloads/archive/PartAnnotation/03001627-chair/points/1a6f615e8b1b5ae4dbbc9440457e303e.pts"
+        )
+    )
     pointcloud: PointCloudConfig = field(default_factory=PointCloudConfig)
     poisson: PoissonConfig = field(default_factory=PoissonConfig)
     ball_pivot: BallPivotConfig = field(default_factory=BallPivotConfig)
@@ -152,6 +166,8 @@ class PointCloudLoader:
     Additional columns beyond XYZ are ignored, except RGB if present.
     """
 
+    file_path: Optional[Path] = None
+
     def __init__(self, config: PointCloudConfig) -> None:
         self.config = config
 
@@ -160,6 +176,9 @@ class PointCloudLoader:
 
         Supports .pts with XYZ and optional RGB columns. Lines starting with '#' or '//' are ignored.
         """
+        if self.file_path is None:
+            self.file_path = file_path
+
         if not file_path.exists():
             raise PointCloudLoadError(f"File not found: {file_path}")
 
@@ -196,7 +215,11 @@ class PointCloudLoader:
                     rgb: Optional[Tuple[float, float, float]] = None
                     if len(tokens) >= 6:
                         try:
-                            r, g, b = float(tokens[3]), float(tokens[4]), float(tokens[5])
+                            r, g, b = (
+                                float(tokens[3]),
+                                float(tokens[4]),
+                                float(tokens[5]),
+                            )
                             # Normalize if values look like 0..255
                             if max(r, g, b) > 1.5:
                                 rgb = (r / 255.0, g / 255.0, b / 255.0)
@@ -224,7 +247,8 @@ class PointCloudLoader:
             if self.config.estimate_normals:
                 pcd.estimate_normals(
                     search_param=o3d.geometry.KDTreeSearchParamHybrid(
-                        radius=self.config.normal_radius, max_nn=self.config.normal_max_nn
+                        radius=self.config.normal_radius,
+                        max_nn=self.config.normal_max_nn,
                     )
                 )
                 pcd.normalize_normals()
@@ -255,7 +279,9 @@ class PointCloudLoader:
             If the directory is invalid, no files match, or ``n`` is out of range.
         """
         if not directory.exists() or not directory.is_dir():
-            raise PointCloudLoadError(f"Directory not found or not a directory: {directory}")
+            raise PointCloudLoadError(
+                f"Directory not found or not a directory: {directory}"
+            )
 
         files = list(directory.glob(pattern))
         if not files:
@@ -274,6 +300,7 @@ class PointCloudLoader:
             )
 
         target = files[n - 1]
+        self.file_path = target
         return self.load(target)
 
 
@@ -328,7 +355,9 @@ class PoissonReconstructor(MeshReconstructor):
         try:
             import numpy as np
         except Exception as exc:  # pragma: no cover - optional speedup
-            raise ReconstructionError("NumPy is required for Poisson postprocessing.") from exc
+            raise ReconstructionError(
+                "NumPy is required for Poisson postprocessing."
+            ) from exc
 
         densities_np = np.asarray(densities)
         if densities_np.size:
@@ -346,7 +375,10 @@ class PoissonReconstructor(MeshReconstructor):
 
         mesh = self._postprocess(mesh)
 
-        if self.config.simplify_target_triangles and self.config.simplify_target_triangles > 0:
+        if (
+            self.config.simplify_target_triangles
+            and self.config.simplify_target_triangles > 0
+        ):
             target = int(self.config.simplify_target_triangles)
             mesh = mesh.simplify_quadric_decimation(target)
             mesh.compute_vertex_normals()
@@ -365,23 +397,38 @@ class BallPivotReconstructor(MeshReconstructor):
 
     def reconstruct(self, pcd: o3d.geometry.PointCloud) -> o3d.geometry.TriangleMesh:
         if not self.config.enabled:
-            raise ReconstructionError("Ball Pivot reconstruction is disabled in config.")
+            raise ReconstructionError(
+                "Ball Pivot reconstruction is disabled in config."
+            )
 
         if not pcd.has_normals():
             # Ball pivoting requires normals
-            pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=30))
+            pcd.estimate_normals(
+                search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                    radius=0.05, max_nn=30
+                )
+            )
             pcd.normalize_normals()
 
         mean_nn = _estimate_mean_nearest_neighbor_distance(pcd)
         if mean_nn <= 0.0:
-            raise ReconstructionError("Could not estimate a valid nearest neighbor distance.")
+            raise ReconstructionError(
+                "Could not estimate a valid nearest neighbor distance."
+            )
 
         base_radius = max(mean_nn * self.config.radius_factor, 1e-6)
-        radii = o3d.utility.DoubleVector([base_radius * m for m in self.config.radii_multipliers])
-        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcd, radii)
+        radii = o3d.utility.DoubleVector(
+            [base_radius * m for m in self.config.radii_multipliers]
+        )
+        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
+            pcd, radii
+        )
         mesh = self._postprocess(mesh)
 
-        if self.config.simplify_target_triangles and self.config.simplify_target_triangles > 0:
+        if (
+            self.config.simplify_target_triangles
+            and self.config.simplify_target_triangles > 0
+        ):
             target = int(self.config.simplify_target_triangles)
             mesh = mesh.simplify_quadric_decimation(target)
             mesh.compute_vertex_normals()
@@ -408,7 +455,9 @@ class PyVistaReconstructor(MeshReconstructor):
         try:
             import numpy as np  # type: ignore
         except Exception as exc:  # pragma: no cover - optional speedup
-            raise ReconstructionError("NumPy is required for PyVista reconstruction.") from exc
+            raise ReconstructionError(
+                "NumPy is required for PyVista reconstruction."
+            ) from exc
 
         try:
             import pyvista as pv  # type: ignore
@@ -428,7 +477,9 @@ class PyVistaReconstructor(MeshReconstructor):
         try:
             pv_mesh = pv_points.reconstruct_surface()
         except Exception as exc:
-            raise ReconstructionError(f"PyVista reconstruct_surface failed: {exc}") from exc
+            raise ReconstructionError(
+                f"PyVista reconstruct_surface failed: {exc}"
+            ) from exc
 
         # Ensure triangulated mesh for Open3D compatibility
         try:
@@ -449,7 +500,10 @@ class PyVistaReconstructor(MeshReconstructor):
 
         mesh = self._postprocess(mesh)
 
-        if self.config.simplify_target_triangles and self.config.simplify_target_triangles > 0:
+        if (
+            self.config.simplify_target_triangles
+            and self.config.simplify_target_triangles > 0
+        ):
             target = int(self.config.simplify_target_triangles)
             mesh = mesh.simplify_quadric_decimation(target)
             mesh.compute_vertex_normals()
@@ -484,6 +538,7 @@ def _estimate_mean_nearest_neighbor_distance(
     if not distances:
         return 0.0
     return float(sum(distances) / len(distances))
+
 
 def compute_reconstruction_metrics(
     pcd: o3d.geometry.PointCloud, mesh: o3d.geometry.TriangleMesh
@@ -536,7 +591,12 @@ class MeshResidualComputer:
         subsample_voxel: Optional[float] = None,
     ) -> Tuple[np.ndarray, Dict[str, float]]:
         if len(mesh.vertices) == 0:
-            return np.zeros((0,), dtype=float), {"rmse": 0.0, "max": 0.0, "mean": 0.0, "median": 0.0}
+            return np.zeros((0,), dtype=float), {
+                "rmse": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+                "median": 0.0,
+            }
 
         cloud = pcd
         if subsample_voxel is not None and subsample_voxel > 0.0:
@@ -548,7 +608,7 @@ class MeshResidualComputer:
             residuals = np.full((len(verts),), float("inf"), dtype=float)
             stats = {
                 "mean": float(np.mean(residuals)),
-                "rmse": float(np.sqrt(np.mean(residuals ** 2))),
+                "rmse": float(np.sqrt(np.mean(residuals**2))),
                 "max": float(np.max(residuals)),
                 "median": float(np.median(residuals)),
             }
@@ -563,7 +623,7 @@ class MeshResidualComputer:
 
         stats = {
             "mean": float(np.mean(residuals)),
-            "rmse": float(np.sqrt(np.mean(residuals ** 2))),
+            "rmse": float(np.sqrt(np.mean(residuals**2))),
             "max": float(np.max(residuals)),
             "median": float(np.median(residuals)),
         }
@@ -586,12 +646,27 @@ class ScalarColorizer:
         if name.lower() == "viridis":
             # A reduced table constructed from viridis samples; values in [0,1]
             # For brevity include 64 entries and interpolate to 256
-            base = np.array([
-                [0.267, 0.004, 0.329], [0.282, 0.140, 0.457], [0.254, 0.265, 0.531], [0.207, 0.372, 0.553],
-                [0.164, 0.471, 0.558], [0.128, 0.567, 0.551], [0.135, 0.659, 0.518], [0.267, 0.748, 0.441],
-                [0.478, 0.821, 0.318], [0.741, 0.873, 0.150], [0.993, 0.906, 0.144], [0.993, 0.773, 0.188],
-                [0.990, 0.636, 0.285], [0.984, 0.503, 0.384], [0.969, 0.382, 0.494], [0.940, 0.278, 0.607],
-            ], dtype=float)
+            base = np.array(
+                [
+                    [0.267, 0.004, 0.329],
+                    [0.282, 0.140, 0.457],
+                    [0.254, 0.265, 0.531],
+                    [0.207, 0.372, 0.553],
+                    [0.164, 0.471, 0.558],
+                    [0.128, 0.567, 0.551],
+                    [0.135, 0.659, 0.518],
+                    [0.267, 0.748, 0.441],
+                    [0.478, 0.821, 0.318],
+                    [0.741, 0.873, 0.150],
+                    [0.993, 0.906, 0.144],
+                    [0.993, 0.773, 0.188],
+                    [0.990, 0.636, 0.285],
+                    [0.984, 0.503, 0.384],
+                    [0.969, 0.382, 0.494],
+                    [0.940, 0.278, 0.607],
+                ],
+                dtype=float,
+            )
             # Interpolate to 256 entries
             x = np.linspace(0.0, 1.0, base.shape[0])
             xi = np.linspace(0.0, 1.0, 256)
@@ -608,7 +683,11 @@ class ScalarColorizer:
             return np.zeros((0, 3), dtype=float)
         if vmax is None or not np.isfinite(vmax) or vmax <= 0.0:
             # Robust default: 95th percentile to reduce outlier influence
-            vmax = float(np.percentile(values[np.isfinite(values)], 95.0)) if np.any(np.isfinite(values)) else 1.0
+            vmax = (
+                float(np.percentile(values[np.isfinite(values)], 95.0))
+                if np.any(np.isfinite(values))
+                else 1.0
+            )
             if vmax <= 0.0:
                 vmax = 1.0
         vals = np.asarray(values, dtype=float)
@@ -637,7 +716,9 @@ class Visualizer:
         Geometry names will appear in the UI and can be toggled on and off.
         """
         # Try O3DVisualizer with GUI (best UI for toggling)
-        if hasattr(o3d.visualization, "gui") and hasattr(o3d.visualization, "O3DVisualizer"):
+        if hasattr(o3d.visualization, "gui") and hasattr(
+            o3d.visualization, "O3DVisualizer"
+        ):
             try:
                 self._show_with_o3d_visualizer(geometries)
                 return
@@ -665,12 +746,16 @@ class Visualizer:
         # Legacy fallback
         o3d.visualization.draw_geometries(list(geometries.values()))
 
-    def _show_with_o3d_visualizer(self, geometries: Dict[str, o3d.geometry.Geometry]) -> None:
+    def _show_with_o3d_visualizer(
+        self, geometries: Dict[str, o3d.geometry.Geometry]
+    ) -> None:
         gui = o3d.visualization.gui
         app = gui.Application.instance
         app.initialize()
 
-        window = o3d.visualization.O3DVisualizer(self.config.title, self.config.width, self.config.height)
+        window = o3d.visualization.O3DVisualizer(
+            self.config.title, self.config.width, self.config.height
+        )
         window.show_settings = True
 
         for name, geom in geometries.items():
@@ -692,7 +777,11 @@ class Visualizer:
             visible = True
             if not self.config.show_point_cloud and name.lower().startswith("point"):
                 visible = False
-            if not self.config.show_meshes and ("mesh" in name.lower() or name.lower().startswith("poisson") or name.lower().startswith("ball")):
+            if not self.config.show_meshes and (
+                "mesh" in name.lower()
+                or name.lower().startswith("poisson")
+                or name.lower().startswith("ball")
+            ):
                 visible = False
             try:
                 window.set_geometry_visibility(name, visible)
@@ -741,7 +830,9 @@ def analyze(config: AnalyzerConfig) -> None:
         try:
             mesh = reconstructor.reconstruct(pcd)
         except Exception as exc:
-            raise ReconstructionError(f"{reconstructor.name()} reconstruction failed: {exc}") from exc
+            raise ReconstructionError(
+                f"{reconstructor.name()} reconstruction failed: {exc}"
+            ) from exc
 
         metrics = compute_reconstruction_metrics(pcd, mesh)
         print(f"[{reconstructor.name()}] Reconstruction Metrics:")
@@ -761,7 +852,9 @@ def analyze(config: AnalyzerConfig) -> None:
                 if config.visualize.mesh_residuals.max_residual is not None
                 else None
             )
-            colors = ScalarColorizer(colormap=config.visualize.mesh_residuals.colormap).map(residuals, vmax=vmax)
+            colors = ScalarColorizer(
+                colormap=config.visualize.mesh_residuals.colormap
+            ).map(residuals, vmax=vmax)
 
             # Create a colored copy of the mesh
             verts = np.asarray(mesh.vertices)
@@ -800,6 +893,19 @@ def analyze(config: AnalyzerConfig) -> None:
                 pct = (100.0 * over / total) if total > 0 else 0.0
                 print(f"  - triangles over threshold: {over}/{total} ({pct:.1f}%)")
 
+    poisson_mesh = PoissonReconstructionProcessor.from_pts_file(
+        str(loader.file_path),
+    ).construct_mesh()
+    geometries["PoissonProcessor Mesh"] = poisson_mesh
+    ball_pivoting_mesh = BallPivotingProcessor.from_pts_file(
+        str(loader.file_path)
+    ).construct_mesh()
+    geometries["BallPivotProcessor Mesh"] = ball_pivoting_mesh
+    voxel_mesh = VoxelProcessor.from_pts_file(
+        str(loader.file_path),
+        closing_algorithm=MorphologicalClosing(),
+    ).construct_mesh()
+    geometries["VoxelProcessor Mesh"] = voxel_mesh
     Visualizer(config.visualize).show(geometries)
 
 
@@ -815,7 +921,9 @@ def _build_arg_parser():
 
     # You can pass either a .pts file or a directory. If a directory is provided,
     # the first .pts file (sorted by name) will be loaded.
-    default_path = "/home/pmania/Downloads/archive/PartAnnotation/03001627-chair/points/"
+    default_path = (
+        "/home/pmania/Downloads/archive/PartAnnotation/03001627-chair/points/"
+    )
 
     parser.add_argument(
         "--file",
@@ -825,13 +933,31 @@ def _build_arg_parser():
     )
 
     # Point cloud options
-    parser.add_argument("--voxel-size", type=float, default=0.0, help="Voxel downsampling size (0 to disable)")
-    parser.add_argument("--no-estimate-normals", action="store_true", help="Disable normal estimation for the point cloud")
-    parser.add_argument("--normal-radius", type=float, default=0.05, help="Radius for normal estimation")
-    parser.add_argument("--normal-max-nn", type=int, default=30, help="Max neighbors for normal estimation")
+    parser.add_argument(
+        "--voxel-size",
+        type=float,
+        default=0.0,
+        help="Voxel downsampling size (0 to disable)",
+    )
+    parser.add_argument(
+        "--no-estimate-normals",
+        action="store_true",
+        help="Disable normal estimation for the point cloud",
+    )
+    parser.add_argument(
+        "--normal-radius", type=float, default=0.05, help="Radius for normal estimation"
+    )
+    parser.add_argument(
+        "--normal-max-nn",
+        type=int,
+        default=30,
+        help="Max neighbors for normal estimation",
+    )
 
     # Visualization toggles
-    parser.add_argument("--title", type=str, default="Point Cloud Analyzer", help="Window title")
+    parser.add_argument(
+        "--title", type=str, default="Point Cloud Analyzer", help="Window title"
+    )
     parser.add_argument("--width", type=int, default=1280, help="Window width")
     parser.add_argument("--height", type=int, default=800, help="Window height")
     parser.add_argument(
@@ -840,7 +966,9 @@ def _build_arg_parser():
         default=True,
         help="Show point cloud initially (default: on)",
     )
-    parser.add_argument("--hide-meshes", action="store_true", help="Hide meshes initially")
+    parser.add_argument(
+        "--hide-meshes", action="store_true", help="Hide meshes initially"
+    )
     parser.add_argument(
         "--point-size",
         type=float,
@@ -849,10 +977,18 @@ def _build_arg_parser():
     )
 
     # Poisson
-    parser.add_argument("--poisson", action="store_true", help="Enable Poisson reconstruction")
-    parser.add_argument("--poisson-depth", type=int, default=10, help="Poisson octree depth")
-    parser.add_argument("--poisson-scale", type=float, default=1.1, help="Poisson scale")
-    parser.add_argument("--poisson-linear-fit", action="store_true", help="Enable Poisson linear fit")
+    parser.add_argument(
+        "--poisson", action="store_true", help="Enable Poisson reconstruction"
+    )
+    parser.add_argument(
+        "--poisson-depth", type=int, default=10, help="Poisson octree depth"
+    )
+    parser.add_argument(
+        "--poisson-scale", type=float, default=1.1, help="Poisson scale"
+    )
+    parser.add_argument(
+        "--poisson-linear-fit", action="store_true", help="Enable Poisson linear fit"
+    )
     parser.add_argument(
         "--poisson-trim-q",
         type=float,
@@ -867,8 +1003,15 @@ def _build_arg_parser():
     )
 
     # Ball Pivot
-    parser.add_argument("--ball-pivot", action="store_true", help="Enable Ball Pivot reconstruction")
-    parser.add_argument("--bp-radius-factor", type=float, default=2.5, help="Nearest-neighbor factor for base radius")
+    parser.add_argument(
+        "--ball-pivot", action="store_true", help="Enable Ball Pivot reconstruction"
+    )
+    parser.add_argument(
+        "--bp-radius-factor",
+        type=float,
+        default=2.5,
+        help="Nearest-neighbor factor for base radius",
+    )
     parser.add_argument(
         "--bp-radii-multipliers",
         type=float,
@@ -884,7 +1027,11 @@ def _build_arg_parser():
     )
 
     # PyVista
-    parser.add_argument("--pyvista", action="store_true", help="Enable PyVista reconstruct_surface reconstruction")
+    parser.add_argument(
+        "--pyvista",
+        action="store_true",
+        help="Enable PyVista reconstruct_surface reconstruction",
+    )
     parser.add_argument(
         "--pv-simplify",
         type=int,
@@ -958,9 +1105,13 @@ def _args_to_config(args) -> AnalyzerConfig:
     vis_cfg.mesh_residuals.max_residual = args.mesh_residual_max
     vis_cfg.mesh_residuals.colormap = str(args.mesh_residual_colormap)
     vis_cfg.mesh_residuals.threshold = args.mesh_residual_threshold
-    vis_cfg.mesh_residuals.hide_above_threshold = bool(args.mesh_residual_hide_above_threshold)
+    vis_cfg.mesh_residuals.hide_above_threshold = bool(
+        args.mesh_residual_hide_above_threshold
+    )
     vis_cfg.mesh_residuals.subsample_voxel = args.mesh_residual_subsample_voxel
-    vis_cfg.mesh_residuals.report_area_over_threshold = not bool(args.no_mesh_residual_area_report)
+    vis_cfg.mesh_residuals.report_area_over_threshold = not bool(
+        args.no_mesh_residual_area_report
+    )
 
     poi_cfg = PoissonConfig(
         enabled=args.poisson,

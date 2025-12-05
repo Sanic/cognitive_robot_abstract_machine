@@ -9,11 +9,12 @@ import random
 # Debug config helpers
 # ------------------------------------------------------------------------
 
+
 @dataclass
 class DebugConfig:
-    enabled: bool = False          # master switch
-    max_depth: int = 5             # how deep in recursion to print
-    print_threshold_vol: int = 0   # only log boxes with volume >= this
+    enabled: bool = False  # master switch
+    max_depth: int = 5  # how deep in recursion to print
+    print_threshold_vol: int = 0  # only log boxes with volume >= this
     regions_of_interest: list = None  # list of (x0,x1,y0,y1,z0,z1) boxes
 
 
@@ -26,9 +27,7 @@ def box_overlaps_region(box, roi):
     rx0, rx1, ry0, ry1, rz0, rz1 = roi
     # AABB overlap
     return not (
-        x1 <= rx0 or rx1 <= x0 or
-        y1 <= ry0 or ry1 <= y0 or
-        z1 <= rz0 or rz1 <= z0
+        x1 <= rx0 or rx1 <= x0 or y1 <= ry0 or ry1 <= y0 or z1 <= rz0 or rz1 <= z0
     )
 
 
@@ -36,8 +35,9 @@ def box_overlaps_region(box, roi):
 # 1. Synthetic table as an Open3D point cloud
 # ------------------------------------------------------------------------
 
+
 def create_synthetic_table_point_cloud(
-    tabletop_size=(0.8, 0.5),   # (length_x, width_z)
+    tabletop_size=(0.8, 0.5),  # (length_x, width_z)
     tabletop_thickness=0.05,
     tabletop_height=0.7,
     leg_thickness=0.05,
@@ -68,9 +68,9 @@ def create_synthetic_table_point_cloud(
     # Leg centers at (±(lx/2 - lt/2), ±(lz/2 - lt/2))
     leg_centers = [
         (-lx / 2 + lt / 2, -lz / 2 + lt / 2),
-        ( lx / 2 - lt / 2, -lz / 2 + lt / 2),
-        (-lx / 2 + lt / 2,  lz / 2 - lt / 2),
-        ( lx / 2 - lt / 2,  lz / 2 - lt / 2),
+        (lx / 2 - lt / 2, -lz / 2 + lt / 2),
+        (-lx / 2 + lt / 2, lz / 2 - lt / 2),
+        (lx / 2 - lt / 2, lz / 2 - lt / 2),
     ]
 
     all_leg_points = []
@@ -92,6 +92,7 @@ def create_synthetic_table_point_cloud(
 # ------------------------------------------------------------------------
 # 2. Convert Open3D VoxelGrid -> dense occupancy grid
 # ------------------------------------------------------------------------
+
 
 def build_occupancy_from_voxel_grid(voxel_grid):
     """
@@ -130,6 +131,7 @@ def build_occupancy_from_voxel_grid(voxel_grid):
 # ------------------------------------------------------------------------
 # 3. Prefix sums + DP guillotine decomposition
 # ------------------------------------------------------------------------
+
 
 def build_prefix_sums(occ):
     """
@@ -253,7 +255,9 @@ def decompose_occupancy_grid_to_boxes(
             # Split along X
             if dx > 1:
                 for s in range(x0 + 1, x1):
-                    c = F(x0, s, y0, y1, z0, z1, depth + 1) + F(s, x1, y0, y1, z0, z1, depth + 1)
+                    c = F(x0, s, y0, y1, z0, z1, depth + 1) + F(
+                        s, x1, y0, y1, z0, z1, depth + 1
+                    )
                     if c < best_cost:
                         best_cost = c
                         best_choice = ("SPLIT_X", s)
@@ -261,7 +265,9 @@ def decompose_occupancy_grid_to_boxes(
             # Split along Y
             if dy > 1:
                 for s in range(y0 + 1, y1):
-                    c = F(x0, x1, y0, s, z0, z1, depth + 1) + F(x0, x1, s, y1, z0, z1, depth + 1)
+                    c = F(x0, x1, y0, s, z0, z1, depth + 1) + F(
+                        x0, x1, s, y1, z0, z1, depth + 1
+                    )
                     if c < best_cost:
                         best_cost = c
                         best_choice = ("SPLIT_Y", s)
@@ -269,7 +275,9 @@ def decompose_occupancy_grid_to_boxes(
             # Split along Z
             if dz > 1:
                 for s in range(z0 + 1, z1):
-                    c = F(x0, x1, y0, y1, z0, s, depth + 1) + F(x0, x1, y0, y1, s, z1, depth + 1)
+                    c = F(x0, x1, y0, y1, z0, s, depth + 1) + F(
+                        x0, x1, y0, y1, s, z1, depth + 1
+                    )
                     if c < best_cost:
                         best_cost = c
                         best_choice = ("SPLIT_Z", s)
@@ -289,7 +297,9 @@ def decompose_occupancy_grid_to_boxes(
                 elif ctype == "EMPTY":
                     print(f"{indent}-> EMPTY (cost=0.0)")
                 else:
-                    print(f"{indent}-> UNKNOWN CHOICE {best_choice} (cost={best_cost:.3f})")
+                    print(
+                        f"{indent}-> UNKNOWN CHOICE {best_choice} (cost={best_cost:.3f})"
+                    )
 
         return best_cost
 
@@ -371,6 +381,7 @@ def decompose_point_cloud_to_boxes(
 # 4. Visual debug helper
 # ------------------------------------------------------------------------
 
+
 def visualize_debug_boxes(occ, voxel_size, grid_origin_world, box_indices, pcd=None):
     """
     Given list of index-space boxes (x0,x1,y0,y1,z0,z1),
@@ -399,6 +410,7 @@ def visualize_debug_boxes(occ, voxel_size, grid_origin_world, box_indices, pcd=N
 # 5. Optional NumPy-only unit test for the synthetic table (no Open3D)
 # ------------------------------------------------------------------------
 
+
 def unit_test_synthetic_table():
     """
     Simple unit test on a 20x20x20 voxel "table" grid using the same DP logic
@@ -411,10 +423,10 @@ def unit_test_synthetic_table():
     occ[4:16, 14:15, 4:16] = True
 
     # Four legs
-    occ[4:5,   5:15, 4:5]    = True
-    occ[15:16, 5:15, 4:5]    = True
-    occ[4:5,   5:15, 15:16]  = True
-    occ[15:16, 5:15, 15:16]  = True
+    occ[4:5, 5:15, 4:5] = True
+    occ[15:16, 5:15, 4:5] = True
+    occ[4:5, 5:15, 15:16] = True
+    occ[15:16, 5:15, 15:16] = True
 
     ps = build_prefix_sums(occ)
     x_min, y_min, z_min = np.argwhere(occ).min(axis=0)
@@ -464,10 +476,10 @@ if __name__ == "__main__":
 
     # Debug configuration
     debug_cfg = DebugConfig(
-        enabled=True,          # turn to False to silence DP logging
-        max_depth=4,           # how deep in recursion to log
-        print_threshold_vol=5, # don't log tiny 1-voxel boxes
-        regions_of_interest=None
+        enabled=True,  # turn to False to silence DP logging
+        max_depth=4,  # how deep in recursion to log
+        print_threshold_vol=5,  # don't log tiny 1-voxel boxes
+        regions_of_interest=None,
         # you can set this to e.g. [(4,16,14,15,4,16)] to highlight tabletop region
     )
 
