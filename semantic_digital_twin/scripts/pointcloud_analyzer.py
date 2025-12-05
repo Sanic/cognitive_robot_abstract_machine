@@ -263,6 +263,7 @@ class PoissonReconstructor(MeshReconstructor):
         if densities_np.size:
             # Trim low-density vertices (likely artifacts)
             q = min(max(self.config.density_trim_quantile, 0.0), 0.5)
+            # q = 0.2
             threshold = np.quantile(densities_np, q)
             vertices_to_keep = densities_np >= threshold
             mesh = mesh.select_by_index(np.where(vertices_to_keep)[0])
