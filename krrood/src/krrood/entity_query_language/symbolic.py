@@ -32,7 +32,7 @@ from typing_extensions import (
 )
 
 from .cache_data import (
-    SeenSet,
+    SeenSet, ReEnterableLazyIterable,
 )
 from .enums import PredicateType
 from .failures import (
@@ -50,7 +50,7 @@ from .result_quantification_constraint import (
 )
 from .rxnode import RWXNode, ColorLegend
 from .symbol_graph import SymbolGraph
-from .utils import IDGenerator, is_iterable, generate_combinations, make_list, make_set, T, ReEnterableLazyIterable
+from .utils import IDGenerator, is_iterable, generate_combinations, make_list, make_set, T
 from ..class_diagrams import ClassRelation
 from ..class_diagrams.class_diagram import Association, WrappedClass
 from ..class_diagrams.failures import ClassIsUnMappedInClassDiagram

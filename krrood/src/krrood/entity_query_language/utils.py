@@ -16,8 +16,7 @@ try:
 except ImportError:
     Source = None
 
-from dataclasses import dataclass, field
-from typing_extensions import Set, Any, TypeVar, Generic, Iterable, List
+from typing_extensions import Set, Any, TypeVar, List
 
 
 class IDGenerator:
@@ -158,43 +157,3 @@ def make_set(value: Any) -> Set:
 
 
 T = TypeVar("T")
-
-
-@dataclass
-class ReEnterableLazyIterable(Generic[T]):
-    """
-    A wrapper for an iterable that allows multiple iterations over its elements,
-    materializing values as they are iterated over.
-    """
-
-    iterable: Iterable[T] = field(default_factory=list)
-    """
-    The iterable to wrap.
-    """
-    materialized_values: List[T] = field(default_factory=list)
-    """
-    The materialized values of the iterable.
-    """
-
-    def set_iterable(self, iterable):
-        """
-        Set the iterable to wrap.
-        """
-        self.iterable = (v for v in iterable)
-
-    def __iter__(self):
-        """
-        Iterate over the values, materializing them as they are iterated over.
-
-        :return: An iterator over the values.
-        """
-        yield from self.materialized_values
-        for v in self.iterable:
-            self.materialized_values.append(v)
-            yield v
-
-    def __bool__(self):
-        """
-        Return True if the iterable has values, False otherwise.
-        """
-        return bool(self.materialized_values) or bool(self.iterable)
