@@ -75,7 +75,7 @@ class VoxelProcessor(PointCloudProcessor):
 
         :return: PointCloudProcessor instance.
         """
-        processor = super().from_pts_file(pts_file_path)
+        processor = super().from_pts_file(pts_file_path, outlier_removal, **kwargs)
         processor.closing_algorithm = closing_algorithm
         return processor
 

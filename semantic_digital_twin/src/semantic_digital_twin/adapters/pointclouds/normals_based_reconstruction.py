@@ -33,6 +33,7 @@ class NormalsBasedProcessor(PointCloudProcessor, ABC):
     """
 
     def __post_init__(self):
+        super().__post_init__()
         self.point_cloud_data.estimate_normals(
             search_param=o3d.geometry.KDTreeSearchParamHybrid(
                 radius=self.radius,
