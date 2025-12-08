@@ -107,7 +107,7 @@ class VoxelProcessorBase(PointCloudProcessor, ABC):
         processor.closing_algorithm = closing_algorithm
         return processor
 
-    def _construct_mesh(self) -> o3d.geometry.TriangleMesh:
+    def _compute_mesh(self) -> o3d.geometry.TriangleMesh:
         """
         1. Voxelize the point cloud.
         2. Build a scalar field from the voxels (subclass).

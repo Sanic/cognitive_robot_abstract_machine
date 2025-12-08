@@ -8,8 +8,8 @@ import open3d as o3d
 @dataclass
 class PointCloudReconstructionVisualizerParameters:
     title: str = "Point Cloud Analyzer"
-    width: int = 1280
-    height: int = 800
+    width: int = 1650
+    height: int = 1400
     show_point_cloud: bool = True
     show_meshes: bool = True
     show_settings: bool = True
@@ -48,15 +48,15 @@ class PointCloudReconstructionVisualizer:
         names = []
 
         for processor in self.point_cloud_processors:
-            mesh = processor.construct_mesh()
+            mesh = processor.compute_mesh()
             name = processor.point_cloud_name
             names.append(name)
-            window.add_geometry(name, mesh)
+            window.add_geometry(name, mesh, is_visible=False)
 
             if self.visualizer_config.visualize_residuals:
                 name, mesh = processor.compute_residual_mesh_and_name()
                 names.append(name)
-                window.add_geometry(name, mesh)
+                window.add_geometry(name, mesh, is_visible=False)
 
         window.reset_camera_to_default()
         app.add_window(window)

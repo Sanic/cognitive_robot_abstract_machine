@@ -73,7 +73,7 @@ class PoissonReconstructionProcessor(NormalsBasedProcessor):
     If true, the reconstructor will use linear interpolation to estimate the positions of iso-vertices.
     """
 
-    def _construct_mesh(self) -> o3d.geometry.TriangleMesh:
+    def _compute_mesh(self) -> o3d.geometry.TriangleMesh:
         mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
             self.point_cloud_data,
             depth=self.depth,
@@ -106,7 +106,7 @@ class BallPivotingProcessor(NormalsBasedProcessor):
     Multiplier for average NN distance to define BPA radii.
     """
 
-    def _construct_mesh(self) -> o3d.geometry.TriangleMesh:
+    def _compute_mesh(self) -> o3d.geometry.TriangleMesh:
         distances = self.point_cloud_data.compute_nearest_neighbor_distance()
         avg_dist = float(np.mean(distances))
         r1 = self.ball_pivoting_average_nearest_neighbor_factor * avg_dist
@@ -138,7 +138,7 @@ class PyVistaProcessor(NormalsBasedProcessor):
 
         self.py_vista_points = pv.PolyData(points_np)
 
-    def _construct_mesh(self) -> o3d.geometry.TriangleMesh:
+    def _compute_mesh(self) -> o3d.geometry.TriangleMesh:
         pv_mesh = self.py_vista_points.reconstruct_surface()
 
         try:

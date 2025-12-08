@@ -112,13 +112,27 @@ class ViridisScalarColorizer:
             look_up_table[:, c] = np.interp(xi, x, base[:, c])
         self._look_up_table = look_up_table
 
-    def map(self, values: np.ndarray) -> np.ndarray:
-        """Input: values expected in [0,1]. Returns RGB."""
+    def map(
+        self, values: np.ndarray, max_vertices: Optional[float] = None
+    ) -> np.ndarray:
         if values.size == 0:
             return np.zeros((0, 3), dtype=float)
-
-        t = np.clip(values.astype(float), 0.0, 1.0)
-        idx = (t * (len(self._look_up_table) - 1)).astype(int)
+        if max_vertices is None or not np.isfinite(max_vertices) or max_vertices <= 0.0:
+            # Robust default: 95th percentile to reduce outlier influence
+            max_vertices = (
+                float(np.percentile(values[np.isfinite(values)], 95.0))
+                if np.any(np.isfinite(values))
+                else 1.0
+            )
+            if max_vertices <= 0.0:
+                max_vertices = 1.0
+        vals = np.asarray(values, dtype=float)
+        vals[~np.isfinite(vals)] = max_vertices
+        t = np.clip(vals / max_vertices, 0.0, 1.0)
+        idx = np.minimum(
+            (t * (len(self._look_up_table) - 1)).astype(int),
+            len(self._look_up_table) - 1,
+        )
         return self._look_up_table[idx]
 
 
@@ -153,10 +167,10 @@ class PointCloudProcessor(ABC):
                 self.point_cloud_data
             )
 
-    def construct_mesh(
+    def compute_mesh(
         self, remove_duplication: bool = True
     ) -> o3d.geometry.TriangleMesh:
-        mesh = self._construct_mesh()
+        mesh = self._compute_mesh()
         mesh.remove_unreferenced_vertices()
         mesh.remove_degenerate_triangles()
 
@@ -171,7 +185,7 @@ class PointCloudProcessor(ABC):
         return mesh
 
     @abstractmethod
-    def _construct_mesh(self) -> o3d.geometry.TriangleMesh:
+    def _compute_mesh(self) -> o3d.geometry.TriangleMesh:
         """
         Constructs a mesh from the point cloud.
         """
@@ -255,7 +269,7 @@ class PointCloudProcessor(ABC):
         """
         Exports the constructed mesh as an OBJ file.
         """
-        mesh = self.construct_mesh(remove_duplication=remove_duplication)
+        mesh = self.compute_mesh(remove_duplication=remove_duplication)
 
         mesh.orient_triangles()
         mesh.compute_vertex_normals()
@@ -266,7 +280,7 @@ class PointCloudProcessor(ABC):
 
     def compute_residual_mesh_and_name(self):
         name = f"{self.point_cloud_name} Residuals"
-        mesh = self.construct_mesh()
+        mesh = self.compute_mesh()
 
         subsample_voxel = self.residual_computation_config.subsample_voxel
         point_cloud_data = self.point_cloud_data
@@ -302,9 +316,13 @@ class PointCloudProcessor(ABC):
             residuals[i] = math.sqrt(d2[0]) if len(d2) else float("inf")
         return residuals
 
-    @staticmethod
-    def _colored_mesh_from_residuals(mesh, residuals):
-        colors = ViridisScalarColorizer().map(residuals)
+    def _colored_mesh_from_residuals(self, mesh, residuals):
+        max_vertices = (
+            self.residual_computation_config.max_residual
+            if self.residual_computation_config.max_residual is not None
+            else None
+        )
+        colors = ViridisScalarColorizer().map(residuals, max_vertices=max_vertices)
         verts = np.asarray(mesh.vertices)
         tris = np.asarray(mesh.triangles)
         residual_mesh = o3d.geometry.TriangleMesh(

@@ -47,7 +47,7 @@ def main() -> None:
     )
     luca_path = Path("/home/itsme/Downloads/archive/PartAnnotation/03001627/points")
 
-    default_path = luca_path
+    default_path = patrick_path
 
     processors = []
 

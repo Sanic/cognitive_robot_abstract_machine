@@ -35,21 +35,21 @@ voxel_processor = VoxelProcessor.from_pts_file(
     file_path,
     closing_algorithm=MorphologicalClosing(),
 )
-mesh = voxel_processor.construct_mesh()
+mesh = voxel_processor.compute_mesh()
 voxel_processor.export_as_obj_file(os.path.join(output_directory, "voxelized_mesh.obj"))
 
 poisson_processor = PoissonReconstructionProcessor.from_pts_file(file_path)
-poisson_mesh = poisson_processor.construct_mesh()
+poisson_mesh = poisson_processor.compute_mesh()
 poisson_processor.export_as_obj_file(os.path.join(output_directory, "poisson_mesh.obj"))
 
 ball_pivoting_processor = BallPivotingProcessor.from_pts_file(file_path)
-ball_pivoting_mesh = ball_pivoting_processor.construct_mesh()
+ball_pivoting_mesh = ball_pivoting_processor.compute_mesh()
 ball_pivoting_processor.export_as_obj_file(
     os.path.join(output_directory, "ball_pivoting_mesh.obj")
 )
 
 pyvista_processor = PyVistaProcessor.from_pts_file(file_path)
-pyvista_mesh = pyvista_processor.construct_mesh()
+pyvista_mesh = pyvista_processor.compute_mesh()
 pyvista_processor.export_as_obj_file(os.path.join(output_directory, "pyvista_mesh.obj"))
 
 
