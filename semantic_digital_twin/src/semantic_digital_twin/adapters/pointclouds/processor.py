@@ -336,6 +336,11 @@ class PointCloudProcessor(ABC):
 
     @staticmethod
     def _report_area_over_threshold(name, mesh, residuals, threshold):
+        # Skip report on empty meshes
+        if len(mesh.vertices) == 0:
+            print(f"[{name}] Mesh is empty.")
+            return
+
         stats = {
             "mean": float(np.mean(residuals)),
             "rmse": float(np.sqrt(np.mean(residuals**2))),

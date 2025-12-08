@@ -47,7 +47,10 @@ def main() -> None:
     )
     luca_path = Path("/home/itsme/Downloads/archive/PartAnnotation/03001627/points")
 
-    default_path = patrick_path
+    kitchen_path = Path("/home/pmania/Downloads/archive/PPP/pts/")
+
+    # default_path = patrick_path
+    default_path = kitchen_path
 
     processors = []
 
@@ -56,13 +59,13 @@ def main() -> None:
     )
     processors.append(poisson_processor)
 
-    ball_pivoting_processor = BallPivotingProcessor.from_nth_in_directory(
-        default_path, 1
-    )
-    processors.append(ball_pivoting_processor)
+    # ball_pivoting_processor = BallPivotingProcessor.from_nth_in_directory(
+    #     default_path, 1
+    # )
+    # processors.append(ball_pivoting_processor)
 
-    pyvista_processor = PyVistaProcessor.from_nth_in_directory(default_path, 1)
-    processors.append(pyvista_processor)
+    # pyvista_processor = PyVistaProcessor.from_nth_in_directory(default_path, 1)
+    # processors.append(pyvista_processor)
 
     voxel_processor = VoxelProcessor.from_nth_in_directory(
         default_path, 1, closing_algorithm=MorphologicalClosing()
