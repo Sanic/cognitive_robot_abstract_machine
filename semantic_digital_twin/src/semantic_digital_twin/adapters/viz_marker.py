@@ -36,6 +36,18 @@ from ..world import World
 class VizMarkerPublisher(StateChangeCallback):
     """
     Publishes an Array of visualization marker which represent the situation in the World
+    Use as follows:
+
+    from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+    import threading
+    import rclpy
+    rclpy.init()
+
+    node = rclpy.create_node("semantic_digital_twin")
+    thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    thread.start()
+
+    viz = VizMarkerPublisher(world=world, node=node)
     """
 
     node: rclpy.node.Node

@@ -130,6 +130,8 @@ class Shape(ABC, SubclassJSONSerializer):
 
     color: Color = field(default_factory=Color)
 
+    _mesh: trimesh.Trimesh = field(default=None, init=False)
+
     @property
     @abstractmethod
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -184,12 +186,6 @@ class Mesh(Shape, ABC):
     """
     Scale of the mesh.
     """
-
-    @property
-    @abstractmethod
-    def mesh(self) -> trimesh.Trimesh:
-        """Return the loaded mesh object."""
-        raise NotImplementedError
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -247,14 +243,18 @@ class FileMesh(Mesh):
     Filename of the mesh.
     """
 
-    @cached_property
+    @property
     def mesh(self) -> trimesh.Trimesh:
         """
         The mesh object.
         """
-        mesh = trimesh.load_mesh(self.filename)
-        mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
-        return mesh
+        if self._mesh is not None:
+            return self._mesh
+        self._mesh = trimesh.load_mesh(self.filename, process=False)
+        self._mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
+            self.color.to_rgba()
+        )
+        return self._mesh
 
     def to_json(self) -> Dict[str, Any]:
         json = {
@@ -382,9 +382,13 @@ class Sphere(Shape):
         """
         Returns a trimesh object representing the sphere.
         """
-        mesh = trimesh.creation.icosphere(subdivisions=2, radius=self.radius)
-        mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
-        return mesh
+        if self._mesh is not None:
+            return self._mesh
+        self._mesh = trimesh.creation.icosphere(subdivisions=2, radius=self.radius)
+        self._mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
+            self.color.to_rgba()
+        )
+        return self._mesh
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -427,11 +431,15 @@ class Cylinder(Shape):
         """
         Returns a trimesh object representing the cylinder.
         """
-        mesh = trimesh.creation.cylinder(
+        if self._mesh is not None:
+            return self._mesh
+        self._mesh = trimesh.creation.cylinder(
             radius=self.width / 2, height=self.height, sections=16
         )
-        mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
-        return mesh
+        self._mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
+            self.color.to_rgba()
+        )
+        return self._mesh
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -478,9 +486,15 @@ class Box(Shape):
         Returns a trimesh object representing the box.
         The box is centered at the origin and has the specified scale.
         """
-        mesh = trimesh.creation.box(extents=(self.scale.x, self.scale.y, self.scale.z))
-        mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
-        return mesh
+        if self._mesh is not None:
+            return self._mesh
+        self._mesh = trimesh.creation.box(
+            extents=(self.scale.x, self.scale.y, self.scale.z)
+        )
+        self._mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
+            self.color.to_rgba()
+        )
+        return self._mesh
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
