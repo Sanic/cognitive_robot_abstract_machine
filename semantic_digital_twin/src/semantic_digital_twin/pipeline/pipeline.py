@@ -5,12 +5,14 @@ from dataclasses import dataclass
 from typing import List, Callable
 
 import numpy as np
+import trimesh
 
 from ..spatial_types import Point3
 from ..spatial_types.spatial_types import TransformationMatrix
 from ..semantic_annotations.factories import SemanticAnnotationFactory
 from ..world import World
 from ..world_description.geometry import TriangleMesh, FileMesh
+from ..world_description.shape_collection import ShapeCollection
 from ..world_description.world_entity import Body
 
 
@@ -159,5 +161,47 @@ class BodyFactoryReplace(Step):
             new_world = factory.create()
             parent_connection.child = new_world.root
             world.merge_world(new_world, parent_connection)
+
+        return world
+
+
+@dataclass
+class TransformGeometry(Step):
+    """
+    Applies a transformation to the geometry of all collision meshes in the world.
+    """
+
+    transform: TransformationMatrix
+    """
+    The transformation matrix to apply to the geometry.
+    """
+
+    def _apply(self, world: World) -> World:
+        for body in world.bodies_with_enabled_collision:
+            collision = body.collision
+            new_collision = []
+            for coll in collision:
+                if isinstance(coll, (FileMesh, TriangleMesh)):
+                    mesh = coll.mesh
+                    if mesh.vertices.shape[0] > 0:
+                        # Apply the transformation to the vertices
+                        homogenous_vertices = np.hstack(
+                            (mesh.vertices, np.ones((mesh.vertices.shape[0], 1)))
+                        )
+                        transformed_vertices = (
+                            self.transform.to_np() @ homogenous_vertices.T
+                        ).T[:, :3]
+                        new_trimesh = trimesh.Trimesh(
+                            vertices=transformed_vertices, faces=mesh.faces
+                        )
+                        new_mesh = TriangleMesh(
+                            origin=coll.origin,
+                            scale=coll.scale,
+                            color=coll.color,
+                            mesh=new_trimesh,
+                        )
+                        new_collision.append(new_mesh)
+            body.collision = ShapeCollection(new_collision)
+            body.visual = ShapeCollection(new_collision)
 
         return world

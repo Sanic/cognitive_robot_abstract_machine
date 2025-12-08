@@ -23,12 +23,12 @@ class OutlierRemoval:
     Parameters for statistical outlier removal
     """
 
-    number_of_neighbors: int
+    number_of_neighbors: int = field(default=20)
     """
     Number of neighbors for statistical outlier removal
     """
 
-    std_ratio: float
+    std_ratio: float = field(default=5.0)
     """
     Std_ratio for statistical outlier removal
     """
@@ -160,6 +160,12 @@ class PointCloudProcessor(ABC):
     """
     Configuration for residual computation and visualization.
     """
+
+    def __post_init__(self):
+        if self.outlier_removal:
+            self.point_cloud_data = self.outlier_removal.remove_outliers(
+                self.point_cloud_data
+            )
 
     def compute_mesh(
         self, remove_duplication: bool = True

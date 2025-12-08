@@ -36,6 +36,18 @@ from ..world import World
 class VizMarkerPublisher(StateChangeCallback):
     """
     Publishes an Array of visualization marker which represent the situation in the World
+    Use as follows:
+
+    from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+    import threading
+    import rclpy
+    rclpy.init()
+
+    node = rclpy.create_node("semantic_digital_twin")
+    thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    thread.start()
+
+    viz = VizMarkerPublisher(world=world, node=node)
     """
 
     node: rclpy.node.Node
@@ -53,6 +65,11 @@ class VizMarkerPublisher(StateChangeCallback):
     The reference frame of the visualization marker.
     """
 
+    throttle_state_updates: int = 1
+    """
+    Only published every n-th state update.
+    """
+
     def __post_init__(self):
         """
         Initializes the publisher and registers the callback to the world.
@@ -66,6 +83,8 @@ class VizMarkerPublisher(StateChangeCallback):
         """
         Publishes the Marker Array on world changes.
         """
+        if self.world.state.version % self.throttle_state_updates != 0:
+            return
         marker_array = self._make_marker_array()
         self.pub.publish(marker_array)
 
