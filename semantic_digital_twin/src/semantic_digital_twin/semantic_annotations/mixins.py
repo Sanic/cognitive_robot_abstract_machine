@@ -43,7 +43,7 @@ class HasBody(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class HasRegion(SemanticAnnotation, ABC):
+class HasRegion(ABC):
     """
     Abstract base class for all household objects. Each semantic annotation refers to a single Body.
     Each subclass automatically derives a MatchRule from its own class name and
@@ -55,7 +55,7 @@ class HasRegion(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class HasDrawers(SemanticAnnotation):
+class HasDrawers(ABC):
     """
     A mixin class for semantic annotations that have drawers.
     """
@@ -64,7 +64,7 @@ class HasDrawers(SemanticAnnotation):
 
 
 @dataclass(eq=False)
-class HasDoors(SemanticAnnotation):
+class HasDoors(ABC):
     """
     A mixin class for semantic annotations that have doors.
     """
@@ -73,7 +73,7 @@ class HasDoors(SemanticAnnotation):
 
 
 @dataclass(eq=False)
-class HasSupportingSurface(SemanticAnnotation):
+class HasSupportingSurface(ABC):
     """
     A semantic annotation that represents a supporting surface.
     """

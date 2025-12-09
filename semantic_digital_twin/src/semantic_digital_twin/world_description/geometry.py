@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
+import webcolors
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
 from PIL import Image
 from krrood.adapters.json_serializer import SubclassJSONSerializer, JSON_TYPE_NAME
@@ -75,6 +76,33 @@ class Color(SubclassJSONSerializer):
 
     def __hash__(self):
         return hash((self.R, self.G, self.B, self.A))
+
+    def closest_css3_color_name(self):
+
+        r = int(round(self.R * 255))
+        g = int(round(self.G * 255))
+        b = int(round(self.B * 255))
+
+        try:
+            name = webcolors.rgb_to_name((r, g, b))
+            return name
+        except ValueError:
+            pass
+
+        min_dist = float("inf")
+        best_name = None
+
+        for hex_value, name in webcolors._definitions._CSS3_HEX_TO_NAMES.items():
+            cr, cg, cb = webcolors.hex_to_rgb(hex_value)
+            dr = r - cr
+            dg = g - cg
+            db = b - cb
+            dist = dr * dr + dg * dg + db * db
+            if dist < min_dist:
+                min_dist = dist
+                best_name = name
+
+        return best_name
 
 
 @dataclass
