@@ -63,6 +63,7 @@ import numpy as np
 
 number_of_bodies = 4  # <-- group size you want
 
+
 def make_opencv_palette(n: int):
     """
     Generate n distinct-ish colors using an OpenCV colormap.
