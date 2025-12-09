@@ -6,6 +6,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
 from functools import cached_property
+from pathlib import Path
 
 import numpy as np
 import trimesh
@@ -71,6 +72,9 @@ class Color(SubclassJSONSerializer):
 
     def to_rgba(self) -> Tuple[float, float, float, float]:
         return (self.R, self.G, self.B, self.A)
+
+    def __hash__(self):
+        return hash((self.R, self.G, self.B, self.A))
 
 
 @dataclass
@@ -231,6 +235,12 @@ class Mesh(Shape, ABC):
         mesh.visual.material = SimpleMaterial(name=material_name, image=image)
         return mesh
 
+    def override_mesh_with_color(self, color: Color):
+        self.mesh.visual = trimesh.visual.ColorVisuals(
+            mesh=self.mesh,
+            face_colors=np.tile(color.to_rgba(), (len(self.mesh.faces), 1)),
+        )
+
 
 @dataclass(eq=False)
 class FileMesh(Mesh):
@@ -306,7 +316,10 @@ class TriangleMesh(Mesh):
     def file(
         self, dirname: str = "/tmp", file_type: str = "obj"
     ) -> tempfile.NamedTemporaryFile:
-        f = tempfile.NamedTemporaryFile(dir=dirname, delete=False)
+        suffix = "." + file_type
+        f = tempfile.NamedTemporaryFile(dir=dirname, suffix=suffix, delete=False)
+        path = Path(f.name)
+        tmp_dir = path.parent
         if file_type == "obj":
             self.mesh.export(f.name, file_type="obj")
             old_mtl_file = "material.mtl"
@@ -322,6 +335,33 @@ class TriangleMesh(Mesh):
                 f.write(text)
         elif file_type == "stl":
             self.mesh.export(f.name, file_type="stl")
+        elif file_type == "dae":
+
+            visual = self.mesh.visual
+            if isinstance(visual, TextureVisuals):
+                material = visual.material
+                image = material.image
+
+            if (
+                isinstance(visual, TextureVisuals)
+                and isinstance(material, SimpleMaterial)
+                and image is not None
+            ):
+                # choose a nice deterministic name for the texture
+                tex_name = path.stem + "_tex.png"
+                tex_path = tmp_dir / tex_name
+
+                print("saving texure to:", tex_path)
+
+                # save the image to disk
+                image.save(tex_path)
+
+                # tell trimesh what filename to use in the DAE
+                # (no directory, just the basename — it will be relative)
+                material.image_path = tex_name
+
+            self.mesh.export(path, file_type="dae")
+
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
         return f
