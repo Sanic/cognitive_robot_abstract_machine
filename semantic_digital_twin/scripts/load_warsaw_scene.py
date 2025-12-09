@@ -40,10 +40,8 @@ pipeline = Pipeline(
     ]
 )
 world = pipeline.apply(world)
-
 rt = RayTracer(world=world)
 scene = rt.scene
-
 
 world_meshes = []  # list of (id, mesh_in_world)
 
@@ -75,32 +73,75 @@ for i in range(len(ids)):
             adj[n1].add(n2)
             adj[n2].add(n1)
 
-# Choose your 4 RGBA colors
-color_palette = [
-    Color(1, 0, 0),
-    Color(0, 1, 0),
-    Color(0, 0, 1),
-    Color(1, 1, 0),
-]
+# -------------------------------------------------
+# 1) Graph coloring with an unbounded palette (indices)
+# -------------------------------------------------
 
-colors_by_id = {}
+color_index_by_id = {}
 
-
-# Sort nodes by degree (high-degree first = better greedy result)
+# Sort nodes by degree (high-degree first = usually fewer colors in greedy)
 nodes_sorted = sorted(adj.keys(), key=lambda n: -len(adj[n]))
 
 for node_id in nodes_sorted:
-    # colors already used by neighbors
-    used = {colors_by_id[nbr] for nbr in adj[node_id] if nbr in colors_by_id}
+    # color indices used by already-colored neighbors
+    used = {color_index_by_id[nbr] for nbr in adj[node_id] if nbr in color_index_by_id}
 
-    # pick the first palette index that's not used
-    for color in color_palette:
-        if color not in used:
-            colors_by_id[node_id] = color
-            break
+    # pick the smallest non-negative integer not in 'used'
+    c = 0
+    while c in used:
+        c += 1
+    color_index_by_id[node_id] = c
+
+num_colors = max(color_index_by_id.values()) + 1
+print(f"Greedy coloring used {num_colors} colors")
+
+# -------------------------------------------------
+# 2) Turn color indices into actual Color objects
+#    (generate as many as needed)
+# -------------------------------------------------
+
+
+def hsv_to_rgb(h, s, v):
+    """
+    Simple HSV -> RGB conversion.
+    h in [0, 1], s in [0, 1], v in [0, 1]
+    returns (r, g, b) in [0, 1]
+    """
+    i = int(h * 6.0)
+    f = (h * 6.0) - i
+    i = i % 6
+
+    p = v * (1.0 - s)
+    q = v * (1.0 - f * s)
+    t = v * (1.0 - (1.0 - f) * s)
+
+    if i == 0:
+        r, g, b = v, t, p
+    elif i == 1:
+        r, g, b = q, v, p
+    elif i == 2:
+        r, g, b = p, v, t
+    elif i == 3:
+        r, g, b = p, q, v
+    elif i == 4:
+        r, g, b = t, p, v
     else:
-        # if this ever triggers, you needed more than 4 colors
-        raise RuntimeError("Ran out of colors, need more than 4 for this graph?")
+        r, g, b = v, p, q
+
+    return r, g, b
+
+
+# Generate a palette with num_colors distinct-ish hues
+palette = []
+for k in range(num_colors):
+    h = k / max(1, num_colors)  # spread hues around the circle
+    s = 0.7
+    v = 1.0
+    r, g, b = hsv_to_rgb(h, s, v)
+    palette.append(Color(r, g, b))
+
+# Map each body to a Color via its color index
+colors_by_id = {node_id: palette[color_index_by_id[node_id]] for node_id in adj.keys()}
 
 for body in world.bodies_with_enabled_collision:
     body_color = colors_by_id[body.id]
