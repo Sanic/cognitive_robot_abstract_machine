@@ -1,8 +1,9 @@
 import os
+from pathlib import Path
 
+import cv2
 import numpy as np
 import trimesh
-from trimesh.collision import CollisionManager
 
 from semantic_digital_twin.adapters.mesh import OBJParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -27,7 +28,6 @@ with world.modify_world():
 for i, file in enumerate(files):
     obj_world = OBJParser(os.path.join(dir_path, file)).parse()
     with world.modify_world():
-        # color = index_to_color[i % 4]
         # obj_world.bodies[0].collision[0].override_mesh_with_color(color)
         world.merge_world(obj_world)
 
@@ -43,118 +43,63 @@ world = pipeline.apply(world)
 rt = RayTracer(world=world)
 scene = rt.scene
 
-world_meshes = []  # list of (id, mesh_in_world)
+import numpy as np
 
-for body in world.bodies_with_enabled_collision:
-    transform = body.global_pose.to_np()
-    body_id = body.id
-    geom_hash = body.collision[0].mesh.identifier_hash
-    geom_name = scene.geometry_identifiers[geom_hash]
-
-    mesh = scene.geometry[geom_name].copy()
-    mesh.apply_transform(transform)
-    world_meshes.append((body_id, mesh))
-
-ids = [id_ for id_, _ in world_meshes]
-bounds = {id_: mesh.bounds for id_, mesh in world_meshes}
+number_of_bodies = 4  # <-- group size you want
 
 
-def boxes_touch(b1, b2, tol=0.0):
-    (min1, max1), (min2, max2) = b1, b2
-    return np.all(max1 + tol >= min2) and np.all(max2 + tol >= min1)
-
-
-adj = {id_: set() for id_ in ids}
-
-for i in range(len(ids)):
-    for j in range(i + 1, len(ids)):
-        n1, n2 = ids[i], ids[j]
-        if boxes_touch(bounds[n1], bounds[n2], tol=1e-6):
-            adj[n1].add(n2)
-            adj[n2].add(n1)
-
-# -------------------------------------------------
-# 1) Graph coloring with an unbounded palette (indices)
-# -------------------------------------------------
-
-color_index_by_id = {}
-
-# Sort nodes by degree (high-degree first = usually fewer colors in greedy)
-nodes_sorted = sorted(adj.keys(), key=lambda n: -len(adj[n]))
-
-for node_id in nodes_sorted:
-    # color indices used by already-colored neighbors
-    used = {color_index_by_id[nbr] for nbr in adj[node_id] if nbr in color_index_by_id}
-
-    # pick the smallest non-negative integer not in 'used'
-    c = 0
-    while c in used:
-        c += 1
-    color_index_by_id[node_id] = c
-
-num_colors = max(color_index_by_id.values()) + 1
-print(f"Greedy coloring used {num_colors} colors")
-
-# -------------------------------------------------
-# 2) Turn color indices into actual Color objects
-#    (generate as many as needed)
-# -------------------------------------------------
-
-
-def hsv_to_rgb(h, s, v):
+def make_opencv_palette(n: int):
     """
-    Simple HSV -> RGB conversion.
-    h in [0, 1], s in [0, 1], v in [0, 1]
-    returns (r, g, b) in [0, 1]
+    Generate n distinct-ish colors using an OpenCV colormap.
+    Returns a list of Color(r, g, b) with r,g,b in [0,1].
     """
-    i = int(h * 6.0)
-    f = (h * 6.0) - i
-    i = i % 6
+    if n <= 0:
+        return []
 
-    p = v * (1.0 - s)
-    q = v * (1.0 - f * s)
-    t = v * (1.0 - (1.0 - f) * s)
+    # values in [0, 255]
+    values = np.linspace(0, 255, n, dtype=np.uint8)
+    # shape (n,1) so applyColorMap gives (n,1,3)
+    gray = values.reshape(-1, 1)
 
-    if i == 0:
-        r, g, b = v, t, p
-    elif i == 1:
-        r, g, b = q, v, p
-    elif i == 2:
-        r, g, b = p, v, t
-    elif i == 3:
-        r, g, b = p, q, v
-    elif i == 4:
-        r, g, b = t, p, v
-    else:
-        r, g, b = v, p, q
+    # pick any nice colormap you like:
+    #   COLORMAP_TURBO (if available), COLORMAP_VIRIDIS, COLORMAP_JET, etc.
+    cmap = cv2.applyColorMap(gray, cv2.COLORMAP_VIRIDIS)
 
-    return r, g, b
+    palette = []
+    for i in range(n):
+        b, g, r = cmap[i, 0]  # OpenCV is BGR, uint8
+        palette.append(Color(r / 255.0, g / 255.0, b / 255.0))
+    return palette
 
 
-# Generate a palette with num_colors distinct-ish hues
-palette = []
-for k in range(num_colors):
-    h = k / max(1, num_colors)  # spread hues around the circle
-    s = 0.7
-    v = 1.0
-    r, g, b = hsv_to_rgb(h, s, v)
-    palette.append(Color(r, g, b))
+# --- collect bodies once ---
+bodies = list(world.bodies_with_enabled_collision)
 
-# Map each body to a Color via its color index
-colors_by_id = {node_id: palette[color_index_by_id[node_id]] for node_id in adj.keys()}
-
-for body in world.bodies_with_enabled_collision:
-    body_color = colors_by_id[body.id]
-    body.collision[0].override_mesh_with_color(body_color)
-
-scene.show()
-exit()
+# Optional: store original state so we can reset between groups.
+# You’ll need to adapt this to your actual API.
+original_state = {}
+for body in bodies:
+    visuals = body.collision[0].mesh.visual.copy()
+    # Replace 'current_color' with whatever your API uses.
+    # If you don't have a color property, you might skip this
+    # and just "overwrite" each iteration instead.
+    original_state[body.id] = {
+        "mesh_visuals": visuals,
+        # "color": getattr(coll, "color", None),   # example, if it exists
+        # store anything else you need to restore
+    }
 
 
-camera_pose = TransformationMatrix.from_xyz_rpy(
-    x=-3, y=0, z=3, roll=-np.pi / 2, pitch=np.pi / 4, yaw=0
-).to_np()
-# By default, the camera is looking along the -z axis, so we need to rotate it to look along the x-axis.
+def reset_scene_visuals():
+    """
+    Reset bodies to their original look.
+    You must fill in the restore logic for your engine.
+    """
+    for body in bodies:
+        visuals = original_state[body.id]["mesh_visuals"]
+        body.collision[0].mesh.visual = visuals
+
+
 rotate = trimesh.transformations.rotation_matrix(
     angle=np.radians(-90.0), direction=[0, 1, 0]
 )
@@ -162,15 +107,73 @@ rotate_x = trimesh.transformations.rotation_matrix(
     angle=np.radians(180.0), direction=[1, 0, 0]
 )
 
-scene.graph[scene.camera.name] = camera_pose @ rotate_x @ rotate
+camera_poses = []
 
-# Adjust field of view (FX/FY)
+camera_pose1 = TransformationMatrix.from_xyz_rpy(
+    x=-3, y=0, z=2.5, roll=-np.pi / 2, pitch=np.pi / 4, yaw=0
+).to_np()
+
+camera_poses.append(camera_pose1 @ rotate_x @ rotate)
+
+camera_pose2 = TransformationMatrix.from_xyz_rpy(
+    x=3, y=0, z=2.5, roll=-np.pi / 2, pitch=np.pi / 4, yaw=np.pi
+).to_np()
+
+camera_poses.append(camera_pose2 @ rotate_x @ rotate)
+
+camera_pose3 = TransformationMatrix.from_xyz_rpy(
+    x=0, y=-3.5, z=3, roll=-np.pi / 2, pitch=np.pi / 4, yaw=np.pi / 2
+).to_np()
+
+camera_poses.append(camera_pose3 @ rotate_x @ rotate)
+
+camera_pose4 = TransformationMatrix.from_xyz_rpy(
+    x=0, y=3.5, z=3, roll=-np.pi / 2, pitch=np.pi / 4, yaw=-np.pi / 2
+).to_np()
+
+camera_poses.append(camera_pose4 @ rotate_x @ rotate)
+
+output_path = Path("../resources/warsaw_data/scene_images/")
+
+if not output_path.exists():
+    output_path.mkdir(parents=True)
+
 scene.camera.fov = [60, 45]  # horizontal, vertical degrees
 
-scene.show()
+for j, pose in enumerate(camera_poses):
 
-# # Render to PNG bytes
-# png = scene.save_image(resolution=(1024, 768), visible=True)
-#
-# with open("render.png", "wb") as f:
-#     f.write(png)
+    scene.graph[scene.camera.name] = pose
+
+    png = scene.save_image(resolution=(1024, 768), visible=True)
+
+    with open(os.path.join(output_path, f"original_render_{j}.png"), "wb") as f:
+        f.write(png)
+
+# --- iterate over groups of bodies ---
+for i, start in enumerate(range(0, len(bodies), number_of_bodies)):
+    group = bodies[start : start + number_of_bodies]
+
+    # reset everything to default look
+    reset_scene_visuals()
+
+    # create palette for this group
+    palette = make_opencv_palette(len(group))
+
+    # apply colors only to the current group; others keep texture
+    for body, color in zip(group, palette):
+        body.collision[0].override_mesh_with_color(color)
+
+    # (Re)build ray tracer / scene if needed
+    rt = RayTracer(world=world)
+    scene = rt.scene
+
+    scene.camera.fov = [60, 45]  # horizontal, vertical degrees
+
+    for j, pose in enumerate(camera_poses):
+
+        scene.graph[scene.camera.name] = pose
+
+        png = scene.save_image(resolution=(1024, 768), visible=True)
+
+        with open(os.path.join(output_path, f"group_{i}_render_{j}.png"), "wb") as f:
+            f.write(png)
