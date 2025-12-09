@@ -2,12 +2,14 @@ from __future__ import absolute_import
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import wraps, lru_cache, cached_property
 from itertools import combinations_with_replacement
+from pathlib import Path
 from uuid import UUID
 
 import numpy as np
@@ -1157,9 +1159,7 @@ class World:
     def get_actuator_by_id(self, id: UUID) -> Actuator:
         return self._get_world_entity_by_hash(hash(id))
 
-    def _get_world_entity_by_hash(
-        self, entity_hash: int
-    ) -> GenericWorldEntity:
+    def _get_world_entity_by_hash(self, entity_hash: int) -> GenericWorldEntity:
         """
         Retrieve a WorldEntity by its hash.
 
@@ -1175,7 +1175,10 @@ class World:
     def is_semantic_annotation_in_world(
         self, semantic_annotation: SemanticAnnotation
     ) -> bool:
-        return semantic_annotation._world == self and semantic_annotation in self.semantic_annotations
+        return (
+            semantic_annotation._world == self
+            and semantic_annotation in self.semantic_annotations
+        )
 
     def is_body_in_world(self, body: Body) -> bool:
         return self._is_world_entity_with_hash_in_world_from_iterable(hash(body))
@@ -1912,6 +1915,41 @@ class World:
                 new_connection = connection.copy_for_world(new_world)
                 new_world.add_connection(new_connection)
         return new_world
+
+    def export_kinematic_structure_tree_to_json(
+        self, output_path: Path, include_connections: bool = True
+    ) -> None:
+        """
+        Export the kinematic structure tree to a JSON representation.
+        :param output_path: Path to the output file.
+        """
+
+        def _export_node(kse: KinematicStructureEntity) -> Dict[str, Any]:
+
+            json_dict = {
+                "name": kse.name.name,
+                "children": [
+                    _export_node(child)
+                    for child in kse.child_kinematic_structure_entities
+                ],
+            }
+
+            if include_connections:
+                json_dict["parent_connection"] = (
+                    kse.parent_connection.__class__.__name__
+                    if kse.parent_connection
+                    else None
+                )
+
+            return json_dict
+
+        if self.is_empty():
+            raise ValueError("Cannot export an empty world.")
+
+        root = self.root
+        kinematic_tree = _export_node(root)
+        with output_path.open("w") as f:
+            json.dump(kinematic_tree, f, indent=4)
 
     # %% Associations
     def load_collision_srdf(self, file_path: str):

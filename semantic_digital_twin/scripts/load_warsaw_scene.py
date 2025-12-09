@@ -14,9 +14,13 @@ from semantic_digital_twin.pipeline.pipeline import (
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.utils import InheritanceStructureExporter
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    SemanticAnnotation,
+)
 
 dir_path = "/home/itsme/work/cram_ws/src/cognitive_robot_abstract_machine/semantic_digital_twin/resources/warsaw_data/objects/"
 files = [f for f in os.listdir(dir_path) if f.endswith(".obj")]
@@ -40,6 +44,18 @@ pipeline = Pipeline(
     ]
 )
 world = pipeline.apply(world)
+output_path = Path("../resources/warsaw_data/json_exports/")
+if not output_path.exists():
+    output_path.mkdir(parents=True)
+world.export_kinematic_structure_tree_to_json(
+    Path(os.path.join(output_path, "kinematic_structure.json")),
+    include_connections=False,
+)
+
+InheritanceStructureExporter(
+    SemanticAnnotation, Path(os.path.join(output_path, "semantic_annotations.json"))
+).export()
+
 rt = RayTracer(world=world)
 scene = rt.scene
 
