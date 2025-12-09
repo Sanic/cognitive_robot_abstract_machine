@@ -191,8 +191,11 @@ class TransformGeometry(Step):
                         transformed_vertices = (
                             self.transform.to_np() @ homogenous_vertices.T
                         ).T[:, :3]
+
                         new_trimesh = trimesh.Trimesh(
-                            vertices=transformed_vertices, faces=mesh.faces
+                            vertices=transformed_vertices,
+                            faces=mesh.faces,
+                            visual=mesh.visual,
                         )
                         new_mesh = TriangleMesh(
                             origin=coll.origin,
