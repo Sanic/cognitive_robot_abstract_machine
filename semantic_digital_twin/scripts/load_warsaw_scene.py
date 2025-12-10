@@ -84,7 +84,7 @@ frustum_culling_max_distance = 8.0
 # Camera height filter: poses outside this [min, max] world Z interval are rejected early
 # Defaults allow all heights; set to finite values to enable filtering
 min_camera_height = 0.5  # -float('inf')
-max_camera_height = 4.5  # float('inf')
+max_camera_height = 2.0  # float('inf')
 ###
 
 
@@ -109,6 +109,7 @@ class CameraPose:
     geometry_key: str
 
 
+# These are just defaults. Make sure to change the values way below in the instantiation
 @dataclass
 class ConeSamplingConfig:
     """
@@ -118,13 +119,13 @@ class ConeSamplingConfig:
     a half-angle of ``cone_half_angle_deg``.
     """
 
-    cone_half_angle_deg: float = 75
+    cone_half_angle_deg: float = 25
     samples_per_cone: int = 12
     roll_samples: int = 1
     seed: int | None = None
     fit_method: str = "footprint_2d"  # or "spherical"
     # If True, reject poses whose directional viewing cones overlap existing ones (per object)
-    reject_overlapping_cones: bool = True
+    reject_overlapping_cones: bool = True  # True
     # Small angular margin added to the cone-overlap test (degrees)
     cone_overlap_margin_deg: float = 5.0
 
@@ -486,7 +487,7 @@ def add_camera_origin_spheres(
                 pose.camera,
                 pose.transform,
                 require_full_visibility=True,
-                occlusion_check=True,
+                occlusion_check=occlusion_check,
                 samples_per_mesh=samples_per_mesh,
                 visibility_threshold=visibility_threshold,
             )
@@ -984,8 +985,8 @@ def generate_cone_view_poses(
 
 # Generate additional cone-based viewpoints and merge them with the existing poses
 cone_cfg = ConeSamplingConfig(
-    cone_half_angle_deg=25.0,
-    samples_per_cone=12,
+    cone_half_angle_deg=75,
+    samples_per_cone=20,
     roll_samples=1,
     fit_method="footprint_2d",
 )
@@ -1009,7 +1010,7 @@ add_camera_origin_spheres(
     scene,
     generated_camera_poses,
     radius=0.08,
-    occlusion_check=True,
+    occlusion_check=False,
     samples_per_mesh=64,
     visibility_threshold=0.8,
 )
