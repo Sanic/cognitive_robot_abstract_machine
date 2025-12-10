@@ -73,116 +73,109 @@ scene.add_geometry(
 )
 
 
+####
+test_fov = [60, 45]  # horizontal, vertical degrees
+###
+
+
 import numpy as np
 import trimesh
 from trimesh.scene.cameras import Camera
 
 
-# --- helpers ---
-def _safe_normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    n = np.linalg.norm(v)
-    if n < eps:
-        return v
-    return v / n
+def add_mean_normal_lines_and_cameras(
+    scene, normal_length: float = 1.0, marker_height: float = 0.15
+):
+    import numpy as np
+    import trimesh
+    from trimesh.scene.cameras import Camera
 
+    def _safe_normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+        n = np.linalg.norm(v)
+        if n < eps:
+            return v
+        return v / n
 
-def look_at_transform(
-    origin: np.ndarray, target: np.ndarray, up_hint: np.ndarray | None = None
-) -> np.ndarray:
-    """
-    Build a camera-to-world transform where the camera is at `origin`,
-    looking at `target`. The camera looks along -Z, Y is up, X is right.
-    """
-    if up_hint is None:
-        up_hint = np.array([0.0, 0.0, 1.0])
-
-    f = _safe_normalize(target - origin)  # forward (world)
-    z_cam = -f  # camera -Z points along forward
-
-    # Build X from up x Z; if degenerate, pick another up
-    x_cam = np.cross(up_hint, z_cam)
-    if np.linalg.norm(x_cam) < 1e-6:
-        up_hint = np.array([0.0, 1.0, 0.0])
+    def look_at_transform(
+        origin: np.ndarray, target: np.ndarray, up_hint: np.ndarray | None = None
+    ) -> np.ndarray:
+        if up_hint is None:
+            up_hint = np.array([0.0, 0.0, 1.0])
+        f = _safe_normalize(target - origin)  # forward (world)
+        z_cam = -f  # camera -Z
         x_cam = np.cross(up_hint, z_cam)
+        if np.linalg.norm(x_cam) < 1e-6:
+            up_hint = np.array([0.0, 1.0, 0.0])
+            x_cam = np.cross(up_hint, z_cam)
+        x_cam = _safe_normalize(x_cam)
+        y_cam = _safe_normalize(np.cross(z_cam, x_cam))
+        T = np.eye(4)
+        T[:3, 0] = x_cam
+        T[:3, 1] = y_cam
+        T[:3, 2] = z_cam
+        T[:3, 3] = origin
+        return T
 
-    x_cam = _safe_normalize(x_cam)
-    y_cam = _safe_normalize(np.cross(z_cam, x_cam))
+    line_color = np.array([255, 32, 32, 255], dtype=np.uint8)
+    marker_cam = Camera(resolution=(640, 480), fov=test_fov)
 
-    T = np.eye(4)
-    T[:3, 0] = x_cam
-    T[:3, 1] = y_cam
-    T[:3, 2] = z_cam
-    T[:3, 3] = origin
-    return T
+    for node_name in scene.graph.nodes_geometry:
+        _, gkey = scene.graph[node_name]
+        geom = scene.geometry[gkey]
+        if not isinstance(geom, trimesh.Trimesh):
+            continue
+
+        T_node, _ = scene.graph.get(
+            frame_to=node_name, frame_from=scene.graph.base_frame
+        )
+        R = T_node[:3, :3]
+        t = T_node[:3, 3]
+
+        if geom.faces.shape[0] == 0:
+            continue
+        face_normals = geom.face_normals
+        if hasattr(geom, "area_faces") and geom.area_faces is not None:
+            w = geom.area_faces.reshape(-1, 1)
+            n_local = (face_normals * w).sum(axis=0)
+        else:
+            n_local = face_normals.mean(axis=0)
+        n_local = _safe_normalize(n_local)
+        if np.linalg.norm(n_local) < 1e-12:
+            continue
+
+        c_local = geom.center_mass if geom.is_volume else geom.centroid
+        c_world = (R @ c_local) + t
+        n_world = _safe_normalize(R @ n_local)
+        if np.linalg.norm(n_world) < 1e-12:
+            continue
+
+        p0 = c_world
+        p1 = c_world + normal_length * n_world
+
+        path = trimesh.load_path(np.vstack([p0, p1]))
+        path.colors = np.tile(line_color, (len(path.entities), 1))
+        line_node_name = f"normal_line__{node_name}__{gkey}"
+        scene.add_geometry(
+            path,
+            node_name=line_node_name,
+            parent_node_name=scene.graph.base_frame,
+            transform=np.eye(4),
+        )
+
+        T_cam = look_at_transform(origin=p1, target=p0)
+        cam_marker = trimesh.creation.camera_marker(
+            marker_cam, marker_height=marker_height
+        )
+        cam_node_name = f"camera_marker__{node_name}__{gkey}"
+        scene.add_geometry(
+            cam_marker,
+            node_name=cam_node_name,
+            parent_node_name=scene.graph.base_frame,
+            transform=T_cam,
+        )
 
 
-# --- parameters ---
-line_color = np.array([255, 32, 32, 255], dtype=np.uint8)
-marker_height = 0.15  # meters (scale of the camera frustum)
-# Create a reusable camera model for markers (FOV arbitrary but reasonable)
-marker_cam = Camera(resolution=(640, 480), fov=(60.0, 45.0))
-
-# --- iterate meshes, draw line and marker ---
-for node_name in scene.graph.nodes_geometry:
-    # node tuple is (parent_node_name, geometry_key)
-    _, gkey = scene.graph[node_name]
-    geom = scene.geometry[gkey]
-    if not isinstance(geom, trimesh.Trimesh):
-        continue
-
-    # Transform from world (base) to this node
-    T_node, _ = scene.graph.get(frame_to=node_name, frame_from=scene.graph.base_frame)
-    R = T_node[:3, :3]
-    t = T_node[:3, 3]
-
-    # Compute area-weighted mean normal in local frame
-    if geom.faces.shape[0] == 0:
-        continue
-    face_normals = geom.face_normals
-    if hasattr(geom, "area_faces") and geom.area_faces is not None:
-        w = geom.area_faces.reshape(-1, 1)
-        n_local = (face_normals * w).sum(axis=0)
-    else:
-        n_local = face_normals.mean(axis=0)
-    n_local = _safe_normalize(n_local)
-    if np.linalg.norm(n_local) < 1e-12:
-        continue
-
-    # Choose centroid: center of mass for volumes, centroid for surfaces
-    c_local = geom.center_mass if geom.is_volume else geom.centroid
-
-    # Map to world
-    c_world = (R @ c_local) + t
-    n_world = _safe_normalize(R @ n_local)
-    if np.linalg.norm(n_world) < 1e-12:
-        continue
-
-    # 1 meter segment
-    p0 = c_world
-    p1 = c_world + 1.0 * n_world
-
-    # 1) Add the red normal line in world frame
-    path = trimesh.load_path(np.vstack([p0, p1]))
-    path.colors = np.tile(line_color, (len(path.entities), 1))
-    line_node_name = f"normal_line__{node_name}__{gkey}"
-    scene.add_geometry(
-        path,
-        node_name=line_node_name,
-        parent_node_name=scene.graph.base_frame,
-        transform=np.eye(4),
-    )
-
-    # 2) Add a camera marker at p1, oriented to look toward p0
-    T_cam = look_at_transform(origin=p1, target=p0)
-    cam_marker = trimesh.creation.camera_marker(marker_cam, marker_height=marker_height)
-    cam_node_name = f"camera_marker__{node_name}__{gkey}"
-    scene.add_geometry(
-        cam_marker,
-        node_name=cam_node_name,
-        parent_node_name=scene.graph.base_frame,
-        transform=T_cam,
-    )
-
+add_mean_normal_lines_and_cameras(scene, normal_length=1.25, marker_height=0.5)
 
 import numpy as np
 
