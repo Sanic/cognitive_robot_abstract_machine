@@ -10,13 +10,24 @@ from semantic_digital_twin.world_description.world_entity import SemanticAnnotat
 
 
 class SpecialFieldTypes(Enum):
+    """
+    Special field types for semantic annotation class building.
+    """
+
     NO_DEFAULT = object
+    """
+    Indicates that a field has no default value. Needed because `None` can be a valid default.
+    """
 
 
 SemanticAnnotationFieldDefaultTypes = Union[SpecialFieldTypes, Any]
 
 
 class SemanticAnnotationFilePaths(Enum):
+    """
+    File paths related to semantic annotations for easy access.
+    """
+
     MAIN_SEMANTIC_ANNOTATION_FILE = os.path.join(
         Path(__file__).resolve().parent, "semantic_annotations.py"
     )
@@ -81,6 +92,9 @@ class SemanticAnnotationClassBuilder:
     # %% In memory dataclass creation
 
     def _expand_fields_for_make_dataclass(self):
+        """
+        Expands the fields to be compatible with make_dataclass, converting fields without defaults
+        """
         expanded = []
         for name, type_, default in self.fields:
             if default is SpecialFieldTypes.NO_DEFAULT:
@@ -92,8 +106,13 @@ class SemanticAnnotationClassBuilder:
         return expanded
 
     def build(self):
+        """
+        Builds the semantic annotation class in memory as a dataclass.
+        :return: The semantic annotation class.
+        :raises TypeError: If at least one base class is not a subclass of SemanticAnnotation.
+        """
         if not any(issubclass(base, SemanticAnnotation) for base in self.bases):
-            raise ValueError(
+            raise TypeError(
                 f"At least one base class must be a subclass of SemanticAnnotation."
             )
         expanded_fields = self._expand_fields_for_make_dataclass()
@@ -107,6 +126,9 @@ class SemanticAnnotationClassBuilder:
 
     # %% Jinja rendering
     def _fields_for_template(self):
+        """
+        Prepares the fields for rendering in the Jinja template.
+        """
         out = []
         for name, type_, default in self.fields:
             out.append(
@@ -123,6 +145,9 @@ class SemanticAnnotationClassBuilder:
         return out
 
     def render_source(self, include_imports: bool = False) -> str:
+        """
+        Renders the semantic annotation class as source code using the specified Jinja template.
+        """
         template = self._env.get_template(self.template_name)
         rendered = template.render(
             name=self.name,
@@ -133,6 +158,9 @@ class SemanticAnnotationClassBuilder:
         return rendered.rstrip() + "\n"
 
     def append_to_file(self, filepath: Path, include_imports: bool = False):
+        """
+        Appends the rendered semantic annotation class source code to the specified file.
+        """
         src = self.render_source(include_imports=include_imports)
         with open(str(filepath), "a", encoding="utf-8") as f:
             f.write("\n\n" + src)
