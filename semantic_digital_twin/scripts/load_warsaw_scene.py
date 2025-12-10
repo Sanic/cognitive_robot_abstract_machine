@@ -63,14 +63,15 @@ scene = rt.scene
 # import trimesh
 # from semantic_digital_twin.spatial_types import TransformationMatrix
 
-s = trimesh.creation.icosphere(subdivisions=2, radius=0.1)
-# Set color (RGBA)
-s.visual.vertex_colors = trimesh.visual.color.to_rgba([255, 80, 80, 255])
-
-T = TransformationMatrix.from_xyz_rpy(x=1.0, y=0.5, z=0.8).to_np()
-scene.add_geometry(
-    s, node_name="debug_sphere_temp", parent_node_name="world", transform=T
-)
+# Add simple sphere
+# s = trimesh.creation.icosphere(subdivisions=2, radius=0.1)
+# # Set color (RGBA)
+# s.visual.vertex_colors = trimesh.visual.color.to_rgba([255, 80, 80, 255])
+#
+# T = TransformationMatrix.from_xyz_rpy(x=1.0, y=0.5, z=0.8).to_np()
+# scene.add_geometry(
+#     s, node_name="debug_sphere_temp", parent_node_name="world", transform=T
+# )
 
 
 ####
@@ -222,21 +223,89 @@ def add_camera_origin_spheres(
     scene: trimesh.Scene,
     camera_poses: list[CameraPose],
     radius: float = 0.05,
-    color_rgba: tuple[int, int, int, int] = (80, 180, 255, 255),
+    color_rgba: tuple[int, int, int, int] | None = None,
+    *,
+    occlusion_check: bool = False,
+    samples_per_mesh: int = 32,
+    visibility_threshold: float = 0.8,
 ) -> None:
     """
-    Add a small colored sphere at the origin of each provided camera pose.
+    Add a small sphere at each camera origin and color it by how many bodies
+    are fully inside the camera frustum.
 
-    The sphere is centered at the camera origin in world coordinates.
+    If ``color_rgba`` is None, a two-color gradient is used (blue → red), where
+    blue means few objects fully visible and red means many objects fully visible.
 
     :param scene: The scene to which the spheres are added.
     :param camera_poses: List of camera poses whose origins are to be marked.
     :param radius: Radius of the marker spheres in meters.
-    :param color_rgba: RGBA color used for the spheres as 0–255 integers.
+    :param color_rgba: If provided, overrides data-driven colors with this RGBA.
     """
-    for pose in camera_poses:
+
+    def _count_fully_visible_bodies(pose: CameraPose) -> int:
+        # Use frustum culling to get fully inside nodes, then map to unique body indices
+        try:
+            fully_inside, _ = frustum_cull_scene(
+                scene,
+                pose.camera,
+                pose.transform,
+                require_full_visibility=True,
+                occlusion_check=occlusion_check,
+                samples_per_mesh=samples_per_mesh,
+                visibility_threshold=visibility_threshold,
+            )
+        except NameError:
+            # Fallback if frustum function not yet defined
+            fully_inside = set()
+
+        # Prefer RayTracer mapping if available
+        body_indices = set()
+        mapping = None
+        try:
+            mapping = rt.scene_to_index  # type: ignore[name-defined]
+        except Exception:
+            mapping = None
+
+        if mapping is not None:
+            for node in fully_inside:
+                if node in mapping:
+                    body_indices.add(mapping[node])
+        else:
+            # Fallback: deduplicate by body name prefix before '_collision_'
+            for node in fully_inside:
+                if "_collision_" in node:
+                    body_indices.add(node.split("_collision_")[0])
+
+        return len(body_indices)
+
+    # Compute counts per pose for normalization
+    counts = [
+        _count_fully_visible_bodies(pose) if color_rgba is None else 0
+        for pose in camera_poses
+    ]
+    max_count = max(counts) if counts else 0
+
+    def _val_to_rgba(v: float) -> tuple[int, int, int, int]:
+        """
+        Map a normalized value v in [0,1] to a color using a two-color gradient
+        from blue (low) to red (high).
+        """
+        v = float(max(0.0, min(1.0, v)))
+        low = np.array([0, 0, 255, 255], dtype=float)  # blue
+        high = np.array([255, 0, 0, 255], dtype=float)  # red
+        rgba = (1.0 - v) * low + v * high
+        return tuple(int(round(c)) for c in rgba)
+
+    for idx, pose in enumerate(camera_poses):
+        # Determine color
+        if color_rgba is None:
+            v = (counts[idx] / max_count) if max_count > 0 else 0.0
+            rgba = _val_to_rgba(v)
+        else:
+            rgba = color_rgba
+
         sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
-        sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(color_rgba)
+        sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
 
         node_name = f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}"
         scene.add_geometry(
@@ -247,35 +316,12 @@ def add_camera_origin_spheres(
         )
 
 
-# Place a small sphere at each generated camera origin
-add_camera_origin_spheres(scene, generated_camera_poses, radius=0.08)
+# Note: spheres are placed after frustum utilities are defined (see below) so
+# they can be colored by visibility counts.
 
 # -----------------------------------------------------------------------------
-# Frustum culling utilities (projection to NDC and AABB testing)
+# Frustum culling utilities (Option 2: camera-space FOV angle tests)
 # -----------------------------------------------------------------------------
-
-
-def _safe_div(a: np.ndarray, b: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    """
-    Divide a by b in a numerically stable manner.
-    """
-    return a / (b + eps)
-
-
-def _project_points_to_ndc(
-    P: np.ndarray, V: np.ndarray, points_world: np.ndarray
-) -> np.ndarray:
-    """
-    Project world points to Normalized Device Coordinates.
-    """
-    N = len(points_world)
-    pts_h = np.hstack([points_world, np.ones((N, 1))])
-    clip = (P @ (V @ pts_h.T)).T
-    ndc = np.empty((N, 3))
-    ndc[:, 0] = _safe_div(clip[:, 0], clip[:, 3])
-    ndc[:, 1] = _safe_div(clip[:, 1], clip[:, 3])
-    ndc[:, 2] = _safe_div(clip[:, 2], clip[:, 3])
-    return ndc
 
 
 def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
@@ -289,15 +335,14 @@ def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
     return np.array([[x, y, z] for x in xs for y in ys for z in zs], dtype=float)
 
 
-def camera_matrices(
-    camera: Camera, T_cam_world: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+def camera_view_matrix(T_cam_world: np.ndarray) -> np.ndarray:
     """
-    Compute projection and view matrices for a camera pose.
+    Compute the view matrix V that maps world -> camera.
+
+    Assumes T_cam_world maps camera coordinates to world coordinates and
+    that the camera looks along its local negative Z axis.
     """
-    P = camera.matrix
-    V = np.linalg.inv(T_cam_world)
-    return P, V
+    return np.linalg.inv(T_cam_world)
 
 
 def frustum_cull_scene(
@@ -306,16 +351,95 @@ def frustum_cull_scene(
     T_cam_world: np.ndarray,
     require_full_visibility: bool = True,
     eps: float = 1e-6,
+    *,
+    occlusion_check: bool = False,
+    samples_per_mesh: int = 32,
+    visibility_threshold: float = 0.8,
 ) -> tuple[set[str], set[str]]:
     """
-    Test scene meshes against the camera frustum.
+    Test scene meshes against the camera frustum using camera-space FOV tests.
 
+    Convention: camera looks along negative Z. Points in front have z_cam < 0.
     Returns two sets of node names: fully_inside and partially_inside.
+
+    If ``occlusion_check`` is True, candidate meshes are validated by ray casting
+    from the camera origin to samples on the mesh. For a mesh to count as fully
+    visible, at least ``visibility_threshold`` fraction of the sampled points
+    must be the first hit in the scene.
     """
-    P, V = camera_matrices(camera, T_cam_world)
+    V = camera_view_matrix(T_cam_world)
+
+    # FOV to tangents
+    fovx_deg, fovy_deg = float(camera.fov[0]), float(camera.fov[1])
+    tx = np.tan(np.deg2rad(fovx_deg) * 0.5)
+    ty = np.tan(np.deg2rad(fovy_deg) * 0.5)
+    z_near = float(camera.z_near)
+    z_far = float(camera.z_far)
 
     fully_inside: set[str] = set()
     partially_inside: set[str] = set()
+
+    # Prepare ray engine if we do occlusion. Some trimesh versions don't expose
+    # Scene.ray; in that case build a fallback intersector on a merged world-space mesh.
+    ray_engine = None
+    use_scene_ray = False
+    if occlusion_check:
+        try:
+            candidate = getattr(scene, "ray", None)
+            if candidate is not None and hasattr(candidate, "intersects_location"):
+                ray_engine = candidate
+                use_scene_ray = True
+        except Exception:
+            ray_engine = None
+
+        if ray_engine is None:
+            # Build a cached fallback ray intersector for this scene id
+            from dataclasses import dataclass
+            from functools import lru_cache
+            import trimesh as _tm
+
+            @dataclass
+            class _RayEngine:
+                intersector: any
+
+            @lru_cache(maxsize=8)
+            def _build_ray_engine_for_scene(scene_id: int) -> _RayEngine:
+                # Reconstruct meshes in world frame and concatenate
+                meshes = []
+                for _node in scene.graph.nodes_geometry:
+                    _, _gk = scene.graph[_node]
+                    _geom = scene.geometry[_gk]
+                    if not isinstance(_geom, _tm.Trimesh):
+                        continue
+                    Tnw, _ = scene.graph.get(
+                        frame_to=_node, frame_from=scene.graph.base_frame
+                    )
+                    Rnw = Tnw[:3, :3]
+                    tnw = Tnw[:3, 3]
+                    m = _geom.copy()
+                    m.vertices = (Rnw @ m.vertices.T).T + tnw
+                    meshes.append(m)
+                if len(meshes) == 0:
+                    # Create an empty tiny mesh to avoid errors
+                    combined = _tm.Trimesh(
+                        vertices=np.zeros((0, 3)),
+                        faces=np.zeros((0, 3), dtype=np.int64),
+                        process=False,
+                    )
+                else:
+                    combined = _tm.util.concatenate(meshes)
+                # Create intersector
+                try:
+                    from trimesh.ray.ray_triangle import RayMeshIntersector
+
+                    intersector = RayMeshIntersector(combined)
+                except Exception:
+                    # Fallback to slower generic ray if available
+                    intersector = combined.ray
+                return _RayEngine(intersector=intersector)
+
+            _engine = _build_ray_engine_for_scene(id(scene))
+            ray_engine = _engine
 
     for node_name in scene.graph.nodes_geometry:
         _, gkey = scene.graph[node_name]
@@ -323,36 +447,133 @@ def frustum_cull_scene(
         if not isinstance(geom, trimesh.Trimesh):
             continue
 
+        # Local AABB corners -> world
         corners_local = _aabb_corners(geom.bounds)
         T_node_world, _ = scene.graph.get(
             frame_to=node_name, frame_from=scene.graph.base_frame
         )
         corners_world = (T_node_world[:3, :3] @ corners_local.T).T + T_node_world[:3, 3]
 
-        ndc = _project_points_to_ndc(P, V, corners_world)
+        # World -> camera
+        N = len(corners_world)
+        pts_h = np.hstack([corners_world, np.ones((N, 1))])
+        pc = (V @ pts_h.T).T  # (N,4)
+        x = pc[:, 0]
+        y = pc[:, 1]
+        z = pc[:, 2]
+
+        # Camera looks along -Z; distance in front:
+        dz = -z
+
         inside_mask = (
-            (ndc[:, 0] >= -1.0 - eps)
-            & (ndc[:, 0] <= 1.0 + eps)
-            & (ndc[:, 1] >= -1.0 - eps)
-            & (ndc[:, 1] <= 1.0 + eps)
-            & (ndc[:, 2] >= -1.0 - eps)
-            & (ndc[:, 2] <= 1.0 + eps)
+            (dz >= z_near - eps)
+            & (dz <= z_far + eps)
+            & (np.abs(x) <= dz * tx + eps)
+            & (np.abs(y) <= dz * ty + eps)
         )
 
         all_inside = bool(np.all(inside_mask))
         any_inside = bool(np.any(inside_mask))
 
+        candidate_full = False
+        candidate_partial = False
         if require_full_visibility:
-            if all_inside:
-                fully_inside.add(node_name)
+            candidate_full = all_inside
         else:
-            if any_inside:
-                partially_inside.add(node_name)
+            candidate_partial = any_inside
+
+        if not (candidate_full or candidate_partial):
+            continue
+
+        if occlusion_check and ray_engine is not None:
+            # Sample points on the mesh surface in local frame
+            try:
+                n_samples = max(8, int(samples_per_mesh))
+                pts_local = geom.sample(n_samples)
+                if pts_local.shape[0] == 0:
+                    # fall back to AABB corners and centroid
+                    aabb = _aabb_corners(geom.bounds)
+                    centroid = geom.centroid.reshape(1, 3)
+                    pts_local = np.vstack([aabb, centroid])
+            except Exception:
+                aabb = _aabb_corners(geom.bounds)
+                centroid = geom.centroid.reshape(1, 3)
+                pts_local = np.vstack([aabb, centroid])
+
+            # Transform samples to world
+            pts_world = (T_node_world[:3, :3] @ pts_local.T).T + T_node_world[:3, 3]
+
+            # Build rays from camera origin
+            origin = T_cam_world[:3, 3]
+            dirs = pts_world - origin
+            dists = np.linalg.norm(dirs, axis=1)
+            valid = dists > eps
+            if not np.any(valid):
+                continue
+            dirs = dirs[valid] / dists[valid][:, None]
+            pts_world = pts_world[valid]
+            dists = dists[valid]
+
+            # Intersect
+            try:
+                if use_scene_ray:
+                    loc, idx_ray, _ = ray_engine.intersects_location(
+                        ray_origins=np.repeat(origin[None, :], len(dirs), axis=0),
+                        ray_directions=dirs,
+                        multiple_hits=False,
+                    )
+                else:
+                    loc, idx_ray, _ = ray_engine.intersector.intersects_location(
+                        ray_origins=np.repeat(origin[None, :], len(dirs), axis=0),
+                        ray_directions=dirs,
+                    )
+            except Exception:
+                loc = np.empty((0, 3))
+                idx_ray = np.empty((0,), dtype=int)
+
+            # Count rays where first hit distance matches the sampled point distance
+            visible = 0
+            if len(idx_ray) > 0:
+                hit_d = np.linalg.norm(loc - origin, axis=1)
+                # Map back to corresponding target distances
+                target_d = dists[idx_ray]
+                # If the first intersection is at the same distance (+/- tol), it is not occluded
+                visible = int(np.sum(np.abs(hit_d - target_d) <= 1e-3))
+            # consider rays that did not hit anything as not visible
+            visibility_ratio = visible / max(1, len(dirs))
+
+            if require_full_visibility:
+                candidate_full = candidate_full and (
+                    visibility_ratio >= visibility_threshold
+                )
+                if not candidate_full:
+                    continue
+            else:
+                # For partial case, require that at least one sample is visible
+                candidate_partial = candidate_partial and (visibility_ratio > 0.0)
+                if not candidate_partial:
+                    continue
+
+        if candidate_full:
+            fully_inside.add(node_name)
+        elif candidate_partial:
+            partially_inside.add(node_name)
 
     return fully_inside, partially_inside
 
 
 import numpy as np
+
+# After defining frustum utilities, place spheres colored by visibility counts
+# Enable occlusion checking so colors reflect actually visible bodies, not just frustum inclusion
+add_camera_origin_spheres(
+    scene,
+    generated_camera_poses,
+    radius=0.08,
+    occlusion_check=False,
+    samples_per_mesh=64,
+    visibility_threshold=0.8,
+)
 
 number_of_bodies = 4  # <-- group size you want
 
