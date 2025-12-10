@@ -76,8 +76,8 @@ scene = rt.scene
 
 ####
 test_fov = [60, 45]  # horizontal, vertical degrees
-fixed_camera_distance = 1.5
-frustum_culling_max_distance = 5.0
+min_standoff_distance = 1.5
+max_view_distance = 5.0
 ###
 
 
@@ -102,7 +102,13 @@ class CameraPose:
 
 
 def add_mean_normal_lines_and_cameras(
-    scene, normal_length: float = 1.0, marker_height: float = 0.15
+    scene,
+    normal_length: float | None = None,
+    marker_height: float = 0.15,
+    *,
+    min_standoff: float | None = None,
+    max_distance: float | None = None,
+    fov_deg_xy: tuple[float, float] | None = None,
 ) -> list[CameraPose]:
     import numpy as np
     import trimesh
@@ -142,6 +148,29 @@ def add_mean_normal_lines_and_cameras(
     def _new_camera_instance() -> Camera:
         return Camera(resolution=(640, 480), fov=test_fov)
 
+    # Resolve configuration with sensible defaults from module-level settings
+    # normal_length (if provided) is treated as the minimum standoff distance for backwards compatibility
+    effective_min_standoff = (
+        min_standoff
+        if min_standoff is not None
+        else (normal_length if normal_length is not None else 1.0)
+    )
+    effective_max_distance = (
+        max_distance if max_distance is not None else max_view_distance
+    )
+    fov_xy = (
+        fov_deg_xy
+        if fov_deg_xy is not None
+        else (float(test_fov[0]), float(test_fov[1]))
+    )
+
+    # Precompute FOV tangents
+    fovx_deg, fovy_deg = float(fov_xy[0]), float(fov_xy[1])
+    tx = np.tan(np.deg2rad(fovx_deg) * 0.5)
+    ty = np.tan(np.deg2rad(fovy_deg) * 0.5)
+
+    margin_factor = 1.05  # small safety margin to ensure full coverage
+
     camera_poses: list[CameraPose] = []
 
     for node_name in scene.graph.nodes_geometry:
@@ -174,8 +203,39 @@ def add_mean_normal_lines_and_cameras(
         if np.linalg.norm(n_world) < 1e-12:
             continue
 
+        # Compute a conservative world-space radius of the object around its centroid
+        # using the transformed local AABB corners.
+        corners_local = np.array(
+            [
+                [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[0][2]],
+                [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[1][2]],
+                [geom.bounds[0][0], geom.bounds[1][1], geom.bounds[0][2]],
+                [geom.bounds[0][0], geom.bounds[1][1], geom.bounds[1][2]],
+                [geom.bounds[1][0], geom.bounds[0][1], geom.bounds[0][2]],
+                [geom.bounds[1][0], geom.bounds[0][1], geom.bounds[1][2]],
+                [geom.bounds[1][0], geom.bounds[1][1], geom.bounds[0][2]],
+                [geom.bounds[1][0], geom.bounds[1][1], geom.bounds[1][2]],
+            ],
+            dtype=float,
+        )
+        corners_world = (R @ corners_local.T).T + t
+        # radius is the max distance from centroid to any corner
+        radius_world = float(np.max(np.linalg.norm(corners_world - c_world, axis=1)))
+
+        # Distance needed so the whole object fits inside the frustum given FOV
+        # Ensure both horizontal and vertical fit
+        fit_distance = margin_factor * max(
+            (radius_world / tx) if tx > 1e-12 else np.inf,
+            (radius_world / ty) if ty > 1e-12 else np.inf,
+        )
+
+        # Final standoff distance with min and max bounds
+        standoff_distance = max(effective_min_standoff, fit_distance)
+        if effective_max_distance is not None:
+            standoff_distance = min(standoff_distance, effective_max_distance)
+
         p0 = c_world
-        p1 = c_world + normal_length * n_world
+        p1 = c_world + standoff_distance * n_world
 
         path = trimesh.load_path(np.vstack([p0, p1]))
         path.colors = np.tile(line_color, (len(path.entities), 1))
@@ -213,13 +273,17 @@ def add_mean_normal_lines_and_cameras(
 
 # Generate visualization and collect camera instances and their poses
 generated_camera_poses = add_mean_normal_lines_and_cameras(
-    scene, normal_length=fixed_camera_distance, marker_height=fixed_camera_distance
+    scene,
+    marker_height=min_standoff_distance,
+    min_standoff=min_standoff_distance,
+    max_distance=max_view_distance,
+    fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
 )
 
 # Set the z_far distance of all cameras to a fixed value. This affects the frustum culling calculation
 # to decide which objects are visible.
 for pose in generated_camera_poses:
-    pose.camera.z_far = frustum_culling_max_distance  # meters
+    pose.camera.z_far = max_view_distance  # meters
 
 # -----------------------------------------------------------------------------
 # Camera origin spheres (visual markers placed at each generated camera origin)
