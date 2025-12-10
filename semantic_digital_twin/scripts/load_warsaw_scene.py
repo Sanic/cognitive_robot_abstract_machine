@@ -81,6 +81,10 @@ max_view_distance = 5.0
 # The frustum culling distance should be larger than the maximum camera placement distance
 # so that visibility evaluation is not clipped too early.
 frustum_culling_max_distance = 8.0
+# Camera height filter: poses outside this [min, max] world Z interval are rejected early
+# Defaults allow all heights; set to finite values to enable filtering
+min_camera_height = 0.5  # -float('inf')
+max_camera_height = 2.5  # float('inf')
 ###
 
 
@@ -114,10 +118,17 @@ class ConeSamplingConfig:
     """
 
     cone_half_angle_deg: float = 40
-    samples_per_cone: int = 6
+    samples_per_cone: int = 8
     roll_samples: int = 1
     seed: int | None = None
     fit_method: str = "footprint_2d"  # or "spherical"
+
+
+def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
+    """
+    Return True if the world Z coordinate lies within [min_h, max_h].
+    """
+    return (z_world >= min_h) and (z_world <= max_h)
 
 
 def compute_fit_distance_spherical_bound(
@@ -179,6 +190,8 @@ def add_mean_normal_lines_and_cameras(
     max_distance: float | None = None,
     fov_deg_xy: tuple[float, float] | None = None,
     fit_method: str = "footprint_2d",  # "spherical" is more conservative
+    min_camera_height_override: float | None = None,
+    max_camera_height_override: float | None = None,
 ) -> list[CameraPose]:
     import numpy as np
     import trimesh
@@ -240,6 +253,18 @@ def add_mean_normal_lines_and_cameras(
     ty = np.tan(np.deg2rad(fovy_deg) * 0.5)
 
     margin_factor = 1.05  # small safety margin to ensure full coverage
+
+    # Resolve height constraints
+    allowed_min_h = (
+        float(min_camera_height_override)
+        if min_camera_height_override is not None
+        else float(min_camera_height)
+    )
+    allowed_max_h = (
+        float(max_camera_height_override)
+        if max_camera_height_override is not None
+        else float(max_camera_height)
+    )
 
     camera_poses: list[CameraPose] = []
 
@@ -316,6 +341,10 @@ def add_mean_normal_lines_and_cameras(
 
         p0 = c_world
         p1 = c_world + standoff_distance * n_world
+
+        # Early reject by camera height (use z of camera origin p1)
+        if not _is_height_allowed(float(p1[2]), allowed_min_h, allowed_max_h):
+            continue
 
         path = trimesh.load_path(np.vstack([p0, p1]))
         path.colors = np.tile(line_color, (len(path.entities), 1))
@@ -667,6 +696,8 @@ def generate_cone_view_poses(
     fov_deg_xy: tuple[float, float],
     visualize: bool = True,
     marker_height: float = 0.15,
+    min_camera_height_override: float | None = None,
+    max_camera_height_override: float | None = None,
 ) -> list[CameraPose]:
     """
     Generate additional camera poses by sampling directions within a cone
@@ -725,6 +756,18 @@ def generate_cone_view_poses(
         return theta, phi
 
     poses: list[CameraPose] = []
+
+    # Resolve height constraints once
+    allowed_min_h = (
+        float(min_camera_height_override)
+        if min_camera_height_override is not None
+        else float(min_camera_height)
+    )
+    allowed_max_h = (
+        float(max_camera_height_override)
+        if max_camera_height_override is not None
+        else float(max_camera_height)
+    )
 
     for node_name in scene.graph.nodes_geometry:
         _, gkey = scene.graph[node_name]
@@ -801,6 +844,9 @@ def generate_cone_view_poses(
             standoff = min(standoff, float(max_distance))
 
             p_cam = c_world + standoff * d
+            # Early height filter: skip pose generation if camera Z not in range
+            if not _is_height_allowed(float(p_cam[2]), allowed_min_h, allowed_max_h):
+                continue
             T_cam = look_at_transform(origin=p_cam, target=c_world)
 
             for r in range(RS):
