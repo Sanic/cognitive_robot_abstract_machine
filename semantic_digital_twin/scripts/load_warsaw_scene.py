@@ -76,6 +76,8 @@ scene = rt.scene
 
 ####
 test_fov = [60, 45]  # horizontal, vertical degrees
+fixed_camera_distance = 1.5
+frustum_culling_max_distance = 5.0
 ###
 
 
@@ -211,8 +213,13 @@ def add_mean_normal_lines_and_cameras(
 
 # Generate visualization and collect camera instances and their poses
 generated_camera_poses = add_mean_normal_lines_and_cameras(
-    scene, normal_length=1.25, marker_height=0.5
+    scene, normal_length=fixed_camera_distance, marker_height=fixed_camera_distance
 )
+
+# Set the z_far distance of all cameras to a fixed value. This affects the frustum culling calculation
+# to decide which objects are visible.
+for pose in generated_camera_poses:
+    pose.camera.z_far = frustum_culling_max_distance  # meters
 
 # -----------------------------------------------------------------------------
 # Camera origin spheres (visual markers placed at each generated camera origin)
