@@ -104,6 +104,22 @@ class CameraPose:
     geometry_key: str
 
 
+@dataclass
+class ConeSamplingConfig:
+    """
+    Configuration for sampling camera view directions on a cone around the mean normal.
+
+    The cone is a spherical cap with the axis aligned to the object's mean normal and
+    a half-angle of ``cone_half_angle_deg``.
+    """
+
+    cone_half_angle_deg: float = 40
+    samples_per_cone: int = 6
+    roll_samples: int = 1
+    seed: int | None = None
+    fit_method: str = "footprint_2d"  # or "spherical"
+
+
 def compute_fit_distance_spherical_bound(
     radius_world: float, tx: float, ty: float, margin: float
 ) -> float:
@@ -635,6 +651,219 @@ def frustum_cull_scene(
 
 
 import numpy as np
+
+# -----------------------------------------------------------------------------
+# Cone-based camera pose generation around object normals
+# -----------------------------------------------------------------------------
+
+
+def generate_cone_view_poses(
+    scene: trimesh.Scene,
+    *,
+    cone: ConeSamplingConfig,
+    min_standoff: float,
+    max_distance: float,
+    frustum_culling_max_distance: float,
+    fov_deg_xy: tuple[float, float],
+    visualize: bool = True,
+    marker_height: float = 0.15,
+) -> list[CameraPose]:
+    """
+    Generate additional camera poses by sampling directions within a cone
+    around each mesh's mean normal and placing cameras that look at the
+    mesh centroid. Returns a list of CameraPose.
+    """
+    from trimesh.scene.cameras import Camera as TrimeshCamera
+
+    def _safe_normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+        n = np.linalg.norm(v)
+        if n < eps:
+            return v
+        return v / n
+
+    def look_at_transform(
+        origin: np.ndarray, target: np.ndarray, up_hint: np.ndarray | None = None
+    ) -> np.ndarray:
+        if up_hint is None:
+            up_hint = np.array([0.0, 0.0, 1.0])
+        f = _safe_normalize(target - origin)
+        z_cam = -f
+        x_cam = np.cross(up_hint, z_cam)
+        if np.linalg.norm(x_cam) < 1e-6:
+            up_hint = np.array([0.0, 1.0, 0.0])
+            x_cam = np.cross(up_hint, z_cam)
+        x_cam = _safe_normalize(x_cam)
+        y_cam = _safe_normalize(np.cross(z_cam, x_cam))
+        T = np.eye(4)
+        T[:3, 0] = x_cam
+        T[:3, 1] = y_cam
+        T[:3, 2] = z_cam
+        T[:3, 3] = origin
+        return T
+
+    def _new_camera_instance() -> TrimeshCamera:
+        return TrimeshCamera(
+            resolution=(640, 480), fov=(float(fov_deg_xy[0]), float(fov_deg_xy[1]))
+        )
+
+    # FOV tangents
+    fovx_deg, fovy_deg = float(fov_deg_xy[0]), float(fov_deg_xy[1])
+    tx = np.tan(np.deg2rad(fovx_deg) * 0.5)
+    ty = np.tan(np.deg2rad(fovy_deg) * 0.5)
+    margin = 1.05
+
+    alpha = np.deg2rad(float(cone.cone_half_angle_deg))
+    cos_alpha = float(np.cos(alpha))
+
+    def fibonacci_cap(k: int, K: int) -> tuple[float, float]:
+        phi_g = (np.sqrt(5.0) - 1.0) / 2.0
+        u = (k + 0.5) / K
+        v = (k * phi_g) % 1.0
+        cos_theta = (1.0 - u) + u * cos_alpha
+        theta = float(np.arccos(cos_theta))
+        phi = float(2.0 * np.pi * v)
+        return theta, phi
+
+    poses: list[CameraPose] = []
+
+    for node_name in scene.graph.nodes_geometry:
+        _, gkey = scene.graph[node_name]
+        geom = scene.geometry[gkey]
+        if not isinstance(geom, trimesh.Trimesh) or geom.faces.shape[0] == 0:
+            continue
+
+        T_node, _ = scene.graph.get(
+            frame_to=node_name, frame_from=scene.graph.base_frame
+        )
+        R = T_node[:3, :3]
+        t = T_node[:3, 3]
+
+        # Mean normal in world
+        face_normals = geom.face_normals
+        if hasattr(geom, "area_faces") and geom.area_faces is not None:
+            w = geom.area_faces.reshape(-1, 1)
+            n_local = (face_normals * w).sum(axis=0)
+        else:
+            n_local = face_normals.mean(axis=0)
+        n_world = _safe_normalize(R @ _safe_normalize(n_local))
+        if np.linalg.norm(n_world) < 1e-12:
+            continue
+
+        c_local = geom.center_mass if geom.is_volume else geom.centroid
+        c_world = (R @ c_local) + t
+
+        corners_local = _aabb_corners(geom.bounds)
+        corners_world = (R @ corners_local.T).T + t
+
+        # Tangent basis around normal
+        up = np.array([0.0, 0.0, 1.0])
+        t1 = np.cross(up, n_world)
+        if np.linalg.norm(t1) < 1e-6:
+            t1 = np.cross(np.array([0.0, 1.0, 0.0]), n_world)
+        t1 = _safe_normalize(t1)
+        t2 = _safe_normalize(np.cross(n_world, t1))
+
+        K = max(1, int(cone.samples_per_cone))
+        RS = max(1, int(cone.roll_samples))
+        for k in range(K):
+            theta, phi = fibonacci_cap(k, K)
+            d = (
+                (np.sin(theta) * np.cos(phi)) * t1
+                + (np.sin(theta) * np.sin(phi)) * t2
+                + (np.cos(theta)) * n_world
+            )
+            d = _safe_normalize(d)
+
+            # Fit distance selection
+            if str(cone.fit_method).lower() in {
+                "footprint",
+                "2d",
+                "plane",
+                "footprint_2d",
+            }:
+                fit_d = compute_fit_distance_footprint_2d(
+                    corners_world=corners_world,
+                    centroid_world=c_world,
+                    view_normal_world=d,
+                    tx=tx,
+                    ty=ty,
+                    margin=margin,
+                )
+            else:
+                radius_world = float(
+                    np.max(np.linalg.norm(corners_world - c_world, axis=1))
+                )
+                fit_d = compute_fit_distance_spherical_bound(
+                    radius_world=radius_world, tx=tx, ty=ty, margin=margin
+                )
+
+            standoff = max(float(min_standoff), float(fit_d))
+            standoff = min(standoff, float(max_distance))
+
+            p_cam = c_world + standoff * d
+            T_cam = look_at_transform(origin=p_cam, target=c_world)
+
+            for r in range(RS):
+                T_pose = T_cam.copy()
+                if RS > 1:
+                    psi = 2.0 * np.pi * (r / float(RS))
+                    Rz = trimesh.transformations.rotation_matrix(
+                        psi, direction=[0, 0, -1]
+                    )
+                    T_pose = T_pose @ Rz
+
+                cam = _new_camera_instance()
+                cam.z_near = 0.1
+                cam.z_far = float(frustum_culling_max_distance)
+
+                poses.append(
+                    CameraPose(
+                        camera=cam,
+                        transform=T_pose,
+                        node_name=node_name,
+                        geometry_key=gkey,
+                    )
+                )
+
+                if visualize:
+                    path = trimesh.load_path(np.vstack([c_world, p_cam]))
+                    scene.add_geometry(
+                        path,
+                        node_name=f"cone_line__{node_name}__{gkey}__{k}_{r}",
+                        parent_node_name=scene.graph.base_frame,
+                        transform=np.eye(4),
+                    )
+                    marker = trimesh.creation.camera_marker(
+                        cam, marker_height=marker_height
+                    )
+                    scene.add_geometry(
+                        marker,
+                        node_name=f"cone_cam__{node_name}__{gkey}__{k}_{r}",
+                        parent_node_name=scene.graph.base_frame,
+                        transform=T_pose,
+                    )
+
+    return poses
+
+
+# Generate additional cone-based viewpoints and merge them with the existing poses
+cone_cfg = ConeSamplingConfig(
+    cone_half_angle_deg=25.0,
+    samples_per_cone=12,
+    roll_samples=1,
+    fit_method="footprint_2d",
+)
+_extra_cone_poses = generate_cone_view_poses(
+    scene,
+    cone=cone_cfg,
+    min_standoff=min_standoff_distance,
+    max_distance=max_view_distance,
+    frustum_culling_max_distance=frustum_culling_max_distance,
+    fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
+    visualize=True,
+    marker_height=0.15,
+)
+generated_camera_poses.extend(_extra_cone_poses)
 
 # After defining frustum utilities, place spheres colored by visibility counts
 # Enable occlusion checking so colors reflect actually visible bodies, not just frustum inclusion
