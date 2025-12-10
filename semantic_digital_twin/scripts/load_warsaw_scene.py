@@ -84,7 +84,7 @@ frustum_culling_max_distance = 8.0
 # Camera height filter: poses outside this [min, max] world Z interval are rejected early
 # Defaults allow all heights; set to finite values to enable filtering
 min_camera_height = 0.5  # -float('inf')
-max_camera_height = 1.5  # float('inf')
+max_camera_height = 4.5  # float('inf')
 ###
 
 
@@ -118,11 +118,15 @@ class ConeSamplingConfig:
     a half-angle of ``cone_half_angle_deg``.
     """
 
-    cone_half_angle_deg: float = 40
-    samples_per_cone: int = 8
+    cone_half_angle_deg: float = 75
+    samples_per_cone: int = 12
     roll_samples: int = 1
     seed: int | None = None
     fit_method: str = "footprint_2d"  # or "spherical"
+    # If True, reject poses whose directional viewing cones overlap existing ones (per object)
+    reject_overlapping_cones: bool = True
+    # Small angular margin added to the cone-overlap test (degrees)
+    cone_overlap_margin_deg: float = 5.0
 
 
 @dataclass
@@ -798,6 +802,25 @@ def generate_cone_view_poses(
     alpha = np.deg2rad(float(cone.cone_half_angle_deg))
     cos_alpha = float(np.cos(alpha))
 
+    # Directional cone-overlap helper: given two forward unit vectors f1 and f2,
+    # and a camera half-FOV (use the larger of hfov/2, vfov/2), determine if the
+    # viewing cones overlap significantly (Stage 1 directional test).
+    half_fov_rad = max(np.deg2rad(fovx_deg) * 0.5, np.deg2rad(fovy_deg) * 0.5)
+    overlap_margin_rad = np.deg2rad(
+        float(getattr(cone, "cone_overlap_margin_deg", 5.0))
+    )
+
+    def cones_overlap_dir(f1: np.ndarray, f2: np.ndarray) -> bool:
+        # Angle between forward vectors
+        c = float(np.clip(np.dot(f1, f2), -1.0, 1.0))
+        # If theta <= half_fov1 + half_fov2 + margin, cones overlap
+        # Since both use same intrinsics here, this becomes theta <= 2*half_fov + margin
+        # Compare using cosine to avoid acos when possible
+        theta_thresh = 2.0 * half_fov_rad + overlap_margin_rad
+        # For small counts this acos is fine and clearer
+        theta = float(np.arccos(c))
+        return theta <= theta_thresh
+
     def fibonacci_cap(k: int, K: int) -> tuple[float, float]:
         phi_g = (np.sqrt(5.0) - 1.0) / 2.0
         u = (k + 0.5) / K
@@ -859,6 +882,8 @@ def generate_cone_view_poses(
         t2 = _safe_normalize(np.cross(n_world, t1))
 
         K = max(1, int(cone.samples_per_cone))
+        # Keep accepted forward directions for this object to reject overlapping cones
+        accepted_forward_dirs: list[np.ndarray] = []
         RS = max(1, int(cone.roll_samples))
         for k in range(K):
             theta, phi = fibonacci_cap(k, K)
@@ -900,6 +925,19 @@ def generate_cone_view_poses(
             if not _is_height_allowed(float(p_cam[2]), allowed_min_h, allowed_max_h):
                 continue
             T_cam = look_at_transform(origin=p_cam, target=c_world)
+
+            # Directional cone overlap rejection (per object)
+            if getattr(cone, "reject_overlapping_cones", True):
+                # Forward vector is along -Z of camera pose
+                fwd = -T_cam[:3, 2]
+                fwd = fwd / (np.linalg.norm(fwd) + 1e-12)
+                # If overlaps with any accepted direction, reject this sample
+                overlapped = any(
+                    cones_overlap_dir(fwd, a) for a in accepted_forward_dirs
+                )
+                if overlapped:
+                    continue
+                accepted_forward_dirs.append(fwd)
 
             for r in range(RS):
                 T_pose = T_cam.copy()
