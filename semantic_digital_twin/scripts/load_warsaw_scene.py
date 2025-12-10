@@ -80,12 +80,27 @@ test_fov = [60, 45]  # horizontal, vertical degrees
 
 import numpy as np
 import trimesh
+from dataclasses import dataclass
 from trimesh.scene.cameras import Camera
+
+
+@dataclass
+class CameraPose:
+    """
+    Small container for a camera and its pose in the world.
+
+    The transform maps the camera frame to the world frame.
+    """
+
+    camera: Camera
+    transform: np.ndarray
+    node_name: str
+    geometry_key: str
 
 
 def add_mean_normal_lines_and_cameras(
     scene, normal_length: float = 1.0, marker_height: float = 0.15
-):
+) -> list[CameraPose]:
     import numpy as np
     import trimesh
     from trimesh.scene.cameras import Camera
@@ -117,7 +132,14 @@ def add_mean_normal_lines_and_cameras(
         return T
 
     line_color = np.array([255, 32, 32, 255], dtype=np.uint8)
-    marker_cam = Camera(resolution=(640, 480), fov=test_fov)
+
+    # We will create one Camera instance per generated pose so callers can keep
+    # and modify them independently later on.
+    # This template defines default parameters for each instance.
+    def _new_camera_instance() -> Camera:
+        return Camera(resolution=(640, 480), fov=test_fov)
+
+    camera_poses: list[CameraPose] = []
 
     for node_name in scene.graph.nodes_geometry:
         _, gkey = scene.graph[node_name]
@@ -163,8 +185,11 @@ def add_mean_normal_lines_and_cameras(
         )
 
         T_cam = look_at_transform(origin=p1, target=p0)
+
+        # Create a distinct camera instance for this pose
+        pose_cam = _new_camera_instance()
         cam_marker = trimesh.creation.camera_marker(
-            marker_cam, marker_height=marker_height
+            pose_cam, marker_height=marker_height
         )
         cam_node_name = f"camera_marker__{node_name}__{gkey}"
         scene.add_geometry(
@@ -174,8 +199,158 @@ def add_mean_normal_lines_and_cameras(
             transform=T_cam,
         )
 
+        camera_poses.append(
+            CameraPose(
+                camera=pose_cam, transform=T_cam, node_name=node_name, geometry_key=gkey
+            )
+        )
 
-add_mean_normal_lines_and_cameras(scene, normal_length=1.25, marker_height=0.5)
+    return camera_poses
+
+
+# Generate visualization and collect camera instances and their poses
+generated_camera_poses = add_mean_normal_lines_and_cameras(
+    scene, normal_length=1.25, marker_height=0.5
+)
+
+# -----------------------------------------------------------------------------
+# Camera origin spheres (visual markers placed at each generated camera origin)
+# -----------------------------------------------------------------------------
+
+
+def add_camera_origin_spheres(
+    scene: trimesh.Scene,
+    camera_poses: list[CameraPose],
+    radius: float = 0.05,
+    color_rgba: tuple[int, int, int, int] = (80, 180, 255, 255),
+) -> None:
+    """
+    Add a small colored sphere at the origin of each provided camera pose.
+
+    The sphere is centered at the camera origin in world coordinates.
+
+    :param scene: The scene to which the spheres are added.
+    :param camera_poses: List of camera poses whose origins are to be marked.
+    :param radius: Radius of the marker spheres in meters.
+    :param color_rgba: RGBA color used for the spheres as 0–255 integers.
+    """
+    for pose in camera_poses:
+        sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
+        sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(color_rgba)
+
+        node_name = f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}"
+        scene.add_geometry(
+            sphere,
+            node_name=node_name,
+            parent_node_name=scene.graph.base_frame,
+            transform=pose.transform,
+        )
+
+
+# Place a small sphere at each generated camera origin
+add_camera_origin_spheres(scene, generated_camera_poses, radius=0.08)
+
+# -----------------------------------------------------------------------------
+# Frustum culling utilities (projection to NDC and AABB testing)
+# -----------------------------------------------------------------------------
+
+
+def _safe_div(a: np.ndarray, b: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    """
+    Divide a by b in a numerically stable manner.
+    """
+    return a / (b + eps)
+
+
+def _project_points_to_ndc(
+    P: np.ndarray, V: np.ndarray, points_world: np.ndarray
+) -> np.ndarray:
+    """
+    Project world points to Normalized Device Coordinates.
+    """
+    N = len(points_world)
+    pts_h = np.hstack([points_world, np.ones((N, 1))])
+    clip = (P @ (V @ pts_h.T)).T
+    ndc = np.empty((N, 3))
+    ndc[:, 0] = _safe_div(clip[:, 0], clip[:, 3])
+    ndc[:, 1] = _safe_div(clip[:, 1], clip[:, 3])
+    ndc[:, 2] = _safe_div(clip[:, 2], clip[:, 3])
+    return ndc
+
+
+def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
+    """
+    Return the eight corners of an axis aligned bounding box.
+    """
+    mn, mx = bounds
+    xs = [mn[0], mx[0]]
+    ys = [mn[1], mx[1]]
+    zs = [mn[2], mx[2]]
+    return np.array([[x, y, z] for x in xs for y in ys for z in zs], dtype=float)
+
+
+def camera_matrices(
+    camera: Camera, T_cam_world: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Compute projection and view matrices for a camera pose.
+    """
+    P = camera.matrix
+    V = np.linalg.inv(T_cam_world)
+    return P, V
+
+
+def frustum_cull_scene(
+    scene: trimesh.Scene,
+    camera: Camera,
+    T_cam_world: np.ndarray,
+    require_full_visibility: bool = True,
+    eps: float = 1e-6,
+) -> tuple[set[str], set[str]]:
+    """
+    Test scene meshes against the camera frustum.
+
+    Returns two sets of node names: fully_inside and partially_inside.
+    """
+    P, V = camera_matrices(camera, T_cam_world)
+
+    fully_inside: set[str] = set()
+    partially_inside: set[str] = set()
+
+    for node_name in scene.graph.nodes_geometry:
+        _, gkey = scene.graph[node_name]
+        geom = scene.geometry[gkey]
+        if not isinstance(geom, trimesh.Trimesh):
+            continue
+
+        corners_local = _aabb_corners(geom.bounds)
+        T_node_world, _ = scene.graph.get(
+            frame_to=node_name, frame_from=scene.graph.base_frame
+        )
+        corners_world = (T_node_world[:3, :3] @ corners_local.T).T + T_node_world[:3, 3]
+
+        ndc = _project_points_to_ndc(P, V, corners_world)
+        inside_mask = (
+            (ndc[:, 0] >= -1.0 - eps)
+            & (ndc[:, 0] <= 1.0 + eps)
+            & (ndc[:, 1] >= -1.0 - eps)
+            & (ndc[:, 1] <= 1.0 + eps)
+            & (ndc[:, 2] >= -1.0 - eps)
+            & (ndc[:, 2] <= 1.0 + eps)
+        )
+
+        all_inside = bool(np.all(inside_mask))
+        any_inside = bool(np.any(inside_mask))
+
+        if require_full_visibility:
+            if all_inside:
+                fully_inside.add(node_name)
+        else:
+            if any_inside:
+                partially_inside.add(node_name)
+
+    return fully_inside, partially_inside
+
 
 import numpy as np
 
