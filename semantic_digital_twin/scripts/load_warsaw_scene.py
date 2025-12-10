@@ -84,13 +84,14 @@ frustum_culling_max_distance = 8.0
 # Camera height filter: poses outside this [min, max] world Z interval are rejected early
 # Defaults allow all heights; set to finite values to enable filtering
 min_camera_height = 0.5  # -float('inf')
-max_camera_height = 2.5  # float('inf')
+max_camera_height = 1.5  # float('inf')
 ###
 
 
 import numpy as np
 import trimesh
 from dataclasses import dataclass
+import time
 from trimesh.scene.cameras import Camera
 
 
@@ -124,6 +125,50 @@ class ConeSamplingConfig:
     fit_method: str = "footprint_2d"  # or "spherical"
 
 
+@dataclass
+class Timer:
+    """
+    Simple context manager to measure elapsed wall time.
+
+    Prints a line when exiting the context with the elapsed time in milliseconds.
+    """
+
+    label: str
+
+    def __enter__(self):
+        self._t0 = time.perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        dt_ms = (time.perf_counter() - self._t0) * 1000.0
+        print(f"[TIMING] {self.label}: {dt_ms:.2f} ms")
+
+
+def timeit(label: str | None = None):
+    """
+    Decorator to print how long a function call took.
+
+    If ``label`` is None, the function's __name__ is used.
+    """
+
+    def _decorator(fn):
+        def _wrapped(*args, **kwargs):
+            t0 = time.perf_counter()
+            try:
+                return fn(*args, **kwargs)
+            finally:
+                dt_ms = (time.perf_counter() - t0) * 1000.0
+                name = label if label is not None else fn.__name__
+                print(f"[TIMING] {name}: {dt_ms:.2f} ms")
+
+        _wrapped.__name__ = fn.__name__
+        _wrapped.__doc__ = fn.__doc__
+        _wrapped.__qualname__ = getattr(fn, "__qualname__", fn.__name__)
+        return _wrapped
+
+    return _decorator
+
+
 def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
     """
     Return True if the world Z coordinate lies within [min_h, max_h].
@@ -131,6 +176,7 @@ def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
     return (z_world >= min_h) and (z_world <= max_h)
 
 
+@timeit("compute_fit_distance_spherical_bound")
 def compute_fit_distance_spherical_bound(
     radius_world: float, tx: float, ty: float, margin: float
 ) -> float:
@@ -148,6 +194,7 @@ def compute_fit_distance_spherical_bound(
     )
 
 
+@timeit("compute_fit_distance_footprint_2d")
 def compute_fit_distance_footprint_2d(
     corners_world: np.ndarray,
     centroid_world: np.ndarray,
@@ -181,6 +228,7 @@ def compute_fit_distance_footprint_2d(
     return margin * max(dx, dy)
 
 
+@timeit("add_mean_normal_lines_and_cameras")
 def add_mean_normal_lines_and_cameras(
     scene,
     normal_length: float | None = None,
@@ -381,6 +429,7 @@ def add_mean_normal_lines_and_cameras(
 
 
 # Generate visualization and collect camera instances and their poses
+
 generated_camera_poses = add_mean_normal_lines_and_cameras(
     scene,
     marker_height=min_standoff_distance,
@@ -401,6 +450,7 @@ for pose in generated_camera_poses:
 # -----------------------------------------------------------------------------
 
 
+@timeit("add_camera_origin_spheres")
 def add_camera_origin_spheres(
     scene: trimesh.Scene,
     camera_poses: list[CameraPose],
@@ -432,7 +482,7 @@ def add_camera_origin_spheres(
                 pose.camera,
                 pose.transform,
                 require_full_visibility=True,
-                occlusion_check=occlusion_check,
+                occlusion_check=True,
                 samples_per_mesh=samples_per_mesh,
                 visibility_threshold=visibility_threshold,
             )
@@ -527,6 +577,7 @@ def camera_view_matrix(T_cam_world: np.ndarray) -> np.ndarray:
     return np.linalg.inv(T_cam_world)
 
 
+@timeit("frustum_cull_scene")
 def frustum_cull_scene(
     scene: trimesh.Scene,
     camera: Camera,
@@ -686,6 +737,7 @@ import numpy as np
 # -----------------------------------------------------------------------------
 
 
+@timeit("generate_cone_view_poses")
 def generate_cone_view_poses(
     scene: trimesh.Scene,
     *,
@@ -899,6 +951,7 @@ cone_cfg = ConeSamplingConfig(
     roll_samples=1,
     fit_method="footprint_2d",
 )
+
 _extra_cone_poses = generate_cone_view_poses(
     scene,
     cone=cone_cfg,
@@ -913,6 +966,7 @@ generated_camera_poses.extend(_extra_cone_poses)
 
 # After defining frustum utilities, place spheres colored by visibility counts
 # Enable occlusion checking so colors reflect actually visible bodies, not just frustum inclusion
+
 add_camera_origin_spheres(
     scene,
     generated_camera_poses,
