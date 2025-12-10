@@ -78,6 +78,9 @@ scene = rt.scene
 test_fov = [60, 45]  # horizontal, vertical degrees
 min_standoff_distance = 1.5
 max_view_distance = 5.0
+# The frustum culling distance should be larger than the maximum camera placement distance
+# so that visibility evaluation is not clipped too early.
+frustum_culling_max_distance = 8.0
 ###
 
 
@@ -101,6 +104,56 @@ class CameraPose:
     geometry_key: str
 
 
+def compute_fit_distance_spherical_bound(
+    radius_world: float, tx: float, ty: float, margin: float
+) -> float:
+    """
+    Compute a conservative camera standoff distance using a spherical bound.
+
+    The method treats the object as a sphere with radius equal to the maximum
+    distance from the centroid to the transformed AABB corners and computes the
+    distance required to fit the sphere within both horizontal and vertical
+    fields of view.
+    """
+    return margin * max(
+        (radius_world / tx) if tx > 1e-12 else np.inf,
+        (radius_world / ty) if ty > 1e-12 else np.inf,
+    )
+
+
+def compute_fit_distance_footprint_2d(
+    corners_world: np.ndarray,
+    centroid_world: np.ndarray,
+    view_normal_world: np.ndarray,
+    tx: float,
+    ty: float,
+    margin: float,
+) -> float:
+    """
+    Compute camera standoff distance from the 2D image-plane footprint.
+
+    The method builds a temporary camera frame oriented by the view normal and
+    projects the object’s world-space AABB corners into this frame. The in-plane
+    half-extents along X and Y determine the minimum distance to fit within the
+    horizontal and vertical FOV, ignoring thickness along the view axis.
+    """
+    z_cam = -view_normal_world
+    x_cam = np.cross(np.array([0.0, 0.0, 1.0]), z_cam)
+    if np.linalg.norm(x_cam) < 1e-6:
+        x_cam = np.cross(np.array([0.0, 1.0, 0.0]), z_cam)
+    x_cam = x_cam / (np.linalg.norm(x_cam) + 1e-12)
+    y_cam = np.cross(z_cam, x_cam)
+    offsets_world = corners_world - centroid_world
+    R_world_cam = np.stack([x_cam, y_cam, z_cam], axis=1)
+    offsets_cam = offsets_world @ R_world_cam
+    max_abs_x = float(np.max(np.abs(offsets_cam[:, 0]))) if offsets_cam.size else 0.0
+    max_abs_y = float(np.max(np.abs(offsets_cam[:, 1]))) if offsets_cam.size else 0.0
+
+    dx = max_abs_x / (tx if tx > 1e-12 else np.inf)
+    dy = max_abs_y / (ty if ty > 1e-12 else np.inf)
+    return margin * max(dx, dy)
+
+
 def add_mean_normal_lines_and_cameras(
     scene,
     normal_length: float | None = None,
@@ -109,6 +162,7 @@ def add_mean_normal_lines_and_cameras(
     min_standoff: float | None = None,
     max_distance: float | None = None,
     fov_deg_xy: tuple[float, float] | None = None,
+    fit_method: str = "footprint_2d",  # "spherical" is more conservative
 ) -> list[CameraPose]:
     import numpy as np
     import trimesh
@@ -173,6 +227,8 @@ def add_mean_normal_lines_and_cameras(
 
     camera_poses: list[CameraPose] = []
 
+    # use module-level distance calculators defined above
+
     for node_name in scene.graph.nodes_geometry:
         _, gkey = scene.graph[node_name]
         geom = scene.geometry[gkey]
@@ -203,8 +259,7 @@ def add_mean_normal_lines_and_cameras(
         if np.linalg.norm(n_world) < 1e-12:
             continue
 
-        # Compute a conservative world-space radius of the object around its centroid
-        # using the transformed local AABB corners.
+        # Compute transformed local AABB corners used by fit-distance methods
         corners_local = np.array(
             [
                 [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[0][2]],
@@ -219,15 +274,24 @@ def add_mean_normal_lines_and_cameras(
             dtype=float,
         )
         corners_world = (R @ corners_local.T).T + t
-        # radius is the max distance from centroid to any corner
-        radius_world = float(np.max(np.linalg.norm(corners_world - c_world, axis=1)))
-
-        # Distance needed so the whole object fits inside the frustum given FOV
-        # Ensure both horizontal and vertical fit
-        fit_distance = margin_factor * max(
-            (radius_world / tx) if tx > 1e-12 else np.inf,
-            (radius_world / ty) if ty > 1e-12 else np.inf,
-        )
+        # Pick fit-distance method
+        if fit_method.lower() in {"footprint", "2d", "plane", "footprint_2d"}:
+            fit_distance = compute_fit_distance_footprint_2d(
+                corners_world=corners_world,
+                centroid_world=c_world,
+                view_normal_world=n_world,
+                tx=tx,
+                ty=ty,
+                margin=margin_factor,
+            )
+        else:
+            # radius is the max distance from centroid to any corner
+            radius_world = float(
+                np.max(np.linalg.norm(corners_world - c_world, axis=1))
+            )
+            fit_distance = compute_fit_distance_spherical_bound(
+                radius_world=radius_world, tx=tx, ty=ty, margin=margin_factor
+            )
 
         # Final standoff distance with min and max bounds
         standoff_distance = max(effective_min_standoff, fit_distance)
@@ -278,12 +342,14 @@ generated_camera_poses = add_mean_normal_lines_and_cameras(
     min_standoff=min_standoff_distance,
     max_distance=max_view_distance,
     fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
+    # fit_method="footprint_2d",
 )
 
-# Set the z_far distance of all cameras to a fixed value. This affects the frustum culling calculation
-# to decide which objects are visible.
+# Set the z_far distance of all cameras to a fixed value used by frustum culling.
+# This is intentionally larger than the maximum camera placement distance so that
+# culling/visibility evaluation does not prematurely clip distant objects.
 for pose in generated_camera_poses:
-    pose.camera.z_far = max_view_distance  # meters
+    pose.camera.z_far = frustum_culling_max_distance  # meters
 
 # -----------------------------------------------------------------------------
 # Camera origin spheres (visual markers placed at each generated camera origin)
