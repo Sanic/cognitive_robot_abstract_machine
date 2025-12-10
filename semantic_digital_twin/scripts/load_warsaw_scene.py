@@ -379,67 +379,8 @@ def frustum_cull_scene(
     fully_inside: set[str] = set()
     partially_inside: set[str] = set()
 
-    # Prepare ray engine if we do occlusion. Some trimesh versions don't expose
-    # Scene.ray; in that case build a fallback intersector on a merged world-space mesh.
-    ray_engine = None
-    use_scene_ray = False
-    if occlusion_check:
-        try:
-            candidate = getattr(scene, "ray", None)
-            if candidate is not None and hasattr(candidate, "intersects_location"):
-                ray_engine = candidate
-                use_scene_ray = True
-        except Exception:
-            ray_engine = None
-
-        if ray_engine is None:
-            # Build a cached fallback ray intersector for this scene id
-            from dataclasses import dataclass
-            from functools import lru_cache
-            import trimesh as _tm
-
-            @dataclass
-            class _RayEngine:
-                intersector: any
-
-            @lru_cache(maxsize=8)
-            def _build_ray_engine_for_scene(scene_id: int) -> _RayEngine:
-                # Reconstruct meshes in world frame and concatenate
-                meshes = []
-                for _node in scene.graph.nodes_geometry:
-                    _, _gk = scene.graph[_node]
-                    _geom = scene.geometry[_gk]
-                    if not isinstance(_geom, _tm.Trimesh):
-                        continue
-                    Tnw, _ = scene.graph.get(
-                        frame_to=_node, frame_from=scene.graph.base_frame
-                    )
-                    Rnw = Tnw[:3, :3]
-                    tnw = Tnw[:3, 3]
-                    m = _geom.copy()
-                    m.vertices = (Rnw @ m.vertices.T).T + tnw
-                    meshes.append(m)
-                if len(meshes) == 0:
-                    # Create an empty tiny mesh to avoid errors
-                    combined = _tm.Trimesh(
-                        vertices=np.zeros((0, 3)),
-                        faces=np.zeros((0, 3), dtype=np.int64),
-                        process=False,
-                    )
-                else:
-                    combined = _tm.util.concatenate(meshes)
-                # Create intersector
-                try:
-                    from trimesh.ray.ray_triangle import RayMeshIntersector
-
-                    intersector = RayMeshIntersector(combined)
-                except Exception:
-                    # Fallback to slower generic ray if available
-                    intersector = combined.ray
-                return _RayEngine(intersector=intersector)
-
-            _engine = _build_ray_engine_for_scene(id(scene))
-            ray_engine = _engine
+    # Prepare ray engine if we do occlusion
+    ray_engine = scene.to_mesh().ray if occlusion_check else None
 
     for node_name in scene.graph.nodes_geometry:
         _, gkey = scene.graph[node_name]
@@ -516,17 +457,11 @@ def frustum_cull_scene(
 
             # Intersect
             try:
-                if use_scene_ray:
-                    loc, idx_ray, _ = ray_engine.intersects_location(
-                        ray_origins=np.repeat(origin[None, :], len(dirs), axis=0),
-                        ray_directions=dirs,
-                        multiple_hits=False,
-                    )
-                else:
-                    loc, idx_ray, _ = ray_engine.intersector.intersects_location(
-                        ray_origins=np.repeat(origin[None, :], len(dirs), axis=0),
-                        ray_directions=dirs,
-                    )
+                loc, idx_ray, _ = ray_engine.intersects_location(
+                    ray_origins=np.repeat(origin[None, :], len(dirs), axis=0),
+                    ray_directions=dirs,
+                    multiple_hits=False,
+                )
             except Exception:
                 loc = np.empty((0, 3))
                 idx_ray = np.empty((0,), dtype=int)
@@ -570,7 +505,7 @@ add_camera_origin_spheres(
     scene,
     generated_camera_poses,
     radius=0.08,
-    occlusion_check=False,
+    occlusion_check=True,
     samples_per_mesh=64,
     visibility_threshold=0.8,
 )
