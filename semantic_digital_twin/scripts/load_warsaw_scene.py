@@ -544,7 +544,11 @@ def add_camera_origin_spheres(
         sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
         sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
 
-        node_name = f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}"
+        # Use a unique node name per pose to avoid collisions when multiple
+        # camera poses originate from the same mesh/node (e.g., cone sampling).
+        node_name = (
+            f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}__{idx}"
+        )
         scene.add_geometry(
             sphere,
             node_name=node_name,
@@ -1010,7 +1014,7 @@ add_camera_origin_spheres(
     scene,
     generated_camera_poses,
     radius=0.08,
-    occlusion_check=False,
+    occlusion_check=True,
     samples_per_mesh=64,
     visibility_threshold=0.8,
 )
