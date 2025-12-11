@@ -92,6 +92,9 @@ frustum_culling_max_distance = 8.0
 # Defaults allow all heights; set to finite values to enable filtering
 min_camera_height = 0.5  # -float('inf')
 max_camera_height = 2.0  # float('inf')
+# Debug reporting: when enabled, print which cameras see which objects, and
+# per object, which cameras can see it.
+debug_visibility_reports = True
 ###
 
 
@@ -973,6 +976,126 @@ def greedy_non_maximum_suppression(
 
 
 # -----------------------------------------------------------------------------
+# Debug visibility reports (camera→objects and object→cameras)
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class DebugVisibilityReportConfig:
+    """
+    Configuration for printing debug visibility reports.
+
+    When enabled, the script prints two reports:
+    - for each camera pose, the list of objects it can fully see;
+    - for each object, the list of camera poses that can see it.
+    """
+
+    enabled: bool = False
+    show_camera_to_objects: bool = True
+    show_object_to_cameras: bool = True
+
+
+def _make_body_label_resolver() -> dict[object, str]:
+    """
+    Build a mapping from internal body identifiers to human‑readable labels.
+
+    This prefers the :class:`RayTracer`'s ``scene_to_index`` mapping when
+    available by constructing an index→name map using the prefix before
+    ``"_collision_"``. If absent, an empty dict is returned and callers should
+    treat identifiers as display strings directly.
+    """
+
+    try:
+        # rt is expected to be a module‑level RayTracer instance if created
+        mapping = rt.scene_to_index  # type: ignore[name-defined]
+    except Exception:
+        mapping = None
+
+    id_to_label: dict[object, str] = {}
+    if mapping is None:
+        return id_to_label
+
+    # mapping: node_name(str) -> index(object)
+    # Build reverse by choosing a stable, readable base name per index
+    for node_name, idx in mapping.items():
+        base = (
+            node_name.split("_collision_")[0]
+            if "_collision_" in node_name
+            else node_name
+        )
+        # only set first time to keep deterministic, earlier items take precedence
+        if idx not in id_to_label:
+            id_to_label[idx] = base
+    return id_to_label
+
+
+def _camera_label(pose: CameraPose, idx: int) -> str:
+    """
+    Create a concise camera identifier for debug output.
+
+    The label includes the index and the originating node/geometry keys.
+    """
+
+    return f"{idx}:{pose.node_name}/{pose.geometry_key}"
+
+
+def print_camera_to_bodies_report(
+    camera_poses: list[CameraPose],
+    body_sets: list[set[object]],
+) -> None:
+    """
+    Print a report listing, for each camera, the objects it can fully see.
+    """
+
+    if len(camera_poses) != len(body_sets):
+        raise ValueError("body_sets must be aligned with camera_poses")
+
+    id_to_label = _make_body_label_resolver()
+
+    print("[DEBUG] Camera → Objects visibility report:")
+    for i, pose in enumerate(camera_poses):
+        cam_label = _camera_label(pose, i)
+        # Map identifiers to strings
+        names = []
+        for bid in body_sets[i]:
+            if bid in id_to_label:
+                names.append(id_to_label[bid])
+            else:
+                # bid may already be a string base name
+                names.append(str(bid))
+        names_sorted = sorted(set(names))
+        print(
+            f"  - {cam_label}: {', '.join(names_sorted) if names_sorted else '(none)'}"
+        )
+
+
+def print_body_to_cameras_report(
+    camera_poses: list[CameraPose],
+    body_sets: list[set[object]],
+) -> None:
+    """
+    Print a report listing, for each object, which cameras can fully see it.
+    """
+
+    if len(camera_poses) != len(body_sets):
+        raise ValueError("body_sets must be aligned with camera_poses")
+
+    id_to_label = _make_body_label_resolver()
+
+    body_to_cams: dict[str, list[str]] = {}
+    for i, pose in enumerate(camera_poses):
+        cam_label = _camera_label(pose, i)
+        for bid in body_sets[i]:
+            name = id_to_label.get(bid, str(bid))
+            body_to_cams.setdefault(name, []).append(cam_label)
+
+    print("[DEBUG] Object → Cameras visibility report:")
+    for body_name in sorted(body_to_cams.keys()):
+        cams_sorted = sorted(body_to_cams[body_name])
+        print(f"  - {body_name}: {', '.join(cams_sorted) if cams_sorted else '(none)'}")
+
+
+# -----------------------------------------------------------------------------
 # Frustum culling utilities (Option 2: camera-space FOV angle tests)
 # -----------------------------------------------------------------------------
 
@@ -1530,12 +1653,35 @@ _selection_cfg = CameraSelectionConfig(
 _body_sets = compute_visible_body_indices_per_pose(
     scene=scene, camera_poses=generated_camera_poses, config=_visibility_cfg
 )
+
+# Optional debug reports for visibility relationships before selection
+if debug_visibility_reports:
+    print("[DEBUG] ==== Visibility reports BEFORE selection ====")
+    print_camera_to_bodies_report(
+        camera_poses=generated_camera_poses, body_sets=_body_sets
+    )
+    print_body_to_cameras_report(
+        camera_poses=generated_camera_poses, body_sets=_body_sets
+    )
 _selected_camera_poses = greedy_select_by_score_similarity_and_novelty(
     camera_poses=generated_camera_poses,
     scores=_scores,
     body_sets=_body_sets,
     cfg=_selection_cfg,
 )
+
+# Optional debug reports for visibility relationships after selection
+if debug_visibility_reports:
+    _selected_body_sets = compute_visible_body_indices_per_pose(
+        scene=scene, camera_poses=_selected_camera_poses, config=_visibility_cfg
+    )
+    print("[DEBUG] ==== Visibility reports AFTER selection ====")
+    print_camera_to_bodies_report(
+        camera_poses=_selected_camera_poses, body_sets=_selected_body_sets
+    )
+    print_body_to_cameras_report(
+        camera_poses=_selected_camera_poses, body_sets=_selected_body_sets
+    )
 
 # 3) visualize only the selected camera origins (colors reflect visibility counts)
 add_camera_origin_spheres(
