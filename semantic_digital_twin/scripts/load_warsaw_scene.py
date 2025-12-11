@@ -115,6 +115,96 @@ class CameraPose:
     node_name: str
     geometry_key: str
 
+    def is_similar_to(
+        self,
+        other: "CameraPose",
+        pos_threshold_m: float = 0.20,
+        ang_threshold_deg: float = 10.0,
+    ) -> bool:
+        """
+        Return ``True`` if this pose is too similar to ``other``.
+
+        Similarity requires both:
+        - the Euclidean distance between camera origins is below ``pos_threshold_m``;
+        - the angular distance between viewing directions is below ``ang_threshold_deg``.
+
+        Viewing direction follows the convention used in this module: cameras look
+        along their local negative Z axis, so the world forward is ``-R[:, 2]`` of
+        the camera-to-world transform. The angular distance is computed with
+        ``atan2(||u×v||, u·v)`` for numerical stability.
+        """
+
+        return are_camera_poses_too_similar(
+            self,
+            other,
+            pos_threshold_m=pos_threshold_m,
+            ang_threshold_deg=ang_threshold_deg,
+        )
+
+
+def _safe_normalize_dir(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    """
+    Normalize a vector; return the input if its norm is near zero.
+    """
+
+    n = float(np.linalg.norm(v))
+    if n < eps:
+        return v
+    return v / n
+
+
+def _camera_forward_world(T_cam_world: np.ndarray) -> np.ndarray:
+    """
+    Compute the camera's viewing direction in world coordinates.
+
+    The camera looks along its local negative Z axis.
+    """
+
+    return _safe_normalize_dir(-T_cam_world[:3, 2])
+
+
+def _angle_between_dirs(u: np.ndarray, v: np.ndarray) -> float:
+    """
+    Robust unsigned angle (radians) between two direction vectors.
+
+    Uses ``atan2(||u×v||, u·v)`` to avoid precision loss near 0 and π.
+    """
+
+    u_n = _safe_normalize_dir(u)
+    v_n = _safe_normalize_dir(v)
+    cross_mag = float(np.linalg.norm(np.cross(u_n, v_n)))
+    dot_uv = float(np.clip(np.dot(u_n, v_n), -1.0, 1.0))
+    return float(np.arctan2(cross_mag, dot_uv))
+
+
+def are_camera_poses_too_similar(
+    a: CameraPose,
+    b: CameraPose,
+    *,
+    pos_threshold_m: float = 0.20,
+    ang_threshold_deg: float = 10.0,
+) -> bool:
+    """
+    Check whether two camera poses are too similar.
+
+    Two poses are considered similar if both their positional distance and their
+    angular distance (between viewing directions) are below the given thresholds.
+    The angle is computed using ``atan2`` on cross/dot of the forward vectors to
+    ensure numerical stability. Thresholds are configurable; defaults are 0.20 m
+    and 10 degrees.
+    """
+
+    pa = a.transform[:3, 3]
+    pb = b.transform[:3, 3]
+    pos_dist = float(np.linalg.norm(pa - pb))
+
+    fa = _camera_forward_world(a.transform)
+    fb = _camera_forward_world(b.transform)
+    ang_rad = _angle_between_dirs(fa, fb)
+    ang_deg = float(np.rad2deg(ang_rad))
+
+    return (pos_dist < float(pos_threshold_m)) and (ang_deg < float(ang_threshold_deg))
+
 
 # These are just defaults. Make sure to change the values way below in the instantiation
 @dataclass
