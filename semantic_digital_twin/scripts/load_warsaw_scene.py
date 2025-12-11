@@ -789,6 +789,190 @@ class CameraOriginSpheresVisualizer:
 # they can be colored by visibility counts.
 
 # -----------------------------------------------------------------------------
+# Camera pose scoring and greedy non-maximum suppression (selection)
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class CameraSelectionConfig:
+    """
+    Configuration for greedy non maximum suppression of camera poses.
+
+    Poses are considered duplicates if both their positional distance and
+    angular difference (between viewing directions) are below the thresholds.
+    """
+
+    pos_threshold_m: float = 0.20
+    ang_threshold_deg: float = 10.0
+    max_poses: int | None = None
+
+
+def score_camera_poses_by_visible_bodies(
+    scene: trimesh.Scene,
+    camera_poses: list[CameraPose],
+    visibility_config: VisibilityComputationConfig | None = None,
+) -> list[int]:
+    """
+    Return a score for each pose: the number of fully visible bodies.
+
+    The computation is delegated to :func:`compute_visible_bodies_per_pose`.
+    """
+
+    return compute_visible_bodies_per_pose(scene, camera_poses, visibility_config)
+
+
+@timeit("compute_visible_body_indices_per_pose")
+def compute_visible_body_indices_per_pose(
+    scene: trimesh.Scene,
+    camera_poses: list[CameraPose],
+    config: VisibilityComputationConfig | None = None,
+) -> list[set[object]]:
+    """
+    Compute, for each camera pose, the set of visible body identifiers.
+
+    Bodies are identified using the same mapping semantics as
+    :func:`compute_visible_bodies_per_pose`:
+    - Prefer :class:`RayTracer`'s ``scene_to_index`` mapping if available.
+    - Fallback to deduplicating geometry node names by the prefix before
+      ``"_collision_"``.
+    """
+
+    cfg = config or VisibilityComputationConfig()
+
+    def _bodies_for_pose(pose: CameraPose) -> set[object]:
+        try:
+            fully_inside, _ = frustum_cull_scene(
+                scene,
+                pose.camera,
+                pose.transform,
+                require_full_visibility=True,
+                occlusion_check=cfg.occlusion_check,
+                samples_per_mesh=cfg.samples_per_mesh,
+                visibility_threshold=cfg.visibility_threshold,
+            )
+        except NameError:
+            fully_inside = set()
+
+        # Prefer RayTracer mapping if available
+        mapping = None
+        try:
+            mapping = rt.scene_to_index  # type: ignore[name-defined]
+        except Exception:
+            mapping = None
+
+        body_indices: set[object] = set()
+        if mapping is not None:
+            for node in fully_inside:
+                if node in mapping:
+                    body_indices.add(mapping[node])
+        else:
+            for node in fully_inside:
+                if "_collision_" in node:
+                    body_indices.add(node.split("_collision_")[0])
+
+        return body_indices
+
+    return [_bodies_for_pose(p) for p in camera_poses]
+
+
+def greedy_select_by_score_similarity_and_novelty(
+    camera_poses: list[CameraPose],
+    scores: list[int],
+    body_sets: list[set[object]],
+    cfg: CameraSelectionConfig | None = None,
+) -> list[CameraPose]:
+    """
+    Greedily select camera poses by score, similarity suppression, and novelty.
+
+    The algorithm maintains a set of bodies already covered by selected poses
+    and only accepts a candidate if it adds at least one previously unseen body
+    and is not too similar to any already selected pose according to ``cfg``.
+    """
+
+    if not (len(camera_poses) == len(scores) == len(body_sets)):
+        raise ValueError("camera_poses, scores, and body_sets must be aligned")
+
+    cfg = cfg or CameraSelectionConfig()
+
+    order = list(range(len(camera_poses)))
+    order.sort(key=lambda i: int(scores[i]), reverse=True)
+
+    selected: list[CameraPose] = []
+    covered: set[object] = set()
+
+    for i in order:
+        cand = camera_poses[i]
+
+        # Similarity suppression
+        is_similar = False
+        for sel in selected:
+            if sel.is_similar_to(
+                cand,
+                pos_threshold_m=cfg.pos_threshold_m,
+                ang_threshold_deg=cfg.ang_threshold_deg,
+            ):
+                is_similar = True
+                break
+        if is_similar:
+            continue
+
+        # Novelty requirement: must add at least one new body
+        new_bodies = body_sets[i] - covered
+        if len(new_bodies) == 0:
+            continue
+
+        selected.append(cand)
+        covered.update(body_sets[i])
+
+        if cfg.max_poses is not None and len(selected) >= int(cfg.max_poses):
+            break
+
+    return selected
+
+
+def greedy_non_maximum_suppression(
+    camera_poses: list[CameraPose],
+    scores: list[int],
+    cfg: CameraSelectionConfig | None = None,
+) -> list[CameraPose]:
+    """
+    Greedily select the most promising camera poses by score while suppressing
+    poses that are too similar to already selected ones.
+
+    The algorithm sorts poses by descending ``scores`` and keeps a pose if it is
+    not similar to any already selected pose according to ``cfg``. Selection can
+    be limited via ``cfg.max_poses``.
+    """
+
+    if len(camera_poses) != len(scores):
+        raise ValueError("scores must be aligned with camera_poses")
+
+    cfg = cfg or CameraSelectionConfig()
+
+    order = list(range(len(camera_poses)))
+    order.sort(key=lambda i: int(scores[i]), reverse=True)
+
+    selected: list[CameraPose] = []
+    for i in order:
+        cand = camera_poses[i]
+        is_similar = False
+        for sel in selected:
+            if sel.is_similar_to(
+                cand,
+                pos_threshold_m=cfg.pos_threshold_m,
+                ang_threshold_deg=cfg.ang_threshold_deg,
+            ):
+                is_similar = True
+                break
+        if not is_similar:
+            selected.append(cand)
+            if cfg.max_poses is not None and len(selected) >= int(cfg.max_poses):
+                break
+
+    return selected
+
+
+# -----------------------------------------------------------------------------
 # Frustum culling utilities (Option 2: camera-space FOV angle tests)
 # -----------------------------------------------------------------------------
 
@@ -1325,16 +1509,42 @@ _extra_cone_poses = generate_cone_view_poses(
 )
 generated_camera_poses.extend(_extra_cone_poses)
 
-# After defining frustum utilities, place spheres colored by visibility counts
-# Enable occlusion checking so colors reflect actually visible bodies, not just frustum inclusion
+# After defining frustum utilities, select promising camera poses using a
+# greedy non-maximum suppression based on visible-body scores and the
+# similarity metric defined earlier. Then visualize the selected set.
 
+# 1) score poses (number of fully visible bodies)
+_visibility_cfg = VisibilityComputationConfig(
+    occlusion_check=True, samples_per_mesh=64, visibility_threshold=0.8
+)
+_scores = score_camera_poses_by_visible_bodies(
+    scene=scene, camera_poses=generated_camera_poses, visibility_config=_visibility_cfg
+)
+
+# 2) greedy selection with similarity suppression and coverage novelty
+#    Only accept a camera if it adds at least one body not yet seen by the
+#    already selected set, and is not too similar to any selected pose.
+_selection_cfg = CameraSelectionConfig(
+    pos_threshold_m=0.50, ang_threshold_deg=20.0, max_poses=None
+)
+_body_sets = compute_visible_body_indices_per_pose(
+    scene=scene, camera_poses=generated_camera_poses, config=_visibility_cfg
+)
+_selected_camera_poses = greedy_select_by_score_similarity_and_novelty(
+    camera_poses=generated_camera_poses,
+    scores=_scores,
+    body_sets=_body_sets,
+    cfg=_selection_cfg,
+)
+
+# 3) visualize only the selected camera origins (colors reflect visibility counts)
 add_camera_origin_spheres(
     scene,
-    generated_camera_poses,
+    _selected_camera_poses,
     radius=0.08,
-    occlusion_check=True,
-    samples_per_mesh=64,
-    visibility_threshold=0.8,
+    occlusion_check=_visibility_cfg.occlusion_check,
+    samples_per_mesh=_visibility_cfg.samples_per_mesh,
+    visibility_threshold=_visibility_cfg.visibility_threshold,
 )
 
 number_of_bodies = 4  # <-- group size you want
