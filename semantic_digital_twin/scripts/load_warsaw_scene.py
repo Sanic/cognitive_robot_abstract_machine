@@ -225,7 +225,7 @@ class ConeSamplingConfig:
     seed: int | None = None
     fit_method: str = "footprint_2d"  # or "spherical"
     # If True, reject poses whose directional viewing cones overlap existing ones (per object)
-    reject_overlapping_cones: bool = True  # True
+    reject_overlapping_cones: bool = False  # True
     # Small angular margin added to the cone-overlap test (degrees)
     cone_overlap_margin_deg: float = 5.0
 
@@ -1150,7 +1150,7 @@ def print_uncovered_bodies_report(
     names = [id_to_label.get(bid, str(bid)) for bid in missing]
     names_sorted = sorted(set(names))
 
-    print("[DEBUG] Objects not covered by any selected camera:")
+    print("[DEBUG] Objects not fully covered by any selected camera:")
     if not names_sorted:
         print("  - (all objects are covered)")
     else:
@@ -1681,6 +1681,7 @@ cone_cfg = ConeSamplingConfig(
     samples_per_cone=20,
     roll_samples=1,
     fit_method="footprint_2d",
+    reject_overlapping_cones=False,
 )
 
 _extra_cone_poses = generate_cone_view_poses(
