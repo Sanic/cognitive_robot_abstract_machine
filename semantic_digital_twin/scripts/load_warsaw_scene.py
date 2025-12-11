@@ -642,24 +642,72 @@ def add_camera_origin_spheres(
     :param color_rgba: If provided, overrides data-driven colors with this RGBA.
     """
 
-    def _count_fully_visible_bodies(pose: CameraPose) -> int:
-        # Use frustum culling to get fully inside nodes, then map to unique body indices
+    # Delegate to split steps for clarity and reuse.
+    cfg = VisibilityComputationConfig(
+        occlusion_check=occlusion_check,
+        samples_per_mesh=samples_per_mesh,
+        visibility_threshold=visibility_threshold,
+    )
+    counts = compute_visible_bodies_per_pose(
+        scene=scene, camera_poses=camera_poses, config=cfg
+    )
+    CameraOriginSpheresVisualizer().render(
+        scene=scene,
+        camera_poses=camera_poses,
+        counts=counts,
+        radius=radius,
+        color_rgba=color_rgba,
+    )
+
+
+@dataclass
+class VisibilityComputationConfig:
+    """
+    Options controlling visibility computation of camera poses.
+
+    The occlusion and sampling options are forwarded to the frustum and
+    optional visibility checks when evaluating mesh visibility per pose.
+    """
+
+    occlusion_check: bool = False
+    samples_per_mesh: int = 32
+    visibility_threshold: float = 0.8
+
+
+@timeit("compute_visible_bodies_per_pose")
+def compute_visible_bodies_per_pose(
+    scene: trimesh.Scene,
+    camera_poses: list[CameraPose],
+    config: VisibilityComputationConfig | None = None,
+) -> list[int]:
+    """
+    Compute, for each camera pose, how many bodies are fully visible.
+
+    Returns a list of counts aligned with ``camera_poses``. Visibility is
+    measured by frustum classification and optional occlusion checks.
+    Bodies are derived from scene node names using a `RayTracer` index mapping
+    when available; otherwise, geometry node names are deduplicated by the
+    prefix before ``"_collision_"``.
+    """
+
+    cfg = config or VisibilityComputationConfig()
+
+    def _count_for_pose(pose: CameraPose) -> int:
         try:
             fully_inside, _ = frustum_cull_scene(
                 scene,
                 pose.camera,
                 pose.transform,
                 require_full_visibility=True,
-                occlusion_check=occlusion_check,
-                samples_per_mesh=samples_per_mesh,
-                visibility_threshold=visibility_threshold,
+                occlusion_check=cfg.occlusion_check,
+                samples_per_mesh=cfg.samples_per_mesh,
+                visibility_threshold=cfg.visibility_threshold,
             )
         except NameError:
-            # Fallback if frustum function not yet defined
             fully_inside = set()
 
         # Prefer RayTracer mapping if available
-        body_indices = set()
+        body_indices: set[object] = set()
         mapping = None
         try:
             mapping = rt.scene_to_index  # type: ignore[name-defined]
@@ -678,46 +726,63 @@ def add_camera_origin_spheres(
 
         return len(body_indices)
 
-    # Compute counts per pose for normalization
-    counts = [
-        _count_fully_visible_bodies(pose) if color_rgba is None else 0
-        for pose in camera_poses
-    ]
-    max_count = max(counts) if counts else 0
+    return [_count_for_pose(p) for p in camera_poses]
 
-    def _val_to_rgba(v: float) -> tuple[int, int, int, int]:
-        """
-        Map a normalized value v in [0,1] to a color using a two-color gradient
-        from blue (low) to red (high).
-        """
-        v = float(max(0.0, min(1.0, v)))
-        low = np.array([0, 0, 255, 255], dtype=float)  # blue
-        high = np.array([255, 0, 0, 255], dtype=float)  # red
-        rgba = (1.0 - v) * low + v * high
-        return tuple(int(round(c)) for c in rgba)
 
-    for idx, pose in enumerate(camera_poses):
-        # Determine color
-        if color_rgba is None:
-            v = (counts[idx] / max_count) if max_count > 0 else 0.0
-            rgba = _val_to_rgba(v)
-        else:
-            rgba = color_rgba
+def _value_to_rgba(v: float) -> tuple[int, int, int, int]:
+    """
+    Convert a normalized value in [0, 1] to an RGBA color.
 
-        sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
-        sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
+    Uses a simple two-color gradient: blue (low) to red (high).
+    """
 
-        # Use a unique node name per pose to avoid collisions when multiple
-        # camera poses originate from the same mesh/node (e.g., cone sampling).
-        node_name = (
-            f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}__{idx}"
-        )
-        scene.add_geometry(
-            sphere,
-            node_name=node_name,
-            parent_node_name=scene.graph.base_frame,
-            transform=pose.transform,
-        )
+    v = float(max(0.0, min(1.0, v)))
+    low = np.array([0, 0, 255, 255], dtype=float)  # blue
+    high = np.array([255, 0, 0, 255], dtype=float)  # red
+    rgba = (1.0 - v) * low + v * high
+    return tuple(int(round(c)) for c in rgba)
+
+
+class CameraOriginSpheresVisualizer:
+    """
+    Render spheres at camera origins, colored by per-pose counts.
+
+    If a fixed ``color_rgba`` is provided, it overrides data-driven colors.
+    """
+
+    def render(
+        self,
+        scene: trimesh.Scene,
+        camera_poses: list[CameraPose],
+        counts: list[int],
+        *,
+        radius: float = 0.05,
+        color_rgba: tuple[int, int, int, int] | None = None,
+    ) -> None:
+        if len(counts) != len(camera_poses):
+            raise ValueError("counts must be aligned with camera_poses")
+
+        max_count = max(counts) if counts else 0
+
+        for idx, pose in enumerate(camera_poses):
+            if color_rgba is None:
+                value = (counts[idx] / max_count) if max_count > 0 else 0.0
+                rgba = _value_to_rgba(value)
+            else:
+                rgba = color_rgba
+
+            sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
+            sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
+
+            node_name = (
+                f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}__{idx}"
+            )
+            scene.add_geometry(
+                sphere,
+                node_name=node_name,
+                parent_node_name=scene.graph.base_frame,
+                transform=pose.transform,
+            )
 
 
 # Note: spheres are placed after frustum utilities are defined (see below) so
