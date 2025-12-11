@@ -672,82 +672,122 @@ def frustum_cull_scene(
     visibility_threshold: float = 0.8,
 ) -> tuple[set[str], set[str]]:
     """
-    Test scene meshes against the camera frustum using camera-space FOV tests.
+    Test scene meshes against the camera frustum using camera-space tests.
 
-    Convention: camera looks along negative Z. Points in front have z_cam < 0.
+    The function delegates the workflow to small, focused classes:
+    configuration, projection, frustum classification, and an optional
+    visibility checker for occlusion validation.
+
     Returns two sets of node names: fully_inside and partially_inside.
-
-    If ``occlusion_check`` is True, candidate meshes are validated by ray casting
-    from the camera origin to samples on the mesh. For a mesh to count as fully
-    visible, at least ``visibility_threshold`` fraction of the sampled points
-    must be the first hit in the scene.
     """
-    V = camera_view_matrix(T_cam_world)
+    from dataclasses import dataclass
 
-    # FOV to tangents
-    fovx_deg, fovy_deg = float(camera.fov[0]), float(camera.fov[1])
-    tx = np.tan(np.deg2rad(fovx_deg) * 0.5)
-    ty = np.tan(np.deg2rad(fovy_deg) * 0.5)
-    z_near = float(camera.z_near)
-    z_far = float(camera.z_far)
+    # ------------------------------------------------------------------
+    # Data and helpers
+    # ------------------------------------------------------------------
+    @dataclass
+    class FrustumCullConfig:
+        """Configuration for frustum culling and visibility validation.
 
-    fully_inside: set[str] = set()
-    partially_inside: set[str] = set()
+        The camera is assumed to look along its negative Z axis.
+        """
 
-    # Prepare ray engine if we do occlusion
-    ray_engine = scene.to_mesh().ray if occlusion_check else None
+        fov_deg_xy: tuple[float, float]
+        z_near: float
+        z_far: float
+        require_full_visibility: bool
+        eps: float
+        occlusion_check: bool
+        samples_per_mesh: int
+        visibility_threshold: float
 
-    for node_name in scene.graph.nodes_geometry:
-        _, gkey = scene.graph[node_name]
-        geom = scene.geometry[gkey]
-        if not isinstance(geom, trimesh.Trimesh):
-            continue
+        def tangents(self) -> tuple[float, float]:
+            fx, fy = float(self.fov_deg_xy[0]), float(self.fov_deg_xy[1])
+            return float(np.tan(np.deg2rad(fx) * 0.5)), float(
+                np.tan(np.deg2rad(fy) * 0.5)
+            )
 
-        # Local AABB corners -> world
-        corners_local = _aabb_corners(geom.bounds)
-        T_node_world, _ = scene.graph.get(
-            frame_to=node_name, frame_from=scene.graph.base_frame
-        )
-        corners_world = (T_node_world[:3, :3] @ corners_local.T).T + T_node_world[:3, 3]
+    class CameraFrustum:
+        """Encapsulates FOV and near/far clipping classification in camera space."""
 
-        # World -> camera
-        N = len(corners_world)
-        pts_h = np.hstack([corners_world, np.ones((N, 1))])
-        pc = (V @ pts_h.T).T  # (N,4)
-        x = pc[:, 0]
-        y = pc[:, 1]
-        z = pc[:, 2]
+        def __init__(self, cfg: FrustumCullConfig):
+            self.cfg = cfg
+            self.tx, self.ty = cfg.tangents()
 
-        # Camera looks along -Z; distance in front:
-        dz = -z
+        def classify_corners(
+            self, x: np.ndarray, y: np.ndarray, z: np.ndarray
+        ) -> tuple[bool, bool]:
+            dz = -z  # points in front have positive dz
+            inside = (
+                (dz >= self.cfg.z_near - self.cfg.eps)
+                & (dz <= self.cfg.z_far + self.cfg.eps)
+                & (np.abs(x) <= dz * self.tx + self.cfg.eps)
+                & (np.abs(y) <= dz * self.ty + self.cfg.eps)
+            )
+            return bool(np.all(inside)), bool(np.any(inside))
 
-        inside_mask = (
-            (dz >= z_near - eps)
-            & (dz <= z_far + eps)
-            & (np.abs(x) <= dz * tx + eps)
-            & (np.abs(y) <= dz * ty + eps)
-        )
+    class NodeProjector:
+        """Projects node-local AABB corners to camera space."""
 
-        all_inside = bool(np.all(inside_mask))
-        any_inside = bool(np.any(inside_mask))
+        def __init__(self, scene_: trimesh.Scene, V_world_cam: np.ndarray):
+            self.scene = scene_
+            self.V = V_world_cam
 
-        candidate_full = False
-        candidate_partial = False
-        if require_full_visibility:
-            candidate_full = all_inside
-        else:
-            candidate_partial = any_inside
+        def corners_world(
+            self, node_name: str, geom: trimesh.Trimesh
+        ) -> tuple[np.ndarray, np.ndarray]:
+            corners_local = _aabb_corners(geom.bounds)
+            T_node_world, _ = self.scene.graph.get(
+                frame_to=node_name, frame_from=self.scene.graph.base_frame
+            )
+            corners_world = (T_node_world[:3, :3] @ corners_local.T).T + T_node_world[
+                :3, 3
+            ]
+            return corners_world, T_node_world
 
-        if not (candidate_full or candidate_partial):
-            continue
+        def project(
+            self, points_world: np.ndarray
+        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+            N = len(points_world)
+            pts_h = np.hstack([points_world, np.ones((N, 1))])
+            pc = (self.V @ pts_h.T).T
+            return pc[:, 0], pc[:, 1], pc[:, 2]
 
-        if occlusion_check and ray_engine is not None:
-            # Sample points on the mesh surface in local frame
+    class VisibilityChecker:
+        """Strategy for validating visibility against occluders."""
+
+        def is_sufficiently_visible(
+            self,
+            node_name: str,
+            geom: trimesh.Trimesh,
+            T_node_world: np.ndarray,
+            T_cam_world_local: np.ndarray,
+        ) -> float:
+            """Return ratio of visible samples in [0, 1]."""
+            raise NotImplementedError
+
+    class NoOpVisibilityChecker(VisibilityChecker):
+        def is_sufficiently_visible(
+            self, node_name, geom, T_node_world, T_cam_world_local
+        ) -> float:
+            return 1.0
+
+    class RayOcclusionVisibilityChecker(VisibilityChecker):
+        """Ray-based visibility via `trimesh` ray engine on the merged scene mesh."""
+
+        def __init__(self, scene_: trimesh.Scene, eps_local: float, samples: int):
+            self.scene = scene_
+            self.eps = float(eps_local)
+            # Build once
+            self.ray_engine = self.scene.to_mesh().ray
+            self.samples = int(max(8, samples))
+
+        def _samples_world(
+            self, geom: trimesh.Trimesh, T_node_world: np.ndarray
+        ) -> tuple[np.ndarray, np.ndarray]:
             try:
-                n_samples = max(8, int(samples_per_mesh))
-                pts_local = geom.sample(n_samples)
+                pts_local = geom.sample(self.samples)
                 if pts_local.shape[0] == 0:
-                    # fall back to AABB corners and centroid
                     aabb = _aabb_corners(geom.bounds)
                     centroid = geom.centroid.reshape(1, 3)
                     pts_local = np.vstack([aabb, centroid])
@@ -755,61 +795,111 @@ def frustum_cull_scene(
                 aabb = _aabb_corners(geom.bounds)
                 centroid = geom.centroid.reshape(1, 3)
                 pts_local = np.vstack([aabb, centroid])
-
-            # Transform samples to world
             pts_world = (T_node_world[:3, :3] @ pts_local.T).T + T_node_world[:3, 3]
+            return pts_world, pts_local
 
-            # Build rays from camera origin
-            origin = T_cam_world[:3, 3]
+        def is_sufficiently_visible(
+            self, node_name, geom, T_node_world, T_cam_world_local
+        ) -> float:
+            origin = T_cam_world_local[:3, 3]
+            pts_world, _ = self._samples_world(geom, T_node_world)
             dirs = pts_world - origin
             dists = np.linalg.norm(dirs, axis=1)
-            valid = dists > eps
+            valid = dists > self.eps
             if not np.any(valid):
-                continue
+                return 0.0
             dirs = dirs[valid] / dists[valid][:, None]
-            pts_world = pts_world[valid]
             dists = dists[valid]
-
-            # Intersect
             try:
-                loc, idx_ray, _ = ray_engine.intersects_location(
+                loc, idx_ray, _ = self.ray_engine.intersects_location(
                     ray_origins=np.repeat(origin[None, :], len(dirs), axis=0),
                     ray_directions=dirs,
                     multiple_hits=False,
                 )
             except Exception:
-                loc = np.empty((0, 3))
-                idx_ray = np.empty((0,), dtype=int)
+                return 0.0
+            if len(idx_ray) == 0:
+                return 0.0
+            hit_d = np.linalg.norm(loc - origin, axis=1)
+            target_d = dists[idx_ray]
+            visible = float(np.sum(np.abs(hit_d - target_d) <= 1e-3))
+            return visible / float(max(1, len(dirs)))
 
-            # Count rays where first hit distance matches the sampled point distance
-            visible = 0
-            if len(idx_ray) > 0:
-                hit_d = np.linalg.norm(loc - origin, axis=1)
-                # Map back to corresponding target distances
-                target_d = dists[idx_ray]
-                # If the first intersection is at the same distance (+/- tol), it is not occluded
-                visible = int(np.sum(np.abs(hit_d - target_d) <= 1e-3))
-            # consider rays that did not hit anything as not visible
-            visibility_ratio = visible / max(1, len(dirs))
+    class FrustumCuller:
+        """Iterate scene nodes, classify AABBs, and validate visibility."""
 
-            if require_full_visibility:
-                candidate_full = candidate_full and (
-                    visibility_ratio >= visibility_threshold
+        def __init__(
+            self,
+            scene_: trimesh.Scene,
+            cfg: FrustumCullConfig,
+            V_world_cam: np.ndarray,
+            T_cam_world_local: np.ndarray,
+        ):
+            self.scene = scene_
+            self.cfg = cfg
+            self.frustum = CameraFrustum(cfg)
+            self.proj = NodeProjector(scene_, V_world_cam)
+            if cfg.occlusion_check:
+                self.visibility = RayOcclusionVisibilityChecker(
+                    scene_, cfg.eps, cfg.samples_per_mesh
                 )
-                if not candidate_full:
-                    continue
             else:
-                # For partial case, require that at least one sample is visible
-                candidate_partial = candidate_partial and (visibility_ratio > 0.0)
-                if not candidate_partial:
+                self.visibility = NoOpVisibilityChecker()
+            self.T_cam_world = T_cam_world_local
+
+        def run(self) -> tuple[set[str], set[str]]:
+            fully: set[str] = set()
+            partially: set[str] = set()
+            for node_name in self.scene.graph.nodes_geometry:
+                _, gkey = self.scene.graph[node_name]
+                geom = self.scene.geometry[gkey]
+                if not isinstance(geom, trimesh.Trimesh):
                     continue
 
-        if candidate_full:
-            fully_inside.add(node_name)
-        elif candidate_partial:
-            partially_inside.add(node_name)
+                corners_world, T_node_world = self.proj.corners_world(node_name, geom)
+                x, y, z = self.proj.project(corners_world)
+                all_inside, any_inside = self.frustum.classify_corners(x, y, z)
 
-    return fully_inside, partially_inside
+                candidate_full = self.cfg.require_full_visibility and all_inside
+                candidate_partial = (
+                    not self.cfg.require_full_visibility
+                ) and any_inside
+                if not (candidate_full or candidate_partial):
+                    continue
+
+                vis_ratio = self.visibility.is_sufficiently_visible(
+                    node_name=node_name,
+                    geom=geom,
+                    T_node_world=T_node_world,
+                    T_cam_world_local=self.T_cam_world,
+                )
+
+                if self.cfg.require_full_visibility:
+                    if candidate_full and (vis_ratio >= self.cfg.visibility_threshold):
+                        fully.add(node_name)
+                else:
+                    # For partial, require that at least one sample is visible
+                    if candidate_partial and (vis_ratio > 0.0):
+                        partially.add(node_name)
+
+            return fully, partially
+
+    # ------------------------------------------------------------------
+    # Assemble and execute
+    # ------------------------------------------------------------------
+    V = camera_view_matrix(T_cam_world)
+    cfg = FrustumCullConfig(
+        fov_deg_xy=(float(camera.fov[0]), float(camera.fov[1])),
+        z_near=float(camera.z_near),
+        z_far=float(camera.z_far),
+        require_full_visibility=bool(require_full_visibility),
+        eps=float(eps),
+        occlusion_check=bool(occlusion_check),
+        samples_per_mesh=int(samples_per_mesh),
+        visibility_threshold=float(visibility_threshold),
+    )
+    culler = FrustumCuller(scene, cfg, V, T_cam_world)
+    return culler.run()
 
 
 import numpy as np
