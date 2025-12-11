@@ -933,48 +933,6 @@ def greedy_select_by_score_similarity_and_novelty(
     return selected
 
 
-def greedy_non_maximum_suppression(
-    camera_poses: list[CameraPose],
-    scores: list[int],
-    cfg: CameraSelectionConfig | None = None,
-) -> list[CameraPose]:
-    """
-    Greedily select the most promising camera poses by score while suppressing
-    poses that are too similar to already selected ones.
-
-    The algorithm sorts poses by descending ``scores`` and keeps a pose if it is
-    not similar to any already selected pose according to ``cfg``. Selection can
-    be limited via ``cfg.max_poses``.
-    """
-
-    if len(camera_poses) != len(scores):
-        raise ValueError("scores must be aligned with camera_poses")
-
-    cfg = cfg or CameraSelectionConfig()
-
-    order = list(range(len(camera_poses)))
-    order.sort(key=lambda i: int(scores[i]), reverse=True)
-
-    selected: list[CameraPose] = []
-    for i in order:
-        cand = camera_poses[i]
-        is_similar = False
-        for sel in selected:
-            if sel.is_similar_to(
-                cand,
-                pos_threshold_m=cfg.pos_threshold_m,
-                ang_threshold_deg=cfg.ang_threshold_deg,
-            ):
-                is_similar = True
-                break
-        if not is_similar:
-            selected.append(cand)
-            if cfg.max_poses is not None and len(selected) >= int(cfg.max_poses):
-                break
-
-    return selected
-
-
 # -----------------------------------------------------------------------------
 # Debug visibility reports (camera→objects and object→cameras)
 # -----------------------------------------------------------------------------
