@@ -203,7 +203,7 @@ def main(args):
 
     if not args.skip_vlm:
         # Set up visual state management
-        camera_pose = world_loader._predefined_camera_transforms()[
+        camera_pose = world_loader._predefined_camera_transforms[
             1
         ]  # Use first camera pose for VLM queries
 

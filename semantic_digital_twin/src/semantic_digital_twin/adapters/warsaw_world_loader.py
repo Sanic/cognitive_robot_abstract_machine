@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
 import numpy as np
@@ -47,9 +47,7 @@ class WarsawWorldLoader:
     Camera field of view for rendering.
     """
 
-    original_state: Dict[UUID, trimesh.visual.base.Visual] = field(
-        init=False, default_factory=dict
-    )
+    original_state: Dict[UUID, Any] = field(init=False, default_factory=dict)
     """
     Original visual states of bodies before highlighting.
     """
