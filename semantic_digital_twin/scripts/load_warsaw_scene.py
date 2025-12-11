@@ -534,12 +534,12 @@ def add_mean_normal_lines_and_cameras(
                 pose_cam, marker_height=self.config.marker_height
             )
             cam_node_name = f"camera_marker__{node_name}__{gkey}"
-            scene.add_geometry(
-                cam_marker,
-                node_name=cam_node_name,
-                parent_node_name=scene.graph.base_frame,
-                transform=T_cam,
-            )
+            # scene.add_geometry(
+            #     cam_marker,
+            #     node_name=cam_node_name,
+            #     parent_node_name=scene.graph.base_frame,
+            #     transform=T_cam,
+            # )
 
             poses.append(
                 CameraPose(
@@ -631,6 +631,8 @@ def add_camera_origin_spheres(
     occlusion_check: bool = False,
     samples_per_mesh: int = 32,
     visibility_threshold: float = 0.8,
+    add_camera_marker: bool = False,
+    marker_height: float = 0.15,
 ) -> None:
     """
     Add a small sphere at each camera origin and color it by how many bodies
@@ -643,6 +645,8 @@ def add_camera_origin_spheres(
     :param camera_poses: List of camera poses whose origins are to be marked.
     :param radius: Radius of the marker spheres in meters.
     :param color_rgba: If provided, overrides data-driven colors with this RGBA.
+    :param add_camera_marker: If ``True``, also add a trimesh camera marker at each pose.
+    :param marker_height: Height of the camera marker when ``add_camera_marker`` is ``True``.
     """
 
     # Delegate to split steps for clarity and reuse.
@@ -660,6 +664,8 @@ def add_camera_origin_spheres(
         counts=counts,
         radius=radius,
         color_rgba=color_rgba,
+        add_camera_marker=add_camera_marker,
+        marker_height=marker_height,
     )
 
 
@@ -761,6 +767,8 @@ class CameraOriginSpheresVisualizer:
         *,
         radius: float = 0.05,
         color_rgba: tuple[int, int, int, int] | None = None,
+        add_camera_marker: bool = False,
+        marker_height: float = 0.15,
     ) -> None:
         if len(counts) != len(camera_poses):
             raise ValueError("counts must be aligned with camera_poses")
@@ -786,6 +794,19 @@ class CameraOriginSpheresVisualizer:
                 parent_node_name=scene.graph.base_frame,
                 transform=pose.transform,
             )
+
+            if add_camera_marker:
+                marker = trimesh.creation.camera_marker(
+                    pose.camera, marker_height=marker_height
+                )
+                scene.add_geometry(
+                    marker,
+                    node_name=(
+                        f"camera_marker__{pose.node_name}__{pose.geometry_key}__{idx}"
+                    ),
+                    parent_node_name=scene.graph.base_frame,
+                    transform=pose.transform,
+                )
 
 
 # Note: spheres are placed after frustum utilities are defined (see below) so
@@ -1639,7 +1660,7 @@ cone_cfg = ConeSamplingConfig(
     samples_per_cone=20,
     roll_samples=1,
     fit_method="footprint_2d",
-    reject_overlapping_cones=False,
+    reject_overlapping_cones=True,
 )
 
 _extra_cone_poses = generate_cone_view_poses(
@@ -1649,7 +1670,7 @@ _extra_cone_poses = generate_cone_view_poses(
     max_distance=max_view_distance,
     frustum_culling_max_distance=frustum_culling_max_distance,
     fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
-    visualize=True,
+    visualize=False,
     marker_height=0.15,
 )
 generated_camera_poses.extend(_extra_cone_poses)
@@ -1715,6 +1736,7 @@ add_camera_origin_spheres(
     occlusion_check=_visibility_cfg.occlusion_check,
     samples_per_mesh=_visibility_cfg.samples_per_mesh,
     visibility_threshold=_visibility_cfg.visibility_threshold,
+    add_camera_marker=True,
 )
 
 number_of_bodies = 4  # <-- group size you want
