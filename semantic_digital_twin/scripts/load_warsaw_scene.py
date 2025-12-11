@@ -1095,6 +1095,69 @@ def print_body_to_cameras_report(
         print(f"  - {body_name}: {', '.join(cams_sorted) if cams_sorted else '(none)'}")
 
 
+def _all_body_identifiers(scene: trimesh.Scene) -> set[object]:
+    """
+    Return the set of all body identifiers present in the scene.
+
+    The identifier type matches what is used in visibility body sets:
+    - If a :class:`RayTracer` mapping is available, use its indices.
+    - Otherwise, collapse geometry node names by the prefix before
+      ``"_collision_"`` to represent logical objects.
+    """
+
+    # Prefer RayTracer mapping if available
+    try:
+        mapping = rt.scene_to_index  # type: ignore[name-defined]
+    except Exception:
+        mapping = None
+
+    if mapping is not None:
+        # mapping: node_name -> index (identifier)
+        return set(mapping.values())
+
+    # Fallback: collect base names from scene nodes
+    all_ids: set[object] = set()
+    try:
+        node_names = list(scene.graph.nodes_geometry)
+    except Exception:
+        node_names = []
+    for node in node_names:
+        if isinstance(node, str) and "_collision_" in node:
+            all_ids.add(node.split("_collision_")[0])
+    return all_ids
+
+
+def print_uncovered_bodies_report(
+    scene: trimesh.Scene,
+    body_sets: list[set[object]],
+) -> None:
+    """
+    Print the list of objects that are not covered by any of the given
+    camera body sets.
+
+    This should be called after NMS selection to reveal which scene objects
+    remain unseen by all selected poses.
+    """
+
+    all_ids = _all_body_identifiers(scene)
+    covered: set[object] = set()
+    for s in body_sets:
+        covered.update(s)
+
+    missing = all_ids - covered
+
+    id_to_label = _make_body_label_resolver()
+    names = [id_to_label.get(bid, str(bid)) for bid in missing]
+    names_sorted = sorted(set(names))
+
+    print("[DEBUG] Objects not covered by any selected camera:")
+    if not names_sorted:
+        print("  - (all objects are covered)")
+    else:
+        for name in names_sorted:
+            print(f"  - {name}")
+
+
 # -----------------------------------------------------------------------------
 # Frustum culling utilities (Option 2: camera-space FOV angle tests)
 # -----------------------------------------------------------------------------
@@ -1682,6 +1745,8 @@ if debug_visibility_reports:
     print_body_to_cameras_report(
         camera_poses=_selected_camera_poses, body_sets=_selected_body_sets
     )
+    # Additionally report which objects are not covered by any selected camera
+    print_uncovered_bodies_report(scene=scene, body_sets=_selected_body_sets)
 
 # 3) visualize only the selected camera origins (colors reflect visibility counts)
 add_camera_origin_spheres(
