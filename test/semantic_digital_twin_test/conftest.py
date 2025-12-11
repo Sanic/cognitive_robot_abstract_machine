@@ -7,6 +7,7 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.utils import recursive_subclasses
+
 from semantic_digital_twin.world import World
 import runpy
 from pathlib import Path
@@ -20,14 +21,21 @@ def pytest_configure(config):
     )
     # Execute the ORM generation script as a standalone module
     runpy.run_path(str(generate_orm_path), run_name="__main__")
-    SymbolGraph()
+    class_diagram = ClassDiagram(
+        recursive_subclasses(Symbol) + [World],
+        introspector=DescriptorAwareIntrospector(),
+    )
+    SymbolGraph(_class_diagram=class_diagram)
+
 
 
 @pytest.fixture(autouse=True, scope="function")
 def cleanup_after_test():
-    # fetch all symbols and construct the graph
+    # We need to pass the class diagram, since otherwise some names are not found anymore after clearing the symbol graph
+    # for the first time, since World is not a symbol
+    SymbolGraph().clear()
     class_diagram = ClassDiagram(
-        list(recursive_subclasses(Symbol)) + [World],
+        recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
     )
     SymbolGraph(_class_diagram=class_diagram)
