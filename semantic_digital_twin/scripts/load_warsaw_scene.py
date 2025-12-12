@@ -850,6 +850,81 @@ class CameraPoseGenerationEngine:
 
         return poses
 
+    # -----------------------------
+    # Scoring helpers
+    # -----------------------------
+    @staticmethod
+    def score_camera_poses_by_visible_bodies(
+        scene: trimesh.Scene,
+        camera_poses: list["CameraPose"],
+        visibility_config: "VisibilityComputationConfig | None" = None,
+    ) -> list[int]:
+        """
+        Return a score for each pose: the number of fully visible bodies.
+
+        Delegates to the existing module-level `compute_visible_bodies_per_pose`
+        to preserve behavior.
+        """
+
+        return CameraPoseGenerationEngine.compute_visible_bodies_per_pose(
+            scene, camera_poses, visibility_config
+        )
+
+    @staticmethod
+    @timeit("compute_visible_bodies_per_pose")
+    def compute_visible_bodies_per_pose(
+        scene: trimesh.Scene,
+        camera_poses: list["CameraPose"],
+        config: "VisibilityComputationConfig | None" = None,
+    ) -> list[int]:
+        """
+        Compute, for each camera pose, how many bodies are fully visible.
+
+        Returns a list of counts aligned with ``camera_poses``. Visibility is
+        measured by frustum classification and optional occlusion checks.
+        Bodies are derived from scene node names using a `RayTracer` index mapping
+        when available; otherwise, geometry node names are deduplicated by the
+        prefix before "_collision_".
+        """
+
+        cfg = config or VisibilityComputationConfig()
+
+        def _count_for_pose(pose: "CameraPose") -> int:
+            try:
+                fully_inside, _ = frustum_cull_scene(
+                    scene,
+                    pose.camera,
+                    pose.transform,
+                    require_full_visibility=True,
+                    occlusion_check=cfg.occlusion_check,
+                    samples_per_mesh=cfg.samples_per_mesh,
+                    visibility_threshold=cfg.visibility_threshold,
+                )
+            except NameError:
+                fully_inside = set()
+
+            # Prefer RayTracer mapping if available
+            body_indices: set[object] = set()
+            mapping = None
+            try:
+                mapping = rt.scene_to_index  # type: ignore[name-defined]
+            except Exception:
+                mapping = None
+
+            if mapping is not None:
+                for node in fully_inside:
+                    if node in mapping:
+                        body_indices.add(mapping[node])
+            else:
+                # Fallback: deduplicate by body name prefix before '_collision_'
+                for node in fully_inside:
+                    if "_collision_" in node:
+                        body_indices.add(node.split("_collision_")[0])
+
+            return len(body_indices)
+
+        return [_count_for_pose(p) for p in camera_poses]
+
     def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
         """
         Return True if the world Z coordinate lies within [min_h, max_h].
@@ -978,52 +1053,14 @@ def compute_visible_bodies_per_pose(
     config: VisibilityComputationConfig | None = None,
 ) -> list[int]:
     """
-    Compute, for each camera pose, how many bodies are fully visible.
+    Deprecated module-level entry point. Use
+    `CameraPoseGenerationEngine.compute_visible_bodies_per_pose` instead.
 
-    Returns a list of counts aligned with ``camera_poses``. Visibility is
-    measured by frustum classification and optional occlusion checks.
-    Bodies are derived from scene node names using a `RayTracer` index mapping
-    when available; otherwise, geometry node names are deduplicated by the
-    prefix before ``"_collision_"``.
+    This function delegates to the class method to preserve behavior.
     """
-
-    cfg = config or VisibilityComputationConfig()
-
-    def _count_for_pose(pose: CameraPose) -> int:
-        try:
-            fully_inside, _ = frustum_cull_scene(
-                scene,
-                pose.camera,
-                pose.transform,
-                require_full_visibility=True,
-                occlusion_check=cfg.occlusion_check,
-                samples_per_mesh=cfg.samples_per_mesh,
-                visibility_threshold=cfg.visibility_threshold,
-            )
-        except NameError:
-            fully_inside = set()
-
-        # Prefer RayTracer mapping if available
-        body_indices: set[object] = set()
-        mapping = None
-        try:
-            mapping = rt.scene_to_index  # type: ignore[name-defined]
-        except Exception:
-            mapping = None
-
-        if mapping is not None:
-            for node in fully_inside:
-                if node in mapping:
-                    body_indices.add(mapping[node])
-        else:
-            # Fallback: deduplicate by body name prefix before '_collision_'
-            for node in fully_inside:
-                if "_collision_" in node:
-                    body_indices.add(node.split("_collision_")[0])
-
-        return len(body_indices)
-
-    return [_count_for_pose(p) for p in camera_poses]
+    return CameraPoseGenerationEngine.compute_visible_bodies_per_pose(
+        scene=scene, camera_poses=camera_poses, config=config
+    )
 
 
 def _value_to_rgba(v: float) -> tuple[int, int, int, int]:
@@ -1745,7 +1782,7 @@ generated_camera_poses.extend(_extra_cone_poses)
 _visibility_cfg = VisibilityComputationConfig(
     occlusion_check=True, samples_per_mesh=64, visibility_threshold=0.8
 )
-_scores = score_camera_poses_by_visible_bodies(
+_scores = CameraPoseGenerationEngine.score_camera_poses_by_visible_bodies(
     scene=scene, camera_poses=generated_camera_poses, visibility_config=_visibility_cfg
 )
 
