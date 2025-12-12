@@ -95,6 +95,7 @@ max_camera_height = 2.0  # float('inf')
 # Debug reporting: when enabled, print which cameras see which objects, and
 # per object, which cameras can see it.
 debug_visibility_reports = True
+turn_off_all_visualizations = True
 ###
 
 
@@ -117,6 +118,17 @@ class CameraPose:
     transform: np.ndarray
     node_name: str
     geometry_key: str
+
+    def to_transformation_matrix(self) -> TransformationMatrix:
+        """
+        Return a ``TransformationMatrix`` built from the pose's 4x4 transform.
+
+        The stored transform maps the camera frame to the world frame. This
+        method wraps that constant homogeneous matrix into a
+        ``semantic_digital_twin.spatial_types.TransformationMatrix`` instance.
+        """
+
+        return TransformationMatrix(self.transform)
 
     def is_similar_to(
         self,
@@ -517,29 +529,33 @@ def add_mean_normal_lines_and_cameras(
                 return poses
 
             # Add normal line visualization
-            path = trimesh.load_path(np.vstack([p0, p1]))
-            path.colors = np.tile(self.config.line_color, (len(path.entities), 1))
-            line_node_name = f"normal_line__{node_name}__{gkey}"
-            scene.add_geometry(
-                path,
-                node_name=line_node_name,
-                parent_node_name=scene.graph.base_frame,
-                transform=np.eye(4),
-            )
+
+            if not turn_off_all_visualizations:
+                path = trimesh.load_path(np.vstack([p0, p1]))
+                path.colors = np.tile(self.config.line_color, (len(path.entities), 1))
+                line_node_name = f"normal_line__{node_name}__{gkey}"
+                scene.add_geometry(
+                    path,
+                    node_name=line_node_name,
+                    parent_node_name=scene.graph.base_frame,
+                    transform=np.eye(4),
+                )
 
             # Add camera marker
             T_cam = self._look_at_transform(origin=p1, target=p0)
             pose_cam = self._new_camera_instance()
-            cam_marker = trimesh.creation.camera_marker(
-                pose_cam, marker_height=self.config.marker_height
-            )
-            cam_node_name = f"camera_marker__{node_name}__{gkey}"
-            # scene.add_geometry(
-            #     cam_marker,
-            #     node_name=cam_node_name,
-            #     parent_node_name=scene.graph.base_frame,
-            #     transform=T_cam,
-            # )
+
+            if not turn_off_all_visualizations:
+                cam_marker = trimesh.creation.camera_marker(
+                    pose_cam, marker_height=self.config.marker_height
+                )
+                cam_node_name = f"camera_marker__{node_name}__{gkey}"
+                scene.add_geometry(
+                    cam_marker,
+                    node_name=cam_node_name,
+                    parent_node_name=scene.graph.base_frame,
+                    transform=T_cam,
+                )
 
             poses.append(
                 CameraPose(
@@ -782,20 +798,19 @@ class CameraOriginSpheresVisualizer:
             else:
                 rgba = color_rgba
 
-            sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
-            sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
+            if not turn_off_all_visualizations:
+                sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
+                sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
 
-            node_name = (
-                f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}__{idx}"
-            )
-            scene.add_geometry(
-                sphere,
-                node_name=node_name,
-                parent_node_name=scene.graph.base_frame,
-                transform=pose.transform,
-            )
+                node_name = f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}__{idx}"
+                scene.add_geometry(
+                    sphere,
+                    node_name=node_name,
+                    parent_node_name=scene.graph.base_frame,
+                    transform=pose.transform,
+                )
 
-            if add_camera_marker:
+            if add_camera_marker and not turn_off_all_visualizations:
                 marker = trimesh.creation.camera_marker(
                     pose.camera, marker_height=marker_height
                 )
@@ -1633,7 +1648,7 @@ def generate_cone_view_poses(
                     )
                 )
 
-                if visualize:
+                if visualize and not turn_off_all_visualizations:
                     path = trimesh.load_path(np.vstack([c_world, p_cam]))
                     scene.add_geometry(
                         path,
@@ -1827,6 +1842,8 @@ camera_poses.append(camera_pose1 @ rotate_x @ rotate)
 #
 # camera_poses.append(camera_pose4 @ rotate_x @ rotate)
 
+camera_poses = [pose.transform for pose in _selected_camera_poses]
+
 output_path = Path("../resources/warsaw_data/scene_images/")
 
 if not output_path.exists():
@@ -1837,38 +1854,38 @@ scene.camera.fov = [60, 45]  # horizontal, vertical degrees
 for j, pose in enumerate(camera_poses):
 
     scene.graph[scene.camera.name] = pose
-    scene.show()
+    # scene.show()
 
-    # png = scene.save_image(resolution=(1024, 768), visible=True)
+    png = scene.save_image(resolution=(1024, 768), visible=True)
 
-    # with open(os.path.join(output_path, f"original_render_{j}.png"), "wb") as f:
-    #     f.write(png)
-#
-# # --- iterate over groups of bodies ---
-# for i, start in enumerate(range(0, len(bodies), number_of_bodies)):
-#     group = bodies[start : start + number_of_bodies]
-#
-#     # reset everything to default look
-#     reset_scene_visuals()
-#
-#     # create palette for this group
-#     palette = make_opencv_palette(len(group))
-#
-#     # apply colors only to the current group; others keep texture
-#     for body, color in zip(group, palette):
-#         body.collision[0].override_mesh_with_color(color)
-#
-#     # (Re)build ray tracer / scene if needed
-#     rt = RayTracer(world=world)
-#     scene = rt.scene
-#
-#     scene.camera.fov = [60, 45]  # horizontal, vertical degrees
-#
-#     for j, pose in enumerate(camera_poses):
-#
-#         scene.graph[scene.camera.name] = pose
-#
-#         png = scene.save_image(resolution=(1024, 768), visible=True)
-#
-#         with open(os.path.join(output_path, f"group_{i}_render_{j}.png"), "wb") as f:
-#             f.write(png)
+    with open(os.path.join(output_path, f"original_render_{j}.png"), "wb") as f:
+        f.write(png)
+
+# --- iterate over groups of bodies ---
+for i, start in enumerate(range(0, len(bodies), number_of_bodies)):
+    group = bodies[start : start + number_of_bodies]
+
+    # reset everything to default look
+    reset_scene_visuals()
+
+    # create palette for this group
+    palette = make_opencv_palette(len(group))
+
+    # apply colors only to the current group; others keep texture
+    for body, color in zip(group, palette):
+        body.collision[0].override_mesh_with_color(color)
+
+    # (Re)build ray tracer / scene if needed
+    rt = RayTracer(world=world)
+    scene = rt.scene
+
+    scene.camera.fov = [60, 45]  # horizontal, vertical degrees
+
+    for j, pose in enumerate(camera_poses):
+
+        scene.graph[scene.camera.name] = pose
+
+        png = scene.save_image(resolution=(1024, 768), visible=True)
+
+        with open(os.path.join(output_path, f"group_{i}_render_{j}.png"), "wb") as f:
+            f.write(png)
