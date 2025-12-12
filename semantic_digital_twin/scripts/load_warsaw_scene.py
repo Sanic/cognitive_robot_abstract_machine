@@ -1440,14 +1440,14 @@ def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
     return np.array([[x, y, z] for x in xs for y in ys for z in zs], dtype=float)
 
 
-def camera_view_matrix(T_cam_world: np.ndarray) -> np.ndarray:
-    """
-    Deprecated: use ``CameraPoseGenerationEngine.view_matrix_from_cam_to_world``.
-
-    This function now delegates to the class method which computes the
-    orthonormal inverse efficiently without a general matrix inversion.
-    """
-    return CameraPoseGenerationEngine.view_matrix_from_cam_to_world(T_cam_world)
+# def camera_view_matrix(T_cam_world: np.ndarray) -> np.ndarray:
+#     """
+#     Deprecated: use ``CameraPoseGenerationEngine.view_matrix_from_cam_to_world``.
+#
+#     This function now delegates to the class method which computes the
+#     orthonormal inverse efficiently without a general matrix inversion.
+#     """
+#     return CameraPoseGenerationEngine.view_matrix_from_cam_to_world(T_cam_world)
 
 
 @timeit("frustum_cull_scene")
@@ -1679,7 +1679,7 @@ def frustum_cull_scene(
     # ------------------------------------------------------------------
     # Assemble and execute
     # ------------------------------------------------------------------
-    V = camera_view_matrix(T_cam_world)
+    V = CameraPoseGenerationEngine.view_matrix_from_cam_to_world(T_cam_world)
     cfg = FrustumCullConfig(
         fov_deg_xy=(float(camera.fov[0]), float(camera.fov[1])),
         z_near=float(camera.z_near),
