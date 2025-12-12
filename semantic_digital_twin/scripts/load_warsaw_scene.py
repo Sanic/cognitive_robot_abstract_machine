@@ -614,28 +614,6 @@ def add_mean_normal_lines_and_cameras(
     return all_poses
 
 
-# Generate visualization and collect camera instances and their poses
-
-generated_camera_poses = add_mean_normal_lines_and_cameras(
-    scene,
-    marker_height=min_standoff_distance,
-    min_standoff=min_standoff_distance,
-    max_distance=max_view_distance,
-    fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
-    # fit_method="footprint_2d",
-)
-
-# Set the z_far distance of all cameras to a fixed value used by frustum culling.
-# This is intentionally larger than the maximum camera placement distance so that
-# culling/visibility evaluation does not prematurely clip distant objects.
-for pose in generated_camera_poses:
-    pose.camera.z_far = frustum_culling_max_distance  # meters
-
-# -----------------------------------------------------------------------------
-# Camera origin spheres (visual markers placed at each generated camera origin)
-# -----------------------------------------------------------------------------
-
-
 @timeit("add_camera_origin_spheres")
 def add_camera_origin_spheres(
     scene: trimesh.Scene,
@@ -1191,6 +1169,7 @@ def frustum_cull_scene(
 ) -> tuple[set[str], set[str]]:
     """
     Test scene meshes against the camera frustum using camera-space tests.
+    This method is computationally expensive when used with the occulusion check.
 
     The function delegates the workflow to small, focused classes:
     configuration, projection, frustum classification, and an optional
@@ -1420,8 +1399,6 @@ def frustum_cull_scene(
     return culler.run()
 
 
-import numpy as np
-
 # -----------------------------------------------------------------------------
 # Cone-based camera pose generation around object normals
 # -----------------------------------------------------------------------------
@@ -1642,6 +1619,24 @@ def generate_cone_view_poses(
                     )
 
     return poses
+
+
+# Generate visualization and collect camera instances and their poses
+
+generated_camera_poses = add_mean_normal_lines_and_cameras(
+    scene,
+    marker_height=min_standoff_distance,
+    min_standoff=min_standoff_distance,
+    max_distance=max_view_distance,
+    fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
+    # fit_method="footprint_2d",
+)
+
+# Set the z_far distance of all cameras to a fixed value used by frustum culling.
+# This is intentionally larger than the maximum camera placement distance so that
+# culling/visibility evaluation does not prematurely clip distant objects.
+for pose in generated_camera_poses:
+    pose.camera.z_far = frustum_culling_max_distance  # meters
 
 
 # Generate additional cone-based viewpoints and merge them with the existing poses
