@@ -191,6 +191,19 @@ class CameraPoseGenerationEngine:
     as well as supporting helpers like visibility/frustum culling utilities.
     """
 
+    @dataclass
+    class VisibilityComputationConfig:
+        """
+        Options controlling visibility computation of camera poses.
+
+        The occlusion and sampling options are forwarded to the frustum and
+        optional visibility checks when evaluating mesh visibility per pose.
+        """
+
+        occlusion_check: bool = False
+        samples_per_mesh: int = 32
+        visibility_threshold: float = 0.8
+
     # -----------------------------
     # Basic math helpers
     # -----------------------------
@@ -857,7 +870,7 @@ class CameraPoseGenerationEngine:
     def score_camera_poses_by_visible_bodies(
         scene: trimesh.Scene,
         camera_poses: list["CameraPose"],
-        visibility_config: "VisibilityComputationConfig | None" = None,
+        visibility_config: VisibilityComputationConfig | None = None,
     ) -> list[int]:
         """
         Return a score for each pose: the number of fully visible bodies.
@@ -871,25 +884,25 @@ class CameraPoseGenerationEngine:
         )
 
     @staticmethod
-    @timeit("compute_visible_bodies_per_pose")
-    def compute_visible_bodies_per_pose(
+    @timeit("compute_visible_body_indices_per_pose")
+    def compute_visible_body_indices_per_pose(
         scene: trimesh.Scene,
-        camera_poses: list["CameraPose"],
-        config: "VisibilityComputationConfig | None" = None,
-    ) -> list[int]:
+        camera_poses: list[CameraPose],
+        config: VisibilityComputationConfig | None = None,
+    ) -> list[set[object]]:
         """
-        Compute, for each camera pose, how many bodies are fully visible.
+        Compute, for each camera pose, the set of visible body identifiers.
 
-        Returns a list of counts aligned with ``camera_poses``. Visibility is
-        measured by frustum classification and optional occlusion checks.
-        Bodies are derived from scene node names using a `RayTracer` index mapping
-        when available; otherwise, geometry node names are deduplicated by the
-        prefix before "_collision_".
+        Bodies are identified using the same mapping semantics as
+        :func:`compute_visible_bodies_per_pose`:
+        - Prefer :class:`RayTracer`'s ``scene_to_index`` mapping if available.
+        - Fallback to deduplicating geometry node names by the prefix before
+          ``"_collision_"``.
         """
 
-        cfg = config or VisibilityComputationConfig()
+        cfg = config or CameraPoseGenerationEngine.VisibilityComputationConfig()
 
-        def _count_for_pose(pose: "CameraPose") -> int:
+        def _bodies_for_pose(pose: CameraPose) -> set[object]:
             try:
                 fully_inside, _ = frustum_cull_scene(
                     scene,
@@ -904,26 +917,40 @@ class CameraPoseGenerationEngine:
                 fully_inside = set()
 
             # Prefer RayTracer mapping if available
-            body_indices: set[object] = set()
             mapping = None
             try:
                 mapping = rt.scene_to_index  # type: ignore[name-defined]
             except Exception:
                 mapping = None
 
+            body_indices: set[object] = set()
             if mapping is not None:
                 for node in fully_inside:
                     if node in mapping:
                         body_indices.add(mapping[node])
             else:
-                # Fallback: deduplicate by body name prefix before '_collision_'
                 for node in fully_inside:
                     if "_collision_" in node:
                         body_indices.add(node.split("_collision_")[0])
 
-            return len(body_indices)
+            return body_indices
 
-        return [_count_for_pose(p) for p in camera_poses]
+        return [_bodies_for_pose(p) for p in camera_poses]
+
+    @staticmethod
+    @timeit("compute_visible_bodies_per_pose")
+    def compute_visible_bodies_per_pose(
+        scene: trimesh.Scene,
+        camera_poses: list["CameraPose"],
+        config: "VisibilityComputationConfig | None" = None,
+    ) -> list[int]:
+        _visible_body_sets = (
+            CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
+                scene=scene, camera_poses=camera_poses, config=config
+            )
+        )
+
+        return [len(visible_bodies) for visible_bodies in _visible_body_sets]
 
     def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
         """
@@ -961,7 +988,7 @@ def add_camera_origin_spheres(
     """
 
     # Delegate to split steps for clarity and reuse.
-    cfg = VisibilityComputationConfig(
+    cfg = CameraPoseGenerationEngine.VisibilityComputationConfig(
         occlusion_check=occlusion_check,
         samples_per_mesh=samples_per_mesh,
         visibility_threshold=visibility_threshold,
@@ -980,25 +1007,11 @@ def add_camera_origin_spheres(
     )
 
 
-@dataclass
-class VisibilityComputationConfig:
-    """
-    Options controlling visibility computation of camera poses.
-
-    The occlusion and sampling options are forwarded to the frustum and
-    optional visibility checks when evaluating mesh visibility per pose.
-    """
-
-    occlusion_check: bool = False
-    samples_per_mesh: int = 32
-    visibility_threshold: float = 0.8
-
-
 @timeit("compute_visible_bodies_per_pose")
 def compute_visible_bodies_per_pose(
     scene: trimesh.Scene,
     camera_poses: list[CameraPose],
-    config: VisibilityComputationConfig | None = None,
+    config: CameraPoseGenerationEngine.VisibilityComputationConfig | None = None,
 ) -> list[int]:
     """
     Deprecated module-level entry point. Use
@@ -1106,7 +1119,9 @@ class CameraSelectionConfig:
 def score_camera_poses_by_visible_bodies(
     scene: trimesh.Scene,
     camera_poses: list[CameraPose],
-    visibility_config: VisibilityComputationConfig | None = None,
+    visibility_config: (
+        CameraPoseGenerationEngine.VisibilityComputationConfig | None
+    ) = None,
 ) -> list[int]:
     """
     Return a score for each pose: the number of fully visible bodies.
@@ -1115,60 +1130,6 @@ def score_camera_poses_by_visible_bodies(
     """
 
     return compute_visible_bodies_per_pose(scene, camera_poses, visibility_config)
-
-
-@timeit("compute_visible_body_indices_per_pose")
-def compute_visible_body_indices_per_pose(
-    scene: trimesh.Scene,
-    camera_poses: list[CameraPose],
-    config: VisibilityComputationConfig | None = None,
-) -> list[set[object]]:
-    """
-    Compute, for each camera pose, the set of visible body identifiers.
-
-    Bodies are identified using the same mapping semantics as
-    :func:`compute_visible_bodies_per_pose`:
-    - Prefer :class:`RayTracer`'s ``scene_to_index`` mapping if available.
-    - Fallback to deduplicating geometry node names by the prefix before
-      ``"_collision_"``.
-    """
-
-    cfg = config or VisibilityComputationConfig()
-
-    def _bodies_for_pose(pose: CameraPose) -> set[object]:
-        try:
-            fully_inside, _ = frustum_cull_scene(
-                scene,
-                pose.camera,
-                pose.transform,
-                require_full_visibility=True,
-                occlusion_check=cfg.occlusion_check,
-                samples_per_mesh=cfg.samples_per_mesh,
-                visibility_threshold=cfg.visibility_threshold,
-            )
-        except NameError:
-            fully_inside = set()
-
-        # Prefer RayTracer mapping if available
-        mapping = None
-        try:
-            mapping = rt.scene_to_index  # type: ignore[name-defined]
-        except Exception:
-            mapping = None
-
-        body_indices: set[object] = set()
-        if mapping is not None:
-            for node in fully_inside:
-                if node in mapping:
-                    body_indices.add(mapping[node])
-        else:
-            for node in fully_inside:
-                if "_collision_" in node:
-                    body_indices.add(node.split("_collision_")[0])
-
-        return body_indices
-
-    return [_bodies_for_pose(p) for p in camera_poses]
 
 
 def greedy_select_by_score_similarity_and_novelty(
@@ -1727,7 +1688,7 @@ generated_camera_poses.extend(_extra_cone_poses)
 # similarity metric defined earlier. Then visualize the selected set.
 
 # 1) score poses (number of fully visible bodies)
-_visibility_cfg = VisibilityComputationConfig(
+_visibility_cfg = CameraPoseGenerationEngine.VisibilityComputationConfig(
     occlusion_check=True, samples_per_mesh=64, visibility_threshold=0.8
 )
 _scores = CameraPoseGenerationEngine.score_camera_poses_by_visible_bodies(
@@ -1740,7 +1701,7 @@ _scores = CameraPoseGenerationEngine.score_camera_poses_by_visible_bodies(
 _selection_cfg = CameraSelectionConfig(
     pos_threshold_m=0.50, ang_threshold_deg=20.0, max_poses=None
 )
-_body_sets = compute_visible_body_indices_per_pose(
+_body_sets = CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
     scene=scene, camera_poses=generated_camera_poses, config=_visibility_cfg
 )
 
@@ -1762,8 +1723,10 @@ _selected_camera_poses = greedy_select_by_score_similarity_and_novelty(
 
 # Optional debug reports for visibility relationships after selection
 if debug_visibility_reports:
-    _selected_body_sets = compute_visible_body_indices_per_pose(
-        scene=scene, camera_poses=_selected_camera_poses, config=_visibility_cfg
+    _selected_body_sets = (
+        CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
+            scene=scene, camera_poses=_selected_camera_poses, config=_visibility_cfg
+        )
     )
     print("[DEBUG] ==== Visibility reports AFTER selection ====")
     print_camera_to_bodies_report(
