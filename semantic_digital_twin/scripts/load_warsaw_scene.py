@@ -958,6 +958,38 @@ class CameraPoseGenerationEngine:
         """
         return (z_world >= min_h) and (z_world <= max_h)
 
+    @staticmethod
+    def _all_body_identifiers(scene: trimesh.Scene) -> set[object]:
+        """
+        Return the set of all body identifiers present in the scene.
+
+        The identifier type matches what is used in visibility body sets:
+        - If a :class:`RayTracer` mapping is available, use its indices.
+        - Otherwise, collapse geometry node names by the prefix before
+          ``"_collision_"`` to represent logical objects.
+        """
+
+        # Prefer RayTracer mapping if available
+        try:
+            mapping = rt.scene_to_index  # type: ignore[name-defined]
+        except Exception:
+            mapping = None
+
+        if mapping is not None:
+            # mapping: node_name -> index (identifier)
+            return set(mapping.values())
+
+        # Fallback: collect base names from scene nodes
+        all_ids: set[object] = set()
+        try:
+            node_names = list(scene.graph.nodes_geometry)
+        except Exception:
+            node_names = []
+        for node in node_names:
+            if isinstance(node, str) and "_collision_" in node:
+                all_ids.add(node.split("_collision_")[0])
+        return all_ids
+
 
 @timeit("add_camera_origin_spheres")
 def add_camera_origin_spheres(
@@ -993,7 +1025,7 @@ def add_camera_origin_spheres(
         samples_per_mesh=samples_per_mesh,
         visibility_threshold=visibility_threshold,
     )
-    counts = compute_visible_bodies_per_pose(
+    counts = CameraPoseGenerationEngine.compute_visible_bodies_per_pose(
         scene=scene, camera_poses=camera_poses, config=cfg
     )
     CameraOriginSpheresVisualizer().render(
@@ -1004,23 +1036,6 @@ def add_camera_origin_spheres(
         color_rgba=color_rgba,
         add_camera_marker=add_camera_marker,
         marker_height=marker_height,
-    )
-
-
-@timeit("compute_visible_bodies_per_pose")
-def compute_visible_bodies_per_pose(
-    scene: trimesh.Scene,
-    camera_poses: list[CameraPose],
-    config: CameraPoseGenerationEngine.VisibilityComputationConfig | None = None,
-) -> list[int]:
-    """
-    Deprecated module-level entry point. Use
-    `CameraPoseGenerationEngine.compute_visible_bodies_per_pose` instead.
-
-    This function delegates to the class method to preserve behavior.
-    """
-    return CameraPoseGenerationEngine.compute_visible_bodies_per_pose(
-        scene=scene, camera_poses=camera_poses, config=config
     )
 
 
@@ -1129,7 +1144,9 @@ def score_camera_poses_by_visible_bodies(
     The computation is delegated to :func:`compute_visible_bodies_per_pose`.
     """
 
-    return compute_visible_bodies_per_pose(scene, camera_poses, visibility_config)
+    return CameraPoseGenerationEngine.compute_visible_bodies_per_pose(
+        scene=scene, camera_poses=camera_poses, config=visibility_config
+    )
 
 
 def greedy_select_by_score_similarity_and_novelty(
@@ -1192,19 +1209,20 @@ def greedy_select_by_score_similarity_and_novelty(
 # -----------------------------------------------------------------------------
 
 
-@dataclass
-class DebugVisibilityReportConfig:
-    """
-    Configuration for printing debug visibility reports.
-
-    When enabled, the script prints two reports:
-    - for each camera pose, the list of objects it can fully see;
-    - for each object, the list of camera poses that can see it.
-    """
-
-    enabled: bool = False
-    show_camera_to_objects: bool = True
-    show_object_to_cameras: bool = True
+# @dataclass
+# class DebugVisibilityReportConfig:
+#     """
+#     Configuration for printing debug visibility reports.
+#
+#     When enabled, the script prints two reports:
+#     - for each camera pose, the list of objects it can fully see;
+#     - for each object, the list of camera poses that can see it.
+#     """
+#
+#     enabled: bool = False
+#     show_camera_to_objects: bool = True
+#     show_object_to_cameras: bool = True
+#
 
 
 def _make_body_label_resolver() -> dict[object, str]:
@@ -1351,7 +1369,7 @@ def print_uncovered_bodies_report(
     remain unseen by all selected poses.
     """
 
-    all_ids = _all_body_identifiers(scene)
+    all_ids = CameraPoseGenerationEngine._all_body_identifiers(scene)
     covered: set[object] = set()
     for s in body_sets:
         covered.update(s)
