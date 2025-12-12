@@ -990,239 +990,199 @@ class CameraPoseGenerationEngine:
                 all_ids.add(node.split("_collision_")[0])
         return all_ids
 
-
-@timeit("add_camera_origin_spheres")
-def add_camera_origin_spheres(
-    scene: trimesh.Scene,
-    camera_poses: list[CameraPose],
-    radius: float = 0.05,
-    color_rgba: tuple[int, int, int, int] | None = None,
-    *,
-    occlusion_check: bool = False,
-    samples_per_mesh: int = 32,
-    visibility_threshold: float = 0.8,
-    add_camera_marker: bool = False,
-    marker_height: float = 0.15,
-) -> None:
-    """
-    Add a small sphere at each camera origin and color it by how many bodies
-    are fully inside the camera frustum.
-
-    If ``color_rgba`` is None, a two-color gradient is used (blue → red), where
-    blue means few objects fully visible and red means many objects fully visible.
-
-    :param scene: The scene to which the spheres are added.
-    :param camera_poses: List of camera poses whose origins are to be marked.
-    :param radius: Radius of the marker spheres in meters.
-    :param color_rgba: If provided, overrides data-driven colors with this RGBA.
-    :param add_camera_marker: If ``True``, also add a trimesh camera marker at each pose.
-    :param marker_height: Height of the camera marker when ``add_camera_marker`` is ``True``.
-    """
-
-    # Delegate to split steps for clarity and reuse.
-    cfg = CameraPoseGenerationEngine.VisibilityComputationConfig(
-        occlusion_check=occlusion_check,
-        samples_per_mesh=samples_per_mesh,
-        visibility_threshold=visibility_threshold,
-    )
-    counts = CameraPoseGenerationEngine.compute_visible_bodies_per_pose(
-        scene=scene, camera_poses=camera_poses, config=cfg
-    )
-    CameraOriginSpheresVisualizer().render(
-        scene=scene,
-        camera_poses=camera_poses,
-        counts=counts,
-        radius=radius,
-        color_rgba=color_rgba,
-        add_camera_marker=add_camera_marker,
-        marker_height=marker_height,
-    )
-
-
-def _value_to_rgba(v: float) -> tuple[int, int, int, int]:
-    """
-    Convert a normalized value in [0, 1] to an RGBA color.
-
-    Uses a simple two-color gradient: blue (low) to red (high).
-    """
-
-    v = float(max(0.0, min(1.0, v)))
-    low = np.array([0, 0, 255, 255], dtype=float)  # blue
-    high = np.array([255, 0, 0, 255], dtype=float)  # red
-    rgba = (1.0 - v) * low + v * high
-    return tuple(int(round(c)) for c in rgba)
-
-
-class CameraOriginSpheresVisualizer:
-    """
-    Render spheres at camera origins, colored by per-pose counts.
-
-    If a fixed ``color_rgba`` is provided, it overrides data-driven colors.
-    """
-
-    def render(
-        self,
+    @staticmethod
+    @timeit("add_camera_origin_spheres")
+    def add_camera_origin_spheres(
         scene: trimesh.Scene,
         camera_poses: list[CameraPose],
-        counts: list[int],
-        *,
         radius: float = 0.05,
         color_rgba: tuple[int, int, int, int] | None = None,
+        *,
+        occlusion_check: bool = False,
+        samples_per_mesh: int = 32,
+        visibility_threshold: float = 0.8,
         add_camera_marker: bool = False,
         marker_height: float = 0.15,
     ) -> None:
-        if len(counts) != len(camera_poses):
-            raise ValueError("counts must be aligned with camera_poses")
+        """
+        Add a small sphere at each camera origin and color it by how many bodies
+        are fully inside the camera frustum.
 
-        max_count = max(counts) if counts else 0
+        If ``color_rgba`` is None, a two-color gradient is used (blue → red), where
+        blue means few objects fully visible and red means many objects fully visible.
 
-        for idx, pose in enumerate(camera_poses):
-            if color_rgba is None:
-                value = (counts[idx] / max_count) if max_count > 0 else 0.0
-                rgba = _value_to_rgba(value)
-            else:
-                rgba = color_rgba
+        :param scene: The scene to which the spheres are added.
+        :param camera_poses: List of camera poses whose origins are to be marked.
+        :param radius: Radius of the marker spheres in meters.
+        :param color_rgba: If provided, overrides data-driven colors with this RGBA.
+        :param add_camera_marker: If ``True``, also add a trimesh camera marker at each pose.
+        :param marker_height: Height of the camera marker when ``add_camera_marker`` is ``True``.
+        """
 
-            if not turn_off_all_visualizations:
-                sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
-                sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
+        # Delegate to split steps for clarity and reuse.
+        cfg = CameraPoseGenerationEngine.VisibilityComputationConfig(
+            occlusion_check=occlusion_check,
+            samples_per_mesh=samples_per_mesh,
+            visibility_threshold=visibility_threshold,
+        )
+        counts = CameraPoseGenerationEngine.compute_visible_bodies_per_pose(
+            scene=scene, camera_poses=camera_poses, config=cfg
+        )
+        CameraPoseGenerationEngine.CameraOriginSpheresVisualizer().render(
+            scene=scene,
+            camera_poses=camera_poses,
+            counts=counts,
+            radius=radius,
+            color_rgba=color_rgba,
+            add_camera_marker=add_camera_marker,
+            marker_height=marker_height,
+        )
 
-                node_name = f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}__{idx}"
-                scene.add_geometry(
-                    sphere,
-                    node_name=node_name,
-                    parent_node_name=scene.graph.base_frame,
-                    transform=pose.transform,
-                )
+    class CameraOriginSpheresVisualizer:
+        """
+        Render spheres at camera origins, colored by per-pose counts.
 
-            if add_camera_marker and not turn_off_all_visualizations:
-                marker = trimesh.creation.camera_marker(
-                    pose.camera, marker_height=marker_height
-                )
-                scene.add_geometry(
-                    marker,
-                    node_name=(
-                        f"camera_marker__{pose.node_name}__{pose.geometry_key}__{idx}"
-                    ),
-                    parent_node_name=scene.graph.base_frame,
-                    transform=pose.transform,
-                )
+        If a fixed ``color_rgba`` is provided, it overrides data-driven colors.
+        """
 
+        @staticmethod
+        def _value_to_rgba(v: float) -> tuple[int, int, int, int]:
+            """
+            Convert a normalized value in [0, 1] to an RGBA color.
 
-# Note: spheres are placed after frustum utilities are defined (see below) so
-# they can be colored by visibility counts.
+            Uses a simple two-color gradient: blue (low) to red (high).
+            """
 
-# -----------------------------------------------------------------------------
-# Camera pose scoring and greedy non-maximum suppression (selection)
-# -----------------------------------------------------------------------------
+            v = float(max(0.0, min(1.0, v)))
+            low = np.array([0, 0, 255, 255], dtype=float)  # blue
+            high = np.array([255, 0, 0, 255], dtype=float)  # red
+            rgba = (1.0 - v) * low + v * high
+            return tuple(int(round(c)) for c in rgba)
 
+        def render(
+            self,
+            scene: trimesh.Scene,
+            camera_poses: list[CameraPose],
+            counts: list[int],
+            *,
+            radius: float = 0.05,
+            color_rgba: tuple[int, int, int, int] | None = None,
+            add_camera_marker: bool = False,
+            marker_height: float = 0.15,
+        ) -> None:
+            if len(counts) != len(camera_poses):
+                raise ValueError("counts must be aligned with camera_poses")
 
-@dataclass
-class CameraSelectionConfig:
-    """
-    Configuration for greedy non maximum suppression of camera poses.
+            max_count = max(counts) if counts else 0
 
-    Poses are considered duplicates if both their positional distance and
-    angular difference (between viewing directions) are below the thresholds.
-    """
+            for idx, pose in enumerate(camera_poses):
+                if color_rgba is None:
+                    value = (counts[idx] / max_count) if max_count > 0 else 0.0
+                    rgba = CameraPoseGenerationEngine.CameraOriginSpheresVisualizer._value_to_rgba(
+                        value
+                    )
+                else:
+                    rgba = color_rgba
 
-    pos_threshold_m: float = 0.20
-    ang_threshold_deg: float = 10.0
-    max_poses: int | None = None
+                if not turn_off_all_visualizations:
+                    sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
+                    sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
 
+                    node_name = f"camera_origin_sphere__{pose.node_name}__{pose.geometry_key}__{idx}"
+                    scene.add_geometry(
+                        sphere,
+                        node_name=node_name,
+                        parent_node_name=scene.graph.base_frame,
+                        transform=pose.transform,
+                    )
 
-def score_camera_poses_by_visible_bodies(
-    scene: trimesh.Scene,
-    camera_poses: list[CameraPose],
-    visibility_config: (
-        CameraPoseGenerationEngine.VisibilityComputationConfig | None
-    ) = None,
-) -> list[int]:
-    """
-    Return a score for each pose: the number of fully visible bodies.
+                if add_camera_marker and not turn_off_all_visualizations:
+                    marker = trimesh.creation.camera_marker(
+                        pose.camera, marker_height=marker_height
+                    )
+                    scene.add_geometry(
+                        marker,
+                        node_name=(
+                            f"camera_marker__{pose.node_name}__{pose.geometry_key}__{idx}"
+                        ),
+                        parent_node_name=scene.graph.base_frame,
+                        transform=pose.transform,
+                    )
 
-    The computation is delegated to :func:`compute_visible_bodies_per_pose`.
-    """
+    # Note: spheres are placed after frustum utilities are defined (see below) so
+    # they can be colored by visibility counts.
 
-    return CameraPoseGenerationEngine.compute_visible_bodies_per_pose(
-        scene=scene, camera_poses=camera_poses, config=visibility_config
-    )
+    # -----------------------------------------------------------------------------
+    # Camera pose scoring and greedy non-maximum suppression (selection)
+    # -----------------------------------------------------------------------------
 
+    @dataclass
+    class CameraSelectionConfig:
+        """
+        Configuration for greedy non maximum suppression of camera poses.
 
-def greedy_select_by_score_similarity_and_novelty(
-    camera_poses: list[CameraPose],
-    scores: list[int],
-    body_sets: list[set[object]],
-    cfg: CameraSelectionConfig | None = None,
-) -> list[CameraPose]:
-    """
-    Greedily select camera poses by score, similarity suppression, and novelty.
+        Poses are considered duplicates if both their positional distance and
+        angular difference (between viewing directions) are below the thresholds.
+        """
 
-    The algorithm maintains a set of bodies already covered by selected poses
-    and only accepts a candidate if it adds at least one previously unseen body
-    and is not too similar to any already selected pose according to ``cfg``.
-    """
+        pos_threshold_m: float = 0.20
+        ang_threshold_deg: float = 10.0
+        max_poses: int | None = None
 
-    if not (len(camera_poses) == len(scores) == len(body_sets)):
-        raise ValueError("camera_poses, scores, and body_sets must be aligned")
+    @staticmethod
+    def greedy_select_by_score_similarity_and_novelty(
+        camera_poses: list[CameraPose],
+        scores: list[int],
+        body_sets: list[set[object]],
+        cfg: CameraSelectionConfig | None = None,
+    ) -> list[CameraPose]:
+        """
+        Greedily select camera poses by score, similarity suppression, and novelty.
 
-    cfg = cfg or CameraSelectionConfig()
+        The algorithm maintains a set of bodies already covered by selected poses
+        and only accepts a candidate if it adds at least one previously unseen body
+        and is not too similar to any already selected pose according to ``cfg``.
+        """
 
-    order = list(range(len(camera_poses)))
-    order.sort(key=lambda i: int(scores[i]), reverse=True)
+        if not (len(camera_poses) == len(scores) == len(body_sets)):
+            raise ValueError("camera_poses, scores, and body_sets must be aligned")
 
-    selected: list[CameraPose] = []
-    covered: set[object] = set()
+        cfg = cfg or CameraPoseGenerationEngine.CameraSelectionConfig()
 
-    for i in order:
-        cand = camera_poses[i]
+        order = list(range(len(camera_poses)))
+        order.sort(key=lambda i: int(scores[i]), reverse=True)
 
-        # Similarity suppression
-        is_similar = False
-        for sel in selected:
-            if sel.is_similar_to(
-                cand,
-                pos_threshold_m=cfg.pos_threshold_m,
-                ang_threshold_deg=cfg.ang_threshold_deg,
-            ):
-                is_similar = True
+        selected: list[CameraPose] = []
+        covered: set[object] = set()
+
+        for i in order:
+            cand = camera_poses[i]
+
+            # Similarity suppression
+            is_similar = False
+            for sel in selected:
+                if sel.is_similar_to(
+                    cand,
+                    pos_threshold_m=cfg.pos_threshold_m,
+                    ang_threshold_deg=cfg.ang_threshold_deg,
+                ):
+                    is_similar = True
+                    break
+            if is_similar:
+                continue
+
+            # Novelty requirement: must add at least one new body
+            new_bodies = body_sets[i] - covered
+            if len(new_bodies) == 0:
+                continue
+
+            selected.append(cand)
+            covered.update(body_sets[i])
+
+            if cfg.max_poses is not None and len(selected) >= int(cfg.max_poses):
                 break
-        if is_similar:
-            continue
 
-        # Novelty requirement: must add at least one new body
-        new_bodies = body_sets[i] - covered
-        if len(new_bodies) == 0:
-            continue
-
-        selected.append(cand)
-        covered.update(body_sets[i])
-
-        if cfg.max_poses is not None and len(selected) >= int(cfg.max_poses):
-            break
-
-    return selected
-
-
-# -----------------------------------------------------------------------------
-# Debug visibility reports (camera→objects and object→cameras)
-# -----------------------------------------------------------------------------
-
-
-# @dataclass
-# class DebugVisibilityReportConfig:
-#     """
-#     Configuration for printing debug visibility reports.
-#
-#     When enabled, the script prints two reports:
-#     - for each camera pose, the list of objects it can fully see;
-#     - for each object, the list of camera poses that can see it.
-#     """
-#
-#     enabled: bool = False
-#     show_camera_to_objects: bool = True
-#     show_object_to_cameras: bool = True
-#
+        return selected
 
 
 def _make_body_label_resolver() -> dict[object, str]:
@@ -1402,16 +1362,6 @@ def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
     ys = [mn[1], mx[1]]
     zs = [mn[2], mx[2]]
     return np.array([[x, y, z] for x in xs for y in ys for z in zs], dtype=float)
-
-
-# def camera_view_matrix(T_cam_world: np.ndarray) -> np.ndarray:
-#     """
-#     Deprecated: use ``CameraPoseGenerationEngine.view_matrix_from_cam_to_world``.
-#
-#     This function now delegates to the class method which computes the
-#     orthonormal inverse efficiently without a general matrix inversion.
-#     """
-#     return CameraPoseGenerationEngine.view_matrix_from_cam_to_world(T_cam_world)
 
 
 @timeit("frustum_cull_scene")
@@ -1716,7 +1666,7 @@ _scores = CameraPoseGenerationEngine.score_camera_poses_by_visible_bodies(
 # 2) greedy selection with similarity suppression and coverage novelty
 #    Only accept a camera if it adds at least one body not yet seen by the
 #    already selected set, and is not too similar to any selected pose.
-_selection_cfg = CameraSelectionConfig(
+_selection_cfg = CameraPoseGenerationEngine.CameraSelectionConfig(
     pos_threshold_m=0.50, ang_threshold_deg=20.0, max_poses=None
 )
 _body_sets = CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
@@ -1732,11 +1682,13 @@ if debug_visibility_reports:
     print_body_to_cameras_report(
         camera_poses=generated_camera_poses, body_sets=_body_sets
     )
-_selected_camera_poses = greedy_select_by_score_similarity_and_novelty(
-    camera_poses=generated_camera_poses,
-    scores=_scores,
-    body_sets=_body_sets,
-    cfg=_selection_cfg,
+_selected_camera_poses = (
+    CameraPoseGenerationEngine.greedy_select_by_score_similarity_and_novelty(
+        camera_poses=generated_camera_poses,
+        scores=_scores,
+        body_sets=_body_sets,
+        cfg=_selection_cfg,
+    )
 )
 
 # Optional debug reports for visibility relationships after selection
@@ -1758,7 +1710,7 @@ if debug_visibility_reports:
 
 # 3) visualize only the selected camera origins (colors reflect visibility counts)
 if not turn_off_all_visualizations:
-    add_camera_origin_spheres(
+    CameraPoseGenerationEngine.add_camera_origin_spheres(
         scene,
         _selected_camera_poses,
         radius=0.08,
