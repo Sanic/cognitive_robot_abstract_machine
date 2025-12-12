@@ -1714,15 +1714,16 @@ if debug_visibility_reports:
     print_uncovered_bodies_report(scene=scene, body_sets=_selected_body_sets)
 
 # 3) visualize only the selected camera origins (colors reflect visibility counts)
-add_camera_origin_spheres(
-    scene,
-    _selected_camera_poses,
-    radius=0.08,
-    occlusion_check=_visibility_cfg.occlusion_check,
-    samples_per_mesh=_visibility_cfg.samples_per_mesh,
-    visibility_threshold=_visibility_cfg.visibility_threshold,
-    add_camera_marker=True,
-)
+if not turn_off_all_visualizations:
+    add_camera_origin_spheres(
+        scene,
+        _selected_camera_poses,
+        radius=0.08,
+        occlusion_check=_visibility_cfg.occlusion_check,
+        samples_per_mesh=_visibility_cfg.samples_per_mesh,
+        visibility_threshold=_visibility_cfg.visibility_threshold,
+        add_camera_marker=True,
+    )
 
 number_of_bodies = 4  # <-- group size you want
 
