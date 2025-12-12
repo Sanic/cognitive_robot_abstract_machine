@@ -95,7 +95,7 @@ max_camera_height = 2.0  # float('inf')
 # Debug reporting: when enabled, print which cameras see which objects, and
 # per object, which cameras can see it.
 debug_visibility_reports = True
-turn_off_all_visualizations = True
+turn_off_all_visualizations = False
 ###
 
 
@@ -930,58 +930,6 @@ class CameraPoseGenerationEngine:
         Return True if the world Z coordinate lies within [min_h, max_h].
         """
         return (z_world >= min_h) and (z_world <= max_h)
-
-
-@timeit("compute_fit_distance_spherical_bound")
-def compute_fit_distance_spherical_bound(
-    radius_world: float, tx: float, ty: float, margin: float
-) -> float:
-    """
-    Compute a conservative camera standoff distance using a spherical bound.
-
-    The method treats the object as a sphere with radius equal to the maximum
-    distance from the centroid to the transformed AABB corners and computes the
-    distance required to fit the sphere within both horizontal and vertical
-    fields of view.
-    """
-    return margin * max(
-        (radius_world / tx) if tx > 1e-12 else np.inf,
-        (radius_world / ty) if ty > 1e-12 else np.inf,
-    )
-
-
-@timeit("compute_fit_distance_footprint_2d")
-def compute_fit_distance_footprint_2d(
-    corners_world: np.ndarray,
-    centroid_world: np.ndarray,
-    view_normal_world: np.ndarray,
-    tx: float,
-    ty: float,
-    margin: float,
-) -> float:
-    """
-    Compute camera standoff distance from the 2D image-plane footprint.
-
-    The method builds a temporary camera frame oriented by the view normal and
-    projects the object’s world-space AABB corners into this frame. The in-plane
-    half-extents along X and Y determine the minimum distance to fit within the
-    horizontal and vertical FOV, ignoring thickness along the view axis.
-    """
-    z_cam = -view_normal_world
-    x_cam = np.cross(np.array([0.0, 0.0, 1.0]), z_cam)
-    if np.linalg.norm(x_cam) < 1e-6:
-        x_cam = np.cross(np.array([0.0, 1.0, 0.0]), z_cam)
-    x_cam = x_cam / (np.linalg.norm(x_cam) + 1e-12)
-    y_cam = np.cross(z_cam, x_cam)
-    offsets_world = corners_world - centroid_world
-    R_world_cam = np.stack([x_cam, y_cam, z_cam], axis=1)
-    offsets_cam = offsets_world @ R_world_cam
-    max_abs_x = float(np.max(np.abs(offsets_cam[:, 0]))) if offsets_cam.size else 0.0
-    max_abs_y = float(np.max(np.abs(offsets_cam[:, 1]))) if offsets_cam.size else 0.0
-
-    dx = max_abs_x / (tx if tx > 1e-12 else np.inf)
-    dy = max_abs_y / (ty if ty > 1e-12 else np.inf)
-    return margin * max(dx, dy)
 
 
 @timeit("add_camera_origin_spheres")
@@ -1939,7 +1887,7 @@ scene.camera.fov = test_fov  # horizontal, vertical degrees
 for j, pose in enumerate(camera_poses):
 
     scene.graph[scene.camera.name] = pose
-    # scene.show()
+    scene.show()
 
     png = scene.save_image(resolution=(1024, 768), visible=True)
 
