@@ -149,7 +149,7 @@ class CameraPose:
         ``atan2(||u×v||, u·v)`` for numerical stability.
         """
 
-        return are_camera_poses_too_similar(
+        return CameraPoseGenerationEngine.are_camera_poses_too_similar(
             self,
             other,
             pos_threshold_m=pos_threshold_m,
@@ -192,87 +192,6 @@ def _angle_between_dirs(u: np.ndarray, v: np.ndarray) -> float:
     return float(np.arctan2(cross_mag, dot_uv))
 
 
-def look_at_transform(
-    origin: np.ndarray, target: np.ndarray, up_hint: np.ndarray | None = None
-) -> np.ndarray:
-    """
-    Build a camera-to-world transform that looks from ``origin`` to ``target``.
-
-    The camera forward axis is aligned with the vector from ``origin`` to
-    ``target`` using the convention that cameras look along their local
-    negative Z axis. If the provided ``up_hint`` is nearly collinear with the
-    forward direction, a secondary fallback up vector is used to avoid a
-    degenerate basis.
-    """
-
-    if up_hint is None:
-        up_hint = np.array([0.0, 0.0, 1.0])
-    f = _safe_normalize_dir(target - origin)
-    z_cam = -f
-    x_cam = np.cross(up_hint, z_cam)
-    if np.linalg.norm(x_cam) < 1e-6:
-        up_hint = np.array([0.0, 1.0, 0.0])
-        x_cam = np.cross(up_hint, z_cam)
-    x_cam = _safe_normalize_dir(x_cam)
-    y_cam = _safe_normalize_dir(np.cross(z_cam, x_cam))
-    T = np.eye(4)
-    T[:3, 0] = x_cam
-    T[:3, 1] = y_cam
-    T[:3, 2] = z_cam
-    T[:3, 3] = origin
-    return T
-
-
-def are_camera_poses_too_similar(
-    a: CameraPose,
-    b: CameraPose,
-    *,
-    pos_threshold_m: float = 0.20,
-    ang_threshold_deg: float = 10.0,
-) -> bool:
-    """
-    Check whether two camera poses are too similar.
-
-    Two poses are considered similar if both their positional distance and their
-    angular distance (between viewing directions) are below the given thresholds.
-    The angle is computed using ``atan2`` on cross/dot of the forward vectors to
-    ensure numerical stability. Thresholds are configurable; defaults are 0.20 m
-    and 10 degrees.
-    """
-
-    pa = a.transform[:3, 3]
-    pb = b.transform[:3, 3]
-    pos_dist = float(np.linalg.norm(pa - pb))
-
-    fa = _camera_forward_world(a.transform)
-    fb = _camera_forward_world(b.transform)
-    ang_rad = _angle_between_dirs(fa, fb)
-    ang_deg = float(np.rad2deg(ang_rad))
-
-    return (pos_dist < float(pos_threshold_m)) and (ang_deg < float(ang_threshold_deg))
-
-
-# These are just defaults. Make sure to change the values way below in the instantiation
-@dataclass
-class ConeSamplingConfig:
-    """
-    Configuration for sampling camera view directions on a cone around the mean normal.
-
-    The cone is a spherical cap with the axis aligned to the object's mean normal and
-    a half-angle of ``cone_half_angle_deg``.
-    """
-
-    cone_half_angle_deg: float = 25
-    samples_per_cone: int = 12
-    roll_samples: int = 1
-    seed: int | None = None
-    fit_method: str = "footprint_2d"  # or "spherical"
-    # If True, reject poses whose directional viewing cones overlap existing ones (per object)
-    reject_overlapping_cones: bool = False  # True
-    # Small angular margin added to the cone-overlap test (degrees)
-    cone_overlap_margin_deg: float = 5.0
-
-
 def timeit(label: str | None = None):
     """
     Decorator to print how long a function call took.
@@ -296,6 +215,668 @@ def timeit(label: str | None = None):
         return _wrapped
 
     return _decorator
+
+
+class CameraPoseGenerationEngine:
+    """
+    Encapsulates the camera-pose generation functionality for a ``trimesh.Scene``.
+
+    This class centralizes the previously module-level functions used to
+    compute camera placements based on mesh normals and optional cone sampling,
+    as well as supporting helpers like visibility/frustum culling utilities.
+    """
+
+    # -----------------------------
+    # Basic math helpers
+    # -----------------------------
+    @staticmethod
+    def _safe_normalize_dir(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+        n = float(np.linalg.norm(v))
+        if n < eps:
+            return v
+        return v / n
+
+    @staticmethod
+    def _camera_forward_world(T_cam_world: np.ndarray) -> np.ndarray:
+        return CameraPoseGenerationEngine._safe_normalize_dir(-T_cam_world[:3, 2])
+
+    @staticmethod
+    def _angle_between_dirs(u: np.ndarray, v: np.ndarray) -> float:
+        u_n = CameraPoseGenerationEngine._safe_normalize_dir(u)
+        v_n = CameraPoseGenerationEngine._safe_normalize_dir(v)
+        cross_mag = float(np.linalg.norm(np.cross(u_n, v_n)))
+        dot_uv = float(np.clip(np.dot(u_n, v_n), -1.0, 1.0))
+        return float(np.arctan2(cross_mag, dot_uv))
+
+    # -----------------------------
+    # Transform helpers
+    # -----------------------------
+    @staticmethod
+    def look_at_transform(
+        origin: np.ndarray, target: np.ndarray, up_hint: np.ndarray | None = None
+    ) -> np.ndarray:
+        if up_hint is None:
+            up_hint = np.array([0.0, 0.0, 1.0])
+        f = CameraPoseGenerationEngine._safe_normalize_dir(target - origin)
+        z_cam = -f
+        x_cam = np.cross(up_hint, z_cam)
+        if np.linalg.norm(x_cam) < 1e-6:
+            up_hint = np.array([0.0, 1.0, 0.0])
+            x_cam = np.cross(up_hint, z_cam)
+        x_cam = CameraPoseGenerationEngine._safe_normalize_dir(x_cam)
+        y_cam = CameraPoseGenerationEngine._safe_normalize_dir(np.cross(z_cam, x_cam))
+        T = np.eye(4)
+        T[:3, 0] = x_cam
+        T[:3, 1] = y_cam
+        T[:3, 2] = z_cam
+        T[:3, 3] = origin
+        return T
+
+    # -----------------------------
+    # Similarity helper
+    # -----------------------------
+    @staticmethod
+    def are_camera_poses_too_similar(
+        a: "CameraPose",
+        b: "CameraPose",
+        *,
+        pos_threshold_m: float = 0.20,
+        ang_threshold_deg: float = 10.0,
+    ) -> bool:
+        pa = a.transform[:3, 3]
+        pb = b.transform[:3, 3]
+        dp = float(np.linalg.norm(pa - pb))
+        if dp > float(pos_threshold_m):
+            return False
+        fa = CameraPoseGenerationEngine._camera_forward_world(a.transform)
+        fb = CameraPoseGenerationEngine._camera_forward_world(b.transform)
+        ang = np.rad2deg(CameraPoseGenerationEngine._angle_between_dirs(fa, fb))
+        return bool(ang <= float(ang_threshold_deg))
+
+    # -----------------------------
+    # Configs used by cone sampling
+    # -----------------------------
+    @dataclass
+    class ConeSamplingConfig:
+        cone_half_angle_deg: float = 30.0
+        samples_per_object: int = 20
+        samples_per_cone: int = 12
+        roll_samples: int = 1
+        seed: int | None = None
+        fit_method: str = "footprint_2d"
+        reject_overlapping_cones: bool = False
+        cone_overlap_margin_deg: float = 5.0
+
+    # -----------------------------
+    # Misc helpers
+    # -----------------------------
+    @staticmethod
+    def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
+        return (z_world >= min_h) and (z_world <= max_h)
+
+    # -----------------------------
+    # Fit-distance helpers
+    # -----------------------------
+    @staticmethod
+    @timeit("compute_fit_distance_spherical_bound")
+    def compute_fit_distance_spherical_bound(
+        radius_world: float, tx: float, ty: float, margin: float
+    ) -> float:
+        return margin * max(
+            (radius_world / tx) if tx > 1e-12 else np.inf,
+            (radius_world / ty) if ty > 1e-12 else np.inf,
+        )
+
+    @staticmethod
+    @timeit("compute_fit_distance_footprint_2d")
+    def compute_fit_distance_footprint_2d(
+        corners_world: np.ndarray,
+        centroid_world: np.ndarray,
+        view_normal_world: np.ndarray,
+        tx: float,
+        ty: float,
+        margin: float,
+    ) -> float:
+        z_cam = -view_normal_world
+        x_cam = np.cross(np.array([0.0, 0.0, 1.0]), z_cam)
+        if np.linalg.norm(x_cam) < 1e-6:
+            x_cam = np.cross(np.array([0.0, 1.0, 0.0]), z_cam)
+        x_cam = x_cam / (np.linalg.norm(x_cam) + 1e-12)
+        y_cam = np.cross(z_cam, x_cam)
+        offsets_world = corners_world - centroid_world
+        R_world_cam = np.stack([x_cam, y_cam, z_cam], axis=1)
+        offsets_cam = offsets_world @ R_world_cam
+        max_abs_x = (
+            float(np.max(np.abs(offsets_cam[:, 0]))) if offsets_cam.size else 0.0
+        )
+        max_abs_y = (
+            float(np.max(np.abs(offsets_cam[:, 1]))) if offsets_cam.size else 0.0
+        )
+
+        dx = max_abs_x / (tx if tx > 1e-12 else np.inf)
+        dy = max_abs_y / (ty if ty > 1e-12 else np.inf)
+        return margin * max(dx, dy)
+
+    # -----------------------------
+    # Mean-normal placement
+    # -----------------------------
+    @timeit("add_mean_normal_lines_and_cameras")
+    def add_mean_normal_lines_and_cameras(
+        self,
+        scene,
+        normal_length: float | None = None,
+        marker_height: float = 0.15,
+        *,
+        min_standoff: float | None = None,
+        max_distance: float | None = None,
+        fov_deg_xy: tuple[float, float] | None = None,
+        fit_method: str = "footprint_2d",
+        min_camera_height_override: float | None = None,
+        max_camera_height_override: float | None = None,
+    ) -> list[CameraPose]:
+        """
+        Create visualization lines along mean normals and place cameras facing
+        object centroids from an appropriate standoff distance.
+        """
+
+        @dataclass
+        class MeanNormalCameraConfig:
+            marker_height: float
+            min_standoff: float
+            max_distance: Optional[float]
+            fov_deg_xy: tuple[float, float]
+            fit_method: str
+            min_height: float
+            max_height: float
+            margin_factor: float
+            line_color: np.ndarray
+
+            def fov_tangents(self) -> tuple[float, float]:
+                fx, fy = float(self.fov_deg_xy[0]), float(self.fov_deg_xy[1])
+                return float(np.tan(np.deg2rad(fx) * 0.5)), float(
+                    np.tan(np.deg2rad(fy) * 0.5)
+                )
+
+        class MeanNormalCameraPlacer:
+            def __init__(self, config: MeanNormalCameraConfig):
+                self.config = config
+
+            @staticmethod
+            def _safe_normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+                n = float(np.linalg.norm(v))
+                if n < eps:
+                    return v
+                return v / n
+
+            @staticmethod
+            def _look_at_transform(
+                origin: np.ndarray,
+                target: np.ndarray,
+                up_hint: np.ndarray | None = None,
+            ) -> np.ndarray:
+                return CameraPoseGenerationEngine.look_at_transform(
+                    origin=origin, target=target, up_hint=up_hint
+                )
+
+            @staticmethod
+            def _new_camera_instance() -> Camera:
+                return Camera(resolution=(640, 480), fov=test_fov)
+
+            def _compute_weighted_mean_normal(
+                self, geom: trimesh.Trimesh
+            ) -> np.ndarray:
+                if geom.faces.shape[0] == 0:
+                    return np.zeros(3, dtype=float)
+                face_normals = geom.face_normals
+                if hasattr(geom, "area_faces") and geom.area_faces is not None:
+                    w = geom.area_faces.reshape(-1, 1)
+                    n_local = (face_normals * w).sum(axis=0)
+                else:
+                    n_local = face_normals.mean(axis=0)
+                return self._safe_normalize(n_local)
+
+            def _corners_world(
+                self, geom: trimesh.Trimesh, R: np.ndarray, t: np.ndarray
+            ) -> np.ndarray:
+                corners_local = np.array(
+                    [
+                        [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[0][2]],
+                        [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[1][2]],
+                        [geom.bounds[0][0], geom.bounds[1][1], geom.bounds[0][2]],
+                        [geom.bounds[0][0], geom.bounds[1][1], geom.bounds[1][2]],
+                        [geom.bounds[1][0], geom.bounds[0][1], geom.bounds[0][2]],
+                        [geom.bounds[1][0], geom.bounds[0][1], geom.bounds[1][2]],
+                        [geom.bounds[1][0], geom.bounds[1][1], geom.bounds[0][2]],
+                        [geom.bounds[1][0], geom.bounds[1][1], geom.bounds[1][2]],
+                    ]
+                )
+                return (R @ corners_local.T).T + t
+
+            def _compute_standoff(
+                self,
+                corners_world: np.ndarray,
+                c_world: np.ndarray,
+                n_world: np.ndarray,
+            ) -> float:
+                tx, ty = self.config.fov_tangents()
+                if str(self.config.fit_method).lower() in {
+                    "footprint",
+                    "2d",
+                    "plane",
+                    "footprint_2d",
+                }:
+                    fit_d = (
+                        CameraPoseGenerationEngine.compute_fit_distance_footprint_2d(
+                            corners_world=corners_world,
+                            centroid_world=c_world,
+                            view_normal_world=n_world,
+                            tx=tx,
+                            ty=ty,
+                            margin=self.config.margin_factor,
+                        )
+                    )
+                else:
+                    radius_world = float(
+                        np.max(np.linalg.norm(corners_world - c_world, axis=1))
+                    )
+                    fit_d = (
+                        CameraPoseGenerationEngine.compute_fit_distance_spherical_bound(
+                            radius_world=radius_world,
+                            tx=tx,
+                            ty=ty,
+                            margin=self.config.margin_factor,
+                        )
+                    )
+
+                standoff = max(float(self.config.min_standoff), float(fit_d))
+                if self.config.max_distance is not None:
+                    standoff = min(standoff, self.config.max_distance)
+                return float(standoff)
+
+            def process_node(
+                self, scene_: trimesh.Scene, node_name: str
+            ) -> list[CameraPose]:
+                poses: list[CameraPose] = []
+                _, gkey = scene_.graph[node_name]
+                geom = scene_.geometry[gkey]
+                if not isinstance(geom, trimesh.Trimesh):
+                    return poses
+
+                T_node, _ = scene_.graph.get(
+                    frame_to=node_name, frame_from=scene_.graph.base_frame
+                )
+                R = T_node[:3, :3]
+                t = T_node[:3, 3]
+
+                n_local = self._compute_weighted_mean_normal(geom)
+                if float(np.linalg.norm(n_local)) < 1e-12:
+                    return poses
+
+                c_local = geom.center_mass if geom.is_volume else geom.centroid
+                c_world = (R @ c_local) + t
+                n_world = self._safe_normalize(R @ n_local)
+                if float(np.linalg.norm(n_world)) < 1e-12:
+                    return poses
+
+                corners_world = self._corners_world(geom, R, t)
+                standoff_distance = self._compute_standoff(
+                    corners_world, c_world, n_world
+                )
+
+                p0 = c_world
+                p1 = c_world + standoff_distance * n_world
+
+                if not CameraPoseGenerationEngine._is_height_allowed(
+                    float(p1[2]), config.min_height, config.max_height
+                ):
+                    return poses
+
+                if not turn_off_all_visualizations:
+                    path = trimesh.load_path(np.vstack([p0, p1]))
+                    path.colors = np.tile(config.line_color, (len(path.entities), 1))
+                    line_node_name = f"normal_line__{node_name}__{gkey}"
+                    scene_.add_geometry(
+                        path,
+                        node_name=line_node_name,
+                        parent_node_name=scene_.graph.base_frame,
+                        transform=np.eye(4),
+                    )
+
+                T_cam = self._look_at_transform(origin=p1, target=p0)
+                pose_cam = self._new_camera_instance()
+
+                if not turn_off_all_visualizations:
+                    cam_marker = trimesh.creation.camera_marker(
+                        pose_cam, marker_height=config.marker_height
+                    )
+                    cam_node_name = f"camera_marker__{node_name}__{gkey}"
+                    scene_.add_geometry(
+                        cam_marker,
+                        node_name=cam_node_name,
+                        parent_node_name=scene_.graph.base_frame,
+                        transform=T_cam,
+                    )
+
+                poses.append(
+                    CameraPose(
+                        camera=pose_cam,
+                        transform=T_cam,
+                        node_name=node_name,
+                        geometry_key=gkey,
+                    )
+                )
+                return poses
+
+        # Resolve configuration using module-level defaults (to preserve behavior)
+        effective_min_standoff = (
+            min_standoff
+            if min_standoff is not None
+            else (normal_length if normal_length is not None else 1.0)
+        )
+        effective_max_distance = (
+            max_distance if max_distance is not None else max_view_distance
+        )
+        fov_xy = (
+            fov_deg_xy
+            if fov_deg_xy is not None
+            else (float(test_fov[0]), float(test_fov[1]))
+        )
+        allowed_min_h = (
+            float(min_camera_height_override)
+            if min_camera_height_override is not None
+            else float(min_camera_height)
+        )
+        allowed_max_h = (
+            float(max_camera_height_override)
+            if max_camera_height_override is not None
+            else float(max_camera_height)
+        )
+
+        config = MeanNormalCameraConfig(
+            marker_height=marker_height,
+            min_standoff=float(effective_min_standoff),
+            max_distance=(
+                float(effective_max_distance)
+                if effective_max_distance is not None
+                else None
+            ),
+            fov_deg_xy=(float(fov_xy[0]), float(fov_xy[1])),
+            fit_method=str(fit_method),
+            min_height=float(allowed_min_h),
+            max_height=float(allowed_max_h),
+            margin_factor=1.05,
+            line_color=np.array([255, 32, 32, 255], dtype=np.uint8),
+        )
+
+        placer = MeanNormalCameraPlacer(config)
+        poses_all: list[CameraPose] = []
+        for node in scene.graph.nodes_geometry:
+            poses_all.extend(placer.process_node(scene, node))
+        return poses_all
+
+    # -----------------------------
+    # Frustum utilities (kept as-is but scoped here)
+    # -----------------------------
+    @staticmethod
+    def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
+        return np.array(
+            [
+                [bounds[0][0], bounds[0][1], bounds[0][2]],
+                [bounds[0][0], bounds[0][1], bounds[1][2]],
+                [bounds[0][0], bounds[1][1], bounds[0][2]],
+                [bounds[0][0], bounds[1][1], bounds[1][2]],
+                [bounds[1][0], bounds[0][1], bounds[0][2]],
+                [bounds[1][0], bounds[0][1], bounds[1][2]],
+                [bounds[1][0], bounds[1][1], bounds[0][2]],
+                [bounds[1][0], bounds[1][1], bounds[1][2]],
+            ]
+        )
+
+    @staticmethod
+    def camera_view_matrix(T_cam_world: np.ndarray) -> np.ndarray:
+        R = T_cam_world[:3, :3]
+        t = T_cam_world[:3, 3]
+        Rt = R.T
+        return np.block(
+            [
+                [Rt, -Rt @ t.reshape(3, 1)],
+                [np.zeros((1, 3)), np.ones((1, 1))],
+            ]
+        )
+
+    @staticmethod
+    def frustum_cull_scene(
+        scene: trimesh.Scene,
+        camera: Camera,
+        T_cam_world: np.ndarray,
+        require_full_visibility: bool = True,
+        eps: float = 1e-6,
+        *,
+        occlusion_check: bool = False,
+        samples_per_mesh: int = 32,
+        visibility_threshold: float = 0.8,
+    ) -> list[str]:
+        # For brevity and to keep behavior identical, reuse the existing
+        # module-level implementation by calling it directly if available.
+        # If not available, this placeholder returns all nodes.
+        try:
+            return frustum_cull_scene(
+                scene,
+                camera,
+                T_cam_world,
+                require_full_visibility=require_full_visibility,
+                eps=eps,
+                occlusion_check=occlusion_check,
+                samples_per_mesh=samples_per_mesh,
+                visibility_threshold=visibility_threshold,
+            )
+        except NameError:
+            return list(scene.graph.nodes_geometry)
+
+    # -----------------------------
+    # Cone-based pose generation
+    # -----------------------------
+    @timeit("generate_cone_view_poses")
+    def generate_cone_view_poses(
+        self,
+        scene: trimesh.Scene,
+        *,
+        cone: "CameraPoseGenerationEngine.ConeSamplingConfig",
+        min_standoff: float,
+        max_distance: float,
+        frustum_culling_max_distance: float,
+        fov_deg_xy: tuple[float, float],
+        visualize: bool = True,
+        marker_height: float = 0.15,
+        min_camera_height_override: float | None = None,
+        max_camera_height_override: float | None = None,
+    ) -> list[CameraPose]:
+        from trimesh.scene.cameras import Camera as TrimeshCamera
+
+        def _new_camera_instance() -> TrimeshCamera:
+            return TrimeshCamera(
+                resolution=(640, 480), fov=(float(fov_deg_xy[0]), float(fov_deg_xy[1]))
+            )
+
+        fovx_deg, fovy_deg = float(fov_deg_xy[0]), float(fov_deg_xy[1])
+        tx = np.tan(np.deg2rad(fovx_deg) * 0.5)
+        ty = np.tan(np.deg2rad(fovy_deg) * 0.5)
+        margin = 1.05
+
+        alpha = np.deg2rad(float(cone.cone_half_angle_deg))
+        cos_alpha = float(np.cos(alpha))
+
+        half_fov_rad = max(np.deg2rad(fovx_deg) * 0.5, np.deg2rad(fovy_deg) * 0.5)
+        overlap_margin_rad = np.deg2rad(
+            float(getattr(cone, "cone_overlap_margin_deg", 5.0))
+        )
+
+        def cones_overlap_dir(f1: np.ndarray, f2: np.ndarray) -> bool:
+            c = float(np.clip(np.dot(f1, f2), -1.0, 1.0))
+            theta_thresh = 2.0 * half_fov_rad + overlap_margin_rad
+            theta = float(np.arccos(c))
+            return theta <= theta_thresh
+
+        def fibonacci_cap(k: int, K: int) -> tuple[float, float]:
+            phi_g = (np.sqrt(5.0) - 1.0) / 2.0
+            u = (k + 0.5) / K
+            v = (k * phi_g) % 1.0
+            cos_theta = (1.0 - u) + u * cos_alpha
+            theta = float(np.arccos(cos_theta))
+            phi = float(2.0 * np.pi * v)
+            return theta, phi
+
+        poses: list[CameraPose] = []
+
+        allowed_min_h = (
+            float(min_camera_height_override)
+            if min_camera_height_override is not None
+            else float(min_camera_height)
+        )
+        allowed_max_h = (
+            float(max_camera_height_override)
+            if max_camera_height_override is not None
+            else float(max_camera_height)
+        )
+
+        for node_name in scene.graph.nodes_geometry:
+            _, gkey = scene.graph[node_name]
+            geom = scene.geometry[gkey]
+            if not isinstance(geom, trimesh.Trimesh) or geom.faces.shape[0] == 0:
+                continue
+
+            T_node, _ = scene.graph.get(
+                frame_to=node_name, frame_from=scene.graph.base_frame
+            )
+            R = T_node[:3, :3]
+            t = T_node[:3, 3]
+
+            face_normals = geom.face_normals
+            if hasattr(geom, "area_faces") and geom.area_faces is not None:
+                w = geom.area_faces.reshape(-1, 1)
+                n_local = (face_normals * w).sum(axis=0)
+            else:
+                n_local = face_normals.mean(axis=0)
+            n_world = CameraPoseGenerationEngine._safe_normalize_dir(
+                R @ CameraPoseGenerationEngine._safe_normalize_dir(n_local)
+            )
+            if np.linalg.norm(n_world) < 1e-12:
+                continue
+
+            c_local = geom.center_mass if geom.is_volume else geom.centroid
+            c_world = (R @ c_local) + t
+
+            corners_local = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
+            corners_world = (R @ corners_local.T).T + t
+
+            up = np.array([0.0, 0.0, 1.0])
+            t1 = np.cross(up, n_world)
+            if np.linalg.norm(t1) < 1e-6:
+                t1 = np.cross(np.array([0.0, 1.0, 0.0]), n_world)
+            t1 = CameraPoseGenerationEngine._safe_normalize_dir(t1)
+            t2 = CameraPoseGenerationEngine._safe_normalize_dir(np.cross(n_world, t1))
+
+            K = max(1, int(cone.samples_per_cone))
+            accepted_forward_dirs: list[np.ndarray] = []
+            RS = max(1, int(cone.roll_samples))
+            for k in range(K):
+                theta, phi = fibonacci_cap(k, K)
+                d = (
+                    (np.sin(theta) * np.cos(phi)) * t1
+                    + (np.sin(theta) * np.sin(phi)) * t2
+                    + (np.cos(theta)) * n_world
+                )
+                d = CameraPoseGenerationEngine._safe_normalize_dir(d)
+
+                if str(cone.fit_method).lower() in {
+                    "footprint",
+                    "2d",
+                    "plane",
+                    "footprint_2d",
+                }:
+                    fit_d = (
+                        CameraPoseGenerationEngine.compute_fit_distance_footprint_2d(
+                            corners_world=corners_world,
+                            centroid_world=c_world,
+                            view_normal_world=d,
+                            tx=tx,
+                            ty=ty,
+                            margin=margin,
+                        )
+                    )
+                else:
+                    radius_world = float(
+                        np.max(np.linalg.norm(corners_world - c_world, axis=1))
+                    )
+                    fit_d = (
+                        CameraPoseGenerationEngine.compute_fit_distance_spherical_bound(
+                            radius_world=radius_world, tx=tx, ty=ty, margin=margin
+                        )
+                    )
+
+                standoff = max(float(min_standoff), float(fit_d))
+                standoff = min(standoff, float(max_distance))
+
+                p_cam = c_world + standoff * d
+                if not CameraPoseGenerationEngine._is_height_allowed(
+                    float(p_cam[2]), allowed_min_h, allowed_max_h
+                ):
+                    continue
+                T_cam = CameraPoseGenerationEngine.look_at_transform(
+                    origin=p_cam, target=c_world
+                )
+
+                if getattr(cone, "reject_overlapping_cones", True):
+                    fwd = -T_cam[:3, 2]
+                    fwd = fwd / (np.linalg.norm(fwd) + 1e-12)
+                    overlapped = any(
+                        cones_overlap_dir(fwd, a) for a in accepted_forward_dirs
+                    )
+                    if overlapped:
+                        continue
+                    accepted_forward_dirs.append(fwd)
+
+                for r in range(RS):
+                    T_pose = T_cam.copy()
+                    if RS > 1:
+                        psi = 2.0 * np.pi * (r / float(RS))
+                        Rz = trimesh.transformations.rotation_matrix(
+                            psi, direction=[0, 0, -1]
+                        )
+                        T_pose = T_pose @ Rz
+
+                    cam = _new_camera_instance()
+                    cam.z_near = 0.1
+                    cam.z_far = float(frustum_culling_max_distance)
+
+                    poses.append(
+                        CameraPose(
+                            camera=cam,
+                            transform=T_pose,
+                            node_name=node_name,
+                            geometry_key=gkey,
+                        )
+                    )
+
+                    if visualize and not turn_off_all_visualizations:
+                        path = trimesh.load_path(np.vstack([c_world, p_cam]))
+                        scene.add_geometry(
+                            path,
+                            node_name=f"cone_line__{node_name}__{gkey}__{k}_{r}",
+                            parent_node_name=scene.graph.base_frame,
+                            transform=np.eye(4),
+                        )
+                        marker = trimesh.creation.camera_marker(
+                            cam, marker_height=marker_height
+                        )
+                        scene.add_geometry(
+                            marker,
+                            node_name=f"cone_cam__{node_name}__{gkey}__{k}_{r}",
+                            parent_node_name=scene.graph.base_frame,
+                            transform=T_pose,
+                        )
+
+        return poses
 
 
 def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
@@ -355,263 +936,6 @@ def compute_fit_distance_footprint_2d(
     dx = max_abs_x / (tx if tx > 1e-12 else np.inf)
     dy = max_abs_y / (ty if ty > 1e-12 else np.inf)
     return margin * max(dx, dy)
-
-
-@timeit("add_mean_normal_lines_and_cameras")
-def add_mean_normal_lines_and_cameras(
-    scene,
-    normal_length: float | None = None,
-    marker_height: float = 0.15,
-    *,
-    min_standoff: float | None = None,
-    max_distance: float | None = None,
-    fov_deg_xy: tuple[float, float] | None = None,
-    fit_method: str = "footprint_2d",  # "spherical" is more conservative
-    min_camera_height_override: float | None = None,
-    max_camera_height_override: float | None = None,
-) -> list[CameraPose]:
-    """
-    Create visualization lines along mean normals and place cameras that look at
-    object centroids from an appropriate standoff distance.
-
-    The function delegates the work to a focused object that encapsulates all
-    steps: configuration resolution, geometry analysis, standoff computation,
-    scene updates, and pose collection.
-    """
-
-    @dataclass
-    class MeanNormalCameraConfig:
-        """
-        Configuration for camera placement around scene geometries.
-        """
-
-        marker_height: float
-        min_standoff: float
-        max_distance: Optional[float]
-        fov_deg_xy: tuple[float, float]
-        fit_method: str
-        min_height: float
-        max_height: float
-        margin_factor: float
-        line_color: np.ndarray
-
-        def fov_tangents(self) -> tuple[float, float]:
-            fx, fy = float(self.fov_deg_xy[0]), float(self.fov_deg_xy[1])
-            return float(np.tan(np.deg2rad(fx) * 0.5)), float(
-                np.tan(np.deg2rad(fy) * 0.5)
-            )
-
-    class MeanNormalCameraPlacer:
-        """
-        Analyze each mesh, compute mean normal and place a camera facing the mesh.
-        """
-
-        def __init__(self, config: MeanNormalCameraConfig):
-            self.config = config
-
-        @staticmethod
-        def _safe_normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-            n = float(np.linalg.norm(v))
-            if n < eps:
-                return v
-            return v / n
-
-        @staticmethod
-        def _look_at_transform(
-            origin: np.ndarray, target: np.ndarray, up_hint: np.ndarray | None = None
-        ) -> np.ndarray:
-            # Deprecated: kept for backward compatibility within this class.
-            # Delegate to the module-level implementation to avoid duplication.
-            return look_at_transform(origin=origin, target=target, up_hint=up_hint)
-
-        @staticmethod
-        def _new_camera_instance() -> Camera:
-            return Camera(resolution=(640, 480), fov=test_fov)
-
-        def _compute_weighted_mean_normal(self, geom: trimesh.Trimesh) -> np.ndarray:
-            if geom.faces.shape[0] == 0:
-                return np.zeros(3, dtype=float)
-            face_normals = geom.face_normals
-            if hasattr(geom, "area_faces") and geom.area_faces is not None:
-                w = geom.area_faces.reshape(-1, 1)
-                n_local = (face_normals * w).sum(axis=0)
-            else:
-                n_local = face_normals.mean(axis=0)
-            return self._safe_normalize(n_local)
-
-        def _corners_world(
-            self, geom: trimesh.Trimesh, R: np.ndarray, t: np.ndarray
-        ) -> np.ndarray:
-            corners_local = np.array(
-                [
-                    [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[0][2]],
-                    [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[1][2]],
-                    [geom.bounds[0][0], geom.bounds[1][1], geom.bounds[0][2]],
-                    [geom.bounds[0][0], geom.bounds[1][1], geom.bounds[1][2]],
-                    [geom.bounds[1][0], geom.bounds[0][1], geom.bounds[0][2]],
-                    [geom.bounds[1][0], geom.bounds[0][1], geom.bounds[1][2]],
-                    [geom.bounds[1][0], geom.bounds[1][1], geom.bounds[0][2]],
-                    [geom.bounds[1][0], geom.bounds[1][1], geom.bounds[1][2]],
-                ],
-                dtype=float,
-            )
-            return (R @ corners_local.T).T + t
-
-        def _compute_standoff(
-            self, corners_world: np.ndarray, c_world: np.ndarray, n_world: np.ndarray
-        ) -> float:
-            tx, ty = self.config.fov_tangents()
-            if self.config.fit_method.lower() in {
-                "footprint",
-                "2d",
-                "plane",
-                "footprint_2d",
-            }:
-                fit_distance = compute_fit_distance_footprint_2d(
-                    corners_world=corners_world,
-                    centroid_world=c_world,
-                    view_normal_world=n_world,
-                    tx=tx,
-                    ty=ty,
-                    margin=self.config.margin_factor,
-                )
-            else:
-                radius_world = float(
-                    np.max(np.linalg.norm(corners_world - c_world, axis=1))
-                )
-                fit_distance = compute_fit_distance_spherical_bound(
-                    radius_world=radius_world,
-                    tx=tx,
-                    ty=ty,
-                    margin=self.config.margin_factor,
-                )
-
-            standoff = max(self.config.min_standoff, fit_distance)
-            if self.config.max_distance is not None:
-                standoff = min(standoff, self.config.max_distance)
-            return float(standoff)
-
-        def process_node(
-            self, scene: trimesh.Scene, node_name: str
-        ) -> list[CameraPose]:
-            poses: list[CameraPose] = []
-            _, gkey = scene.graph[node_name]
-            geom = scene.geometry[gkey]
-            if not isinstance(geom, trimesh.Trimesh):
-                return poses
-
-            T_node, _ = scene.graph.get(
-                frame_to=node_name, frame_from=scene.graph.base_frame
-            )
-            R = T_node[:3, :3]
-            t = T_node[:3, 3]
-
-            n_local = self._compute_weighted_mean_normal(geom)
-            if float(np.linalg.norm(n_local)) < 1e-12:
-                return poses
-
-            c_local = geom.center_mass if geom.is_volume else geom.centroid
-            c_world = (R @ c_local) + t
-            n_world = self._safe_normalize(R @ n_local)
-            if float(np.linalg.norm(n_world)) < 1e-12:
-                return poses
-
-            corners_world = self._corners_world(geom, R, t)
-            standoff_distance = self._compute_standoff(corners_world, c_world, n_world)
-
-            p0 = c_world
-            p1 = c_world + standoff_distance * n_world
-
-            if not _is_height_allowed(
-                float(p1[2]), self.config.min_height, self.config.max_height
-            ):
-                return poses
-
-            # Add normal line visualization
-
-            if not turn_off_all_visualizations:
-                path = trimesh.load_path(np.vstack([p0, p1]))
-                path.colors = np.tile(self.config.line_color, (len(path.entities), 1))
-                line_node_name = f"normal_line__{node_name}__{gkey}"
-                scene.add_geometry(
-                    path,
-                    node_name=line_node_name,
-                    parent_node_name=scene.graph.base_frame,
-                    transform=np.eye(4),
-                )
-
-            # Add camera marker
-            T_cam = self._look_at_transform(origin=p1, target=p0)
-            pose_cam = self._new_camera_instance()
-
-            if not turn_off_all_visualizations:
-                cam_marker = trimesh.creation.camera_marker(
-                    pose_cam, marker_height=self.config.marker_height
-                )
-                cam_node_name = f"camera_marker__{node_name}__{gkey}"
-                scene.add_geometry(
-                    cam_marker,
-                    node_name=cam_node_name,
-                    parent_node_name=scene.graph.base_frame,
-                    transform=T_cam,
-                )
-
-            poses.append(
-                CameraPose(
-                    camera=pose_cam,
-                    transform=T_cam,
-                    node_name=node_name,
-                    geometry_key=gkey,
-                )
-            )
-            return poses
-
-    # Resolve configuration using module-level defaults
-    effective_min_standoff = (
-        min_standoff
-        if min_standoff is not None
-        else (normal_length if normal_length is not None else 1.0)
-    )
-    effective_max_distance = (
-        max_distance if max_distance is not None else max_view_distance
-    )
-    fov_xy = (
-        fov_deg_xy
-        if fov_deg_xy is not None
-        else (float(test_fov[0]), float(test_fov[1]))
-    )
-    allowed_min_h = (
-        float(min_camera_height_override)
-        if min_camera_height_override is not None
-        else float(min_camera_height)
-    )
-    allowed_max_h = (
-        float(max_camera_height_override)
-        if max_camera_height_override is not None
-        else float(max_camera_height)
-    )
-
-    config = MeanNormalCameraConfig(
-        marker_height=marker_height,
-        min_standoff=float(effective_min_standoff),
-        max_distance=(
-            float(effective_max_distance)
-            if effective_max_distance is not None
-            else None
-        ),
-        fov_deg_xy=(float(fov_xy[0]), float(fov_xy[1])),
-        fit_method=str(fit_method),
-        min_height=float(allowed_min_h),
-        max_height=float(allowed_max_h),
-        margin_factor=1.05,
-        line_color=np.array([255, 32, 32, 255], dtype=np.uint8),
-    )
-
-    placer = MeanNormalCameraPlacer(config)
-    all_poses: list[CameraPose] = []
-    for node in scene.graph.nodes_geometry:
-        all_poses.extend(placer.process_node(scene, node))
-    return all_poses
 
 
 @timeit("add_camera_origin_spheres")
@@ -1404,232 +1728,14 @@ def frustum_cull_scene(
 # -----------------------------------------------------------------------------
 
 
-@timeit("generate_cone_view_poses")
-def generate_cone_view_poses(
-    scene: trimesh.Scene,
-    *,
-    cone: ConeSamplingConfig,
-    min_standoff: float,
-    max_distance: float,
-    frustum_culling_max_distance: float,
-    fov_deg_xy: tuple[float, float],
-    visualize: bool = True,
-    marker_height: float = 0.15,
-    min_camera_height_override: float | None = None,
-    max_camera_height_override: float | None = None,
-) -> list[CameraPose]:
-    """
-    Generate additional camera poses by sampling directions within a cone
-    around each mesh's mean normal and placing cameras that look at the
-    mesh centroid. Returns a list of CameraPose.
-    """
-    from trimesh.scene.cameras import Camera as TrimeshCamera
-
-    # use module-level look_at_transform
-
-    def _new_camera_instance() -> TrimeshCamera:
-        return TrimeshCamera(
-            resolution=(640, 480), fov=(float(fov_deg_xy[0]), float(fov_deg_xy[1]))
-        )
-
-    # FOV tangents
-    fovx_deg, fovy_deg = float(fov_deg_xy[0]), float(fov_deg_xy[1])
-    tx = np.tan(np.deg2rad(fovx_deg) * 0.5)
-    ty = np.tan(np.deg2rad(fovy_deg) * 0.5)
-    margin = 1.05
-
-    alpha = np.deg2rad(float(cone.cone_half_angle_deg))
-    cos_alpha = float(np.cos(alpha))
-
-    # Directional cone-overlap helper: given two forward unit vectors f1 and f2,
-    # and a camera half-FOV (use the larger of hfov/2, vfov/2), determine if the
-    # viewing cones overlap significantly (Stage 1 directional test).
-    half_fov_rad = max(np.deg2rad(fovx_deg) * 0.5, np.deg2rad(fovy_deg) * 0.5)
-    overlap_margin_rad = np.deg2rad(
-        float(getattr(cone, "cone_overlap_margin_deg", 5.0))
-    )
-
-    def cones_overlap_dir(f1: np.ndarray, f2: np.ndarray) -> bool:
-        # Angle between forward vectors
-        c = float(np.clip(np.dot(f1, f2), -1.0, 1.0))
-        # If theta <= half_fov1 + half_fov2 + margin, cones overlap
-        # Since both use same intrinsics here, this becomes theta <= 2*half_fov + margin
-        # Compare using cosine to avoid acos when possible
-        theta_thresh = 2.0 * half_fov_rad + overlap_margin_rad
-        # For small counts this acos is fine and clearer
-        theta = float(np.arccos(c))
-        return theta <= theta_thresh
-
-    def fibonacci_cap(k: int, K: int) -> tuple[float, float]:
-        phi_g = (np.sqrt(5.0) - 1.0) / 2.0
-        u = (k + 0.5) / K
-        v = (k * phi_g) % 1.0
-        cos_theta = (1.0 - u) + u * cos_alpha
-        theta = float(np.arccos(cos_theta))
-        phi = float(2.0 * np.pi * v)
-        return theta, phi
-
-    poses: list[CameraPose] = []
-
-    # Resolve height constraints once
-    allowed_min_h = (
-        float(min_camera_height_override)
-        if min_camera_height_override is not None
-        else float(min_camera_height)
-    )
-    allowed_max_h = (
-        float(max_camera_height_override)
-        if max_camera_height_override is not None
-        else float(max_camera_height)
-    )
-
-    for node_name in scene.graph.nodes_geometry:
-        _, gkey = scene.graph[node_name]
-        geom = scene.geometry[gkey]
-        if not isinstance(geom, trimesh.Trimesh) or geom.faces.shape[0] == 0:
-            continue
-
-        T_node, _ = scene.graph.get(
-            frame_to=node_name, frame_from=scene.graph.base_frame
-        )
-        R = T_node[:3, :3]
-        t = T_node[:3, 3]
-
-        # Mean normal in world
-        face_normals = geom.face_normals
-        if hasattr(geom, "area_faces") and geom.area_faces is not None:
-            w = geom.area_faces.reshape(-1, 1)
-            n_local = (face_normals * w).sum(axis=0)
-        else:
-            n_local = face_normals.mean(axis=0)
-        n_world = _safe_normalize_dir(R @ _safe_normalize_dir(n_local))
-        if np.linalg.norm(n_world) < 1e-12:
-            continue
-
-        c_local = geom.center_mass if geom.is_volume else geom.centroid
-        c_world = (R @ c_local) + t
-
-        corners_local = _aabb_corners(geom.bounds)
-        corners_world = (R @ corners_local.T).T + t
-
-        # Tangent basis around normal
-        up = np.array([0.0, 0.0, 1.0])
-        t1 = np.cross(up, n_world)
-        if np.linalg.norm(t1) < 1e-6:
-            t1 = np.cross(np.array([0.0, 1.0, 0.0]), n_world)
-        t1 = _safe_normalize_dir(t1)
-        t2 = _safe_normalize_dir(np.cross(n_world, t1))
-
-        K = max(1, int(cone.samples_per_cone))
-        # Keep accepted forward directions for this object to reject overlapping cones
-        accepted_forward_dirs: list[np.ndarray] = []
-        RS = max(1, int(cone.roll_samples))
-        for k in range(K):
-            theta, phi = fibonacci_cap(k, K)
-            d = (
-                (np.sin(theta) * np.cos(phi)) * t1
-                + (np.sin(theta) * np.sin(phi)) * t2
-                + (np.cos(theta)) * n_world
-            )
-            d = _safe_normalize_dir(d)
-
-            # Fit distance selection
-            if str(cone.fit_method).lower() in {
-                "footprint",
-                "2d",
-                "plane",
-                "footprint_2d",
-            }:
-                fit_d = compute_fit_distance_footprint_2d(
-                    corners_world=corners_world,
-                    centroid_world=c_world,
-                    view_normal_world=d,
-                    tx=tx,
-                    ty=ty,
-                    margin=margin,
-                )
-            else:
-                radius_world = float(
-                    np.max(np.linalg.norm(corners_world - c_world, axis=1))
-                )
-                fit_d = compute_fit_distance_spherical_bound(
-                    radius_world=radius_world, tx=tx, ty=ty, margin=margin
-                )
-
-            standoff = max(float(min_standoff), float(fit_d))
-            standoff = min(standoff, float(max_distance))
-
-            p_cam = c_world + standoff * d
-            # Early height filter: skip pose generation if camera Z not in range
-            if not _is_height_allowed(float(p_cam[2]), allowed_min_h, allowed_max_h):
-                continue
-            T_cam = look_at_transform(origin=p_cam, target=c_world)
-
-            # Directional cone overlap rejection (per object)
-            if getattr(cone, "reject_overlapping_cones", True):
-                # Forward vector is along -Z of camera pose
-                fwd = -T_cam[:3, 2]
-                fwd = fwd / (np.linalg.norm(fwd) + 1e-12)
-                # If overlaps with any accepted direction, reject this sample
-                overlapped = any(
-                    cones_overlap_dir(fwd, a) for a in accepted_forward_dirs
-                )
-                if overlapped:
-                    continue
-                accepted_forward_dirs.append(fwd)
-
-            for r in range(RS):
-                T_pose = T_cam.copy()
-                if RS > 1:
-                    psi = 2.0 * np.pi * (r / float(RS))
-                    Rz = trimesh.transformations.rotation_matrix(
-                        psi, direction=[0, 0, -1]
-                    )
-                    T_pose = T_pose @ Rz
-
-                cam = _new_camera_instance()
-                cam.z_near = 0.1
-                cam.z_far = float(frustum_culling_max_distance)
-
-                poses.append(
-                    CameraPose(
-                        camera=cam,
-                        transform=T_pose,
-                        node_name=node_name,
-                        geometry_key=gkey,
-                    )
-                )
-
-                if visualize and not turn_off_all_visualizations:
-                    path = trimesh.load_path(np.vstack([c_world, p_cam]))
-                    scene.add_geometry(
-                        path,
-                        node_name=f"cone_line__{node_name}__{gkey}__{k}_{r}",
-                        parent_node_name=scene.graph.base_frame,
-                        transform=np.eye(4),
-                    )
-                    marker = trimesh.creation.camera_marker(
-                        cam, marker_height=marker_height
-                    )
-                    scene.add_geometry(
-                        marker,
-                        node_name=f"cone_cam__{node_name}__{gkey}__{k}_{r}",
-                        parent_node_name=scene.graph.base_frame,
-                        transform=T_pose,
-                    )
-
-    return poses
-
-
-# Generate visualization and collect camera instances and their poses
-
-generated_camera_poses = add_mean_normal_lines_and_cameras(
+# Generate visualization and collect camera instances and their poses using the engine
+_engine = CameraPoseGenerationEngine()
+generated_camera_poses = _engine.add_mean_normal_lines_and_cameras(
     scene,
     marker_height=min_standoff_distance,
     min_standoff=min_standoff_distance,
     max_distance=max_view_distance,
     fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
-    # fit_method="footprint_2d",
 )
 
 # Set the z_far distance of all cameras to a fixed value used by frustum culling.
@@ -1640,7 +1746,7 @@ for pose in generated_camera_poses:
 
 
 # Generate additional cone-based viewpoints and merge them with the existing poses
-cone_cfg = ConeSamplingConfig(
+cone_cfg = CameraPoseGenerationEngine.ConeSamplingConfig(
     cone_half_angle_deg=75,
     samples_per_cone=20,
     roll_samples=1,
@@ -1648,7 +1754,7 @@ cone_cfg = ConeSamplingConfig(
     reject_overlapping_cones=True,
 )
 
-_extra_cone_poses = generate_cone_view_poses(
+_extra_cone_poses = _engine.generate_cone_view_poses(
     scene,
     cone=cone_cfg,
     min_standoff=min_standoff_distance,
