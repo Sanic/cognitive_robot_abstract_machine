@@ -157,41 +157,6 @@ class CameraPose:
         )
 
 
-def _safe_normalize_dir(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    """
-    Normalize a vector; return the input if its norm is near zero.
-    """
-
-    n = float(np.linalg.norm(v))
-    if n < eps:
-        return v
-    return v / n
-
-
-def _camera_forward_world(T_cam_world: np.ndarray) -> np.ndarray:
-    """
-    Compute the camera's viewing direction in world coordinates.
-
-    The camera looks along its local negative Z axis.
-    """
-
-    return _safe_normalize_dir(-T_cam_world[:3, 2])
-
-
-def _angle_between_dirs(u: np.ndarray, v: np.ndarray) -> float:
-    """
-    Robust unsigned angle (radians) between two direction vectors.
-
-    Uses ``atan2(||u×v||, u·v)`` to avoid precision loss near 0 and π.
-    """
-
-    u_n = _safe_normalize_dir(u)
-    v_n = _safe_normalize_dir(v)
-    cross_mag = float(np.linalg.norm(np.cross(u_n, v_n)))
-    dot_uv = float(np.clip(np.dot(u_n, v_n), -1.0, 1.0))
-    return float(np.arctan2(cross_mag, dot_uv))
-
-
 def timeit(label: str | None = None):
     """
     Decorator to print how long a function call took.
@@ -633,7 +598,14 @@ class CameraPoseGenerationEngine:
         )
 
     @staticmethod
-    def camera_view_matrix(T_cam_world: np.ndarray) -> np.ndarray:
+    def view_matrix_from_cam_to_world(T_cam_world: np.ndarray) -> np.ndarray:
+        """
+        Compute the camera "view" matrix V that maps world -> camera coordinates,
+        given a camera-to-world transform ``T_cam_world``.
+
+        This is equivalent to ``inv(T_cam_world)`` but avoids a general matrix
+        inversion by using the fact that the rotation is orthonormal.
+        """
         R = T_cam_world[:3, :3]
         t = T_cam_world[:3, 3]
         Rt = R.T
@@ -878,12 +850,11 @@ class CameraPoseGenerationEngine:
 
         return poses
 
-
-def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
-    """
-    Return True if the world Z coordinate lies within [min_h, max_h].
-    """
-    return (z_world >= min_h) and (z_world <= max_h)
+    def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
+        """
+        Return True if the world Z coordinate lies within [min_h, max_h].
+        """
+        return (z_world >= min_h) and (z_world <= max_h)
 
 
 @timeit("compute_fit_distance_spherical_bound")
@@ -1471,12 +1442,12 @@ def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
 
 def camera_view_matrix(T_cam_world: np.ndarray) -> np.ndarray:
     """
-    Compute the view matrix V that maps world -> camera.
+    Deprecated: use ``CameraPoseGenerationEngine.view_matrix_from_cam_to_world``.
 
-    Assumes T_cam_world maps camera coordinates to world coordinates and
-    that the camera looks along its local negative Z axis.
+    This function now delegates to the class method which computes the
+    orthonormal inverse efficiently without a general matrix inversion.
     """
-    return np.linalg.inv(T_cam_world)
+    return CameraPoseGenerationEngine.view_matrix_from_cam_to_world(T_cam_world)
 
 
 @timeit("frustum_cull_scene")
