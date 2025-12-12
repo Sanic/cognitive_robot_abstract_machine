@@ -242,25 +242,6 @@ class ConeSamplingConfig:
     cone_overlap_margin_deg: float = 5.0
 
 
-# @dataclass
-# class Timer:
-#     """
-#     Simple context manager to measure elapsed wall time.
-#
-#     Prints a line when exiting the context with the elapsed time in milliseconds.
-#     """
-#
-#     label: str
-#
-#     def __enter__(self):
-#         self._t0 = time.perf_counter()
-#         return self
-#
-#     def __exit__(self, exc_type, exc, tb):
-#         dt_ms = (time.perf_counter() - self._t0) * 1000.0
-#         print(f"[TIMING] {self.label}: {dt_ms:.2f} ms")
-
-
 def timeit(label: str | None = None):
     """
     Decorator to print how long a function call took.
@@ -1849,7 +1830,7 @@ output_path = Path("../resources/warsaw_data/scene_images/")
 if not output_path.exists():
     output_path.mkdir(parents=True)
 
-scene.camera.fov = [60, 45]  # horizontal, vertical degrees
+scene.camera.fov = test_fov  # horizontal, vertical degrees
 
 for j, pose in enumerate(camera_poses):
 
