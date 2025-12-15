@@ -11,12 +11,26 @@ import sys
 
 from semantic_digital_twin.adapters.warsaw_world_loader import WarsawWorldLoader
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from krrood.ormatic.utils import create_engine
+from semantic_digital_twin.orm.ormatic_interface import Base, WorldMappingDAO
+from krrood.ormatic.dao import to_dao
+
 sys.path.insert(
     0, str(Path(__file__).parent.parent / "semantic_digital_twin" / "scripts")
 )
 
-from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
+DB_NAME = os.getenv("PGDATABASE")
+DB_USER = os.getenv("PGUSER")
+DB_PASSWORD = os.getenv("PGPASSWORD")
 
+DB_HOST = "localhost"
+DB_PORT = 5432
+
+connection_string = (
+    f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
@@ -183,6 +197,11 @@ def main(args):
     group_size = args.group_size
     export_path = Path(args.export_dir)
 
+    # Create database engine and tables for later persistence of the world
+    engine = create_engine(connection_string, echo=True)  # echo=True for debugging SQL
+    Base.metadata.create_all(bind=engine)
+    print("Database tables created")
+
     # Load world
     print(f"Loading world from {obj_dir}...")
 
@@ -281,6 +300,13 @@ def main(args):
     with open(summary_file, "w") as f:
         json.dump(summary, f, indent=2)
     print(f"Summary saved to {summary_file}")
+
+    # Convert world to DAO and persist
+    with Session(engine) as session:
+        world_dao: WorldMappingDAO = to_dao(world)
+        session.add(world_dao)
+        session.commit()
+        print(f"World persisted with database_id: {world_dao.database_id}")
 
     return all_responses, summary
 

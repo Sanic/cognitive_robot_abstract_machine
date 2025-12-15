@@ -30,16 +30,17 @@ from semantic_digital_twin.world_description.world_entity import (
 class WarsawWorldLoader:
     """
     Load a collection of OBJ files from a directory into a single World,
+    or wrap an existing World for rendering and export operations.
     """
 
-    input_directory: Path
+    input_directory: Path = field(default=None)
     """
-    Directory containing OBJ files to load.
+    Directory containing OBJ files to load. Can be None if world is provided directly.
     """
 
-    world: World = field(init=False)
+    world: World = field(default=None)
     """
-    Loaded World object.
+    Loaded World object. Can be provided directly or loaded from input_directory.
     """
 
     _camera_field_of_view: Tuple[float, float] = field(default=(60, 45))
@@ -53,14 +54,49 @@ class WarsawWorldLoader:
     """
 
     def __post_init__(self):
-        # Fetch all OBJ files in input directory
+        if self.world is None and self.input_directory is None:
+            raise ValueError("Either input_directory or world must be provided")
+
+        if self.world is None:
+            # Load from directory
+            self.world = self._load_world_from_directory(self.input_directory)
+
+        # Cache original visual states of bodies
+        for body in self.world.bodies_with_enabled_collision:
+            if (
+                body.collision
+                and len(body.collision) > 0
+                and hasattr(body.collision[0], "mesh")
+            ):
+                self.original_state[body.id] = body.collision[0].mesh.visual.copy()
+
+    @classmethod
+    def from_world(
+        cls, world: World, camera_field_of_view: Tuple[float, float] = (60, 45)
+    ) -> "WarsawWorldLoader":
+        """
+        Create a WarsawWorldLoader from an existing World object.
+
+        :param world: An existing World object to wrap.
+        :param camera_field_of_view: Camera field of view for rendering.
+        :return: A WarsawWorldLoader instance wrapping the given world.
+        """
+        return cls(
+            input_directory=None,
+            world=world,
+            _camera_field_of_view=camera_field_of_view,
+        )
+
+    @staticmethod
+    def _load_world_from_directory(input_directory: Path) -> World:
+        """Load OBJ files from directory and return a World object."""
         files = [
-            os.path.join(self.input_directory, file)
-            for file in os.listdir(self.input_directory)
+            os.path.join(input_directory, file)
+            for file in os.listdir(input_directory)
             if file.endswith(".obj")
         ]
         if len(files) == 0:
-            raise ValueError(f"No OBJ files found in {self.input_directory}")
+            raise ValueError(f"No OBJ files found in {input_directory}")
 
         # Load all OBJ files into a single World
         obj_worlds = [OBJParser(file).parse() for file in files]
@@ -80,11 +116,7 @@ class WarsawWorldLoader:
                 CenterLocalGeometryAndPreserveWorldPose(),
             ]
         )
-        self.world = pipeline.apply(main_world)
-
-        # Cache original visual states of bodies
-        for body in self.world.bodies_with_enabled_collision:
-            self.original_state[body.id] = body.collision[0].mesh.visual.copy()
+        return pipeline.apply(main_world)
 
     # %% Public API
     def export_semantic_annotation_inheritance_structure(

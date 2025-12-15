@@ -276,7 +276,7 @@ class InheritanceStructureExporter:
                 self._build_node(base, include_subclasses=False)
                 for base in self._walk_related_classes(clazz, relation="bases")
             ],
-            "fields": self._collect_required_public_fields(clazz),
+            "fields": self.collect_required_public_fields(clazz),
         }
 
         if include_subclasses:
@@ -287,7 +287,7 @@ class InheritanceStructureExporter:
 
         return node
 
-    def _collect_required_public_fields(self, clazz: type) -> List[Dict[str, Any]]:
+    def collect_required_public_fields(self, clazz: type) -> List[Dict[str, Any]]:
         """
         Collects all required public fields from the class's __init__ method.
         :param clazz: The class to inspect.

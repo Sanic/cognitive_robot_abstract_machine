@@ -111,7 +111,6 @@ class DoubleDoor(SemanticAnnotation):
 @dataclass(eq=False)
 class Drawer(SemanticAnnotation):
     container: Container
-    handle: Handle
 
 
 ############################### subclasses to Furniture
@@ -159,3 +158,43 @@ class Wall(SemanticAnnotation):
         door = let(Door, self._world.semantic_annotations)
         query = an(entity(door), InsideOf(self.body, door.entry_way.region)() > 0.1)
         return query.evaluate()
+
+
+@dataclass(eq=False)
+class Countertop(HasBody):
+    pass
+
+
+@dataclass(eq=False)
+class Stovetop(HasBody):
+    pass
+
+
+@dataclass(eq=False)
+class Side(HasBody):
+    pass
+
+
+@dataclass(eq=False)
+class Sink(Container):
+    pass
+
+
+@dataclass(eq=False)
+class Back(SemanticAnnotation):
+    pass
+
+
+@dataclass(eq=False)
+class Things(SemanticAnnotation):
+    pass
+
+
+@dataclass(eq=False)
+class Board(HasBody):
+    pass
+
+
+@dataclass(eq=False)
+class Tap(SemanticAnnotation):
+    pass
