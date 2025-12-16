@@ -1,10 +1,9 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
-import trimesh
-
 from semantic_digital_twin.adapters.mesh import OBJParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.pipeline.pipeline import (
@@ -21,13 +20,6 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
 )
-
-from dataclasses import dataclass
-from typing import Optional
-import numpy as np
-import trimesh
-from trimesh.scene.cameras import Camera
-
 
 # dir_path = "/home/itsme/work/cram_ws/src/cognitive_robot_abstract_machine/semantic_digital_twin/resources/warsaw_data/objects/"
 dir_path = "/home/pmania/warsaw/src/cognitive_robot_abstract_machine/semantic_digital_twin/resources/warsaw_data/objects/"
@@ -66,19 +58,6 @@ InheritanceStructureExporter(
 
 rt = RayTracer(world=world)
 scene = rt.scene
-
-# import trimesh
-# from semantic_digital_twin.spatial_types import TransformationMatrix
-
-# Add simple sphere
-# s = trimesh.creation.icosphere(subdivisions=2, radius=0.1)
-# # Set color (RGBA)
-# s.visual.vertex_colors = trimesh.visual.color.to_rgba([255, 80, 80, 255])
-#
-# T = TransformationMatrix.from_xyz_rpy(x=1.0, y=0.5, z=0.8).to_np()
-# scene.add_geometry(
-#     s, node_name="debug_sphere_temp", parent_node_name="world", transform=T
-# )
 
 
 ####
