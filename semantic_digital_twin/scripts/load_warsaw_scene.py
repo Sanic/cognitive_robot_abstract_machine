@@ -314,6 +314,24 @@ class CameraPoseGenerationEngine:
         dy = max_abs_y / (ty if ty > 1e-12 else np.inf)
         return margin * max(dx, dy)
 
+    @dataclass
+    class MeanNormalCameraConfig:
+        marker_height: float
+        min_standoff: float
+        max_distance: Optional[float]
+        fov_deg_xy: tuple[float, float]
+        fit_method: str
+        min_height: float
+        max_height: float
+        margin_factor: float
+        line_color: np.ndarray
+
+        def fov_tangents(self) -> tuple[float, float]:
+            fx, fy = float(self.fov_deg_xy[0]), float(self.fov_deg_xy[1])
+            return float(np.tan(np.deg2rad(fx) * 0.5)), float(
+                np.tan(np.deg2rad(fy) * 0.5)
+            )
+
     # -----------------------------
     # Mean-normal placement
     # -----------------------------
@@ -336,26 +354,10 @@ class CameraPoseGenerationEngine:
         object centroids from an appropriate standoff distance.
         """
 
-        @dataclass
-        class MeanNormalCameraConfig:
-            marker_height: float
-            min_standoff: float
-            max_distance: Optional[float]
-            fov_deg_xy: tuple[float, float]
-            fit_method: str
-            min_height: float
-            max_height: float
-            margin_factor: float
-            line_color: np.ndarray
-
-            def fov_tangents(self) -> tuple[float, float]:
-                fx, fy = float(self.fov_deg_xy[0]), float(self.fov_deg_xy[1])
-                return float(np.tan(np.deg2rad(fx) * 0.5)), float(
-                    np.tan(np.deg2rad(fy) * 0.5)
-                )
-
         class MeanNormalCameraPlacer:
-            def __init__(self, config: MeanNormalCameraConfig):
+            def __init__(
+                self, config: CameraPoseGenerationEngine.MeanNormalCameraConfig
+            ):
                 self.config = config
 
             @staticmethod
@@ -364,16 +366,6 @@ class CameraPoseGenerationEngine:
                 if n < eps:
                     return v
                 return v / n
-
-            @staticmethod
-            def _look_at_transform(
-                origin: np.ndarray,
-                target: np.ndarray,
-                up_hint: np.ndarray | None = None,
-            ) -> np.ndarray:
-                return CameraPoseGenerationEngine.look_at_transform(
-                    origin=origin, target=target, up_hint=up_hint
-                )
 
             @staticmethod
             def _new_camera_instance() -> Camera:
@@ -488,7 +480,10 @@ class CameraPoseGenerationEngine:
                         transform=np.eye(4),
                     )
 
-                T_cam = self._look_at_transform(origin=p1, target=p0)
+                T_cam = CameraPoseGenerationEngine.look_at_transform(
+                    origin=p1, target=p0
+                )
+
                 pose_cam = self._new_camera_instance()
 
                 if not turn_off_all_visualizations:
@@ -538,7 +533,7 @@ class CameraPoseGenerationEngine:
             else float(max_camera_height)
         )
 
-        config = MeanNormalCameraConfig(
+        config = CameraPoseGenerationEngine.MeanNormalCameraConfig(
             marker_height=marker_height,
             min_standoff=float(effective_min_standoff),
             max_distance=(
@@ -887,12 +882,6 @@ class CameraPoseGenerationEngine:
         )
 
         return [len(visible_bodies) for visible_bodies in _visible_body_sets]
-
-    def _is_height_allowed(z_world: float, min_h: float, max_h: float) -> bool:
-        """
-        Return True if the world Z coordinate lies within [min_h, max_h].
-        """
-        return (z_world >= min_h) and (z_world <= max_h)
 
     @staticmethod
     def _all_body_identifiers(scene: trimesh.Scene) -> set[object]:
