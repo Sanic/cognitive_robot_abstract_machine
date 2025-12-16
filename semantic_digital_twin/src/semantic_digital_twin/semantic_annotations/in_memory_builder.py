@@ -2,11 +2,19 @@ import os.path
 from dataclasses import field, MISSING, make_dataclass, dataclass
 from enum import Enum, StrEnum
 from pathlib import Path
-from typing import Iterable, Tuple, Dict, Callable, Union
+from typing import Iterable, Tuple, Dict, Callable, Union, List, Set
 from jinja2 import Environment, FileSystemLoader
 from typing_extensions import Any
 
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
+
+
+# Mapping from module name patterns to import statements for generated files
+_MODULE_TO_IMPORT = {
+    "world_entity": "from semantic_digital_twin.world_description.world_entity import {classes}",
+    "mixins": "from semantic_digital_twin.semantic_annotations.mixins import {classes}",
+    "semantic_annotations": "from semantic_digital_twin.semantic_annotations.semantic_annotations import {classes}",
+}
 
 
 class SpecialFieldTypes(Enum):
@@ -30,6 +38,10 @@ class SemanticAnnotationFilePaths(Enum):
 
     MAIN_SEMANTIC_ANNOTATION_FILE = os.path.join(
         Path(__file__).resolve().parent, "semantic_annotations.py"
+    )
+
+    GENERATED_CLASSES_FILE = os.path.join(
+        Path(__file__).resolve().parent, "generated_classes.py"
     )
 
 
@@ -164,3 +176,62 @@ class SemanticAnnotationClassBuilder:
         src = self.render_source(include_imports=include_imports)
         with open(str(filepath), "a", encoding="utf-8") as f:
             f.write("\n\n" + src)
+
+    @staticmethod
+    def _get_import_key(base: type) -> str:
+        """Determine which import group a base class belongs to."""
+        module = base.__module__
+        for key in _MODULE_TO_IMPORT:
+            if key in module:
+                return key
+        return module  # fallback to full module path
+
+    @classmethod
+    def write_classes_to_file(
+        cls,
+        builders: List["SemanticAnnotationClassBuilder"],
+        filepath: Path,
+    ):
+        """
+        Write multiple classes to a new file with all required imports.
+
+        :param builders: List of SemanticAnnotationClassBuilder instances
+        :param filepath: Path to the output file
+        """
+        # Collect all unique base classes grouped by their import source
+        imports_by_source: Dict[str, Set[str]] = {}
+        for builder in builders:
+            for base in builder.bases:
+                key = cls._get_import_key(base)
+                if key not in imports_by_source:
+                    imports_by_source[key] = set()
+                imports_by_source[key].add(base.__name__)
+
+        # Generate import statements
+        import_lines = [
+            "from __future__ import annotations",
+            "",
+            "from dataclasses import dataclass",
+            "",
+        ]
+
+        for source, class_names in sorted(imports_by_source.items()):
+            sorted_names = ", ".join(sorted(class_names))
+            if source in _MODULE_TO_IMPORT:
+                import_lines.append(
+                    _MODULE_TO_IMPORT[source].format(classes=sorted_names)
+                )
+            else:
+                # Fallback for unknown modules
+                import_lines.append(f"from {source} import {sorted_names}")
+
+        # Render all class definitions
+        class_definitions = []
+        for builder in builders:
+            class_definitions.append(builder.render_source(include_imports=False))
+
+        # Write the file
+        with open(str(filepath), "w", encoding="utf-8") as f:
+            f.write("\n".join(import_lines))
+            f.write("\n\n")
+            f.write("\n\n".join(class_definitions))

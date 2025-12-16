@@ -26,7 +26,15 @@ class AbstractChild(Root, ABC):
 
 
 class ConcreteChild(Root, ExternalBase):
-    def __init__(self, name: str, value: int, flag: bool = False, _hidden: str = "x", *args, **kwargs):
+    def __init__(
+        self,
+        name: str,
+        value: int,
+        flag: bool = False,
+        _hidden: str = "x",
+        *args,
+        **kwargs,
+    ):
         # Intentionally do nothing
         pass
 
@@ -37,7 +45,9 @@ class ConcreteChild(Root, ExternalBase):
 def make_exporter(tmp_path: Path | None = None) -> InheritanceStructureExporter:
     if tmp_path is None:
         return InheritanceStructureExporter(root_class=Root)
-    return InheritanceStructureExporter(root_class=Root, output_path=tmp_path / "out.json")
+    return InheritanceStructureExporter(
+        root_class=Root, output_path=tmp_path / "out.json"
+    )
 
 
 # --- Unit tests for individual methods -----------------------------------------
@@ -105,19 +115,19 @@ def test_get_only_required_public_fields_filters_correctly():
     ]
 
 
-def test_collect_required_public_fields_aggregates_from_init():
+def testcollect_required_public_fields_aggregates_from_init():
     exp = make_exporter()
-    fields_concrete = exp._collect_required_public_fields(ConcreteChild)
+    fields_concrete = exp.collect_required_public_fields(ConcreteChild)
     assert fields_concrete == [
         {"name": "name", "type": "str"},
         {"name": "value", "type": "int"},
     ]
 
-    fields_abstract = exp._collect_required_public_fields(AbstractChild)
+    fields_abstract = exp.collect_required_public_fields(AbstractChild)
     assert fields_abstract == []
 
     # ExternalBase has one required public param (x), others filtered out
-    fields_external = exp._collect_required_public_fields(ExternalBase)
+    fields_external = exp.collect_required_public_fields(ExternalBase)
     assert fields_external == [{"name": "x", "type": "float"}]
 
 

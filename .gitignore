@@ -67,3 +67,9 @@ CATKIN_IGNORE
 poetry.lock
 
 cram-env
+
+Objects/
+.env
+scripts/model_input
+scripts/model_output
+scripts/ros_python_wrapper.sh
