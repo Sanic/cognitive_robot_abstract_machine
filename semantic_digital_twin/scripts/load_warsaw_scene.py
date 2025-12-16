@@ -335,8 +335,8 @@ class CameraPoseGenerationEngine:
     # -----------------------------
     # Mean-normal placement
     # -----------------------------
-    @timeit("add_mean_normal_lines_and_cameras")
-    def add_mean_normal_lines_and_cameras(
+    @timeit("generate_camera_poses_from_mean_normals")
+    def generate_camera_poses_from_mean_normals(
         self,
         scene,
         normal_length: float | None = None,
@@ -361,13 +361,6 @@ class CameraPoseGenerationEngine:
                 self.config = config
 
             @staticmethod
-            def _safe_normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-                n = float(np.linalg.norm(v))
-                if n < eps:
-                    return v
-                return v / n
-
-            @staticmethod
             def _new_camera_instance() -> Camera:
                 return Camera(resolution=(640, 480), fov=test_fov)
 
@@ -382,7 +375,7 @@ class CameraPoseGenerationEngine:
                     n_local = (face_normals * w).sum(axis=0)
                 else:
                     n_local = face_normals.mean(axis=0)
-                return self._safe_normalize(n_local)
+                return CameraPoseGenerationEngine._safe_normalize_dir(n_local)
 
             def _corners_world(
                 self, geom: trimesh.Trimesh, R: np.ndarray, t: np.ndarray
@@ -452,7 +445,7 @@ class CameraPoseGenerationEngine:
 
                 c_local = geom.center_mass if geom.is_volume else geom.centroid
                 c_world = (R @ c_local) + t
-                n_world = self._safe_normalize(R @ n_local)
+                n_world = CameraPoseGenerationEngine._safe_normalize_dir(R @ n_local)
                 if float(np.linalg.norm(n_world)) < 1e-12:
                     return poses
 
@@ -1543,7 +1536,7 @@ class DebugReporter:
 
 # Generate visualization and collect camera instances and their poses using the engine
 _engine = CameraPoseGenerationEngine()
-generated_camera_poses = _engine.add_mean_normal_lines_and_cameras(
+generated_camera_poses = _engine.generate_camera_poses_from_mean_normals(
     scene,
     marker_height=min_standoff_distance,
     min_standoff=min_standoff_distance,
