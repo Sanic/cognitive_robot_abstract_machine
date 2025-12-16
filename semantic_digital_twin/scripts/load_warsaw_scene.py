@@ -395,18 +395,7 @@ class CameraPoseGenerationEngine:
             def _corners_world(
                 self, geom: trimesh.Trimesh, R: np.ndarray, t: np.ndarray
             ) -> np.ndarray:
-                corners_local = np.array(
-                    [
-                        [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[0][2]],
-                        [geom.bounds[0][0], geom.bounds[0][1], geom.bounds[1][2]],
-                        [geom.bounds[0][0], geom.bounds[1][1], geom.bounds[0][2]],
-                        [geom.bounds[0][0], geom.bounds[1][1], geom.bounds[1][2]],
-                        [geom.bounds[1][0], geom.bounds[0][1], geom.bounds[0][2]],
-                        [geom.bounds[1][0], geom.bounds[0][1], geom.bounds[1][2]],
-                        [geom.bounds[1][0], geom.bounds[1][1], geom.bounds[0][2]],
-                        [geom.bounds[1][0], geom.bounds[1][1], geom.bounds[1][2]],
-                    ]
-                )
+                corners_local = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
                 return (R @ corners_local.T).T + t
 
             def _compute_standoff(
@@ -571,9 +560,6 @@ class CameraPoseGenerationEngine:
             poses_all.extend(placer.process_node(scene, node))
         return poses_all
 
-    # -----------------------------
-    # Frustum utilities (kept as-is but scoped here)
-    # -----------------------------
     @staticmethod
     def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
         return np.array(
@@ -607,35 +593,6 @@ class CameraPoseGenerationEngine:
                 [np.zeros((1, 3)), np.ones((1, 1))],
             ]
         )
-
-    @staticmethod
-    def frustum_cull_scene(
-        scene: trimesh.Scene,
-        camera: Camera,
-        T_cam_world: np.ndarray,
-        require_full_visibility: bool = True,
-        eps: float = 1e-6,
-        *,
-        occlusion_check: bool = False,
-        samples_per_mesh: int = 32,
-        visibility_threshold: float = 0.8,
-    ) -> list[str]:
-        # For brevity and to keep behavior identical, reuse the existing
-        # module-level implementation by calling it directly if available.
-        # If not available, this placeholder returns all nodes.
-        try:
-            return frustum_cull_scene(
-                scene,
-                camera,
-                T_cam_world,
-                require_full_visibility=require_full_visibility,
-                eps=eps,
-                occlusion_check=occlusion_check,
-                samples_per_mesh=samples_per_mesh,
-                visibility_threshold=visibility_threshold,
-            )
-        except NameError:
-            return list(scene.graph.nodes_geometry)
 
     # -----------------------------
     # Cone-based pose generation
@@ -883,7 +840,7 @@ class CameraPoseGenerationEngine:
 
         def _bodies_for_pose(pose: CameraPose) -> set[object]:
             try:
-                fully_inside, _ = frustum_cull_scene(
+                fully_inside, _ = CameraPoseGenerationEngine.frustum_cull_scene(
                     scene,
                     pose.camera,
                     pose.transform,
@@ -1163,412 +1120,431 @@ class CameraPoseGenerationEngine:
 
         return selected
 
-
-def _make_body_label_resolver() -> dict[object, str]:
-    """
-    Build a mapping from internal body identifiers to human‑readable labels.
-
-    This prefers the :class:`RayTracer`'s ``scene_to_index`` mapping when
-    available by constructing an index→name map using the prefix before
-    ``"_collision_"``. If absent, an empty dict is returned and callers should
-    treat identifiers as display strings directly.
-    """
-
-    try:
-        # rt is expected to be a module‑level RayTracer instance if created
-        mapping = rt.scene_to_index  # type: ignore[name-defined]
-    except Exception:
-        mapping = None
-
-    id_to_label: dict[object, str] = {}
-    if mapping is None:
-        return id_to_label
-
-    # mapping: node_name(str) -> index(object)
-    # Build reverse by choosing a stable, readable base name per index
-    for node_name, idx in mapping.items():
-        base = (
-            node_name.split("_collision_")[0]
-            if "_collision_" in node_name
-            else node_name
-        )
-        # only set first time to keep deterministic, earlier items take precedence
-        if idx not in id_to_label:
-            id_to_label[idx] = base
-    return id_to_label
-
-
-def _camera_label(pose: CameraPose, idx: int) -> str:
-    """
-    Create a concise camera identifier for debug output.
-
-    The label includes the index and the originating node/geometry keys.
-    """
-
-    return f"{idx}:{pose.node_name}/{pose.geometry_key}"
-
-
-def print_camera_to_bodies_report(
-    camera_poses: list[CameraPose],
-    body_sets: list[set[object]],
-) -> None:
-    """
-    Print a report listing, for each camera, the objects it can fully see.
-    """
-
-    if len(camera_poses) != len(body_sets):
-        raise ValueError("body_sets must be aligned with camera_poses")
-
-    id_to_label = _make_body_label_resolver()
-
-    print("[DEBUG] Camera → Objects visibility report:")
-    for i, pose in enumerate(camera_poses):
-        cam_label = _camera_label(pose, i)
-        # Map identifiers to strings
-        names = []
-        for bid in body_sets[i]:
-            if bid in id_to_label:
-                names.append(id_to_label[bid])
-            else:
-                # bid may already be a string base name
-                names.append(str(bid))
-        names_sorted = sorted(set(names))
-        print(
-            f"  - {cam_label}: {', '.join(names_sorted) if names_sorted else '(none)'}"
-        )
-
-
-def print_body_to_cameras_report(
-    camera_poses: list[CameraPose],
-    body_sets: list[set[object]],
-) -> None:
-    """
-    Print a report listing, for each object, which cameras can fully see it.
-    """
-
-    if len(camera_poses) != len(body_sets):
-        raise ValueError("body_sets must be aligned with camera_poses")
-
-    id_to_label = _make_body_label_resolver()
-
-    body_to_cams: dict[str, list[str]] = {}
-    for i, pose in enumerate(camera_poses):
-        cam_label = _camera_label(pose, i)
-        for bid in body_sets[i]:
-            name = id_to_label.get(bid, str(bid))
-            body_to_cams.setdefault(name, []).append(cam_label)
-
-    print("[DEBUG] Object → Cameras visibility report:")
-    for body_name in sorted(body_to_cams.keys()):
-        cams_sorted = sorted(body_to_cams[body_name])
-        print(f"  - {body_name}: {', '.join(cams_sorted) if cams_sorted else '(none)'}")
-
-
-def _all_body_identifiers(scene: trimesh.Scene) -> set[object]:
-    """
-    Return the set of all body identifiers present in the scene.
-
-    The identifier type matches what is used in visibility body sets:
-    - If a :class:`RayTracer` mapping is available, use its indices.
-    - Otherwise, collapse geometry node names by the prefix before
-      ``"_collision_"`` to represent logical objects.
-    """
-
-    # Prefer RayTracer mapping if available
-    try:
-        mapping = rt.scene_to_index  # type: ignore[name-defined]
-    except Exception:
-        mapping = None
-
-    if mapping is not None:
-        # mapping: node_name -> index (identifier)
-        return set(mapping.values())
-
-    # Fallback: collect base names from scene nodes
-    all_ids: set[object] = set()
-    try:
-        node_names = list(scene.graph.nodes_geometry)
-    except Exception:
-        node_names = []
-    for node in node_names:
-        if isinstance(node, str) and "_collision_" in node:
-            all_ids.add(node.split("_collision_")[0])
-    return all_ids
-
-
-def print_uncovered_bodies_report(
-    scene: trimesh.Scene,
-    body_sets: list[set[object]],
-) -> None:
-    """
-    Print the list of objects that are not covered by any of the given
-    camera body sets.
-
-    This should be called after NMS selection to reveal which scene objects
-    remain unseen by all selected poses.
-    """
-
-    all_ids = CameraPoseGenerationEngine._all_body_identifiers(scene)
-    covered: set[object] = set()
-    for s in body_sets:
-        covered.update(s)
-
-    missing = all_ids - covered
-
-    id_to_label = _make_body_label_resolver()
-    names = [id_to_label.get(bid, str(bid)) for bid in missing]
-    names_sorted = sorted(set(names))
-
-    print("[DEBUG] Objects not fully covered by any selected camera:")
-    if not names_sorted:
-        print("  - (all objects are covered)")
-    else:
-        for name in names_sorted:
-            print(f"  - {name}")
-
-
-@timeit("frustum_cull_scene")
-def frustum_cull_scene(
-    scene: trimesh.Scene,
-    camera: Camera,
-    T_cam_world: np.ndarray,
-    require_full_visibility: bool = True,
-    eps: float = 1e-6,
-    *,
-    occlusion_check: bool = False,
-    samples_per_mesh: int = 32,
-    visibility_threshold: float = 0.8,
-) -> tuple[set[str], set[str]]:
-    """
-    Test scene meshes against the camera frustum using camera-space tests.
-    This method is computationally expensive when used with the occulusion check.
-
-    The function delegates the workflow to small, focused classes:
-    configuration, projection, frustum classification, and an optional
-    visibility checker for occlusion validation.
-
-    Returns two sets of node names: fully_inside and partially_inside.
-    """
-    from dataclasses import dataclass
-
-    # ------------------------------------------------------------------
-    # Data and helpers
-    # ------------------------------------------------------------------
-    @dataclass
-    class FrustumCullConfig:
-        """Configuration for frustum culling and visibility validation.
-
-        The camera is assumed to look along its negative Z axis.
+    @timeit("frustum_cull_scene")
+    def frustum_cull_scene(
+        scene: trimesh.Scene,
+        camera: Camera,
+        T_cam_world: np.ndarray,
+        require_full_visibility: bool = True,
+        eps: float = 1e-6,
+        *,
+        occlusion_check: bool = False,
+        samples_per_mesh: int = 32,
+        visibility_threshold: float = 0.8,
+    ) -> tuple[set[str], set[str]]:
         """
+        Test scene meshes against the camera frustum using camera-space tests.
+        This method is computationally expensive when used with the occulusion check.
 
-        fov_deg_xy: tuple[float, float]
-        z_near: float
-        z_far: float
-        require_full_visibility: bool
-        eps: float
-        occlusion_check: bool
-        samples_per_mesh: int
-        visibility_threshold: float
+        The function delegates the workflow to small, focused classes:
+        configuration, projection, frustum classification, and an optional
+        visibility checker for occlusion validation.
 
-        def tangents(self) -> tuple[float, float]:
-            fx, fy = float(self.fov_deg_xy[0]), float(self.fov_deg_xy[1])
-            return float(np.tan(np.deg2rad(fx) * 0.5)), float(
-                np.tan(np.deg2rad(fy) * 0.5)
-            )
+        Returns two sets of node names: fully_inside and partially_inside.
+        """
+        from dataclasses import dataclass
 
-    class CameraFrustum:
-        """Encapsulates FOV and near/far clipping classification in camera space."""
+        # ------------------------------------------------------------------
+        # Data and helpers
+        # ------------------------------------------------------------------
+        @dataclass
+        class FrustumCullConfig:
+            """Configuration for frustum culling and visibility validation.
 
-        def __init__(self, cfg: FrustumCullConfig):
-            self.cfg = cfg
-            self.tx, self.ty = cfg.tangents()
+            The camera is assumed to look along its negative Z axis.
+            """
 
-        def classify_corners(
-            self, x: np.ndarray, y: np.ndarray, z: np.ndarray
-        ) -> tuple[bool, bool]:
-            dz = -z  # points in front have positive dz
-            inside = (
-                (dz >= self.cfg.z_near - self.cfg.eps)
-                & (dz <= self.cfg.z_far + self.cfg.eps)
-                & (np.abs(x) <= dz * self.tx + self.cfg.eps)
-                & (np.abs(y) <= dz * self.ty + self.cfg.eps)
-            )
-            return bool(np.all(inside)), bool(np.any(inside))
+            fov_deg_xy: tuple[float, float]
+            z_near: float
+            z_far: float
+            require_full_visibility: bool
+            eps: float
+            occlusion_check: bool
+            samples_per_mesh: int
+            visibility_threshold: float
 
-    class NodeProjector:
-        """Projects node-local AABB corners to camera space."""
+            def tangents(self) -> tuple[float, float]:
+                fx, fy = float(self.fov_deg_xy[0]), float(self.fov_deg_xy[1])
+                return float(np.tan(np.deg2rad(fx) * 0.5)), float(
+                    np.tan(np.deg2rad(fy) * 0.5)
+                )
 
-        def __init__(self, scene_: trimesh.Scene, V_world_cam: np.ndarray):
-            self.scene = scene_
-            self.V = V_world_cam
+        class CameraFrustum:
+            """Encapsulates FOV and near/far clipping classification in camera space."""
 
-        def corners_world(
-            self, node_name: str, geom: trimesh.Trimesh
-        ) -> tuple[np.ndarray, np.ndarray]:
-            corners_local = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
-            T_node_world, _ = self.scene.graph.get(
-                frame_to=node_name, frame_from=self.scene.graph.base_frame
-            )
-            corners_world = (T_node_world[:3, :3] @ corners_local.T).T + T_node_world[
-                :3, 3
-            ]
-            return corners_world, T_node_world
+            def __init__(self, cfg: FrustumCullConfig):
+                self.cfg = cfg
+                self.tx, self.ty = cfg.tangents()
 
-        def project(
-            self, points_world: np.ndarray
-        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-            N = len(points_world)
-            pts_h = np.hstack([points_world, np.ones((N, 1))])
-            pc = (self.V @ pts_h.T).T
-            return pc[:, 0], pc[:, 1], pc[:, 2]
+            def classify_corners(
+                self, x: np.ndarray, y: np.ndarray, z: np.ndarray
+            ) -> tuple[bool, bool]:
+                dz = -z  # points in front have positive dz
+                inside = (
+                    (dz >= self.cfg.z_near - self.cfg.eps)
+                    & (dz <= self.cfg.z_far + self.cfg.eps)
+                    & (np.abs(x) <= dz * self.tx + self.cfg.eps)
+                    & (np.abs(y) <= dz * self.ty + self.cfg.eps)
+                )
+                return bool(np.all(inside)), bool(np.any(inside))
 
-    class VisibilityChecker:
-        """Strategy for validating visibility against occluders."""
+        class NodeProjector:
+            """Projects node-local AABB corners to camera space."""
 
-        def is_sufficiently_visible(
-            self,
-            node_name: str,
-            geom: trimesh.Trimesh,
-            T_node_world: np.ndarray,
-            T_cam_world_local: np.ndarray,
-        ) -> float:
-            """Return ratio of visible samples in [0, 1]."""
-            raise NotImplementedError
+            def __init__(self, scene_: trimesh.Scene, V_world_cam: np.ndarray):
+                self.scene = scene_
+                self.V = V_world_cam
 
-    class NoOpVisibilityChecker(VisibilityChecker):
-        def is_sufficiently_visible(
-            self, node_name, geom, T_node_world, T_cam_world_local
-        ) -> float:
-            return 1.0
+            def corners_world(
+                self, node_name: str, geom: trimesh.Trimesh
+            ) -> tuple[np.ndarray, np.ndarray]:
+                corners_local = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
+                T_node_world, _ = self.scene.graph.get(
+                    frame_to=node_name, frame_from=self.scene.graph.base_frame
+                )
+                corners_world = (
+                    T_node_world[:3, :3] @ corners_local.T
+                ).T + T_node_world[:3, 3]
+                return corners_world, T_node_world
 
-    class RayOcclusionVisibilityChecker(VisibilityChecker):
-        """Ray-based visibility via `trimesh` ray engine on the merged scene mesh."""
+            def project(
+                self, points_world: np.ndarray
+            ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+                N = len(points_world)
+                pts_h = np.hstack([points_world, np.ones((N, 1))])
+                pc = (self.V @ pts_h.T).T
+                return pc[:, 0], pc[:, 1], pc[:, 2]
 
-        def __init__(self, scene_: trimesh.Scene, eps_local: float, samples: int):
-            self.scene = scene_
-            self.eps = float(eps_local)
-            # Build once
-            self.ray_engine = self.scene.to_mesh().ray
-            self.samples = int(max(8, samples))
+        class VisibilityChecker:
+            """Strategy for validating visibility against occluders."""
 
-        def _samples_world(
-            self, geom: trimesh.Trimesh, T_node_world: np.ndarray
-        ) -> tuple[np.ndarray, np.ndarray]:
-            try:
-                pts_local = geom.sample(self.samples)
-                if pts_local.shape[0] == 0:
+            def is_sufficiently_visible(
+                self,
+                node_name: str,
+                geom: trimesh.Trimesh,
+                T_node_world: np.ndarray,
+                T_cam_world_local: np.ndarray,
+            ) -> float:
+                """Return ratio of visible samples in [0, 1]."""
+                raise NotImplementedError
+
+        class NoOpVisibilityChecker(VisibilityChecker):
+            def is_sufficiently_visible(
+                self, node_name, geom, T_node_world, T_cam_world_local
+            ) -> float:
+                return 1.0
+
+        class RayOcclusionVisibilityChecker(VisibilityChecker):
+            """Ray-based visibility via `trimesh` ray engine on the merged scene mesh."""
+
+            def __init__(self, scene_: trimesh.Scene, eps_local: float, samples: int):
+                self.scene = scene_
+                self.eps = float(eps_local)
+                # Build once
+                self.ray_engine = self.scene.to_mesh().ray
+                self.samples = int(max(8, samples))
+
+            def _samples_world(
+                self, geom: trimesh.Trimesh, T_node_world: np.ndarray
+            ) -> tuple[np.ndarray, np.ndarray]:
+                try:
+                    pts_local = geom.sample(self.samples)
+                    if pts_local.shape[0] == 0:
+                        aabb = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
+                        centroid = geom.centroid.reshape(1, 3)
+                        pts_local = np.vstack([aabb, centroid])
+                except Exception:
                     aabb = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
                     centroid = geom.centroid.reshape(1, 3)
                     pts_local = np.vstack([aabb, centroid])
-            except Exception:
-                aabb = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
-                centroid = geom.centroid.reshape(1, 3)
-                pts_local = np.vstack([aabb, centroid])
-            pts_world = (T_node_world[:3, :3] @ pts_local.T).T + T_node_world[:3, 3]
-            return pts_world, pts_local
+                pts_world = (T_node_world[:3, :3] @ pts_local.T).T + T_node_world[:3, 3]
+                return pts_world, pts_local
 
-        def is_sufficiently_visible(
-            self, node_name, geom, T_node_world, T_cam_world_local
-        ) -> float:
-            origin = T_cam_world_local[:3, 3]
-            pts_world, _ = self._samples_world(geom, T_node_world)
-            dirs = pts_world - origin
-            dists = np.linalg.norm(dirs, axis=1)
-            valid = dists > self.eps
-            if not np.any(valid):
-                return 0.0
-            dirs = dirs[valid] / dists[valid][:, None]
-            dists = dists[valid]
-            try:
-                loc, idx_ray, _ = self.ray_engine.intersects_location(
-                    ray_origins=np.repeat(origin[None, :], len(dirs), axis=0),
-                    ray_directions=dirs,
-                    multiple_hits=False,
-                )
-            except Exception:
-                return 0.0
-            if len(idx_ray) == 0:
-                return 0.0
-            hit_d = np.linalg.norm(loc - origin, axis=1)
-            target_d = dists[idx_ray]
-            visible = float(np.sum(np.abs(hit_d - target_d) <= 1e-3))
-            return visible / float(max(1, len(dirs)))
+            def is_sufficiently_visible(
+                self, node_name, geom, T_node_world, T_cam_world_local
+            ) -> float:
+                origin = T_cam_world_local[:3, 3]
+                pts_world, _ = self._samples_world(geom, T_node_world)
+                dirs = pts_world - origin
+                dists = np.linalg.norm(dirs, axis=1)
+                valid = dists > self.eps
+                if not np.any(valid):
+                    return 0.0
+                dirs = dirs[valid] / dists[valid][:, None]
+                dists = dists[valid]
+                try:
+                    loc, idx_ray, _ = self.ray_engine.intersects_location(
+                        ray_origins=np.repeat(origin[None, :], len(dirs), axis=0),
+                        ray_directions=dirs,
+                        multiple_hits=False,
+                    )
+                except Exception:
+                    return 0.0
+                if len(idx_ray) == 0:
+                    return 0.0
+                hit_d = np.linalg.norm(loc - origin, axis=1)
+                target_d = dists[idx_ray]
+                visible = float(np.sum(np.abs(hit_d - target_d) <= 1e-3))
+                return visible / float(max(1, len(dirs)))
 
-    class FrustumCuller:
-        """Iterate scene nodes, classify AABBs, and validate visibility."""
+        class FrustumCuller:
+            """Iterate scene nodes, classify AABBs, and validate visibility."""
 
-        def __init__(
-            self,
-            scene_: trimesh.Scene,
-            cfg: FrustumCullConfig,
-            V_world_cam: np.ndarray,
-            T_cam_world_local: np.ndarray,
-        ):
-            self.scene = scene_
-            self.cfg = cfg
-            self.frustum = CameraFrustum(cfg)
-            self.proj = NodeProjector(scene_, V_world_cam)
-            if cfg.occlusion_check:
-                self.visibility = RayOcclusionVisibilityChecker(
-                    scene_, cfg.eps, cfg.samples_per_mesh
-                )
-            else:
-                self.visibility = NoOpVisibilityChecker()
-            self.T_cam_world = T_cam_world_local
-
-        def run(self) -> tuple[set[str], set[str]]:
-            fully: set[str] = set()
-            partially: set[str] = set()
-            for node_name in self.scene.graph.nodes_geometry:
-                _, gkey = self.scene.graph[node_name]
-                geom = self.scene.geometry[gkey]
-                if not isinstance(geom, trimesh.Trimesh):
-                    continue
-
-                corners_world, T_node_world = self.proj.corners_world(node_name, geom)
-                x, y, z = self.proj.project(corners_world)
-                all_inside, any_inside = self.frustum.classify_corners(x, y, z)
-
-                candidate_full = self.cfg.require_full_visibility and all_inside
-                candidate_partial = (
-                    not self.cfg.require_full_visibility
-                ) and any_inside
-                if not (candidate_full or candidate_partial):
-                    continue
-
-                vis_ratio = self.visibility.is_sufficiently_visible(
-                    node_name=node_name,
-                    geom=geom,
-                    T_node_world=T_node_world,
-                    T_cam_world_local=self.T_cam_world,
-                )
-
-                if self.cfg.require_full_visibility:
-                    if candidate_full and (vis_ratio >= self.cfg.visibility_threshold):
-                        fully.add(node_name)
+            def __init__(
+                self,
+                scene_: trimesh.Scene,
+                cfg: FrustumCullConfig,
+                V_world_cam: np.ndarray,
+                T_cam_world_local: np.ndarray,
+            ):
+                self.scene = scene_
+                self.cfg = cfg
+                self.frustum = CameraFrustum(cfg)
+                self.proj = NodeProjector(scene_, V_world_cam)
+                if cfg.occlusion_check:
+                    self.visibility = RayOcclusionVisibilityChecker(
+                        scene_, cfg.eps, cfg.samples_per_mesh
+                    )
                 else:
-                    # For partial, require that at least one sample is visible
-                    if candidate_partial and (vis_ratio > 0.0):
-                        partially.add(node_name)
+                    self.visibility = NoOpVisibilityChecker()
+                self.T_cam_world = T_cam_world_local
 
-            return fully, partially
+            def run(self) -> tuple[set[str], set[str]]:
+                fully: set[str] = set()
+                partially: set[str] = set()
+                for node_name in self.scene.graph.nodes_geometry:
+                    _, gkey = self.scene.graph[node_name]
+                    geom = self.scene.geometry[gkey]
+                    if not isinstance(geom, trimesh.Trimesh):
+                        continue
 
-    # ------------------------------------------------------------------
-    # Assemble and execute
-    # ------------------------------------------------------------------
-    V = CameraPoseGenerationEngine.view_matrix_from_cam_to_world(T_cam_world)
-    cfg = FrustumCullConfig(
-        fov_deg_xy=(float(camera.fov[0]), float(camera.fov[1])),
-        z_near=float(camera.z_near),
-        z_far=float(camera.z_far),
-        require_full_visibility=bool(require_full_visibility),
-        eps=float(eps),
-        occlusion_check=bool(occlusion_check),
-        samples_per_mesh=int(samples_per_mesh),
-        visibility_threshold=float(visibility_threshold),
-    )
-    culler = FrustumCuller(scene, cfg, V, T_cam_world)
-    return culler.run()
+                    corners_world, T_node_world = self.proj.corners_world(
+                        node_name, geom
+                    )
+                    x, y, z = self.proj.project(corners_world)
+                    all_inside, any_inside = self.frustum.classify_corners(x, y, z)
+
+                    candidate_full = self.cfg.require_full_visibility and all_inside
+                    candidate_partial = (
+                        not self.cfg.require_full_visibility
+                    ) and any_inside
+                    if not (candidate_full or candidate_partial):
+                        continue
+
+                    vis_ratio = self.visibility.is_sufficiently_visible(
+                        node_name=node_name,
+                        geom=geom,
+                        T_node_world=T_node_world,
+                        T_cam_world_local=self.T_cam_world,
+                    )
+
+                    if self.cfg.require_full_visibility:
+                        if candidate_full and (
+                            vis_ratio >= self.cfg.visibility_threshold
+                        ):
+                            fully.add(node_name)
+                    else:
+                        # For partial, require that at least one sample is visible
+                        if candidate_partial and (vis_ratio > 0.0):
+                            partially.add(node_name)
+
+                return fully, partially
+
+        # ------------------------------------------------------------------
+        # Assemble and execute
+        # ------------------------------------------------------------------
+        V = CameraPoseGenerationEngine.view_matrix_from_cam_to_world(T_cam_world)
+        cfg = FrustumCullConfig(
+            fov_deg_xy=(float(camera.fov[0]), float(camera.fov[1])),
+            z_near=float(camera.z_near),
+            z_far=float(camera.z_far),
+            require_full_visibility=bool(require_full_visibility),
+            eps=float(eps),
+            occlusion_check=bool(occlusion_check),
+            samples_per_mesh=int(samples_per_mesh),
+            visibility_threshold=float(visibility_threshold),
+        )
+        culler = FrustumCuller(scene, cfg, V, T_cam_world)
+        return culler.run()
+
+
+class DebugReporter:
+    @staticmethod
+    def _make_body_label_resolver() -> dict[object, str]:
+        """
+        Build a mapping from internal body identifiers to human‑readable labels.
+
+        This prefers the :class:`RayTracer`'s ``scene_to_index`` mapping when
+        available by constructing an index→name map using the prefix before
+        ``"_collision_"``. If absent, an empty dict is returned and callers should
+        treat identifiers as display strings directly.
+        """
+
+        try:
+            # rt is expected to be a module‑level RayTracer instance if created
+            mapping = rt.scene_to_index  # type: ignore[name-defined]
+        except Exception:
+            mapping = None
+
+        id_to_label: dict[object, str] = {}
+        if mapping is None:
+            return id_to_label
+
+        # mapping: node_name(str) -> index(object)
+        # Build reverse by choosing a stable, readable base name per index
+        for node_name, idx in mapping.items():
+            base = (
+                node_name.split("_collision_")[0]
+                if "_collision_" in node_name
+                else node_name
+            )
+            # only set first time to keep deterministic, earlier items take precedence
+            if idx not in id_to_label:
+                id_to_label[idx] = base
+        return id_to_label
+
+    @staticmethod
+    def _camera_label(pose: CameraPose, idx: int) -> str:
+        """
+        Create a concise camera identifier for debug output.
+
+        The label includes the index and the originating node/geometry keys.
+        """
+
+        return f"{idx}:{pose.node_name}/{pose.geometry_key}"
+
+    @staticmethod
+    def print_camera_to_bodies_report(
+        camera_poses: list[CameraPose],
+        body_sets: list[set[object]],
+    ) -> None:
+        """
+        Print a report listing, for each camera, the objects it can fully see.
+        """
+
+        if len(camera_poses) != len(body_sets):
+            raise ValueError("body_sets must be aligned with camera_poses")
+
+        id_to_label = DebugReporter._make_body_label_resolver()
+
+        print("[DEBUG] Camera → Objects visibility report:")
+        for i, pose in enumerate(camera_poses):
+            cam_label = DebugReporter._camera_label(pose, i)
+            # Map identifiers to strings
+            names = []
+            for bid in body_sets[i]:
+                if bid in id_to_label:
+                    names.append(id_to_label[bid])
+                else:
+                    # bid may already be a string base name
+                    names.append(str(bid))
+            names_sorted = sorted(set(names))
+            print(
+                f"  - {cam_label}: {', '.join(names_sorted) if names_sorted else '(none)'}"
+            )
+
+    @staticmethod
+    def print_body_to_cameras_report(
+        camera_poses: list[CameraPose],
+        body_sets: list[set[object]],
+    ) -> None:
+        """
+        Print a report listing, for each object, which cameras can fully see it.
+        """
+
+        if len(camera_poses) != len(body_sets):
+            raise ValueError("body_sets must be aligned with camera_poses")
+
+        id_to_label = DebugReporter._make_body_label_resolver()
+
+        body_to_cams: dict[str, list[str]] = {}
+        for i, pose in enumerate(camera_poses):
+            cam_label = DebugReporter._camera_label(pose, i)
+            for bid in body_sets[i]:
+                name = id_to_label.get(bid, str(bid))
+                body_to_cams.setdefault(name, []).append(cam_label)
+
+        print("[DEBUG] Object → Cameras visibility report:")
+        for body_name in sorted(body_to_cams.keys()):
+            cams_sorted = sorted(body_to_cams[body_name])
+            print(
+                f"  - {body_name}: {', '.join(cams_sorted) if cams_sorted else '(none)'}"
+            )
+
+    @staticmethod
+    def _all_body_identifiers(scene: trimesh.Scene) -> set[object]:
+        """
+        Return the set of all body identifiers present in the scene.
+
+        The identifier type matches what is used in visibility body sets:
+        - If a :class:`RayTracer` mapping is available, use its indices.
+        - Otherwise, collapse geometry node names by the prefix before
+          ``"_collision_"`` to represent logical objects.
+        """
+
+        # Prefer RayTracer mapping if available
+        try:
+            mapping = rt.scene_to_index  # type: ignore[name-defined]
+        except Exception:
+            mapping = None
+
+        if mapping is not None:
+            # mapping: node_name -> index (identifier)
+            return set(mapping.values())
+
+        # Fallback: collect base names from scene nodes
+        all_ids: set[object] = set()
+        try:
+            node_names = list(scene.graph.nodes_geometry)
+        except Exception:
+            node_names = []
+        for node in node_names:
+            if isinstance(node, str) and "_collision_" in node:
+                all_ids.add(node.split("_collision_")[0])
+        return all_ids
+
+    @staticmethod
+    def print_uncovered_bodies_report(
+        scene: trimesh.Scene,
+        body_sets: list[set[object]],
+    ) -> None:
+        """
+        Print the list of objects that are not covered by any of the given
+        camera body sets.
+
+        This should be called after NMS selection to reveal which scene objects
+        remain unseen by all selected poses.
+        """
+
+        all_ids = DebugReporter._all_body_identifiers(scene)
+        covered: set[object] = set()
+        for s in body_sets:
+            covered.update(s)
+
+        missing = all_ids - covered
+
+        id_to_label = DebugReporter._make_body_label_resolver()
+        names = [id_to_label.get(bid, str(bid)) for bid in missing]
+        names_sorted = sorted(set(names))
+
+        print("[DEBUG] Objects not fully covered by any selected camera:")
+        if not names_sorted:
+            print("  - (all objects are covered)")
+        else:
+            for name in names_sorted:
+                print(f"  - {name}")
+
+    @staticmethod
+    def print_report(
+        camera_poses: list[CameraPose], body_sets: list[set[object]]
+    ) -> None:
+        DebugReporter.print_camera_to_bodies_report(
+            camera_poses=camera_poses, body_sets=body_sets
+        )
+        DebugReporter.print_body_to_cameras_report(
+            camera_poses=camera_poses, body_sets=body_sets
+        )
+        DebugReporter.print_uncovered_bodies_report(scene=scene, body_sets=_body_sets)
 
 
 # -----------------------------------------------------------------------------
@@ -1638,13 +1614,12 @@ _body_sets = CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
 
 # Optional debug reports for visibility relationships before selection
 if debug_visibility_reports:
+
     print("[DEBUG] ==== Visibility reports BEFORE selection ====")
-    print_camera_to_bodies_report(
+    DebugReporter.print_report(
         camera_poses=generated_camera_poses, body_sets=_body_sets
     )
-    print_body_to_cameras_report(
-        camera_poses=generated_camera_poses, body_sets=_body_sets
-    )
+
 _selected_camera_poses = (
     CameraPoseGenerationEngine.greedy_select_by_score_similarity_and_novelty(
         camera_poses=generated_camera_poses,
@@ -1662,14 +1637,10 @@ if debug_visibility_reports:
         )
     )
     print("[DEBUG] ==== Visibility reports AFTER selection ====")
-    print_camera_to_bodies_report(
+    DebugReporter.print_report(
         camera_poses=_selected_camera_poses, body_sets=_selected_body_sets
     )
-    print_body_to_cameras_report(
-        camera_poses=_selected_camera_poses, body_sets=_selected_body_sets
-    )
-    # Additionally report which objects are not covered by any selected camera
-    print_uncovered_bodies_report(scene=scene, body_sets=_selected_body_sets)
+
 
 # 3) visualize only the selected camera origins (colors reflect visibility counts)
 if not turn_off_all_visualizations:
