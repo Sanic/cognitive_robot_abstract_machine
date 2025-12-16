@@ -1327,22 +1327,6 @@ def print_uncovered_bodies_report(
             print(f"  - {name}")
 
 
-# -----------------------------------------------------------------------------
-# Frustum culling utilities (Option 2: camera-space FOV angle tests)
-# -----------------------------------------------------------------------------
-
-
-def _aabb_corners(bounds: np.ndarray) -> np.ndarray:
-    """
-    Return the eight corners of an axis aligned bounding box.
-    """
-    mn, mx = bounds
-    xs = [mn[0], mx[0]]
-    ys = [mn[1], mx[1]]
-    zs = [mn[2], mx[2]]
-    return np.array([[x, y, z] for x in xs for y in ys for z in zs], dtype=float)
-
-
 @timeit("frustum_cull_scene")
 def frustum_cull_scene(
     scene: trimesh.Scene,
@@ -1421,7 +1405,7 @@ def frustum_cull_scene(
         def corners_world(
             self, node_name: str, geom: trimesh.Trimesh
         ) -> tuple[np.ndarray, np.ndarray]:
-            corners_local = _aabb_corners(geom.bounds)
+            corners_local = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
             T_node_world, _ = self.scene.graph.get(
                 frame_to=node_name, frame_from=self.scene.graph.base_frame
             )
@@ -1473,11 +1457,11 @@ def frustum_cull_scene(
             try:
                 pts_local = geom.sample(self.samples)
                 if pts_local.shape[0] == 0:
-                    aabb = _aabb_corners(geom.bounds)
+                    aabb = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
                     centroid = geom.centroid.reshape(1, 3)
                     pts_local = np.vstack([aabb, centroid])
             except Exception:
-                aabb = _aabb_corners(geom.bounds)
+                aabb = CameraPoseGenerationEngine._aabb_corners(geom.bounds)
                 centroid = geom.centroid.reshape(1, 3)
                 pts_local = np.vstack([aabb, centroid])
             pts_world = (T_node_world[:3, :3] @ pts_local.T).T + T_node_world[:3, 3]
