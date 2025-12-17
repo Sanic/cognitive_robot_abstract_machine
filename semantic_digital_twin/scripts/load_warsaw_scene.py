@@ -62,19 +62,11 @@ scene = rt.scene
 
 ####
 test_fov = [60, 45]  # horizontal, vertical degrees
-min_standoff_distance = 1.5
-max_view_distance = 5.0
-# The frustum culling distance should be larger than the maximum camera placement distance
-# so that visibility evaluation is not clipped too early.
-frustum_culling_max_distance = 8.0
-# Camera height filter: poses outside this [min, max] world Z interval are rejected early
-# Defaults allow all heights; set to finite values to enable filtering
-min_camera_height = 0.5  # -float('inf')
-max_camera_height = 2.0  # float('inf')
+
 # Debug reporting: when enabled, print which cameras see which objects, and
 # per object, which cameras can see it.
 debug_visibility_reports = True
-turn_off_all_visualizations = False
+
 ###
 
 
@@ -161,6 +153,7 @@ def timeit(label: str | None = None):
     return _decorator
 
 
+@dataclass
 class CameraPoseGenerationEngine:
     """
     Encapsulates the camera-pose generation functionality for a ``trimesh.Scene``.
@@ -169,6 +162,20 @@ class CameraPoseGenerationEngine:
     compute camera placements based on mesh normals and optional cone sampling,
     as well as supporting helpers like visibility/frustum culling utilities.
     """
+
+    turn_off_all_visualizations = True
+
+    # The frustum culling distance should be larger than the maximum camera placement distance
+    # so that visibility evaluation is not clipped too early.
+    frustum_culling_max_distance = 8.0
+
+    min_standoff_distance = 1.5
+    max_view_distance = 5.0
+
+    # Camera height filter: poses outside this [min, max] world Z interval are rejected early
+    # Defaults allow all heights; set to finite values to enable filtering
+    min_camera_height = 0.5  # -float('inf')
+    max_camera_height = 2.0  # float('inf')
 
     @dataclass
     class VisibilityComputationConfig:
@@ -196,6 +203,13 @@ class CameraPoseGenerationEngine:
     @staticmethod
     def _camera_forward_world(T_cam_world: np.ndarray) -> np.ndarray:
         return CameraPoseGenerationEngine._safe_normalize_dir(-T_cam_world[:3, 2])
+
+    @staticmethod
+    def clip_camera_to_max_distance(
+        camera_poses: list[CameraPose], distance: float = frustum_culling_max_distance
+    ) -> None:
+        for camera_pose in camera_poses:
+            camera_pose.camera.z_far = distance
 
     @staticmethod
     def _angle_between_dirs(u: np.ndarray, v: np.ndarray) -> float:
@@ -336,8 +350,8 @@ class CameraPoseGenerationEngine:
     # Mean-normal placement
     # -----------------------------
     @timeit("generate_camera_poses_from_mean_normals")
+    @staticmethod
     def generate_camera_poses_from_mean_normals(
-        self,
         scene,
         normal_length: float | None = None,
         marker_height: float = 0.15,
@@ -462,7 +476,7 @@ class CameraPoseGenerationEngine:
                 ):
                     return poses
 
-                if not turn_off_all_visualizations:
+                if not CameraPoseGenerationEngine.turn_off_all_visualizations:
                     path = trimesh.load_path(np.vstack([p0, p1]))
                     path.colors = np.tile(config.line_color, (len(path.entities), 1))
                     line_node_name = f"normal_line__{node_name}__{gkey}"
@@ -478,8 +492,12 @@ class CameraPoseGenerationEngine:
                 )
 
                 pose_cam = self._new_camera_instance()
+                pose_cam.z_near = 0.1
+                pose_cam.z_far = float(
+                    CameraPoseGenerationEngine.frustum_culling_max_distance
+                )
 
-                if not turn_off_all_visualizations:
+                if not CameraPoseGenerationEngine.turn_off_all_visualizations:
                     cam_marker = trimesh.creation.camera_marker(
                         pose_cam, marker_height=config.marker_height
                     )
@@ -508,7 +526,9 @@ class CameraPoseGenerationEngine:
             else (normal_length if normal_length is not None else 1.0)
         )
         effective_max_distance = (
-            max_distance if max_distance is not None else max_view_distance
+            max_distance
+            if max_distance is not None
+            else CameraPoseGenerationEngine.max_view_distance
         )
         fov_xy = (
             fov_deg_xy
@@ -518,12 +538,12 @@ class CameraPoseGenerationEngine:
         allowed_min_h = (
             float(min_camera_height_override)
             if min_camera_height_override is not None
-            else float(min_camera_height)
+            else float(CameraPoseGenerationEngine.min_camera_height)
         )
         allowed_max_h = (
             float(max_camera_height_override)
             if max_camera_height_override is not None
-            else float(max_camera_height)
+            else float(CameraPoseGenerationEngine.max_camera_height)
         )
 
         config = CameraPoseGenerationEngine.MeanNormalCameraConfig(
@@ -546,6 +566,12 @@ class CameraPoseGenerationEngine:
         poses_all: list[CameraPose] = []
         for node in scene.graph.nodes_geometry:
             poses_all.extend(placer.process_node(scene, node))
+
+        # Set the z_far distance of all cameras to a fixed value used by frustum culling.
+        # This is intentionally larger than the maximum camera placement distance so that
+        # culling/visibility evaluation does not prematurely clip distant objects.
+        CameraPoseGenerationEngine.clip_camera_to_max_distance(poses_all)
+
         return poses_all
 
     @staticmethod
@@ -586,8 +612,8 @@ class CameraPoseGenerationEngine:
     # Cone-based pose generation
     # -----------------------------
     @timeit("generate_cone_view_poses")
+    @staticmethod
     def generate_cone_view_poses(
-        self,
         scene: trimesh.Scene,
         *,
         cone: "CameraPoseGenerationEngine.ConeSamplingConfig",
@@ -640,12 +666,12 @@ class CameraPoseGenerationEngine:
         allowed_min_h = (
             float(min_camera_height_override)
             if min_camera_height_override is not None
-            else float(min_camera_height)
+            else float(CameraPoseGenerationEngine.min_camera_height)
         )
         allowed_max_h = (
             float(max_camera_height_override)
             if max_camera_height_override is not None
-            else float(max_camera_height)
+            else float(CameraPoseGenerationEngine.max_camera_height)
         )
 
         for node_name in scene.graph.nodes_geometry:
@@ -767,7 +793,10 @@ class CameraPoseGenerationEngine:
                         )
                     )
 
-                    if visualize and not turn_off_all_visualizations:
+                    if (
+                        visualize
+                        and not CameraPoseGenerationEngine.turn_off_all_visualizations
+                    ):
                         path = trimesh.load_path(np.vstack([c_world, p_cam]))
                         scene.add_geometry(
                             path,
@@ -937,6 +966,9 @@ class CameraPoseGenerationEngine:
         :param marker_height: Height of the camera marker when ``add_camera_marker`` is ``True``.
         """
 
+        if CameraPoseGenerationEngine.turn_off_all_visualizations:
+            return
+
         # Delegate to split steps for clarity and reuse.
         cfg = CameraPoseGenerationEngine.VisibilityComputationConfig(
             occlusion_check=occlusion_check,
@@ -1002,7 +1034,7 @@ class CameraPoseGenerationEngine:
                 else:
                     rgba = color_rgba
 
-                if not turn_off_all_visualizations:
+                if not CameraPoseGenerationEngine.turn_off_all_visualizations:
                     sphere = trimesh.creation.icosphere(subdivisions=2, radius=radius)
                     sphere.visual.vertex_colors = trimesh.visual.color.to_rgba(rgba)
 
@@ -1014,7 +1046,10 @@ class CameraPoseGenerationEngine:
                         transform=pose.transform,
                     )
 
-                if add_camera_marker and not turn_off_all_visualizations:
+                if (
+                    add_camera_marker
+                    and not CameraPoseGenerationEngine.turn_off_all_visualizations
+                ):
                     marker = trimesh.creation.camera_marker(
                         pose.camera, marker_height=marker_height
                     )
@@ -1535,20 +1570,15 @@ class DebugReporter:
 
 
 # Generate visualization and collect camera instances and their poses using the engine
-_engine = CameraPoseGenerationEngine()
-generated_camera_poses = _engine.generate_camera_poses_from_mean_normals(
-    scene,
-    marker_height=min_standoff_distance,
-    min_standoff=min_standoff_distance,
-    max_distance=max_view_distance,
-    fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
+generated_camera_poses = (
+    CameraPoseGenerationEngine.generate_camera_poses_from_mean_normals(
+        scene,
+        marker_height=CameraPoseGenerationEngine.min_standoff_distance,
+        min_standoff=CameraPoseGenerationEngine.min_standoff_distance,
+        max_distance=CameraPoseGenerationEngine.max_view_distance,
+        fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
+    )
 )
-
-# Set the z_far distance of all cameras to a fixed value used by frustum culling.
-# This is intentionally larger than the maximum camera placement distance so that
-# culling/visibility evaluation does not prematurely clip distant objects.
-for pose in generated_camera_poses:
-    pose.camera.z_far = frustum_culling_max_distance  # meters
 
 
 # Generate additional cone-based viewpoints and merge them with the existing poses
@@ -1560,19 +1590,19 @@ cone_cfg = CameraPoseGenerationEngine.ConeSamplingConfig(
     reject_overlapping_cones=True,
 )
 
-_extra_cone_poses = _engine.generate_cone_view_poses(
+_extra_cone_poses = CameraPoseGenerationEngine.generate_cone_view_poses(
     scene,
     cone=cone_cfg,
-    min_standoff=min_standoff_distance,
-    max_distance=max_view_distance,
-    frustum_culling_max_distance=frustum_culling_max_distance,
+    min_standoff=CameraPoseGenerationEngine.min_standoff_distance,
+    max_distance=CameraPoseGenerationEngine.max_view_distance,
+    frustum_culling_max_distance=CameraPoseGenerationEngine.frustum_culling_max_distance,
     fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
     visualize=False,
     marker_height=0.15,
 )
 generated_camera_poses.extend(_extra_cone_poses)
 
-# After defining frustum utilities, select promising camera poses using a
+# After defining frustum utilities, select promising camera poses using
 # greedy non-maximum suppression based on visible-body scores and the
 # similarity metric defined earlier. Then visualize the selected set.
 
@@ -1596,7 +1626,6 @@ _body_sets = CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
 
 # Optional debug reports for visibility relationships before selection
 if debug_visibility_reports:
-
     print("[DEBUG] ==== Visibility reports BEFORE selection ====")
     DebugReporter.print_report(
         camera_poses=generated_camera_poses, body_sets=_body_sets
@@ -1625,16 +1654,15 @@ if debug_visibility_reports:
 
 
 # 3) visualize only the selected camera origins (colors reflect visibility counts)
-if not turn_off_all_visualizations:
-    CameraPoseGenerationEngine.add_camera_origin_spheres(
-        scene,
-        _selected_camera_poses,
-        radius=0.08,
-        occlusion_check=_visibility_cfg.occlusion_check,
-        samples_per_mesh=_visibility_cfg.samples_per_mesh,
-        visibility_threshold=_visibility_cfg.visibility_threshold,
-        add_camera_marker=True,
-    )
+CameraPoseGenerationEngine.add_camera_origin_spheres(
+    scene,
+    _selected_camera_poses,
+    radius=0.08,
+    occlusion_check=_visibility_cfg.occlusion_check,
+    samples_per_mesh=_visibility_cfg.samples_per_mesh,
+    visibility_threshold=_visibility_cfg.visibility_threshold,
+    add_camera_marker=True,
+)
 
 number_of_bodies = 4  # <-- group size you want
 
