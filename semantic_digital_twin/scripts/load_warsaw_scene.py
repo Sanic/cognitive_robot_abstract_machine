@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
-from typing import Optional
 
 import cv2
 import numpy as np
+import trimesh
 
 from semantic_digital_twin.adapters.camera_pose_generator import CameraPoseGenerator
 from semantic_digital_twin.adapters.mesh import OBJParser
@@ -64,16 +64,6 @@ scene = rt.scene
 
 ####
 test_fov = [60, 45]  # horizontal, vertical degrees
-
-
-###
-
-
-import numpy as np
-import trimesh
-from dataclasses import dataclass
-import time
-from trimesh.scene.cameras import Camera
 
 
 _selected_camera_poses = CameraPoseGenerator(

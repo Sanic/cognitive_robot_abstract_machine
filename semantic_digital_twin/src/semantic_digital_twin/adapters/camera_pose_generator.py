@@ -1502,22 +1502,49 @@ class DebugReporter:
 
 
 class CameraPoseGenerator:
+    """
+    Generates camera viewpoints for a given trimesh Scene.
+
+    This class coordinates the generation of candidate camera poses based on mesh
+    normals and cone sampling, evaluates their visibility, and uses greedy
+    non-maximum suppression to select a diverse and informative set of poses.
+
+    For visual debug output, change CameraPoseGenerationEngine.turn_off_all_visualizations.
+    """
+
     def __init__(
         self,
         scene: trimesh.Scene,
         test_fov: tuple[float, float],
         debug_visibility_reports: bool = False,
     ):
+        """
+        Initialize the generator with a trimesh scene and camera parameters.
+
+        :param scene: The trimesh Scene containing the geometries to observe.
+        :param test_fov: The horizontal and vertical field of view of the cameras in degrees. Required for visibility calculation.
+        :param debug_visibility_reports: If True, prints detailed visibility
+            statistics before and after filtering of candidate camera poses.
+        """
         self.scene = scene
         self.test_fov = test_fov
 
         self.debug_visibility_reports = debug_visibility_reports
 
     def generate_poses(self):
+        """
+        Executes the full pipeline to generate, score, and select camera poses.
 
-        # -----------------------------------------------------------------------------
-        # Cone-based camera pose generation around object normals
-        # -----------------------------------------------------------------------------
+        The pipeline consists of:
+        1. Generating initial poses from weighted mean normals of meshes.
+        2. Sampling additional viewpoints within a cone around normals.
+        3. Scoring poses based on the number of fully visible bodies (occlusion-aware).
+        4. Selecting a final subset using greedy NMS that prioritizes high scores,
+           spatial diversity (positional and angular), and body coverage novelty.
+        5. Optionally adding visualization markers (spheres) to the scene.
+
+        :return: A list of `CameraPose` objects.
+        """
 
         # Generate visualization and collect camera instances and their poses using the engine
         generated_camera_poses = (
