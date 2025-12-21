@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import os
 import weakref
 from copy import deepcopy
@@ -9,7 +10,16 @@ import json
 from abc import ABC
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing_extensions import Type, Dict, List, Any, Tuple
+from typing_extensions import (
+    Type,
+    Dict,
+    List,
+    Any,
+    Tuple,
+    get_origin,
+    get_args,
+    get_type_hints,
+)
 
 try:
     from ament_index_python import PackageNotFoundError
@@ -212,12 +222,12 @@ class InheritanceStructureExporter:
     Superclasses are represented using the same node structure as regular classes
     but omit the `subclasses` field, preventing upward recursion.
 
+    For each class, the exporter collects all public fields from the class's __init__ method.
+
     This exporter only includes:
       - direct and indirect subclasses of `root_class`
       - superclasses that are not `object`, not `ABC`, and not part of the root hierarchy
 
-    The resulting JSON provides a clean, minimal, readable representation of the
-    inheritance landscape, suitable for documentation, visualization, or tooling.
     """
 
     root_class: Type
@@ -232,13 +242,13 @@ class InheritanceStructureExporter:
 
     def export(self) -> None:
         """
-        Build the hierarchy and write it to `self.out_path` as JSON.
+        Build the hierarchy and write it to `self.output_path` as JSON.
         """
-        data = self._build_structure()
+        data = self._build_inheritance_structure()
         with open(self.output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-    def _build_structure(self) -> Dict[str, Any]:
+    def _build_inheritance_structure(self) -> Dict[str, Any]:
         """
         Build the full hierarchy as a Python dict.
         Root is represented by its name + its immediate subclasses.
@@ -266,6 +276,7 @@ class InheritanceStructureExporter:
                 self._build_node(base, include_subclasses=False)
                 for base in self._walk_related_classes(clazz, relation="bases")
             ],
+            "fields": self.collect_required_public_fields(clazz),
         }
 
         if include_subclasses:
@@ -276,6 +287,106 @@ class InheritanceStructureExporter:
 
         return node
 
+    def collect_required_public_fields(self, clazz: type) -> List[Dict[str, Any]]:
+        """
+        Collects all required public fields from the class's __init__ method.
+        :param clazz: The class to inspect.
+        :return: A list of dictionaries, each containing 'name' and 'type' of a required public field.
+        """
+        import inspect
+
+        # Get the __init__ (for dataclasses/attrs/etc. this is the generated one)
+        init = clazz.__init__
+        sig = inspect.signature(init)
+
+        # Annotations: first from __init__, then fallback to class-level annotations
+        init_ann = getattr(init, "__annotations__", {}) or {}
+        class_ann = getattr(clazz, "__annotations__", {}) or {}
+
+        required_public_fields = [
+            required_public_field
+            for name, param in sig.parameters.items()
+            if (
+                required_public_field := self._get_only_required_public_fields(
+                    name, param, init_ann, class_ann
+                )
+            )
+        ]
+
+        return required_public_fields
+
+    def _get_only_required_public_fields(
+        self,
+        name: str,
+        param: inspect.Parameter,
+        init_ann: Dict[str, Any],
+        class_ann: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Returns a dictionary with field info if the parameter is a required public field,
+        otherwise returns an empty dictionary.
+
+        :param name: The name of the parameter.
+        :param param: The inspect.Parameter object.
+        :param init_ann: Annotations from the __init__ method.
+        :param class_ann: Annotations from the class.
+
+        :return: A dictionary with field info or an empty dictionary.
+        """
+        if name == "self":
+            return {}
+
+        # Skip private / "hidden" params
+        if name.startswith("_"):
+            return {}
+
+        # Only normal args / keyword-only; no *args, **kwargs
+        if param.kind not in (
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.KEYWORD_ONLY,
+        ):
+            return {}
+
+        # Only required parameters: nothing with a default (even default=None)
+        if param.default is not inspect._empty:
+            return {}
+
+        # Resolve an annotation if we have one
+        ann = init_ann.get(name, class_ann.get(name, None))
+        type_str = self._type_to_string(ann)
+
+        return {
+            "name": name,
+            "type": type_str,
+        }
+
+    def _type_to_string(self, tp: Any) -> str:
+        """
+        Convert a type annotation to a string representation.
+        """
+        # Missing annotation
+        if tp is None:
+            return Any
+
+        # Forward refs like "World"
+        if isinstance(tp, str):
+            return tp
+
+        origin = get_origin(tp)
+        args = get_args(tp)
+
+        if origin is not None:
+            origin_name = getattr(origin, "__name__", str(origin))
+            if args:
+                arg_str = ", ".join(self._type_to_string(a) for a in args)
+                return f"{origin_name}[{arg_str}]"
+            return origin_name
+
+        if hasattr(tp, "__name__"):
+            return tp.__name__
+
+        return str(tp)
+
     @staticmethod
     def _is_inheriting_from_abc(clazz: Type) -> bool:
         """
@@ -285,7 +396,7 @@ class InheritanceStructureExporter:
 
     def _walk_related_classes(self, clazz: Type, relation: str):
         """
-        Yield related classes based on the specified relation.
+        Yields related classes based on the specified relation.
         """
         match relation:
             case "subclasses":

@@ -1,0 +1,237 @@
+import os.path
+from dataclasses import field, MISSING, make_dataclass, dataclass
+from enum import Enum, StrEnum
+from pathlib import Path
+from typing import Iterable, Tuple, Dict, Callable, Union, List, Set
+from jinja2 import Environment, FileSystemLoader
+from typing_extensions import Any
+
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
+
+
+# Mapping from module name patterns to import statements for generated files
+_MODULE_TO_IMPORT = {
+    "world_entity": "from semantic_digital_twin.world_description.world_entity import {classes}",
+    "mixins": "from semantic_digital_twin.semantic_annotations.mixins import {classes}",
+    "semantic_annotations": "from semantic_digital_twin.semantic_annotations.semantic_annotations import {classes}",
+}
+
+
+class SpecialFieldTypes(Enum):
+    """
+    Special field types for semantic annotation class building.
+    """
+
+    NO_DEFAULT = object
+    """
+    Indicates that a field has no default value. Needed because `None` can be a valid default.
+    """
+
+
+SemanticAnnotationFieldDefaultTypes = Union[SpecialFieldTypes, Any]
+
+
+class SemanticAnnotationFilePaths(Enum):
+    """
+    File paths related to semantic annotations for easy access.
+    """
+
+    MAIN_SEMANTIC_ANNOTATION_FILE = os.path.join(
+        Path(__file__).resolve().parent, "semantic_annotations.py"
+    )
+
+    GENERATED_CLASSES_FILE = os.path.join(
+        Path(__file__).resolve().parent, "generated_classes.py"
+    )
+
+
+@dataclass
+class SemanticAnnotationClassBuilder:
+    """
+    A builder class for creating semantic annotation classes either in memory or as source code files.
+    """
+
+    name: str
+    """
+    The name of the semantic annotation class to create.
+    """
+
+    fields: Iterable[Tuple[str, Any, Any]] = field(default_factory=list)
+    """
+    The fields of the semantic annotation class to create.
+    """
+
+    bases: Tuple[type, ...] = field(default_factory=tuple)
+    """
+    The base classes of the semantic annotation class to create.
+    """
+
+    namespace: Dict[str, Any] = field(default_factory=dict)
+    """
+    The namespace (methods, class variables) of the semantic annotation class to create.
+    """
+
+    template_directory: Path = field(
+        default=Path(__file__).resolve().parent / "templates"
+    )
+    template_name: str = field(kw_only=True)
+    _env: Environment = field(init=False)
+
+    def __post_init__(self):
+        self._env = Environment(
+            loader=FileSystemLoader(str(self.template_directory)),
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+
+    def add_field(
+        self,
+        name: str,
+        type_: type,
+        default: SemanticAnnotationFieldDefaultTypes = SpecialFieldTypes.NO_DEFAULT,
+    ):
+        self.fields = list(self.fields) + [(name, type_, default)]
+        return self
+
+    def add_method(self, name: str, func: Callable):
+        self.namespace[name] = func
+        return self
+
+    def add_base(self, base: type):
+        self.bases = tuple(self.bases) + (base,)
+        return self
+
+    # %% In memory dataclass creation
+
+    def _expand_fields_for_make_dataclass(self):
+        """
+        Expands the fields to be compatible with make_dataclass, converting fields without defaults
+        """
+        expanded = []
+        for name, type_, default in self.fields:
+            if default is SpecialFieldTypes.NO_DEFAULT:
+                # required kw-only field (no default)
+                expanded.append((name, type_, field(default=MISSING, kw_only=True)))
+            else:
+                # explicit default (including None)
+                expanded.append((name, type_, default))
+        return expanded
+
+    def build(self):
+        """
+        Builds the semantic annotation class in memory as a dataclass.
+        :return: The semantic annotation class.
+        :raises TypeError: If at least one base class is not a subclass of SemanticAnnotation.
+        """
+        if not any(issubclass(base, SemanticAnnotation) for base in self.bases):
+            raise TypeError(
+                f"At least one base class must be a subclass of SemanticAnnotation."
+            )
+        expanded_fields = self._expand_fields_for_make_dataclass()
+        return make_dataclass(
+            self.name,
+            expanded_fields,
+            bases=self.bases,
+            namespace=dict(self.namespace),
+            eq=False,
+        )
+
+    # %% Jinja rendering
+    def _fields_for_template(self):
+        """
+        Prepares the fields for rendering in the Jinja template.
+        """
+        out = []
+        for name, type_, default in self.fields:
+            out.append(
+                {
+                    "name": name,
+                    "type_hint": getattr(type_, "__name__", repr(type_)),
+                    "default": (
+                        None
+                        if default is SpecialFieldTypes.NO_DEFAULT
+                        else repr(default)
+                    ),
+                }
+            )
+        return out
+
+    def render_source(self, include_imports: bool = False) -> str:
+        """
+        Renders the semantic annotation class as source code using the specified Jinja template.
+        """
+        template = self._env.get_template(self.template_name)
+        rendered = template.render(
+            name=self.name,
+            bases=[b.__name__ for b in self.bases],
+            fields=self._fields_for_template(),
+            include_imports=include_imports,
+        )
+        return rendered.rstrip() + "\n"
+
+    def append_to_file(self, filepath: Path, include_imports: bool = False):
+        """
+        Appends the rendered semantic annotation class source code to the specified file.
+        """
+        src = self.render_source(include_imports=include_imports)
+        with open(str(filepath), "a", encoding="utf-8") as f:
+            f.write("\n\n" + src)
+
+    @staticmethod
+    def _get_import_key(base: type) -> str:
+        """Determine which import group a base class belongs to."""
+        module = base.__module__
+        for key in _MODULE_TO_IMPORT:
+            if key in module:
+                return key
+        return module  # fallback to full module path
+
+    @classmethod
+    def write_classes_to_file(
+        cls,
+        builders: List["SemanticAnnotationClassBuilder"],
+        filepath: Path,
+    ):
+        """
+        Write multiple classes to a new file with all required imports.
+
+        :param builders: List of SemanticAnnotationClassBuilder instances
+        :param filepath: Path to the output file
+        """
+        # Collect all unique base classes grouped by their import source
+        imports_by_source: Dict[str, Set[str]] = {}
+        for builder in builders:
+            for base in builder.bases:
+                key = cls._get_import_key(base)
+                if key not in imports_by_source:
+                    imports_by_source[key] = set()
+                imports_by_source[key].add(base.__name__)
+
+        # Generate import statements
+        import_lines = [
+            "from __future__ import annotations",
+            "",
+            "from dataclasses import dataclass",
+            "",
+        ]
+
+        for source, class_names in sorted(imports_by_source.items()):
+            sorted_names = ", ".join(sorted(class_names))
+            if source in _MODULE_TO_IMPORT:
+                import_lines.append(
+                    _MODULE_TO_IMPORT[source].format(classes=sorted_names)
+                )
+            else:
+                # Fallback for unknown modules
+                import_lines.append(f"from {source} import {sorted_names}")
+
+        # Render all class definitions
+        class_definitions = []
+        for builder in builders:
+            class_definitions.append(builder.render_source(include_imports=False))
+
+        # Write the file
+        with open(str(filepath), "w", encoding="utf-8") as f:
+            f.write("\n".join(import_lines))
+            f.write("\n\n")
+            f.write("\n\n".join(class_definitions))

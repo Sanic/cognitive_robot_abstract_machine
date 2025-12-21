@@ -1,0 +1,10 @@
+@dataclass(eq=False)
+class {{ name }}{% if bases %}({{ bases | join(", ") }}){% endif %}:
+{% if fields %}
+{% for f in fields %}
+    {{ f.name }}: {{ f.type_hint }}{% if f.default is not none %} = {{ f.default }}{% endif %}
+
+{% endfor %}
+{% else %}
+    pass
+{% endif %}

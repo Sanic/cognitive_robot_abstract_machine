@@ -1,0 +1,85 @@
+{
+    "name": "root_body",
+    "children": [
+        {
+            "name": "Drawer_7.obj",
+            "children": []
+        },
+        {
+            "name": "Drawer_2.obj",
+            "children": []
+        },
+        {
+            "name": "countertop.obj",
+            "children": []
+        },
+        {
+            "name": "Drawer_6.obj",
+            "children": []
+        },
+        {
+            "name": "Drawer_1.obj",
+            "children": []
+        },
+        {
+            "name": "Sink.obj",
+            "children": []
+        },
+        {
+            "name": "Drawer_9.obj",
+            "children": []
+        },
+        {
+            "name": "Drawer_8.obj",
+            "children": []
+        },
+        {
+            "name": "Drawer_4.obj",
+            "children": []
+        },
+        {
+            "name": "Back.obj",
+            "children": []
+        },
+        {
+            "name": "Things.obj",
+            "children": []
+        },
+        {
+            "name": "Cab_2.obj",
+            "children": []
+        },
+        {
+            "name": "Floor.obj",
+            "children": []
+        },
+        {
+            "name": "Stovetop.obj",
+            "children": []
+        },
+        {
+            "name": "Drawer_5.obj",
+            "children": []
+        },
+        {
+            "name": "Board.obj",
+            "children": []
+        },
+        {
+            "name": "Side.obj",
+            "children": []
+        },
+        {
+            "name": "Drawer_3.obj",
+            "children": []
+        },
+        {
+            "name": "Cab_1.obj",
+            "children": []
+        },
+        {
+            "name": "Tap.obj",
+            "children": []
+        }
+    ]
+}

@@ -24,6 +24,7 @@ from ..world_description.shape_collection import BoundingBoxCollection
 from ..world_description.world_entity import (
     SemanticAnnotation,
     Body,
+    SemanticEnvironmentAnnotation,
 )
 
 
@@ -111,7 +112,6 @@ class DoubleDoor(SemanticAnnotation):
 @dataclass(eq=False)
 class Drawer(SemanticAnnotation):
     container: Container
-    handle: Handle
 
 
 ############################### subclasses to Furniture
@@ -135,7 +135,7 @@ class Wardrobe(Furniture, HasDrawers, HasDoors):
     container: Container = field(kw_only=True)
 
 
-class Floor(HasSupportingSurface): ...
+class Floor(SemanticAnnotation, HasSupportingSurface): ...
 
 
 @dataclass(eq=False)

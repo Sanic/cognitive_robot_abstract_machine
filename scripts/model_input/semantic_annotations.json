@@ -1,0 +1,238 @@
+{
+  "root_name": "SemanticAnnotation",
+  "subclasses": [
+    {
+      "name": "RootedSemanticAnnotation",
+      "is_abstract": false,
+      "other_superclasses": [],
+      "subclasses": [
+        {
+          "name": "Agent",
+          "is_abstract": false,
+          "other_superclasses": [],
+          "subclasses": [
+            {
+              "name": "Human",
+              "is_abstract": false,
+              "other_superclasses": [],
+              "subclasses": []
+            },
+            {
+              "name": "AbstractRobot",
+              "is_abstract": true,
+              "other_superclasses": [],
+              "subclasses": []
+            }
+          ]
+        },
+        {
+          "name": "SemanticEnvironmentAnnotation",
+          "is_abstract": false,
+          "other_superclasses": [],
+          "subclasses": []
+        },
+        {
+          "name": "SemanticRobotAnnotation",
+          "is_abstract": true,
+          "other_superclasses": [],
+          "subclasses": [
+            {
+              "name": "KinematicChain",
+              "is_abstract": true,
+              "other_superclasses": [],
+              "subclasses": [
+                {
+                  "name": "Arm",
+                  "is_abstract": false,
+                  "other_superclasses": [],
+                  "subclasses": []
+                },
+                {
+                  "name": "Finger",
+                  "is_abstract": false,
+                  "other_superclasses": [],
+                  "subclasses": []
+                },
+                {
+                  "name": "Neck",
+                  "is_abstract": false,
+                  "other_superclasses": [],
+                  "subclasses": []
+                },
+                {
+                  "name": "Torso",
+                  "is_abstract": false,
+                  "other_superclasses": [],
+                  "subclasses": []
+                }
+              ]
+            },
+            {
+              "name": "Manipulator",
+              "is_abstract": true,
+              "other_superclasses": [],
+              "subclasses": [
+                {
+                  "name": "ParallelGripper",
+                  "is_abstract": false,
+                  "other_superclasses": [],
+                  "subclasses": []
+                }
+              ]
+            },
+            {
+              "name": "Sensor",
+              "is_abstract": true,
+              "other_superclasses": [],
+              "subclasses": [
+                {
+                  "name": "Camera",
+                  "is_abstract": false,
+                  "other_superclasses": [],
+                  "subclasses": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "HasBody",
+      "is_abstract": true,
+      "other_superclasses": [],
+      "subclasses": [
+        {
+          "name": "Handle",
+          "is_abstract": false,
+          "other_superclasses": [],
+          "subclasses": []
+        },
+        {
+          "name": "Container",
+          "is_abstract": false,
+          "other_superclasses": [],
+          "subclasses": []
+        },
+        {
+          "name": "Table",
+          "is_abstract": false,
+          "other_superclasses": [],
+          "subclasses": []
+        },
+        {
+          "name": "Door",
+          "is_abstract": false,
+          "other_superclasses": [],
+          "subclasses": []
+        }
+      ]
+    },
+    {
+      "name": "Furniture",
+      "is_abstract": false,
+      "other_superclasses": [],
+      "subclasses": [
+        {
+          "name": "Table",
+          "is_abstract": false,
+          "other_superclasses": [],
+          "subclasses": []
+        },
+        {
+          "name": "Cabinet",
+          "is_abstract": false,
+          "other_superclasses": [
+            {
+              "name": "HasDrawers",
+              "is_abstract": true,
+              "other_superclasses": []
+            },
+            {
+              "name": "HasDoors",
+              "is_abstract": true,
+              "other_superclasses": []
+            }
+          ],
+          "subclasses": []
+        },
+        {
+          "name": "Dresser",
+          "is_abstract": false,
+          "other_superclasses": [
+            {
+              "name": "HasDrawers",
+              "is_abstract": true,
+              "other_superclasses": []
+            },
+            {
+              "name": "HasDoors",
+              "is_abstract": true,
+              "other_superclasses": []
+            }
+          ],
+          "subclasses": []
+        },
+        {
+          "name": "Cupboard",
+          "is_abstract": false,
+          "other_superclasses": [
+            {
+              "name": "HasDoors",
+              "is_abstract": true,
+              "other_superclasses": []
+            }
+          ],
+          "subclasses": []
+        },
+        {
+          "name": "Wardrobe",
+          "is_abstract": false,
+          "other_superclasses": [
+            {
+              "name": "HasDrawers",
+              "is_abstract": true,
+              "other_superclasses": []
+            },
+            {
+              "name": "HasDoors",
+              "is_abstract": true,
+              "other_superclasses": []
+            }
+          ],
+          "subclasses": []
+        }
+      ]
+    },
+    {
+      "name": "Fridge",
+      "is_abstract": false,
+      "other_superclasses": [],
+      "subclasses": []
+    },
+    {
+      "name": "DoubleDoor",
+      "is_abstract": false,
+      "other_superclasses": [],
+      "subclasses": []
+    },
+    {
+      "name": "Drawer",
+      "is_abstract": false,
+      "other_superclasses": [],
+      "subclasses": []
+    },
+    {
+      "name": "Room",
+      "is_abstract": false,
+      "other_superclasses": [],
+      "subclasses": []
+    },
+    {
+      "name": "Wall",
+      "is_abstract": false,
+      "other_superclasses": [],
+      "subclasses": []
+    }
+  ]
+}

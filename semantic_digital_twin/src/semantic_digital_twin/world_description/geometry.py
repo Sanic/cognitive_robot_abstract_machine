@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, fields
 from functools import cached_property
 from pathlib import Path
 
+import distinctipy
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
@@ -103,6 +104,19 @@ class Color(SubclassJSONSerializer):
                 best_name = name
 
         return best_name
+
+    @classmethod
+    def distinct_html_colors(cls, n, seed=None) -> List[Color]:
+        """
+        Generate n maximally distinct CSS4 color names by projecting distinctipy colors to nearest HTML color names.
+        Ensures the final names are distinct.
+        """
+        if seed is not None:
+            colors = distinctipy.get_colors(n, rng=seed)
+        else:
+            colors = distinctipy.get_colors(n)
+
+        return [cls(*c) for c in colors]
 
 
 @dataclass
@@ -288,7 +302,7 @@ class FileMesh(Mesh):
         """
         if self._mesh is not None:
             return self._mesh
-        self._mesh = trimesh.load_mesh(self.filename, process=False)
+        self._mesh = trimesh.load_mesh(self.filename, process=True)
         self._mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(
             self.color.to_rgba()
         )
