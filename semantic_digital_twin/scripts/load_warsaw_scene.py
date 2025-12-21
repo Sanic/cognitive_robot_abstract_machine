@@ -1561,108 +1561,122 @@ class DebugReporter:
         DebugReporter.print_body_to_cameras_report(
             camera_poses=camera_poses, body_sets=body_sets
         )
-        DebugReporter.print_uncovered_bodies_report(scene=scene, body_sets=_body_sets)
+        DebugReporter.print_uncovered_bodies_report(scene=scene, body_sets=body_sets)
 
 
-# -----------------------------------------------------------------------------
-# Cone-based camera pose generation around object normals
-# -----------------------------------------------------------------------------
+class CameraPoseGenerator:
+    def __init__(self, scene: trimesh.Scene):
+        self.scene = scene
 
+    def generate_poses(self):
 
-# Generate visualization and collect camera instances and their poses using the engine
-generated_camera_poses = (
-    CameraPoseGenerationEngine.generate_camera_poses_from_mean_normals(
-        scene,
-        marker_height=CameraPoseGenerationEngine.min_standoff_distance,
-        min_standoff=CameraPoseGenerationEngine.min_standoff_distance,
-        max_distance=CameraPoseGenerationEngine.max_view_distance,
-        fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
-    )
-)
+        # -----------------------------------------------------------------------------
+        # Cone-based camera pose generation around object normals
+        # -----------------------------------------------------------------------------
 
-
-# Generate additional cone-based viewpoints and merge them with the existing poses
-cone_cfg = CameraPoseGenerationEngine.ConeSamplingConfig(
-    cone_half_angle_deg=75,
-    samples_per_cone=20,
-    roll_samples=1,
-    fit_method="footprint_2d",
-    reject_overlapping_cones=True,
-)
-
-_extra_cone_poses = CameraPoseGenerationEngine.generate_cone_view_poses(
-    scene,
-    cone=cone_cfg,
-    min_standoff=CameraPoseGenerationEngine.min_standoff_distance,
-    max_distance=CameraPoseGenerationEngine.max_view_distance,
-    frustum_culling_max_distance=CameraPoseGenerationEngine.frustum_culling_max_distance,
-    fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
-    visualize=False,
-    marker_height=0.15,
-)
-generated_camera_poses.extend(_extra_cone_poses)
-
-# After defining frustum utilities, select promising camera poses using
-# greedy non-maximum suppression based on visible-body scores and the
-# similarity metric defined earlier. Then visualize the selected set.
-
-# 1) score poses (number of fully visible bodies)
-_visibility_cfg = CameraPoseGenerationEngine.VisibilityComputationConfig(
-    occlusion_check=True, samples_per_mesh=64, visibility_threshold=0.8
-)
-_scores = CameraPoseGenerationEngine.score_camera_poses_by_visible_bodies(
-    scene=scene, camera_poses=generated_camera_poses, visibility_config=_visibility_cfg
-)
-
-# 2) greedy selection with similarity suppression and coverage novelty
-#    Only accept a camera if it adds at least one body not yet seen by the
-#    already selected set, and is not too similar to any selected pose.
-_selection_cfg = CameraPoseGenerationEngine.CameraSelectionConfig(
-    pos_threshold_m=0.50, ang_threshold_deg=20.0, max_poses=None
-)
-_body_sets = CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
-    scene=scene, camera_poses=generated_camera_poses, config=_visibility_cfg
-)
-
-# Optional debug reports for visibility relationships before selection
-if debug_visibility_reports:
-    print("[DEBUG] ==== Visibility reports BEFORE selection ====")
-    DebugReporter.print_report(
-        camera_poses=generated_camera_poses, body_sets=_body_sets
-    )
-
-_selected_camera_poses = (
-    CameraPoseGenerationEngine.greedy_select_by_score_similarity_and_novelty(
-        camera_poses=generated_camera_poses,
-        scores=_scores,
-        body_sets=_body_sets,
-        cfg=_selection_cfg,
-    )
-)
-
-# Optional debug reports for visibility relationships after selection
-if debug_visibility_reports:
-    _selected_body_sets = (
-        CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
-            scene=scene, camera_poses=_selected_camera_poses, config=_visibility_cfg
+        # Generate visualization and collect camera instances and their poses using the engine
+        generated_camera_poses = (
+            CameraPoseGenerationEngine.generate_camera_poses_from_mean_normals(
+                self.scene,
+                marker_height=CameraPoseGenerationEngine.min_standoff_distance,
+                min_standoff=CameraPoseGenerationEngine.min_standoff_distance,
+                max_distance=CameraPoseGenerationEngine.max_view_distance,
+                fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
+            )
         )
-    )
-    print("[DEBUG] ==== Visibility reports AFTER selection ====")
-    DebugReporter.print_report(
-        camera_poses=_selected_camera_poses, body_sets=_selected_body_sets
-    )
+
+        # Generate additional cone-based viewpoints and merge them with the existing poses
+        cone_cfg = CameraPoseGenerationEngine.ConeSamplingConfig(
+            cone_half_angle_deg=75,
+            samples_per_cone=20,
+            roll_samples=1,
+            fit_method="footprint_2d",
+            reject_overlapping_cones=False,  # Set to True for significantly faster compute, but way less candidates
+        )
+
+        _extra_cone_poses = CameraPoseGenerationEngine.generate_cone_view_poses(
+            self.scene,
+            cone=cone_cfg,
+            min_standoff=CameraPoseGenerationEngine.min_standoff_distance,
+            max_distance=CameraPoseGenerationEngine.max_view_distance,
+            frustum_culling_max_distance=CameraPoseGenerationEngine.frustum_culling_max_distance,
+            fov_deg_xy=(float(test_fov[0]), float(test_fov[1])),
+            visualize=False,
+            marker_height=0.15,
+        )
+        generated_camera_poses.extend(_extra_cone_poses)
+
+        # After defining frustum utilities, select promising camera poses using
+        # greedy non-maximum suppression based on visible-body scores and the
+        # similarity metric defined earlier. Then visualize the selected set.
+
+        # 1) score poses (number of fully visible bodies)
+        _visibility_cfg = CameraPoseGenerationEngine.VisibilityComputationConfig(
+            occlusion_check=True, samples_per_mesh=64, visibility_threshold=0.8
+        )
+        _scores = CameraPoseGenerationEngine.score_camera_poses_by_visible_bodies(
+            scene=self.scene,
+            camera_poses=generated_camera_poses,
+            visibility_config=_visibility_cfg,
+        )
+
+        # 2) greedy selection with similarity suppression and coverage novelty
+        #    Only accept a camera if it adds at least one body not yet seen by the
+        #    already selected set, and is not too similar to any selected pose.
+        _selection_cfg = CameraPoseGenerationEngine.CameraSelectionConfig(
+            pos_threshold_m=0.50, ang_threshold_deg=20.0, max_poses=None
+        )
+        _body_sets = CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
+            scene=self.scene,
+            camera_poses=generated_camera_poses,
+            config=_visibility_cfg,
+        )
+
+        # Optional debug reports for visibility relationships before selection
+        if debug_visibility_reports:
+            print("[DEBUG] ==== Visibility reports BEFORE selection ====")
+            DebugReporter.print_report(
+                camera_poses=generated_camera_poses, body_sets=_body_sets
+            )
+
+        _selected_camera_poses = (
+            CameraPoseGenerationEngine.greedy_select_by_score_similarity_and_novelty(
+                camera_poses=generated_camera_poses,
+                scores=_scores,
+                body_sets=_body_sets,
+                cfg=_selection_cfg,
+            )
+        )
+
+        # Optional debug reports for visibility relationships after selection
+        if debug_visibility_reports:
+            _selected_body_sets = (
+                CameraPoseGenerationEngine.compute_visible_body_indices_per_pose(
+                    scene=self.scene,
+                    camera_poses=_selected_camera_poses,
+                    config=_visibility_cfg,
+                )
+            )
+            print("[DEBUG] ==== Visibility reports AFTER selection ====")
+            DebugReporter.print_report(
+                camera_poses=_selected_camera_poses, body_sets=_selected_body_sets
+            )
+
+        # 3) visualize only the selected camera origins (colors reflect visibility counts)
+        CameraPoseGenerationEngine.add_camera_origin_spheres(
+            self.scene,
+            _selected_camera_poses,
+            radius=0.08,
+            occlusion_check=_visibility_cfg.occlusion_check,
+            samples_per_mesh=_visibility_cfg.samples_per_mesh,
+            visibility_threshold=_visibility_cfg.visibility_threshold,
+            add_camera_marker=True,
+        )
+
+        return _selected_camera_poses
 
 
-# 3) visualize only the selected camera origins (colors reflect visibility counts)
-CameraPoseGenerationEngine.add_camera_origin_spheres(
-    scene,
-    _selected_camera_poses,
-    radius=0.08,
-    occlusion_check=_visibility_cfg.occlusion_check,
-    samples_per_mesh=_visibility_cfg.samples_per_mesh,
-    visibility_threshold=_visibility_cfg.visibility_threshold,
-    add_camera_marker=True,
-)
+_selected_camera_poses = CameraPoseGenerator(scene=scene).generate_poses()
 
 number_of_bodies = 4  # <-- group size you want
 
@@ -1764,7 +1778,7 @@ scene.camera.fov = test_fov  # horizontal, vertical degrees
 for j, pose in enumerate(camera_poses):
 
     scene.graph[scene.camera.name] = pose
-    scene.show()
+    # scene.show()
 
     png = scene.save_image(resolution=(1024, 768), visible=True)
 
