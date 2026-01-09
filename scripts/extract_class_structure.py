@@ -1,15 +1,18 @@
 import argparse
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 import requests
 import json
 import os
 import base64
+import numpy as np
+import trimesh
 
 # Import shared functions from load_warsaw_scene
 import sys
 
 from semantic_digital_twin.adapters.warsaw_world_loader import WarsawWorldLoader
+from semantic_digital_twin.spatial_types import TransformationMatrix
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -34,32 +37,60 @@ connection_string = (
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-if not OPENROUTER_API_KEY:
-    raise ValueError("OPENROUTER_API_KEY environment variable is not set")
-
 
 def encode_image_bytes(image_bytes: bytes) -> str:
     return base64.b64encode(image_bytes).decode("utf-8")
 
 
+def create_camera_poses() -> Dict[str, np.ndarray]:
+    """
+    Create camera transforms
+    """
+    return {
+        "back": np.array(
+            [
+                [0.019661, 0.565278, -0.824666, -3.302801],
+                [-0.999801, 0.008306, -0.018143, -0.113984],
+                [-0.003406, 0.824859, 0.565329, 2.521490],
+                [0.000000, 0.000000, 0.000000, 1.000000],
+            ]
+        ),
+        "front_right": np.array(
+            [
+                [0.493480, -0.501933, 0.710310, 2.967743],
+                [0.863728, 0.378807, -0.332385, -1.558169],
+                [-0.102235, 0.777540, 0.620467, 2.430472],
+                [0.000000, 0.000000, 0.000000, 1.000000],
+            ]
+        ),
+        "front_left": np.array(
+            [
+                [-0.658764, -0.383959, 0.646997, 2.903789],
+                [0.752266, -0.323319, 0.574074, 3.060092],
+                [-0.011235, 0.864893, 0.501830, 2.281899],
+                [0.000000, 0.000000, 0.000000, 1.000000],
+            ]
+        ),
+    }
+
+
 def query_vlm(
-    original_image_bytes: bytes,
-    highlighted_image_bytes: bytes,
+    original_images: List[bytes],
+    highlighted_images: List[bytes],
     object_taxonomy: str,
-    spatial_relations: str,
     color_names: List[str],
     semantic_labels: str,
 ) -> dict:
-    """Query the VLM with original and highlighted images."""
-    base64_original = encode_image_bytes(original_image_bytes)
-    base64_highlighted = encode_image_bytes(highlighted_image_bytes)
+    """Query the VLM with original and highlighted images from multiple viewpoints."""
+    base64_originals = [encode_image_bytes(img) for img in original_images]
+    base64_highlighted = [encode_image_bytes(img) for img in highlighted_images]
 
     system_prompt = f"""You are a semantic perception system for robotic scene understanding.
 
 ## Your Task
 Analyze images and classify objects according to a given ontology. You will receive:
-1. An image of a scene with original textures
-2. An image with specific objects highlighted in distinct colors
+1. Three images of a scene with original textures from different viewpoints (diagonal front left, diagonal front right, back)
+2. Three corresponding images with specific objects highlighted in distinct colors from the same viewpoints
 3. The prior from a previous semantic segmentation step for each highlighted object
 
 Focus ONLY on the highlighted objects. For each:
@@ -69,6 +100,7 @@ Focus ONLY on the highlighted objects. For each:
 ### Important rules to keep in mind
 1. A class cannot be its own superclass
 2. The prior semantic segmentation may be wrong. In such cases, please provide a correct semantic class name.
+3. Use all three viewpoints to get a complete understanding of each object's shape and context.
 
 ## Output Schema
 Respond with valid JSON:
@@ -96,11 +128,39 @@ Respond with valid JSON:
 
 ## Images
 
-Image 1: Original scene with natural textures
-Image 2: Same scene with target objects highlighted in distinct colors
+Images 1-3: Original scene with natural textures from three viewpoints:
+  - Image 1: Back view
+  - Image 2: Diagonal front right view
+  - Image 3: Diagonal front left view
 
-Identify the highlighted objects.
+Images 4-6: Same scene with target objects highlighted in distinct colors from the same viewpoints:
+  - Image 4: Back view (highlighted)
+  - Image 5: Diagonal front right view (highlighted)
+  - Image 6: Diagonal front left view (highlighted)
+
+Identify the highlighted objects using all viewpoints for a complete understanding.
 """
+
+    # Build content array with text and all images
+    content = [{"type": "text", "text": user_prompt}]
+
+    # Add original images
+    for base64_img in base64_originals:
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{base64_img}"},
+            }
+        )
+
+    # Add highlighted images
+    for base64_img in base64_highlighted:
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{base64_img}"},
+            }
+        )
 
     response = requests.post(
         url="https://openrouter.ai/api/v1/chat/completions",
@@ -112,7 +172,7 @@ Identify the highlighted objects.
         },
         data=json.dumps(
             {
-                "model": "qwen/qwen2.5-vl-72b-instruct",
+                "model": "image.png/qwen2.5-vl-72b-instruct",
                 "messages": [
                     {
                         "role": "system",
@@ -120,24 +180,7 @@ Identify the highlighted objects.
                     },
                     {
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": user_prompt,
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{base64_original}"
-                                },
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{base64_highlighted}"
-                                },
-                            },
-                        ],
+                        "content": content,
                     },
                 ],
             }
@@ -197,6 +240,18 @@ def main(args):
     group_size = args.group_size
     export_path = Path(args.export_dir)
 
+    # Check API key if VLM will be called
+    if not args.render_only and not args.skip_vlm:
+        if not OPENROUTER_API_KEY:
+            raise ValueError(
+                "OPENROUTER_API_KEY environment variable is not set. Required for VLM queries."
+            )
+
+    # Path for rendered images - save to scripts/model_input/
+    script_dir = Path(__file__).parent
+    model_input_dir = script_dir / "model_input"
+    model_input_dir.mkdir(parents=True, exist_ok=True)
+
     # Create database engine and tables for later persistence of the world
     engine = create_engine(connection_string, echo=True)  # echo=True for debugging SQL
     Base.metadata.create_all(bind=engine)
@@ -212,25 +267,22 @@ def main(args):
     # Export semantic annotations JSON for VLM context
     world_loader.export_semantic_annotation_inheritance_structure(export_path)
 
-    # Read taxonomy and spatial relations
+    # Read taxonomy
     object_taxonomy = (export_path / "semantic_annotations.json").read_text()
-    spatial_relations_path = export_path / "spatial_relations.txt"
-    if spatial_relations_path.exists():
-        spatial_relations = spatial_relations_path.read_text()
-    else:
-        spatial_relations = "on, under, next_to, inside, above, below, left_of, right_of, in_front_of, behind"
 
-    if not args.skip_vlm:
-        # Set up visual state management
-        camera_pose = world_loader._predefined_camera_transforms[
-            1
-        ]  # Use first camera pose for VLM queries
+    # Create custom diagonal camera transforms (returns dict)
+    camera_poses_dict = create_camera_poses()
 
-        # Render original scene once
-        print("Rendering original scene...")
-        original_image = world_loader.render_scene_from_camera_pose(
-            camera_pose, export_path / "scene_orig.png"
-        )
+    if not args.skip_vlm and not args.render_only:
+        # Render original scene from 3 viewpoints
+        print("Rendering original scene from 3 viewpoints...")
+        original_images = []
+        for pose_name, camera_pose in camera_poses_dict.items():
+            print(f"  Rendering {pose_name} view...")
+            image_bytes = world_loader.render_scene_from_camera_pose(
+                camera_pose, model_input_dir / f"scene_orig_{pose_name}.png"
+            )
+            original_images.append(image_bytes)
 
         # Process groups
         all_responses = []
@@ -247,10 +299,14 @@ def main(args):
                 map(lambda c: c.closest_css3_color_name(), bodies_colors.values())
             )
 
-            # Render highlighted scene
-            highlighted_image = world_loader.render_scene_from_camera_pose(
-                camera_pose, export_path / f"scene_{i}.png"
-            )
+            # Render highlighted scene from 3 viewpoints
+            print(f"  Rendering highlighted scene from 3 viewpoints...")
+            highlighted_images = []
+            for pose_name, camera_pose in camera_poses_dict.items():
+                image_bytes = world_loader.render_scene_from_camera_pose(
+                    camera_pose, model_input_dir / f"scene_{i}_{pose_name}.png"
+                )
+                highlighted_images.append(image_bytes)
 
             semantic_labels_dict = {
                 body_id: color_names[i]
@@ -264,10 +320,9 @@ def main(args):
             # Query VLM
             print(f"  Querying VLM for group {i + 1}...")
             response = query_vlm(
-                original_image,
-                highlighted_image,
+                original_images,
+                highlighted_images,
                 object_taxonomy,
-                spatial_relations,
                 color_names,
                 semantic_labels,
             )
@@ -285,21 +340,69 @@ def main(args):
             # Reset for next iteration
             world_loader._reset_body_colors()
 
+    elif args.render_only:
+        # Render-only mode: just save images without calling VLM
+        print("Render-only mode: Saving images without VLM queries...")
+
+        # Render original scene from 3 viewpoints
+        print("Rendering original scene from 3 viewpoints...")
+        for idx, camera_pose in enumerate(camera_poses):
+            print(f"  Rendering {camera_names[idx]} view...")
+            world_loader.render_scene_from_camera_pose(
+                camera_pose, model_input_dir / f"scene_orig_{camera_names[idx]}.png"
+            )
+
+        # Process groups
+        num_groups = (len(bodies) + group_size - 1) // group_size
+
+        for i, start in enumerate(range(0, len(bodies), group_size)):
+            group = bodies[start : start + group_size]
+            print(f"Processing group {i + 1}/{num_groups} ({len(group)} objects)...")
+
+            # Reset visuals and apply highlight colors
+            world_loader._reset_body_colors()
+            bodies_colors = world_loader._apply_highlight_to_group(group)
+            color_names = list(
+                map(lambda c: c.closest_css3_color_name(), bodies_colors.values())
+            )
+
+            # Render highlighted scene from 3 viewpoints
+            print(f"  Rendering highlighted scene from 3 viewpoints...")
+            for idx, camera_pose in enumerate(camera_poses):
+                world_loader.render_scene_from_camera_pose(
+                    camera_pose, model_input_dir / f"scene_{i}_{camera_names[idx]}.png"
+                )
+
+            # Reset for next iteration
+            world_loader._reset_body_colors()
+
+        print(f"All images saved to {model_input_dir}")
+        all_responses = []
+        summary = []
+
+    elif args.skip_vlm:  # Skipped VLM: Read from file instead
+        with open(output_file, "r") as f:
+            all_responses = json.load(f)
+
+        # Extract and save summary
+        summary = extract_summary(all_responses)
+        summary_file = output_file.parent / (output_file.stem + "_summary.json")
+        with open(summary_file, "w") as f:
+            json.dump(summary, f, indent=2)
+        print(f"Summary saved to {summary_file}")
+
+    else:  # Normal VLM mode - save responses and summary
         # Save raw responses
         with open(output_file, "w") as f:
             json.dump(all_responses, f, indent=2)
         print(f"Raw results saved to {output_file}")
 
-    else:  # Skipped VLM: Read from fil instead
-        with open(output_file, "r") as f:
-            all_responses = json.load(f)
-
-    # Extract and save summary
-    summary = extract_summary(all_responses)
-    summary_file = output_file.parent / (output_file.stem + "_summary.json")
-    with open(summary_file, "w") as f:
-        json.dump(summary, f, indent=2)
-    print(f"Summary saved to {summary_file}")
+        # Extract and save summary
+        summary = extract_summary(all_responses)
+        summary_file = output_file.parent / (output_file.stem + "_summary.json")
+        with open(summary_file, "w") as f:
+            json.dump(summary, f, indent=2)
+        print(f"Summary saved to {summary_file}")
 
     # Convert world to DAO and persist
     with Session(engine) as session:
@@ -326,6 +429,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--group-size", type=int, default=8, help="Number of objects per group"
     )
-    parser.add_argument("--skip_vlm", action="store_true", default=False)
+    parser.add_argument(
+        "--skip_vlm",
+        action="store_true",
+        default=False,
+        help="Skip VLM queries and read responses from file instead",
+    )
+    parser.add_argument(
+        "--render-only",
+        action="store_true",
+        default=False,
+        help="Only render images without calling VLM. Images are saved to scripts/model_input/",
+    )
     args = parser.parse_args()
     main(args)
