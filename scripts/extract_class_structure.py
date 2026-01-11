@@ -172,7 +172,7 @@ Identify the highlighted objects using all viewpoints for a complete understandi
         },
         data=json.dumps(
             {
-                "model": "image.png/qwen2.5-vl-72b-instruct",
+                "model": "qwen/qwen3-vl-30b-a3b-instruct",
                 "messages": [
                     {
                         "role": "system",
@@ -340,6 +340,18 @@ def main(args):
             # Reset for next iteration
             world_loader._reset_body_colors()
 
+        # Save raw responses
+        with open(output_file, "w") as f:
+            json.dump(all_responses, f, indent=2)
+        print(f"Raw results saved to {output_file}")
+
+        # Extract and save summary
+        summary = extract_summary(all_responses)
+        summary_file = output_file.parent / (output_file.stem + "_summary.json")
+        with open(summary_file, "w") as f:
+            json.dump(summary, f, indent=2)
+        print(f"Summary saved to {summary_file}")
+
     elif args.render_only:
         # Render-only mode: just save images without calling VLM
         print("Render-only mode: Saving images without VLM queries...")
@@ -383,19 +395,6 @@ def main(args):
     elif args.skip_vlm:  # Skipped VLM: Read from file instead
         with open(output_file, "r") as f:
             all_responses = json.load(f)
-
-        # Extract and save summary
-        summary = extract_summary(all_responses)
-        summary_file = output_file.parent / (output_file.stem + "_summary.json")
-        with open(summary_file, "w") as f:
-            json.dump(summary, f, indent=2)
-        print(f"Summary saved to {summary_file}")
-
-    else:  # Normal VLM mode - save responses and summary
-        # Save raw responses
-        with open(output_file, "w") as f:
-            json.dump(all_responses, f, indent=2)
-        print(f"Raw results saved to {output_file}")
 
         # Extract and save summary
         summary = extract_summary(all_responses)

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import trimesh
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from krrood.ormatic.utils import create_engine
@@ -27,6 +28,8 @@ from semantic_digital_twin.adapters.warsaw_world_loader import WarsawWorldLoader
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import TransformationMatrix
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.geometry import TriangleMesh, FileMesh
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 
 # Database connection settings from environment
 DB_NAME = os.getenv("PGDATABASE")
@@ -123,6 +126,11 @@ def create_exploded_world(world: World, explosion_factor: float = 1.0) -> World:
     print(f"Average distance from center: {avg_distance:.3f}")
     print(f"Explosion distance: {explosion_distance:.3f}")
 
+    # If explosion factor is 0 or very small, return world unchanged
+    if explosion_factor == 0.0 or abs(explosion_distance) < 1e-6:
+        print("Explosion factor is 0, returning world unchanged")
+        return exploded_world
+
     # Modify connections to offset bodies
     with exploded_world.modify_world():
         for connection in exploded_world.connections:
@@ -190,12 +198,315 @@ def create_exploded_world(world: World, explosion_factor: float = 1.0) -> World:
     return exploded_world
 
 
+def reload_textures_from_objects_dir(world: World, objects_dir: Path) -> World:
+    """
+    Reload meshes with textures from OBJ files in the objects directory.
+
+    This function matches body names to OBJ files and reloads the meshes with
+    textures, applying the same coordinate transformation (roll=np.pi/2) that
+    WarsawWorldLoader applies during initial loading.
+
+    Args:
+        world: The world whose meshes should be reloaded
+        objects_dir: Path to directory containing OBJ files
+
+    Returns:
+        The world with reloaded textures (modified in place)
+    """
+    if not objects_dir.exists():
+        print(f"Warning: Objects directory does not exist: {objects_dir}")
+        return world
+
+    print(f"Reloading textures from {objects_dir}...")
+    reloaded_count = 0
+
+    with world.modify_world():
+        for body in world.bodies:
+            if not body.collision or len(body.collision) == 0:
+                continue
+
+            # Get body name (remove prefix if present)
+            body_name = body.name.name
+            original_body_name = body_name
+
+            # Handle body names that might have prefixes or already include .obj extension
+            if body_name.endswith(".obj"):
+                # Body name already includes .obj extension, use it directly
+                obj_file = objects_dir / body_name
+            elif "." in body_name:
+                # If name has a prefix like "prefix.name", use just "name"
+                body_name = body_name.split(".")[-1]
+                obj_file = objects_dir / f"{body_name}.obj"
+            else:
+                # No prefix, use name as-is with .obj extension
+                obj_file = objects_dir / f"{body_name}.obj"
+
+            print(
+                f"  Checking body '{original_body_name}' -> looking for '{obj_file.name}' -> exists: {obj_file.exists()}"
+            )
+
+            if obj_file.exists():
+                try:
+                    print(f"    Loading {obj_file.name}...")
+                    # Reload mesh with textures
+                    # Try loading as Scene first to preserve materials, then extract mesh
+                    loaded = trimesh.load(str(obj_file), process=True)
+
+                    # If trimesh.load returns a Scene (multiple meshes), get the first mesh
+                    if isinstance(loaded, trimesh.Scene):
+                        geometry_names = list(loaded.geometry.keys())
+                        if geometry_names:
+                            reloaded_mesh = loaded.geometry[geometry_names[0]]
+                            print(
+                                f"    Loaded as Scene with {len(geometry_names)} geometries, using first"
+                            )
+                        else:
+                            print(f"  Warning: No geometry found in {obj_file.name}")
+                            continue
+                    else:
+                        reloaded_mesh = loaded
+                        print(f"    Loaded as Trimesh directly")
+
+                    # Ensure we have a Trimesh object
+                    if not isinstance(reloaded_mesh, trimesh.Trimesh):
+                        print(
+                            f"  Warning: {obj_file.name} did not load as Trimesh (got {type(reloaded_mesh)})"
+                        )
+                        continue
+
+                    # Apply the same coordinate transformation as WarsawWorldLoader:
+                    # roll=np.pi/2 (90 degrees around X axis)
+                    # Create a copy before transforming to preserve original
+                    reloaded_mesh = reloaded_mesh.copy()
+                    rotation_matrix = trimesh.transformations.rotation_matrix(
+                        angle=np.pi / 2, direction=[1, 0, 0]
+                    )
+                    reloaded_mesh.apply_transform(rotation_matrix)
+
+                    # Ensure visual is properly initialized
+                    if (
+                        not hasattr(reloaded_mesh, "visual")
+                        or reloaded_mesh.visual is None
+                    ):
+                        reloaded_mesh.visual = trimesh.visual.TextureVisuals()
+
+                    # Check if mesh has textures/material
+                    # Check multiple ways textures might be stored
+                    has_texture = False
+                    texture_info = []
+
+                    if (
+                        hasattr(reloaded_mesh.visual, "material")
+                        and reloaded_mesh.visual.material is not None
+                    ):
+                        has_texture = True
+                        texture_info.append("material exists")
+                        if (
+                            hasattr(reloaded_mesh.visual.material, "image")
+                            and reloaded_mesh.visual.material.image is not None
+                        ):
+                            texture_info.append("material has image")
+
+                    # Also check if visual has UV coordinates (indicates texture mapping)
+                    if (
+                        hasattr(reloaded_mesh.visual, "uv")
+                        and reloaded_mesh.visual.uv is not None
+                    ):
+                        if len(reloaded_mesh.visual.uv) > 0:
+                            has_texture = True
+                            texture_info.append("has UV coordinates")
+
+                    # Debug: check what visual properties the mesh has
+                    print(
+                        f"    Checking {obj_file.name}: has_texture={has_texture}, visual type={type(reloaded_mesh.visual)}, info={texture_info}"
+                    )
+                    if hasattr(reloaded_mesh.visual, "material"):
+                        print(f"      Material: {reloaded_mesh.visual.material}")
+                        if hasattr(reloaded_mesh.visual.material, "image"):
+                            print(
+                                f"      Material has image: {reloaded_mesh.visual.material.image is not None}"
+                            )
+
+                    # Always try to reload the mesh, even if texture detection didn't work
+                    # Sometimes trimesh loads textures but they're not immediately visible
+                    if has_texture or True:  # Try reloading anyway
+                        # Update both collision and visual shapes
+                        new_collision_shapes = []
+                        new_visual_shapes = []
+                        updated_collision = False
+                        updated_visual = False
+
+                        # Update collision shapes
+                        for collision in body.collision:
+                            if (
+                                isinstance(collision, FileMesh)
+                                and not updated_collision
+                            ):
+                                # Replace FileMesh with TriangleMesh containing the reloaded mesh
+                                # Make sure to preserve the visual material
+                                mesh_for_collision = reloaded_mesh.copy()
+                                new_collision = TriangleMesh(
+                                    origin=collision.origin,
+                                    scale=collision.scale,
+                                    color=collision.color,
+                                    mesh=mesh_for_collision,
+                                )
+                                # Verify material is preserved
+                                if (
+                                    hasattr(new_collision.mesh.visual, "material")
+                                    and new_collision.mesh.visual.material is not None
+                                ):
+                                    print(f"    Material preserved in collision mesh")
+                                new_collision_shapes.append(new_collision)
+                                updated_collision = True
+                            elif (
+                                isinstance(collision, TriangleMesh)
+                                and not updated_collision
+                            ):
+                                # Update TriangleMesh directly
+                                collision.mesh = reloaded_mesh.copy()
+                                new_collision_shapes.append(collision)
+                                updated_collision = True
+                            else:
+                                # Keep other collision shapes as-is
+                                new_collision_shapes.append(collision)
+
+                        # Update visual shapes
+                        for visual in body.visual:
+                            if isinstance(visual, FileMesh) and not updated_visual:
+                                # Replace FileMesh with TriangleMesh containing the reloaded mesh
+                                mesh_for_visual = reloaded_mesh.copy()
+                                new_visual = TriangleMesh(
+                                    origin=visual.origin,
+                                    scale=visual.scale,
+                                    color=visual.color,
+                                    mesh=mesh_for_visual,
+                                )
+                                # Verify material is preserved
+                                if (
+                                    hasattr(new_visual.mesh.visual, "material")
+                                    and new_visual.mesh.visual.material is not None
+                                ):
+                                    print(f"    Material preserved in visual mesh")
+                                new_visual_shapes.append(new_visual)
+                                updated_visual = True
+                            elif (
+                                isinstance(visual, TriangleMesh) and not updated_visual
+                            ):
+                                # Update TriangleMesh directly
+                                visual.mesh = reloaded_mesh.copy()
+                                new_visual_shapes.append(visual)
+                                updated_visual = True
+                            else:
+                                # Keep other visual shapes as-is
+                                new_visual_shapes.append(visual)
+
+                        if updated_collision:
+                            # Create new ShapeCollection with updated shapes
+                            body.collision = ShapeCollection(new_collision_shapes)
+                        if updated_visual:
+                            # Create new ShapeCollection with updated visual shapes
+                            body.visual = ShapeCollection(new_visual_shapes)
+
+                        if updated_collision or updated_visual:
+                            reloaded_count += 1
+                            texture_status = (
+                                "with textures"
+                                if has_texture
+                                else "without detected textures"
+                            )
+                            print(
+                                f"  Reloaded {body_name}.obj from {obj_file.name} {texture_status}"
+                            )
+                    else:
+                        print(
+                            f"  Warning: {obj_file.name} has no textures (visual type: {type(reloaded_mesh.visual)})"
+                        )
+
+                except Exception as e:
+                    print(f"  Error reloading {obj_file.name}: {e}")
+                    continue
+            else:
+                # Try alternative names (e.g., with different case or extensions)
+                # Look for any OBJ file that might match
+                matching_files = list(objects_dir.glob(f"{body_name}*.obj"))
+                if matching_files:
+                    obj_file = matching_files[0]
+                    try:
+                        reloaded_mesh = trimesh.load(
+                            str(obj_file), process=True, force="mesh"
+                        )
+                        if isinstance(reloaded_mesh, trimesh.Scene):
+                            geometry_names = list(reloaded_mesh.geometry.keys())
+                            if geometry_names:
+                                reloaded_mesh = reloaded_mesh.geometry[
+                                    geometry_names[0]
+                                ]
+                            else:
+                                continue
+
+                        rotation_matrix = trimesh.transformations.rotation_matrix(
+                            angle=np.pi / 2, direction=[1, 0, 0]
+                        )
+                        reloaded_mesh.apply_transform(rotation_matrix)
+
+                        has_texture = (
+                            hasattr(reloaded_mesh.visual, "material")
+                            and reloaded_mesh.visual.material is not None
+                        )
+
+                        if has_texture:
+                            # Update the mesh in the collision shape
+                            new_collision_shapes = []
+                            updated = False
+                            for collision in body.collision:
+                                if isinstance(collision, FileMesh) and not updated:
+                                    # Replace FileMesh with TriangleMesh containing the reloaded mesh
+                                    new_collision = TriangleMesh(
+                                        origin=collision.origin,
+                                        scale=collision.scale,
+                                        color=collision.color,
+                                        mesh=reloaded_mesh,
+                                    )
+                                    new_collision_shapes.append(new_collision)
+                                    updated = True
+                                    reloaded_count += 1
+                                    print(
+                                        f"  Reloaded {body_name}.obj from {obj_file.name} with textures"
+                                    )
+                                elif (
+                                    isinstance(collision, TriangleMesh) and not updated
+                                ):
+                                    # Update TriangleMesh directly
+                                    collision.mesh = reloaded_mesh
+                                    new_collision_shapes.append(collision)
+                                    updated = True
+                                    reloaded_count += 1
+                                    print(
+                                        f"  Reloaded {body_name}.obj from {obj_file.name} with textures"
+                                    )
+                                else:
+                                    # Keep other collision shapes as-is
+                                    new_collision_shapes.append(collision)
+
+                            if updated:
+                                # Create new ShapeCollection with updated shapes
+                                body.collision = ShapeCollection(new_collision_shapes)
+                    except Exception as e:
+                        print(f"  Error reloading {obj_file.name}: {e}")
+                        continue
+
+    print(f"Reloaded textures for {reloaded_count} bodies.")
+    return world
+
+
 def render_exploded_world(
     world: World,
     save_path: Optional[Path] = None,
     show: bool = True,
     camera_index: int = 0,
     explosion_factor: float = 1.0,
+    objects_dir: Optional[Path] = None,
 ) -> bytes:
     """
     Render the world in an exploded view.
@@ -206,6 +517,7 @@ def render_exploded_world(
         show: Whether to show the interactive viewer
         camera_index: Index of predefined camera pose (0-3)
         explosion_factor: Multiplier for explosion distance
+        objects_dir: Optional path to directory containing OBJ files for texture reloading
 
     Returns:
         PNG image data as bytes
@@ -213,6 +525,11 @@ def render_exploded_world(
     # Create exploded version of the world
     print("Creating exploded view...")
     exploded_world = create_exploded_world(world, explosion_factor=explosion_factor)
+
+    # Reload textures from Objects directory if provided
+    # Do this AFTER creating exploded world to ensure textures are in the final world
+    if objects_dir is not None:
+        exploded_world = reload_textures_from_objects_dir(exploded_world, objects_dir)
 
     # Use WarsawWorldLoader for camera setup
     world_loader = WarsawWorldLoader.from_world(exploded_world)
@@ -307,6 +624,7 @@ def main(args):
                 save_path=args.save,
                 camera_index=args.camera,
                 explosion_factor=args.explosion_factor,
+                objects_dir=args.objects_dir,
             )
 
     finally:
@@ -350,6 +668,11 @@ if __name__ == "__main__":
         type=float,
         default=1.0,
         help="Multiplier for explosion distance. 1.0 = normal explosion, 2.0 = double distance, etc. (default: 1.0).",
+    )
+    parser.add_argument(
+        "--objects-dir",
+        type=Path,
+        help="Path to directory containing OBJ files for texture reloading. If provided, meshes will be reloaded with textures from this directory.",
     )
 
     main(parser.parse_args())
