@@ -3,19 +3,20 @@ import json
 import numpy as np
 from std_srvs.srv import Trigger
 
+from krrood.ormatic.dao import to_dao
 from semantic_digital_twin.adapters.ros.world_fetcher import (
     FetchWorldServer,
     fetch_world_from_service,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle, Door
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import pr2_world
-from semantic_digital_twin.testing import rclpy_node
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -70,7 +71,7 @@ def test_service_callback_success(rclpy_node):
 
     assert result.success is True
 
-    tracker = KinematicStructureEntityKwargsTracker()
+    tracker = WorldEntityWithIDKwargsTracker()
     kwargs = tracker.create_kwargs()
 
     # Verify the message is valid JSON (expects new envelope format)
@@ -120,7 +121,7 @@ def test_service_callback_with_multiple_modifications(rclpy_node):
     assert result.success is True
     # Verify the message is valid JSON
 
-    tracker = KinematicStructureEntityKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
     kwargs = tracker.create_kwargs()
     payload = json.loads(result.message)
     modifications_json = payload["modifications"]
@@ -136,7 +137,7 @@ def test_service_callback_with_multiple_modifications(rclpy_node):
 def test_world_fetching(rclpy_node):
     world = create_dummy_world()
     world.get_body_by_name("body_2").parent_connection.origin = (
-        TransformationMatrix.from_xyz_rpy(1, 1, 1)
+        HomogeneousTransformationMatrix.from_xyz_rpy(1, 1, 1)
     )
     fetcher = FetchWorldServer(node=rclpy_node, world=world)
 
@@ -154,10 +155,23 @@ def test_world_fetching(rclpy_node):
 
 
 def test_semantic_annotation_modifications(rclpy_node):
+    """
+    If this test does not terminate after calling "client.call(Trigger.Request())" inside "fetch_world_from_service" doublecheck
+    if some fields in semantic annotations are not instantiated.
+    For instance having this field in the door semantic annotation causes the above issue:
+
+    >>> entry_way: EntryWay = field(init=False)
+
+    Changing it to:
+
+    >>> entry_way: Optional[EntryWay] = field(init=False, default=None)
+
+    resolves the issue
+    """
     w1 = World(name="w1")
     b1 = Body(name=PrefixedName("b1"))
-    v1 = Handle(body=b1)
-    v2 = Door(body=b1, handle=v1)
+    v1 = Handle(root=b1)
+    v2 = Door(root=b1, handle=v1)
 
     with w1.modify_world():
         w1.add_body(b1)
@@ -175,14 +189,20 @@ def test_semantic_annotation_modifications(rclpy_node):
     ]
 
 
-def test_pr2_semantic_annotation(rclpy_node, pr2_world):
-    PR2.from_world(pr2_world)
-    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world)
+def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
 
     pr2_world_copy = fetch_world_from_service(
         rclpy_node,
     )
 
-    assert [sa.name for sa in pr2_world.semantic_annotations] == [
+    fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+
+    assert set(map(lambda x: x.id, fetched_pr2.manipulators)) == set(
+        map(lambda x: x.id, pr2.manipulators)
+    )
+
+    assert [sa.name for sa in pr2_world_state_reset.semantic_annotations] == [
         sa.name for sa in pr2_world_copy.semantic_annotations
     ]

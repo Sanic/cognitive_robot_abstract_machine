@@ -4,8 +4,9 @@ import importlib
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import Enum, auto
 from types import FunctionType
+from typing import Set
 
 from sqlalchemy import types, TypeDecorator, JSON
 from typing_extensions import Dict, Any, Sequence, Self
@@ -31,9 +32,7 @@ class PositionTypeWrapper(Symbol):
 
 
 # check that flat classes work
-
-
-@dataclass
+@dataclass(unsafe_hash=True)
 class Position(Symbol):
     x: float
     y: float
@@ -41,8 +40,6 @@ class Position(Symbol):
 
 
 # check that classes with optional values work
-
-
 @dataclass
 class Orientation(Symbol):
     x: float
@@ -52,17 +49,13 @@ class Orientation(Symbol):
 
 
 # check that one to one relationship work
-
-
 @dataclass
 class Pose(Symbol):
     position: Position
     orientation: Orientation
 
 
-# check that one to many relationship to built in types and non built in types work
-
-
+# check that many to many relationship to built in types and non built in types work
 @dataclass
 class Positions(Symbol):
     positions: List[Position]
@@ -75,8 +68,6 @@ class PositionsSubclassWithAnotherPosition(Positions):
 
 
 # check that one to many relationships work where the many side is of the same type
-
-
 @dataclass
 class DoublePositionAggregator(Symbol):
     positions1: List[Position]
@@ -220,11 +211,11 @@ class CustomEntity(AlternativeMapping[Entity]):
     overwritten_name: str
 
     @classmethod
-    def create_instance(cls, obj: Entity):
+    def from_domain_object(cls, obj: Entity):
         result = cls(overwritten_name=obj.name)
         return result
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         return Entity(name=self.overwritten_name)
 
 
@@ -266,10 +257,10 @@ class BackreferenceMapping(AlternativeMapping[Backreference]):
     reference: Reference
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         return cls(list(obj.unmappable.values()), obj.reference)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         return Backreference({v: v for v in self.values}, self.reference)
 
 
@@ -304,10 +295,10 @@ class VectorMapped(AlternativeMapping[Vector]):
     x: float
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         return VectorMapped(obj.x)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         return Vector(self.x)
 
 
@@ -322,10 +313,10 @@ class RotationMapped(AlternativeMapping[Rotation]):
     angle: float
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         return RotationMapped(obj.angle)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         pass
 
 
@@ -341,10 +332,10 @@ class TransformationMapped(AlternativeMapping[Transformation]):
     rotation: Rotation
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         return TransformationMapped(obj.vector, obj.rotation)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         return Transformation(self.vector, self.rotation)
 
 
@@ -378,10 +369,10 @@ class VectorsWithPropertyMapped(AlternativeMapping[VectorsWithProperty]):
     vectors: List[Vector]
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         return VectorsWithPropertyMapped(obj.vectors)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         return VectorsWithProperty(self.vectors)
 
 
@@ -401,12 +392,12 @@ class ParentBaseMapping(AlternativeMapping[ParentBase]):
     name: str
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         if not isinstance(obj, Parent):
             raise TypeError(f"Expected Parent, got {type(obj)}")
         return ParentBaseMapping(obj.name)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         return ParentBase(self.name, 0)
 
 
@@ -414,12 +405,12 @@ class ParentBaseMapping(AlternativeMapping[ParentBase]):
 class ChildBaseMapping(ParentBaseMapping, AlternativeMapping[ChildBase]):
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         if not isinstance(obj, ChildMapped):
             raise TypeError(f"Expected TestClass2, got {type(obj)}")
         return ChildBaseMapping(obj.name)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         return ChildBase(self.name, 0)
 
 
@@ -475,10 +466,10 @@ class InheritanceBaseWithoutSymbolButAlternativelyMappedMapping(
     base_attribute: float = 0
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         return cls(obj.base_attribute)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         raise NotImplementedError
 
 
@@ -490,7 +481,7 @@ class InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping(
     level_one_attribute: float = 0
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         return cls(obj.base_attribute, obj.level_one_attribute)
 
 
@@ -502,7 +493,7 @@ class InheritanceLevel2WithoutSymbolButAlternativelyMappedMapping(
     level_two_attribute: float = 0
 
     @classmethod
-    def create_instance(cls, obj: T):
+    def from_domain_object(cls, obj: T):
         return cls(obj.base_attribute, obj.level_one_attribute, obj.level_two_attribute)
 
 
@@ -529,10 +520,10 @@ class ParentAlternativelyMappedMapping(AlternativeMapping[ParentAlternativelyMap
     entities: List[Entity]
 
     @classmethod
-    def create_instance(cls, obj: T) -> Self:
+    def from_domain_object(cls, obj: T) -> Self:
         return cls(str(obj.base_attribute), obj.entities)
 
-    def create_from_dao(self) -> T:
+    def to_domain_object(self) -> T:
         raise NotImplementedError
 
 
@@ -604,3 +595,91 @@ class PrimaryBase:
 @dataclass
 class MultipleInheritance(PrimaryBase, Mixin):
     extra_attribute: str
+
+
+# %% Test enum list
+class TestEnum(Enum):
+    OPTION_A = "option_a"
+    OPTION_B = "option_b"
+    OPTION_C = "option_c"
+
+
+@dataclass
+class ListOfEnum(Symbol):
+    list_of_enum: List[TestEnum]
+
+
+# %% Test forward reference resolution with multiple unresolved types
+# This reproduces the issue where get_type_hints fails because multiple
+# forward references need to be resolved iteratively
+
+
+@dataclass
+class ForwardRefTypeA(Symbol):
+    """A simple class used as a forward reference target."""
+
+    value: str = ""
+
+
+@dataclass
+class ForwardRefTypeB(Symbol):
+    """Another class used as a forward reference target."""
+
+    count: int = 0
+
+
+@dataclass
+class MultipleForwardRefContainer(Symbol):
+    """
+    A class that has multiple fields with forward reference types.
+    This tests that the forward reference resolution can handle
+    multiple unresolved types that need to be resolved iteratively.
+    """
+
+    ref_a: Optional[ForwardRefTypeA] = None
+    ref_b: Optional[ForwardRefTypeB] = None
+
+
+@dataclass
+class Person:
+    name: str
+
+    knows: List[Person] = field(default_factory=list)
+
+
+@dataclass
+class UnderspecifiedTypesContainer:
+    any_list: List[Any] = field(default_factory=list)
+    any_field: Any = None
+
+
+@dataclass
+class TestPositionSet:
+    positions: Set[Position] = field(default_factory=set)
+
+
+class PolymorphicEnum(Enum): ...
+
+
+class ChildEnum1(PolymorphicEnum):
+    A = auto()
+    B = auto()
+
+
+class ChildEnum2(PolymorphicEnum):
+    B = auto()
+    C = auto()
+
+
+@dataclass
+class PolymorphicEnumAssociation:
+    value: PolymorphicEnum
+
+
+@dataclass(frozen=True)
+class NamedNumbers:
+    name: str
+    numbers: List[int] = field(default_factory=list)
+
+    def __hash__(self):
+        return hash(self.name)

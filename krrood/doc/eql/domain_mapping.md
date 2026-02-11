@@ -13,10 +13,11 @@ kernelspec:
 # Domain Mapping
 
 Domain mapping transforms iterable attributes or nested collections into element-wise bindings while preserving existing
-variable bindings. This page covers two common patterns:
+variable bindings. This page covers three common patterns:
 
 - Flattening an iterable attribute (`flatten`)
 - Indexing into container attributes (capturing `__getitem__` symbolically)
+- Concatenating multiple variables (`concatenate`)
 
 ## Setup
 
@@ -29,11 +30,12 @@ from typing_extensions import List, Dict
 from krrood.entity_query_language.entity import (
     entity,
     set_of,
-    let,
+    variable,
     flatten,
     Symbol,
+    concatenate
 )
-from krrood.entity_query_language.quantify_entity import an
+from krrood.entity_query_language.entity_result_processors import an
 
 @dataclass
 class Body(Symbol):
@@ -98,9 +100,9 @@ Flatten turns an iterable-of-iterables into a flat sequence of items while keepi
 It is handy when a selected variable has an attribute that is a list and you want one row per element of that list.
 
 ```{code-cell} ipython3
-views = let(type_=View, domain=world.views)
+views = variable(type_=View, domain=world.views)
 drawers = flatten(views.drawers)  # UNNEST-like flatten of each view's drawers
-query = an(set_of([views, drawers]))
+query = an(set_of(views, drawers))
 
 rows = list(query.evaluate())
 # Each solution contains both the parent view and one flattened drawer
@@ -135,11 +137,28 @@ score_world = ScoreWorld([
     ScoredBody("Body2", {"score": 2}),
 ])
 
-b = let(type_=ScoredBody, domain=score_world.bodies)
+b = variable(type_=ScoredBody, domain=score_world.bodies)
 # Use indexing on a dict field; the indexing is preserved symbolically
-query = an(entity(b, b.props["score"] == 2))
+query = an(entity(b).where(b.props["score"] == 2))
 
 results = list(query.evaluate())
 assert len(results) == 1 and results[0].name == "Body2"
 print(*results, sep="\n")
+```
+
+## concatenate
+
+The `concatenate` function allows combining multiple variables or iterables into a single selectable.
+
+```{code-cell} ipython3
+# Create two variables with different domains
+handles = variable(Handle, world.bodies)
+containers = variable(Container, world.bodies)
+
+# Concatenate them into a single variable
+handles_and_containers = concatenate(handles, containers)
+results = list(an(entity(handles_and_containers)).evaluate())
+
+assert len(results) == len(world.bodies)
+print(len(results))
 ```

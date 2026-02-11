@@ -9,9 +9,20 @@ To install the CRAM architecture, follow these steps:
 Setup the Python venvironment:
 
 ```bash
-python3 -m venv cram-env
-source cram-env/bin/activate
+sudo apt install -y virtualenv virtualenvwrapper && \
+grep -qxF 'export WORKON_HOME=$HOME/.virtualenvs' ~/.bashrc || echo 'export WORKON_HOME=$HOME/.virtualenvs' >> ~/.bashrc && \
+grep -qxF 'export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3' ~/.bashrc || echo 'export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3' >> ~/.bashrc && \
+grep -qxF 'source /usr/share/virtualenvwrapper/virtualenvwrapper.sh' ~/.bashrc || echo 'source /usr/share/virtualenvwrapper/virtualenvwrapper.sh' >> ~/.bashrc && \
+source ~/.bashrc && \
+mkvirtualenv cram-env
 ```
+Activate / deactivate
+
+```
+workon cram-env
+deactivate
+```
+
 
 We use poetry to manage dependencies. Install poetry if you haven't already:
 
@@ -23,6 +34,7 @@ Install the CRAM package along with its dependencies:
 
 ```bash
 cd cognitive_robot_abstract_machine
+git submodule update --init --recursive
 poetry install
 ```
 

@@ -18,6 +18,7 @@ from ..entity_query_language.symbolic import (
     The,
     Variable,
     Literal,
+    Where,
 )
 
 from .dao import get_dao_class
@@ -441,6 +442,8 @@ class EQLTranslator:
             return self.translate_comparator(query)
         if isinstance(query, Attribute):
             return self.translate_attribute(query)
+        if isinstance(query, Where):
+            return self.translate_query(query.conditions)
 
         raise UnsupportedQueryTypeError(f"Unknown query type: {type(query)}")
 
@@ -563,8 +566,8 @@ class EQLTranslator:
             return None
 
         rel_resolver = RelationshipResolver()
-        left_attribute_name = query.left._attr_name_
-        right_attribute_name = query.right._attr_name_
+        left_attribute_name = query.left._attribute_name_
+        right_attribute_name = query.right._attribute_name_
 
         left_rel, left_fk = rel_resolver.resolve_relationship_and_foreign_key(
             left_dao, left_attribute_name
@@ -679,7 +682,7 @@ class EQLTranslator:
         names = []
         node = query
         while isinstance(node, Attribute):
-            names.append(node._attr_name_)
+            names.append(node._attribute_name_)
             node = node._child_
         return list(reversed(names))
 

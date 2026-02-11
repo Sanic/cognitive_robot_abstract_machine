@@ -2,8 +2,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import List
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -19,7 +20,7 @@ class BaseArmWeightScaling(Task):
 
     root_link: Body
     tip_link: Body
-    tip_goal: cas.Point3
+    tip_goal: Point3
     arm_joints: List[str]
     base_joints: List[str]
     gain: float = 100000
@@ -40,7 +41,7 @@ class BaseArmWeightScaling(Task):
             for name in self.arm_joints:
                 vs = context.world.get_connection_by_name(name).active_dofs
                 for v in vs:
-                    v_gain = self.gain * (scaling_exp / v.upper_limits.velocity).norm()
+                    v_gain = self.gain * (scaling_exp / v.limits.upper.velocity).norm()
                     arm_v = v
                     gains[Derivatives.velocity][v] = v_gain
                     gains[Derivatives.acceleration][v] = v_gain
@@ -52,8 +53,8 @@ class BaseArmWeightScaling(Task):
                     v_gain = (
                         self.gain
                         / 100
-                        * cas.Expression(1).safe_division(
-                            (scaling_exp / v.upper_limits.velocity).norm()
+                        * sm.Scalar(1).safe_division(
+                            (scaling_exp / v.limits.upper.velocity).norm()
                         )
                     )
                     base_v = v
@@ -65,13 +66,13 @@ class BaseArmWeightScaling(Task):
         context.add_debug_expression(
             "base_scaling",
             self.gain
-            * cas.Expression(1).safe_division(
-                (scaling_exp / base_v.upper_limits.velocity).norm()
+            * sm.Scalar(1).safe_division(
+                (scaling_exp / base_v.limits.upper.velocity).norm()
             ),
         )
         context.add_debug_expression(
             "arm_scaling",
-            self.gain * (scaling_exp / arm_v.upper_limits.velocity).norm(),
+            self.gain * (scaling_exp / arm_v.limits.upper.velocity).norm(),
         )
         context.add_debug_expression("norm", scaling_exp.norm())
         context.add_debug_expression("division", 1 / scaling_exp.norm())
@@ -96,10 +97,10 @@ class MaxManipulability(Task):
         ).to_position()[:3]
 
         symbols = context.free_variables()
-        e = cas.vstack([root_P_tip])
+        e = sm.vstack([root_P_tip])
         J = e.jacobian(symbols)
         JJT = J.dot(J.T)
-        m = cas.sqrt(JJT.det())
+        m = sm.sqrt(JJT.det())
 
         self.add_position_constraint(
             reference_velocity=1,
@@ -117,4 +118,4 @@ class MaxManipulability(Task):
             self.m_threshold,
             derivatives_to_plot=[0, 1],
         )
-        self.observation_expression = cas.abs(self.m_threshold - m) <= 0.01
+        self.observation_expression = sm.abs(self.m_threshold - m) <= 0.01

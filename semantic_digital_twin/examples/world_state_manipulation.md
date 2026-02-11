@@ -19,7 +19,7 @@ In this tutorial we will manipulate the state (free variables) of the world.
 Concepts Used:
 - [](visualizing-worlds)
 - Factories (TODO)
-- [Entity Query Language](https://abdelrhmanbassiouny.github.io/entity_query_language/intro.html)
+- [Entity Query Language](https://cram2.github.io/cognitive_robot_abstract_machine/krrood/eql/intro.html)
 - [](world-structure-manipulation)
 
 First, we create a dresser containing a single drawer using the respective factories.
@@ -29,54 +29,51 @@ import threading
 import time
 
 import numpy as np
-from krrood.entity_query_language.entity import the, entity, let, in_
+from krrood.entity_query_language.entity import entity, variable, in_
+from krrood.entity_query_language.entity_result_processors import the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
-from semantic_digital_twin.semantic_annotations.factories import (
-    DresserFactory,
-    ContainerFactory,
-    HandleFactory,
-    DrawerFactory,
-    Direction,
-    SemanticPositionDescription,
-    HorizontalSemanticDirection,
-    VerticalSemanticDirection,
-)
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Slider, Dresser
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale, Box, Color
+from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
-drawer_factory = DrawerFactory(
-    name=PrefixedName("drawer"),
-    container_factory=ContainerFactory(
-        name=PrefixedName("drawer_container"),
-        direction=Direction.Z,
+world = World()
+root = Body(name=PrefixedName("root"))
+
+with world.modify_world():
+    world.add_body(root)
+with world.modify_world():
+    drawer= Drawer.create_with_new_body_in_world(
+        name=PrefixedName("drawer"),
         scale=Scale(0.3, 0.3, 0.2),
-    ),
-    handle_factory=HandleFactory(name=PrefixedName("drawer_handle")),
-    semantic_position=SemanticPositionDescription(
-        horizontal_direction_chain=[
-            HorizontalSemanticDirection.FULLY_CENTER,
-        ],
-        vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
-    ),
-)
-drawer_transform = TransformationMatrix()
+        world=world,
+        world_root_T_self=HomogeneousTransformationMatrix(),
+    )
+    handle = Handle.create_with_new_body_in_world(
+        name=PrefixedName("drawer_handle"),
+        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
+        world=world,
+    )
+    drawer.add_handle(handle)
 
-container_factory = ContainerFactory(
-    name=PrefixedName("dresser_container"), scale=Scale(0.31, 0.31, 0.21)
-)
+    slider = Slider.create_with_new_body_in_world(
+        name=PrefixedName("drawer_slider"),
+        world_root_T_self=HomogeneousTransformationMatrix(),
+        world=world,
+        active_axis=Vector3.X()
+    )
+    drawer.add_slider(slider)
 
-dresser_factory = DresserFactory(
-    name=PrefixedName("dresser"),
-    parent_T_drawers=[drawer_transform],
-    drawers_factories=[drawer_factory],
-    container_factory=container_factory,
-)
+    dresser = Dresser.create_with_new_body_in_world(
+        name=PrefixedName("dresser"),
+        scale=Scale(0.31, 0.31, 0.21),
+        world=world,
+    )
 
-world = dresser_factory.create()
+    dresser.add_drawer(drawer)
 
 rt = RayTracer(world)
 rt.update_scene()
@@ -88,7 +85,7 @@ Let's get a reference to the drawer we built above.
 ```{code-cell} ipython3
 drawer = the(
     entity(
-        let(type_=Drawer, domain=world.semantic_annotations),
+        variable(type_=Drawer, domain=world.semantic_annotations),
     )
 ).evaluate()
 ```
@@ -96,7 +93,7 @@ drawer = the(
 We can update the drawer's state by altering the free variables position of its prismatic connection to the dresser.
 
 ```{code-cell} ipython3
-drawer.container.body.parent_connection.position = 0.1
+drawer.root.parent_connection.position = 0.1
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")
@@ -114,7 +111,7 @@ with world.modify_world():
     new_root = Body(name=PrefixedName("virtual root"))
     
     # Add a visual for the new root so we can see the change of position in the visualization
-    box_origin = TransformationMatrix.from_xyz_rpy(reference_frame=new_root)
+    box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=new_root)
     box = Box(origin=box_origin, scale=Scale(0.1, 0.1, 0.1), color=Color(1., 0., 0., 1.))
     new_root.collision = [box]
     
@@ -131,9 +128,10 @@ Now we can start moving the dresser everywhere and even rotate it.
 ```{code-cell} ipython3
 from semantic_digital_twin.world_description.world_entity import Connection
 
-free_connection = the(entity(connection := let(type_=Connection, domain=world.connections), connection.parent == world.root)).evaluate()
+connection = variable(type_=Connection, domain=world.connections)
+free_connection = the(entity(connection).where(connection.parent == world.root)).evaluate()
 with world.modify_world():
-    free_connection.origin = TransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi)
+    free_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi)
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")
@@ -146,7 +144,8 @@ Since it is an aggregation of all degree of freedoms existing in the world, it c
 We can close the drawer again as follows:
 
 ```{code-cell} ipython3
-connection = the(entity(connection := let(type_=PrismaticConnection, domain=world.connections), in_("drawer", connection.child.name.name))).evaluate()
+connection = variable(PrismaticConnection, domain=world.connections)
+connection = the(entity(connection).where(in_("drawer", connection.child.name.name))).evaluate()
 with world.modify_world():
     world.state[connection.dof.id] = [0., 0., 0., 0.]
 rt = RayTracer(world)

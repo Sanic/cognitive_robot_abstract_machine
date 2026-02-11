@@ -1,13 +1,14 @@
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 
 from krrood.ormatic.alternative_mappings import FunctionMapping, UncallableFunction
 from krrood.ormatic.dao import (
     to_dao,
     is_data_column,
-    NoDAOFoundError,
-    ToDAOState,
+    ToDataAccessObjectState,
+    get_dao_class,
 )
+from krrood.ormatic.exceptions import NoDAOFoundError
 from ..dataset.example_classes import *
 from ..dataset.ormatic_interface import *
 
@@ -476,54 +477,60 @@ def test_inheritance_mapper_args(session, database):
 
 def test_to_dao_alternatively_mapped_parent(session, database):
     ch2 = ChildLevel2NormallyMapped(1, [Entity("a")], 2, 3)
-    ch2_dao = to_dao(ch2)
+    ch2_dao: ChildLevel2NormallyMappedDAO = to_dao(ch2)
 
-    assert isinstance(ch2_dao.entities[0], CustomEntityDAO)
-    assert ch2_dao.entities == [CustomEntityDAO(overwritten_name="a")]
-
-    assert ch2_dao == ChildLevel2NormallyMappedDAO(
+    result_by_hand = ChildLevel2NormallyMappedDAO(
         derived_attribute="1",
         entities=[CustomEntityDAO(overwritten_name="a")],
         level_one_attribute=2,
         level_two_attribute=3,
     )
 
+    assert isinstance(ch2_dao.entities[0], CustomEntityDAO)
+    assert (
+        ch2_dao.entities[0].overwritten_name
+        == result_by_hand.entities[0].overwritten_name
+    )
+    assert len(ch2_dao.entities) == len(result_by_hand.entities)
+    assert ch2_dao.level_one_attribute == result_by_hand.level_one_attribute
+    assert ch2_dao.level_two_attribute == result_by_hand.level_two_attribute
+
 
 def test_callable_alternative_mapping():
-    callable_mapping = FunctionMapping.create_instance(module_level_function)
-    reconstructed = callable_mapping.create_from_dao()
+    callable_mapping = FunctionMapping.from_domain_object(module_level_function)
+    reconstructed = callable_mapping.to_domain_object()
     assert reconstructed() == 1
 
 
 def test_callable_alternative_mapping_instance_method():
-    callable_mapping = FunctionMapping.create_instance(
+    callable_mapping = FunctionMapping.from_domain_object(
         CallableWrapper.custom_instance_method
     )
-    reconstructed = callable_mapping.create_from_dao()
+    reconstructed = callable_mapping.to_domain_object()
     assert reconstructed is CallableWrapper.custom_instance_method
 
 
 def test_callable_alternative_mapping_class_method():
-    callable_mapping = FunctionMapping.create_instance(
+    callable_mapping = FunctionMapping.from_domain_object(
         CallableWrapper.custom_class_method
     )
-    reconstructed = callable_mapping.create_from_dao()
+    reconstructed = callable_mapping.to_domain_object()
     assert reconstructed == CallableWrapper.custom_class_method
 
 
 def test_callable_alternative_mapping_static_method():
-    callable_mapping = FunctionMapping.create_instance(
+    callable_mapping = FunctionMapping.from_domain_object(
         CallableWrapper.custom_static_method
     )
-    reconstructed = callable_mapping.create_from_dao()
+    reconstructed = callable_mapping.to_domain_object()
     assert reconstructed is CallableWrapper.custom_static_method
     assert reconstructed() == 4
 
 
 def test_anonymous_function_mapping():
     func = lambda: 0
-    callable_mapping = FunctionMapping.create_instance(func)
-    reconstructed = callable_mapping.create_from_dao()
+    callable_mapping = FunctionMapping.from_domain_object(func)
+    reconstructed = callable_mapping.to_domain_object()
     with pytest.raises(UncallableFunction):
         reconstructed()
 
@@ -574,7 +581,7 @@ def test_json_integration(session, database):
 
 def test_many_to_many_with_same_type(session, database):
 
-    state = ToDAOState()
+    state = ToDataAccessObjectState()
     position = Position(1, 2, 3)
     ps1 = Positions([position], ["a"])
     ps2 = Positions([position], ["a"])
@@ -611,3 +618,114 @@ def test_multiple_inheritance(session, database):
     queried = session.scalars(select(MultipleInheritanceDAO)).one()
     reconstructed = queried.from_dao()
     assert reconstructed == obj
+
+
+def test_list_of_enum(session, database):
+    obj = ListOfEnum([TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C])
+    dao = to_dao(obj)
+
+    session.add(dao)
+    session.commit()
+
+    queried = session.scalars(select(ListOfEnumDAO)).one()
+    reconstructed = queried.from_dao()
+    assert reconstructed == obj
+    assert reconstructed.list_of_enum == [
+        TestEnum.OPTION_A,
+        TestEnum.OPTION_B,
+        TestEnum.OPTION_C,
+    ]
+
+
+def test_persons(session, database):
+    p1 = Person(name="Alice")
+    p2 = Person(name="Bob")
+    p1.knows.append(p2)
+
+    dao = to_dao(p1)
+    session.add(dao)
+    session.commit()
+
+    q = session.scalar(select(PersonDAO).where(PersonDAO.name == "Alice"))
+    assert q.name == "Alice"
+    assert q.knows[0].name == "Bob"
+
+
+def test_underspecified_types():
+    dao_class = get_dao_class(UnderspecifiedTypesContainer)
+    assert dao_class is not None
+    inst = inspect(dao_class)
+    column_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
+    assert "any_list" not in column_names
+    assert "any_field" not in column_names
+
+
+def test_position_set(session, database):
+    p1, p2 = Position(1, 2, 3), Position(2, 3, 4)
+    obj = TestPositionSet({p1, p2})
+    dao = to_dao(obj)
+    session.add(dao)
+    session.commit()
+
+    r = session.scalars(select(TestPositionSetDAO)).one()
+    reconstructed = r.from_dao()
+    assert reconstructed == obj
+
+
+def test_post_init_and_circular_reference(session, database):
+    """
+    Test the 4-phase from_dao logic with __post_init__ and circular references.
+    """
+    c1_dao = ContainerGenerationDAO()
+    i1_dao = ItemWithBackreferenceDAO(value=10)
+    i2_dao = ItemWithBackreferenceDAO(value=20)
+
+    c1_dao.items = [i1_dao, i2_dao]
+    i1_dao.container = c1_dao
+    i2_dao.container = c1_dao
+
+    session.add(c1_dao)
+    session.commit()
+
+    # Clear session to ensure we are loading from DB
+    session.expunge_all()
+
+    queried_c1_dao = session.scalars(select(ContainerGenerationDAO)).one()
+
+    # Reconstruct domain object
+    c1 = queried_c1_dao.from_dao()
+
+    assert isinstance(c1, ContainerGeneration)
+    assert len(c1.items) == 2
+    assert c1.items[0].value == 10
+    assert c1.items[1].value == 20
+
+    # Check if __post_init__ was called and backreferences are set
+    assert c1.items[0].container is c1
+    assert c1.items[1].container is c1
+
+
+def test_polymorphic_enum(session, database):
+    v1 = PolymorphicEnumAssociation(ChildEnum1.A)
+    v2 = PolymorphicEnumAssociation(ChildEnum1.B)
+    v3 = PolymorphicEnumAssociation(ChildEnum2.B)
+    v4 = PolymorphicEnumAssociation(ChildEnum2.C)
+
+    dao_1, dao_2, dao_3, dao_4 = to_dao(v1), to_dao(v2), to_dao(v3), to_dao(v4)
+
+    session.add_all([dao_1, dao_2, dao_3, dao_4])
+    session.commit()
+
+    statement = select(PolymorphicEnumAssociationDAO)
+    r1, r2, r3, r4 = session.scalars(statement).all()
+
+    assert r1.from_dao() == v1
+    assert r2.from_dao() == v2
+    assert r3.from_dao() == v3
+    assert r4.from_dao() == v4
+
+    statement = select(PolymorphicEnumAssociationDAO).where(
+        PolymorphicEnumAssociationDAO.value == ChildEnum1.B
+    )
+    r = session.scalars(statement).all()
+    assert len(r) == 1

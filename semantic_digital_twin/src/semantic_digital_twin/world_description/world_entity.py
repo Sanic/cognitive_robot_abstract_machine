@@ -1,28 +1,19 @@
 from __future__ import annotations
 
 import inspect
-from copy import copy, deepcopy
-
-import itertools
+import uuid
 from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from copy import deepcopy
+from dataclasses import dataclass, field, Field
 from dataclasses import fields
-from functools import lru_cache
+from functools import lru_cache, cached_property
 from uuid import UUID, uuid4
-from typing import ClassVar, List, Dict, Any
 
 import numpy as np
 import trimesh
 import trimesh.boolean
-from krrood.adapters.json_serializer import (
-    SubclassJSONSerializer,
-    JSON_TYPE_NAME,
-    to_json,
-    from_json,
-)
-from krrood.entity_query_language.predicate import Symbol
 from scipy.stats import geom
 from trimesh.proximity import closest_point, nearby_faces
 from trimesh.sample import sample_surface
@@ -33,21 +24,35 @@ from typing_extensions import (
     Dict,
     Any,
     Self,
+    ClassVar,
 )
 from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
 from typing_extensions import Set
 
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+)
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from krrood.entity_query_language.predicate import Symbol
+from krrood.symbolic_math.symbolic_math import Matrix
 from .geometry import TriangleMesh
 from .inertial_properties import Inertial
 from .shape_collection import ShapeCollection, BoundingBoxCollection
+from ..mixin import HasSimulatorProperties
 from ..adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from ..datastructures.prefixed_name import PrefixedName
-from ..exceptions import ReferenceFrameMismatchError
-from ..spatial_types import spatial_types as cas
-from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
-from ..utils import IDGenerator, type_string_to_type, camel_case_split
+from ..exceptions import (
+    ReferenceFrameMismatchError,
+)
+from ..spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+)
+from ..utils import IDGenerator, camel_case_split
 
 if TYPE_CHECKING:
     from ..world_description.degree_of_freedom import DegreeOfFreedom
@@ -57,7 +62,7 @@ id_generator = IDGenerator()
 
 
 @dataclass(eq=False)
-class WorldEntity(Symbol):
+class WorldEntity(Symbol, HasSimulatorProperties):
     """
     A class representing an entity in the world.
 
@@ -114,20 +119,117 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
     A unique identifier for this world entity.
     """
 
-    def __hash__(self):
+    @cached_property
+    def _hash(self):
         return hash(self.id)
+
+    def __hash__(self):
+        return self._hash
 
     def add_to_world(self, world: World):
         super().add_to_world(world)
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["id"] = to_json(self.id)
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(self.__class__):
+            value = getattr(self, field_.public_name)
+
+            if isinstance(value, (list, set)):
+                current_result = [self._item_to_json(item) for item in value]
+            else:
+                current_result = self._item_to_json(value)
+            result[field_.public_name] = current_result
         return result
+
+    @classmethod
+    def _item_to_json(cls, item: Any):
+        """
+        Convert an item to JSON format, handling WorldEntityWithID objects by serializing their ID.
+        """
+        if isinstance(item, WorldEntityWithID):
+            result = to_json(item.id)
+        else:
+            result = to_json(item)
+        return result
+
+    def _track_object_in_from_json(
+        self, from_json_kwargs
+    ) -> WorldEntityWithIDKwargsTracker:
+        """
+        Add this object to the WorldEntityWithIDKwargsTracker.
+
+        .. note::
+            Always use this when referencing WorldEntityWithID in the current class.
+            Call this when the _from_json
+
+        :param from_json_kwargs: The kwargs passed to the _from_json method.
+        :return: The instance of WorldEntityWithIDKwargsTracker.
+        """
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs)
+        tracker.add_world_entity_with_id(self)
+        return tracker
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        .. warn::
+
+            This will not work if any of the classes' fields have a type UUID or some container of UUID.
+            Whenever this happens, the UUIDs are resolved to WorldEntityWithID objects, which leads to undefined
+            behavior.
+        """
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+
+        half_initialized_instance = cls.__new__(cls)
+        half_initialized_instance.id = from_json(data["id"], **kwargs)
+        if tracker.has_world_entity_with_id(half_initialized_instance.id):
+            return tracker.get_world_entity_with_id(half_initialized_instance.id)
+        tracker.add_world_entity_with_id(half_initialized_instance)
+
+        fields_ = {f.name: f for f in fields(cls)}
+
+        init_args = {"id": half_initialized_instance.id}
+        for k, v in fields_.items():
+            if k == "id":
+                continue
+            if k not in data.keys():
+                continue
+
+            current_data = data[k]
+            if isinstance(current_data, list):
+                if isinstance(v.type, str):
+                    type_name = v.type
+                else:
+                    type_name = v.type._name
+                if type_name.startswith("Set"):
+                    container_type = set
+                else:
+                    container_type = list
+
+                current_result = container_type(
+                    [cls._item_from_json(data, **kwargs) for data in current_data]
+                )
+            else:
+                current_result = cls._item_from_json(current_data, **kwargs)
+            init_args[k] = current_result
+        half_initialized_instance.__init__(**init_args)
+        return half_initialized_instance
+
+    @classmethod
+    def _item_from_json(cls, data: Dict[str, Any], **kwargs) -> Any:
+        state = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        obj = from_json(data, **kwargs)
+
+        if isinstance(obj, uuid.UUID):
+            obj = from_json(data, **kwargs)
+            return state.get_world_entity_with_id(obj)
+        else:
+            return obj
 
 
 @dataclass
-class CollisionCheckingConfig(SubclassJSONSerializer):
+class CollisionCheckingConfig:
     buffer_zone_distance: Optional[float] = None
     """
     Distance defining a buffer zone around the entity. The buffer zone represents a soft boundary where
@@ -151,25 +253,9 @@ class CollisionCheckingConfig(SubclassJSONSerializer):
     If more bodies than this are in the buffer zone, only the closest ones are avoided.
     """
 
-    def to_json(self) -> Dict[str, Any]:
-        json_data = super().to_json()
-        for field_ in fields(self):
-            value = getattr(self, field_.name)
-            json_data[field_.name] = to_json(value)
-        return json_data
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        cls_kwargs = {}
-        for field_name, json_field_data in data.items():
-            if field_name == JSON_TYPE_NAME:
-                continue
-            cls_kwargs[field_name] = from_json(json_field_data)
-        return cls(**cls_kwargs)
-
 
 @dataclass(eq=False)
-class KinematicStructureEntity(WorldEntityWithID, SubclassJSONSerializer, ABC):
+class KinematicStructureEntity(WorldEntityWithID, ABC):
     """
     An entity that is part of the kinematic structure of the world.
     """
@@ -204,16 +290,16 @@ class KinematicStructureEntity(WorldEntityWithID, SubclassJSONSerializer, ABC):
         com_local: np.ndarray[np.float64] = self.combined_mesh.center_mass  # (3,)
         # Transform to world frame using the body's global pose
         com = Point3(
-            x_init=com_local[0],
-            y_init=com_local[1],
-            z_init=com_local[2],
+            x=com_local[0],
+            y=com_local[1],
+            z=com_local[2],
             reference_frame=self,
         )
         world = self._world
         return world.transform(com, world.root)
 
     @property
-    def global_pose(self) -> TransformationMatrix:
+    def global_pose(self) -> HomogeneousTransformationMatrix:
         """
         Computes the pose of the KinematicStructureEntity in the world frame.
         :return: TransformationMatrix representing the global pose.
@@ -257,9 +343,43 @@ class KinematicStructureEntity(WorldEntityWithID, SubclassJSONSerializer, ABC):
             connection_type
         )
 
+    @classmethod
+    @abstractmethod
+    def from_shape_collection(
+        cls, name: PrefixedName, shape_collection: ShapeCollection
+    ) -> Self: ...
+
+    @classmethod
+    def from_3d_points(
+        cls,
+        name: PrefixedName,
+        points_3d: List[Point3],
+        minimum_thickness: float = 0.005,
+        sv_ratio_tol: float = 1e-7,
+    ) -> Self:
+        """
+        Constructs a Region from a list of 3D points by creating a convex hull around them.
+        The points are analyzed to determine if they are approximately planar. If they are,
+        a minimum thickness is added to ensure the region has a non-zero volume.
+
+        :param name: Prefixed name for the region.
+        :param points_3d: List of 3D points.
+        :param reference_frame: Optional reference frame.
+        :param minimum_thickness: Minimum thickness to add if points are near-planar.
+        :param sv_ratio_tol: Tolerance for determining planarity based on singular value ratio.
+
+        :return: Region object.
+        """
+        area_mesh = TriangleMesh.from_3d_points(
+            points_3d,
+            minimum_thickness=minimum_thickness,
+            sv_ratio_tol=sv_ratio_tol,
+        )
+        return cls.from_shape_collection(name, ShapeCollection([area_mesh]))
+
 
 @dataclass(eq=False)
-class Body(KinematicStructureEntity, SubclassJSONSerializer):
+class Body(KinematicStructureEntity):
     """
     Represents a body in the world.
     A body is a semantic atom, meaning that it cannot be decomposed into meaningful smaller parts.
@@ -307,6 +427,12 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
         self.collision.reference_frame = self
         self.collision.transform_all_shapes_to_own_frame()
         self.visual.transform_all_shapes_to_own_frame()
+
+    @classmethod
+    def from_shape_collection(
+        cls, name: PrefixedName, shape_collection: ShapeCollection
+    ) -> Self:
+        return cls(name=name, collision=shape_collection, visual=shape_collection)
 
     @property
     def combined_mesh(self) -> Optional[trimesh.Trimesh]:
@@ -445,39 +571,6 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
         ]
         return points_min_self, points_min_other, dist_min
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["name"] = self.name.to_json()
-        result["collision"] = self.collision.to_json()
-        result["visual"] = self.visual.to_json()
-        result["collision_config"] = to_json(self.collision_config)
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        result = cls(
-            name=PrefixedName.from_json(data["name"], **kwargs),
-            id=from_json(data["id"]),
-        )
-        # add the new body so that the transformation matrices in the shapes can use it as reference frame.
-        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
-        if not tracker.has_kinematic_structure_entity(result.id):
-            tracker.add_kinematic_structure_entity(result)
-        else:
-            result = tracker.get_kinematic_structure_entity(result.id)
-
-        collision = ShapeCollection.from_json(data["collision"], **kwargs)
-        visual = ShapeCollection.from_json(data["visual"], **kwargs)
-
-        for shape in itertools.chain(collision, visual):
-            shape.origin.reference_frame = result
-
-        result.collision = collision
-        result.visual = visual
-        result.collision_config = from_json(data["collision_config"])
-
-        return result
-
     def get_semantic_annotations_by_type(
         self, type_: Type[GenericSemanticAnnotation]
     ) -> List[GenericSemanticAnnotation]:
@@ -505,8 +598,11 @@ class Region(KinematicStructureEntity):
     def __post_init__(self):
         self.area.reference_frame = self
 
-    def __hash__(self):
-        return id(self)
+    @classmethod
+    def from_shape_collection(
+        cls, name: PrefixedName, shape_collection: ShapeCollection
+    ):
+        return cls(name=name, area=shape_collection)
 
     @property
     def combined_mesh(self) -> Optional[trimesh.Trimesh]:
@@ -514,93 +610,17 @@ class Region(KinematicStructureEntity):
             return None
         return self.area.combined_mesh
 
-    @classmethod
-    def from_3d_points(
-        cls,
-        name: PrefixedName,
-        points_3d: List[Point3],
-        reference_frame: Optional[KinematicStructureEntity] = None,
-        minimum_thickness: float = 0.005,
-        sv_ratio_tol: float = 1e-7,
-    ) -> Self:
-        """
-        Constructs a Region from a list of 3D points by creating a convex hull around them.
-        The points are analyzed to determine if they are approximately planar. If they are,
-        a minimum thickness is added to ensure the region has a non-zero volume.
-
-        :param name: Prefixed name for the region.
-        :param points_3d: List of 3D points.
-        :param reference_frame: Optional reference frame.
-        :param minimum_thickness: Minimum thickness to add if points are near-planar.
-        :param sv_ratio_tol: Tolerance for determining planarity based on singular value ratio.
-
-        :return: Region object.
-        """
-        points = np.asarray([point.to_np()[:3] for point in points_3d], dtype=float)
-        points = np.unique(points, axis=0)
-        assert (
-            len(points) >= 3
-        ), "At least 4 unique points are required to define a 3D region."
-
-        centered_points = points - points.mean(axis=0, keepdims=True)
-        assert np.any(centered_points), "Points must not be all identical."
-
-        # We compute the principal axes of the point cloud using SVD.
-        # This allows us to reason about the geometric thickness of our point cloud.
-        # The axis with the smallest variance, located at the last index if our `principal_axis` is our `normal`
-        # indicating the direction of the region's thickness.
-        _, variance, principal_axis = np.linalg.svd(
-            centered_points, full_matrices=False
-        )
-        smallest_variance_axis = principal_axis[-1]  # this is our normal
-        unit_vector_normal = smallest_variance_axis / np.linalg.norm(
-            smallest_variance_axis
-        )
-
-        # We compute the thickness, peak-to-peak (max - min), along the normal direction, to get the thickness of
-        # the region.
-        thickness_in_normal_direction = np.ptp(centered_points @ unit_vector_normal)
-        is_near_planar = variance[0] > 0 and variance[-1] / variance[0] < sv_ratio_tol
-        thickness_padding = (
-            minimum_thickness / 2
-            if thickness_in_normal_direction < minimum_thickness or is_near_planar
-            else 0.0
-        )
-
-        # We do not provide any 2d shapes, since they would be very weird to handle with raytracing etc.
-        # Thus we decided that in near-planar cases we add a minimum thickness to ensure we get a 3d shape.
-        if thickness_padding > 0:
-            P_aug = np.vstack(
-                [
-                    points + thickness_padding * unit_vector_normal,
-                    points - thickness_padding * unit_vector_normal,
-                ]
-            )
-        else:
-            P_aug = points
-
-        hull = trimesh.points.PointCloud(P_aug).convex_hull
-        hull.remove_unreferenced_vertices()
-        hull.update_faces(hull.nondegenerate_faces())
-        hull.process()
-
-        area_mesh = TriangleMesh(
-            mesh=hull, origin=TransformationMatrix(reference_frame=reference_frame)
-        )
-        return cls(name=name, area=ShapeCollection([area_mesh]))
-
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["name"] = self.name.to_json()
-        result["area"] = self.area.to_json()
+        result["name"] = to_json(self.name)
+        result["area"] = to_json(self.area)
         return result
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        result = cls(
-            name=PrefixedName.from_json(data["name"], id=from_json(data["id"]))
-        )
-        area = ShapeCollection.from_json(data["area"])
+        result = cls(name=from_json(data["name"]), id=from_json(data["id"]))
+        result._track_object_in_from_json(kwargs)
+        area = from_json(data["area"], **kwargs)
         for shape in area:
             shape.origin.reference_frame = result
         result.area = area
@@ -614,8 +634,8 @@ GenericKinematicStructureEntity = TypeVar(
 GenericWorldEntity = TypeVar("GenericWorldEntity", bound=WorldEntity)
 
 
-@dataclass
-class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
+@dataclass(eq=False)
+class SemanticAnnotation(WorldEntityWithID):
     """
     Represents a semantic annotation on a set of bodies in the world.
 
@@ -662,37 +682,6 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
 
     def __eq__(self, other):
         return hash(self) == hash(other)
-
-    def to_json(self) -> Dict[str, Any]:
-        result = {
-            **super().to_json(),
-        }
-
-        for semantic_annotation_field in fields(self):
-            value = getattr(self, semantic_annotation_field.name)
-            if semantic_annotation_field.name.startswith(
-                "_"
-            ) or semantic_annotation_field.name.startswith("__"):
-                continue
-            if not issubclass(type(value), SubclassJSONSerializer):
-                continue
-            result[semantic_annotation_field.name] = value.to_json()
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        semantic_annotation_fields = {f.name: f for f in fields(cls)}
-
-        init_args = {}
-
-        for k, v in semantic_annotation_fields.items():
-            if k not in data.keys():
-                continue
-            field_type = type_string_to_type(data[k][JSON_TYPE_NAME])
-            if issubclass(field_type, SubclassJSONSerializer):
-                init_args[k] = field_type.from_json(data[k], **kwargs)
-
-        return cls(**init_args)
 
     def _kinematic_structure_entities(
         self, visited: Set[int], aggregation_type: Type[GenericKinematicStructureEntity]
@@ -765,7 +754,7 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         return self._kinematic_structure_entities(set(), Region)
 
     def as_bounding_box_collection_at_origin(
-        self, origin: TransformationMatrix
+        self, origin: HomogeneousTransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies in this semantic annotation.
@@ -794,7 +783,7 @@ class SemanticAnnotation(WorldEntity, SubclassJSONSerializer):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=reference_frame)
+            HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
 
@@ -826,6 +815,7 @@ class RootedSemanticAnnotation(SemanticAnnotation):
             if body.has_collision() and not body.get_collision_config().disabled
         )
 
+
 @dataclass(eq=False)
 class Agent(RootedSemanticAnnotation):
     """
@@ -839,6 +829,7 @@ class Agent(RootedSemanticAnnotation):
 
     ...
 
+
 @dataclass(eq=False)
 class Human(Agent):
     """
@@ -850,7 +841,9 @@ class Human(Agent):
     This class exists primarily for semantic distinction, so that algorithms
     can treat human agents differently from robots if needed.
     """
+
     ...
+
 
 @dataclass(eq=False)
 class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
@@ -866,8 +859,6 @@ class SemanticEnvironmentAnnotation(RootedSemanticAnnotation):
         return set(
             self._world.get_kinematic_structure_entities_of_branch(self.root)
         ) | {self.root}
-
-
 
 
 @dataclass(eq=False)
@@ -891,11 +882,13 @@ class Connection(WorldEntity, SubclassJSONSerializer):
     The child KinematicStructureEntity of the connection.
     """
 
-    parent_T_connection_expression: TransformationMatrix = field(default=None)
-    _kinematics: TransformationMatrix = field(
-        default_factory=TransformationMatrix, init=False
+    parent_T_connection_expression: HomogeneousTransformationMatrix = field(
+        default=None
     )
-    connection_T_child_expression: TransformationMatrix = field(default=None)
+    _kinematics: HomogeneousTransformationMatrix = field(
+        default_factory=HomogeneousTransformationMatrix, init=False
+    )
+    connection_T_child_expression: HomogeneousTransformationMatrix = field(default=None)
     """
     The origin expression of a connection is split into 2 transforms:
     1. parent_T_connection describes the pose of the connection relative to its parent and must be constant.
@@ -916,9 +909,9 @@ class Connection(WorldEntity, SubclassJSONSerializer):
 
         # If I use default factories, I'd have to complicate the from_json, because I couldn't blindly pass these args
         if self.parent_T_connection_expression is None:
-            self.parent_T_connection_expression = TransformationMatrix()
+            self.parent_T_connection_expression = HomogeneousTransformationMatrix()
         if self.connection_T_child_expression is None:
-            self.connection_T_child_expression = TransformationMatrix()
+            self.connection_T_child_expression = HomogeneousTransformationMatrix()
 
         if not self.parent_T_connection_expression.is_constant():
             raise RuntimeError(
@@ -949,30 +942,30 @@ class Connection(WorldEntity, SubclassJSONSerializer):
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
-        result["name"] = self.name.to_json()
+        result["name"] = to_json(self.name)
         result["parent_id"] = to_json(self.parent.id)
         result["child_id"] = to_json(self.child.id)
-        result["parent_T_connection_expression"] = (
-            self.parent_T_connection_expression.to_json()
+        result["parent_T_connection_expression"] = to_json(
+            self.parent_T_connection_expression
         )
         return result
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        tracker = KinematicStructureEntityKwargsTracker.from_kwargs(kwargs)
-        parent = tracker.get_kinematic_structure_entity(id=from_json(data["parent_id"]))
-        child = tracker.get_kinematic_structure_entity(id=from_json(data["child_id"]))
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        parent = tracker.get_world_entity_with_id(id=from_json(data["parent_id"]))
+        child = tracker.get_world_entity_with_id(id=from_json(data["child_id"]))
         return cls(
-            name=PrefixedName.from_json(data["name"]),
+            name=from_json(data["name"]),
             parent=parent,
             child=child,
-            parent_T_connection_expression=TransformationMatrix.from_json(
+            parent_T_connection_expression=from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
         )
 
     @property
-    def origin_expression(self) -> TransformationMatrix:
+    def origin_expression(self) -> HomogeneousTransformationMatrix:
         return (
             self.parent_T_connection_expression
             @ self._kinematics
@@ -1010,7 +1003,7 @@ class Connection(WorldEntity, SubclassJSONSerializer):
         return hash((self.parent, self.child))
 
     @property
-    def origin(self) -> cas.TransformationMatrix:
+    def origin(self) -> HomogeneousTransformationMatrix:
         """
         :return: The relative transform between the parent and child frame.
         """
@@ -1022,10 +1015,10 @@ class Connection(WorldEntity, SubclassJSONSerializer):
             f"Origin can not be set for Connection: {self.__class__.__name__}"
         )
 
-    def origin_as_position_quaternion(self) -> Expression:
+    def origin_as_position_quaternion(self) -> Matrix:
         position = self.origin_expression.to_position()[:3]
         orientation = self.origin_expression.to_quaternion()
-        return cas.Expression.vstack([position, orientation]).T
+        return Matrix.vstack([position, orientation]).T
 
     @property
     def dofs(self) -> Set[DegreeOfFreedom]:
@@ -1069,8 +1062,8 @@ class Connection(WorldEntity, SubclassJSONSerializer):
     def _find_references_in_world(self, world: World) -> Tuple[
         KinematicStructureEntity,
         KinematicStructureEntity,
-        TransformationMatrix,
-        TransformationMatrix,
+        HomogeneousTransformationMatrix,
+        HomogeneousTransformationMatrix,
     ]:
         """
         Finds the reference frames to this connection in the given world and returns them as usable objects.
@@ -1165,33 +1158,12 @@ def _attr_values(
 
 
 @dataclass(eq=False)
-class Actuator(WorldEntityWithID, SubclassJSONSerializer):
+class Actuator(WorldEntityWithID):
     """
     Represents an actuator in the world model.
     """
 
     _dofs: List[DegreeOfFreedom] = field(default_factory=list, init=False, repr=False)
-
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["name"] = self.name.to_json()
-        result["dofs"] = to_json(self._dofs)
-        return result
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Actuator:
-        actuator = cls(
-            name=from_json(data["name"]),
-            id=from_json(data["id"]),
-        )
-        dofs_data = data.get("dofs", [])
-        assert (
-            len(dofs_data) > 0
-        ), "An actuator must have at least one degree of freedom."
-        for dof_data in dofs_data:
-            dof = from_json(dof_data)
-            actuator.add_dof(dof)
-        return actuator
 
     @property
     def dofs(self) -> List[DegreeOfFreedom]:
@@ -1207,4 +1179,3 @@ class Actuator(WorldEntityWithID, SubclassJSONSerializer):
         :param dof: The degree of freedom to add.
         """
         self._dofs.append(dof)
-

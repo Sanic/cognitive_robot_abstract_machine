@@ -1,15 +1,16 @@
 from dataclasses import field, dataclass, InitVar
 from typing import Optional, Dict, List, Tuple, Union, Any
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from typing_extensions import Self
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.exceptions import NodeInitializationError
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
 from giskardpy.motion_statechart.graph_node import Task
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.world import World
@@ -19,56 +20,6 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     ActiveConnection1DOF,
 )
-
-
-@dataclass
-class JointState(SubclassJSONSerializer):
-    mapping: InitVar[Dict[ActiveConnection1DOF, float]]
-
-    _connections: List[ActiveConnection1DOF] = field(init=False, default_factory=list)
-    _target_values: List[float] = field(init=False, default_factory=list)
-
-    def __post_init__(self, mapping: Dict[ActiveConnection1DOF, float]):
-        for connection, target in mapping.items():
-            self._connections.append(connection)
-            self._target_values.append(target)
-
-    def __len__(self):
-        return len(self._connections)
-
-    def items(self):
-        return zip(self._connections, self._target_values)
-
-    @classmethod
-    def from_str_dict(cls, mapping: Dict[str, float], world: World):
-        mapping = {
-            world.get_connection_by_name(connection_name): target
-            for connection_name, target in mapping.items()
-        }
-        return cls(mapping=mapping)
-
-    @classmethod
-    def from_lists(cls, connections: List[ActiveConnection1DOF], targets: List[float]):
-        return cls(mapping=dict(zip(connections, targets)))
-
-    def to_json(self) -> Dict[str, Any]:
-        return {
-            **super().to_json(),
-            "_connections": [
-                connection.name.to_json() for connection in self._connections
-            ],
-            "_target_values": self._target_values,
-        }
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        world: World = kwargs["world"]
-        connections = [
-            world.get_connection_by_name(PrefixedName.from_json(name, **kwargs))
-            for name in data["_connections"]
-        ]
-        target_values = data["_target_values"]
-        return cls.from_lists(connections, target_values)
 
 
 @dataclass(eq=False, repr=False)
@@ -93,7 +44,7 @@ class JointPositionList(Task):
                 isinstance(connection, RevoluteConnection)
                 and not connection.dof.has_position_limits()
             ):
-                error = cas.shortest_angular_distance(current, target)
+                error = sm.shortest_angular_distance(current, target)
             else:
                 error = target - current
             artifacts.constraints.add_equality_constraint(
@@ -103,25 +54,25 @@ class JointPositionList(Task):
                 weight=self.weight,
                 task_expression=current,
             )
-            errors.append(cas.abs(error) < self.threshold)
-        artifacts.observation = cas.logic_all(cas.Expression(errors))
+            errors.append(sm.abs(error) < self.threshold)
+        artifacts.observation = sm.logic_all(sm.Vector(errors))
         return artifacts
 
     def apply_limits_to_target(
         self, target: float, connection: ActiveConnection1DOF
-    ) -> cas.Expression:
-        ul_pos = connection.dof.upper_limits.position
-        ll_pos = connection.dof.lower_limits.position
+    ) -> sm.Scalar:
+        ul_pos = connection.dof.limits.upper.position
+        ll_pos = connection.dof.limits.lower.position
         if ll_pos is not None:
-            target = cas.limit(target, ll_pos, ul_pos)
+            target = sm.limit(target, ll_pos, ul_pos)
         return target
 
     def apply_limits_to_velocity(
         self, velocity: float, connection: ActiveConnection1DOF
-    ) -> cas.Expression:
-        ul_vel = connection.dof.upper_limits.velocity
-        ll_vel = connection.dof.lower_limits.velocity
-        return cas.limit(velocity, ll_vel, ul_vel)
+    ) -> sm.Scalar:
+        ul_vel = connection.dof.limits.upper.velocity
+        ll_vel = connection.dof.limits.lower.velocity
+        return sm.limit(velocity, ll_vel, ul_vel)
 
 
 @dataclass
@@ -146,9 +97,9 @@ class MirrorJointPosition(Task):
             self.connections.append(connection)
             target_connection = context.world.get_connection_by_name(target_joint_name)
 
-            ll_vel = connection.dof.lower_limits
-            ul_vel = connection.dof.upper_limits
-            velocity_limit = cas.limit(self.max_velocity, ll_vel, ul_vel)
+            ll_vel = connection.dof.limits.lower
+            ul_vel = connection.dof.limits.upper
+            velocity_limit = sm.limit(self.max_velocity, ll_vel, ul_vel)
             self.current_positions.append(connection.position)
             self.goal_positions.append(target_connection.position)
             self.velocity_limits.append(velocity_limit)
@@ -164,7 +115,7 @@ class MirrorJointPosition(Task):
                 isinstance(connection, RevoluteConnection)
                 and not connection.dof.has_position_limits()
             ):
-                error = cas.shortest_angular_distance(current, goal)
+                error = sm.shortest_angular_distance(current, goal)
             else:
                 error = goal - current
 
@@ -213,15 +164,15 @@ class JointPositionLimitList(Task):
             )
             self.connections.append(connection)
 
-            ll_pos = connection.dof.lower_limits.position
-            ul_pos = connection.dof.upper_limits.position
+            ll_pos = connection.dof.limits.lower.position
+            ul_pos = connection.dof.limits.upper.position
 
             if ll_pos is not None:
                 lower_limit = min(ul_pos, max(ll_pos, lower_limit))
                 upper_limit = min(ul_pos, max(ll_pos, upper_limit))
 
-            ll_vel = connection.dof.lower_limits.velocity
-            ul_vel = connection.dof.upper_limits.velocity
+            ll_vel = connection.dof.limits.lower.velocity
+            ul_vel = connection.dof.limits.upper.velocity
 
             velocity_limit = min(ul_vel, max(ll_vel, self.max_velocity))
 
@@ -241,8 +192,8 @@ class JointPositionLimitList(Task):
                 isinstance(connection, RevoluteConnection)
                 and not connection.dof.has_position_limits()
             ):
-                lower_error = cas.shortest_angular_distance(current, lower_limit)
-                upper_error = cas.shortest_angular_distance(current, upper_limit)
+                lower_error = sm.shortest_angular_distance(current, lower_limit)
+                upper_error = sm.shortest_angular_distance(current, upper_limit)
             else:
                 lower_error = lower_limit - current
                 upper_error = upper_limit - current
@@ -273,8 +224,8 @@ class JustinTorsoLimit(Task):
         if isinstance(self.connection, RevoluteConnection) or isinstance(
             self.connection, PrismaticConnection
         ):
-            lower_error = cas.shortest_angular_distance(current, self.lower_limit)
-            upper_error = cas.shortest_angular_distance(current, self.upper_limit)
+            lower_error = sm.shortest_angular_distance(current, self.lower_limit)
+            upper_error = sm.shortest_angular_distance(current, self.upper_limit)
         else:
             lower_error = self.lower_limit - current
             upper_error = self.upper_limit - current
@@ -319,7 +270,7 @@ class JointVelocityLimit(Task):
             current_joint = joint.joint_position_expression
             try:
                 limit_expr = joint.dof.upper_limits.velocity
-                max_velocity = cas.min(self.max_velocity, limit_expr)
+                max_velocity = sm.min(self.max_velocity, limit_expr)
             except IndexError:
                 max_velocity = self.max_velocity
             if self.hard:
@@ -363,8 +314,8 @@ class JointVelocity(Task):
         for connection in self.connections:
             current_joint = connection.dof.variables.position
             try:
-                limit_expr = connection.dof.upper_limits.velocity
-                max_velocity = cas.min(self.max_velocity, limit_expr)
+                limit_expr = connection.dof.limits.upper.velocity
+                max_velocity = sm.min(self.max_velocity, limit_expr)
             except IndexError:
                 max_velocity = self.max_velocity
             self.add_velocity_eq_constraint(
@@ -399,9 +350,9 @@ class AvoidJointLimits(Task):
                 weight = self.weight
                 connection_symbol = connection.dof.variables.position
                 percentage = self.percentage / 100.0
-                lower_limit = connection.dof.lower_limits.position
-                upper_limit = connection.dof.upper_limits.position
-                max_velocity = cas.min(100, connection.dof.upper_limits.velocity)
+                lower_limit = connection.dof.limits.lower.position
+                upper_limit = connection.dof.limits.upper.position
+                max_velocity = sm.min(100, connection.dof.limits.upper.velocity)
 
                 joint_range = upper_limit - lower_limit
                 center = (upper_limit + lower_limit) / 2.0
@@ -414,8 +365,8 @@ class AvoidJointLimits(Task):
                 upper_err = upper_goal - connection_symbol
                 lower_err = lower_goal - connection_symbol
 
-                error = cas.max(
-                    cas.abs(cas.min(upper_err, 0)), cas.abs(cas.max(lower_err, 0))
+                error = sm.max(
+                    sm.abs(sm.min(upper_err, 0)), sm.abs(sm.max(lower_err, 0))
                 )
                 weight = weight * (error / max_error)
 

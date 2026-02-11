@@ -12,13 +12,8 @@ import uuid
 from dataclasses import is_dataclass
 
 import sqlalchemy
-import trimesh
-from krrood.class_diagrams import ClassDiagram
-from krrood.ormatic.ormatic import ORMatic
-from krrood.ormatic.utils import classes_of_module
-from krrood.utils import recursive_subclasses
 
-import semantic_digital_twin.adapters.procthor.procthor_semantic_annotations
+import semantic_digital_twin.adapters.procthor.procthor_resolver
 import semantic_digital_twin.orm.model
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.robots.abstract_robot
@@ -28,10 +23,22 @@ import semantic_digital_twin.world_description.degree_of_freedom
 import semantic_digital_twin.world_description.geometry
 import semantic_digital_twin.world_description.shape_collection
 import semantic_digital_twin.world_description.world_entity
+from krrood.adapters.json_serializer import JSONAttributeDiff
+from krrood.class_diagrams import ClassDiagram
+from krrood.ormatic.ormatic import ORMatic
+from krrood.ormatic.type_dict import TypeDict
+from krrood.ormatic.utils import classes_of_module
+from krrood.utils import recursive_subclasses
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.mixin import SimulatorAdditionalProperty
 from semantic_digital_twin.orm.model import *  # type: ignore
 from semantic_digital_twin.reasoning.predicates import ContainsType
-from semantic_digital_twin.semantic_annotations.mixins import HasBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasRootBody,
+)
+from semantic_digital_twin.semantic_annotations.position_descriptions import (
+    SemanticDirection,
+)
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
@@ -44,6 +51,11 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     HasUpdateState,
 )
+from semantic_digital_twin.world_description.world_modification import (
+    AttributeUpdateModification,
+)
+import semantic_digital_twin.robots.hsrb
+import semantic_digital_twin.robots.pr2
 
 all_classes = set(
     classes_of_module(semantic_digital_twin.world_description.world_entity)
@@ -56,6 +68,7 @@ all_classes |= set(classes_of_module(semantic_digital_twin.world))
 all_classes |= set(
     classes_of_module(semantic_digital_twin.datastructures.prefixed_name)
 )
+all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.joint_state))
 
 all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.connections)
@@ -67,20 +80,20 @@ all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.degree_of_freedom)
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.robots.abstract_robot))
+all_classes |= set(classes_of_module(semantic_digital_twin.datastructures.definitions))
+all_classes |= set(classes_of_module(semantic_digital_twin.robots.hsrb))
+all_classes |= set(classes_of_module(semantic_digital_twin.robots.pr2))
 # classes |= set(recursive_subclasses(ViewFactory))
-all_classes |= set([HasBody] + recursive_subclasses(HasBody))
+all_classes |= {SimulatorAdditionalProperty}
 all_classes |= set(classes_of_module(semantic_digital_twin.reasoning.predicates))
 all_classes |= set(classes_of_module(semantic_digital_twin.semantic_annotations.mixins))
 all_classes |= set(
-    classes_of_module(
-        semantic_digital_twin.adapters.procthor.procthor_semantic_annotations
-    )
+    classes_of_module(semantic_digital_twin.adapters.procthor.procthor_resolver)
 )
 all_classes |= set(
     classes_of_module(semantic_digital_twin.world_description.world_modification)
 )
 all_classes |= set(classes_of_module(semantic_digital_twin.callbacks.callback))
-
 
 # remove classes that should not be mapped
 all_classes -= {
@@ -89,8 +102,11 @@ all_classes -= {
     HasUpdateState,
     ForwardKinematicsManager,
     WorldModelManager,
-    semantic_digital_twin.adapters.procthor.procthor_semantic_annotations.ProcthorResolver,
+    semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     ContainsType,
+    SemanticDirection,
+    JSONAttributeDiff,
+    AttributeUpdateModification,
 }
 # keep only dataclasses that are NOT AlternativeMapping subclasses
 all_classes = {
@@ -115,10 +131,11 @@ def generate_orm():
 
     instance = ORMatic(
         class_dependency_graph=class_diagram,
-        type_mappings={
-            trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
-            uuid.UUID: sqlalchemy.UUID,
-        },
+        type_mappings=TypeDict(
+            {
+                trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
+            }
+        ),
         alternative_mappings=alternative_mappings,
     )
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .failures import LiteralConditionError
+from .failures import UnsupportedExpressionTypeForDistinct
 from .symbol_graph import SymbolGraph
 from .utils import is_iterable, T
 
@@ -15,8 +15,6 @@ from typing_extensions import (
     Union,
     Iterable,
     Type,
-    Tuple,
-    List,
     Callable,
     TYPE_CHECKING,
 )
@@ -34,7 +32,12 @@ from .symbolic import (
     Flatten,
     ForAll,
     Exists,
-    Literal, Selectable, Max, Min, Sum, Count, Average, DomainType,
+    Literal,
+    Selectable,
+    DomainType,
+    Concatenate,
+    QueryObjectDescriptor,
+    ResultQuantifier,
 )
 
 from .predicate import (
@@ -43,8 +46,8 @@ from .predicate import (
     Symbol,  # type: ignore
 )
 
-if TYPE_CHECKING:
-    pass
+from .entity_result_processors import *
+
 
 ConditionType = Union[SymbolicExpression, bool, Predicate]
 """
@@ -52,73 +55,31 @@ The possible types for conditions.
 """
 
 
-def entity(
-    selected_variable: T,
-    *properties: ConditionType,
-) -> Entity[T]:
+def entity(selected_variable: T) -> Entity[T]:
     """
-    Create an entity descriptor from a selected variable and its properties.
+    Create an entity descriptor for a selected variable.
 
     :param selected_variable: The variable to select in the result.
-    :type selected_variable: T
-    :param properties: Conditions that define the entity.
-    :type properties: Union[SymbolicExpression, bool]
     :return: Entity descriptor.
-    :rtype: Entity[T]
     """
-    selected_variables, expression = _extract_variables_and_expression(
-        [selected_variable], *properties
-    )
-    return Entity(_selected_variables=selected_variables, _child_=expression)
+    return Entity(_selected_variables=[selected_variable])
 
 
-def set_of(
-    selected_variables: Iterable[T],
-    *properties: ConditionType,
-) -> SetOf[T]:
+def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
     """
-    Create a set descriptor from selected variables and their properties.
+    Create a set descriptor for the selected variables.
 
-    :param selected_variables: Iterable of variables to select in the result set.
-    :type selected_variables: Iterable[T]
-    :param properties: Conditions that define the set.
-    :type properties: Union[SymbolicExpression, bool]
+    :param selected_variables: The variables to select in the result set.
     :return: Set descriptor.
-    :rtype: SetOf[T]
     """
-    selected_variables, expression = _extract_variables_and_expression(
-        selected_variables, *properties
-    )
-    return SetOf(_selected_variables=selected_variables, _child_=expression)
+    return SetOf(_selected_variables=list(selected_variables))
 
 
-def _extract_variables_and_expression(
-    selected_variables: Iterable[T], *properties: ConditionType
-) -> Tuple[List[T], SymbolicExpression]:
-    """
-    Extracts the variables and expressions from the selected variables.
-
-    :param selected_variables: Iterable of variables to select in the result set.
-    :param properties: Conditions on the selected variables.
-    :return: Tuple of selected variables and expressions.
-    """
-    expression_list = list(properties)
-    selected_variables = list(selected_variables)
-    expression = None
-    if len(expression_list) > 0:
-        literal_expressions = [exp for exp in expression_list if not isinstance(exp, SymbolicExpression)]
-        if literal_expressions:
-            raise LiteralConditionError(literal_expressions)
-        expression = (
-            and_(*expression_list) if len(expression_list) > 1 else expression_list[0]
-        )
-    return selected_variables, expression
-
-
-def let(
+def variable(
     type_: Type[T],
     domain: DomainType,
     name: Optional[str] = None,
+    inferred: bool = False,
 ) -> Union[T, Selectable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
@@ -135,6 +96,7 @@ def let(
      If None, the domain will be inferred from the SymbolGraph for Symbol types, else should not be evaluated by EQL
       but by another evaluator (e.g., EQL To SQL converter in Ormatic).
     :param name: The variable name, only required for pretty printing.
+    :param inferred: Whether the variable is inferred or not.
     :return: A Variable that can be queried for.
     """
     domain_source = _get_domain_source_from_domain_and_type_values(domain, type_)
@@ -146,9 +108,46 @@ def let(
         _type_=type_,
         _domain_source_=domain_source,
         _name__=name,
+        _is_inferred_=inferred,
     )
 
     return result
+
+
+def variable_from(
+    domain: DomainType,
+    name: Optional[str] = None,
+) -> Union[T, Selectable[T]]:
+    """
+    Similar to `variable` but constructed from a domain directly wihout specifying its type.
+    """
+    return Literal(data=domain, name=name, wrap_in_iterator=False)
+
+
+def distinct(
+    expression: T,
+    *on: Any,
+) -> T:
+    """
+    Indicate that the result of the expression should be distinct.
+    """
+    if isinstance(expression, QueryObjectDescriptor):
+        return expression.distinct(*on)
+    elif isinstance(expression, ResultQuantifier):
+        return expression._child_.distinct(*on)
+    elif isinstance(expression, Selectable):
+        return entity(expression).distinct(*on)
+    else:
+        raise UnsupportedExpressionTypeForDistinct(type(expression))
+
+
+def concatenate(
+    *variables: Union[Iterable[T], Selectable[T]],
+) -> Union[T, Selectable[T]]:
+    """
+    Concatenation of two or more variables.
+    """
+    return Concatenate(_variables_=list(variables))
 
 
 def _get_domain_source_from_domain_and_type_values(
@@ -192,7 +191,7 @@ def or_(*conditions):
     return chained_logic(optimize_or, *conditions)
 
 
-def not_(operand: SymbolicExpression):
+def not_(operand: ConditionType) -> SymbolicExpression:
     """
     A symbolic NOT operation that can be used to negate symbolic expressions.
     """
@@ -281,61 +280,3 @@ def inference(
     return lambda **kwargs: Variable(
         _type_=type_, _name__=type_.__name__, _kwargs_=kwargs, _is_inferred_=True
     )
-
-
-def max(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Max[T]]:
-    """
-    Maps the variable values to their maximum value.
-
-    :param variable: The variable for which the maximum value is to be found.
-    :param key: A function that extracts a comparison key from each variable value.
-    :param default: The value returned when the iterable is empty.
-    :return: A Max object that can be evaluated to find the maximum value.
-    """
-    return Max(variable, _key_func_=key, _default_value_=default)
-
-
-def min(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Min[T]]:
-    """
-    Maps the variable values to their minimum value.
-
-    :param variable: The variable for which the minimum value is to be found.
-    :param key: A function that extracts a comparison key from each variable value.
-    :param default: The value returned when the iterable is empty.
-    :return: A Min object that can be evaluated to find the minimum value.
-    """
-    return Min(variable, _key_func_=key, _default_value_=default)
-
-
-def sum(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Sum[T]]:
-    """
-    Computes the sum of values produced by the given variable.
-
-    :param variable: The variable for which the sum is calculated.
-    :param key: A function that extracts a comparison key from each variable value.
-    :param default: The value returned when the iterable is empty.
-    :return: A Sum object that can be evaluated to find the sum of values.
-    """
-    return Sum(variable, _key_func_=key, _default_value_=default)
-
-
-def average(variable: Selectable[T], key: Optional[Callable] = None, default: Optional[T] = None) -> Union[T, Average[T]]:
-    """
-    Computes the sum of values produced by the given variable.
-
-    :param variable: The variable for which the sum is calculated.
-    :param key: A function that extracts a comparison key from each variable value.
-    :param default: The value returned when the iterable is empty.
-    :return: A Sum object that can be evaluated to find the sum of values.
-    """
-    return Average(variable, _key_func_=key, _default_value_=default)
-
-
-def count(variable: Selectable[T]) -> Union[T, Count[T]]:
-    """
-    Count the number of values produced by the given variable.
-
-    :param variable: The variable for which the count is calculated.
-    :return: A Count object that can be evaluated to count the number of values.
-    """
-    return Count(variable)

@@ -29,28 +29,34 @@ from giskardpy.motion_statechart.motion_statechart import (
     ObservationState,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ConstTrueNode,
     TestNestedGoal,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
-)
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.spatial_types import Vector3, TransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.spatial_types import (
+from giskardpy.utils.utils import limits_from_urdf_joint
+from krrood.symbolic_math.symbolic_math import (
     trinary_logic_and,
     trinary_logic_not,
+    trinary_logic_or,
 )
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -63,8 +69,8 @@ def test_TrueMonitor():
     assert node_copy.name == node.name
 
 
-def test_CollisionRequest(pr2_world: World):
-    robot = pr2_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+def test_CollisionRequest(pr2_world_setup: World):
+    robot = pr2_world_setup.get_semantic_annotations_by_type(AbstractRobot)[0]
     collision_request = CollisionRequest(
         type_=CollisionAvoidanceTypes.AVOID_COLLISION,
         distance=0.2,
@@ -74,7 +80,7 @@ def test_CollisionRequest(pr2_world: World):
     json_data = collision_request.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     collision_request_copy = CollisionRequest.from_json(new_json_data, **kwargs)
     assert collision_request_copy.type_ == collision_request.type_
@@ -96,7 +102,7 @@ def test_trinary_transition():
 
     node1.start_condition = trinary_logic_and(
         node2.observation_variable,
-        trinary_logic_and(
+        trinary_logic_or(
             node3.observation_variable, trinary_logic_not(node4.observation_variable)
         ),
     )
@@ -111,13 +117,14 @@ def test_trinary_transition():
 def test_to_json_joint_position_list(mini_world):
     connection = mini_world.connections[0]
     node = JointPositionList(
-        goal_state=JointState({connection: 0.5}),
+        goal_state=JointState.from_mapping({connection: 0.5}),
         threshold=0.5,
     )
     json_data = node.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    node_copy = JointPositionList.from_json(new_json_data, world=mini_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    node_copy = JointPositionList.from_json(new_json_data, **tracker.create_kwargs())
     assert node_copy.name == node.name
     assert node_copy.threshold == node.threshold
     assert node_copy.goal_state == node.goal_state
@@ -166,7 +173,8 @@ def test_executing_json_parsed_statechart():
         ll = DerivativeMap()
         ll.velocity = -1
         dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "a"), lower_limits=ll, upper_limits=ul
+            name=PrefixedName("dof", "a"),
+            limits=DegreeOfFreedomLimits(lower=ll, upper=ul),
         )
         world.add_degree_of_freedom(dof)
         root_C_tip = RevoluteConnection(
@@ -175,7 +183,8 @@ def test_executing_json_parsed_statechart():
         world.add_connection(root_C_tip)
 
         dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "b"), lower_limits=ll, upper_limits=ul
+            name=PrefixedName("dof", "b"),
+            limits=DegreeOfFreedomLimits(lower=ll, upper=ul),
         )
         world.add_degree_of_freedom(dof)
         root_C_tip2 = RevoluteConnection(
@@ -185,7 +194,7 @@ def test_executing_json_parsed_statechart():
 
     msc = MotionStatechart()
 
-    task1 = JointPositionList(goal_state=JointState({root_C_tip: 0.5}))
+    task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 0.5}))
     always_true = ConstTrueNode()
     msc.add_node(always_true)
     msc.add_node(task1)
@@ -200,7 +209,10 @@ def test_executing_json_parsed_statechart():
     json_data = msc.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    msc_copy = MotionStatechart.from_json(new_json_data, world=world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    msc_copy = MotionStatechart.from_json(
+        new_json_data, world=world, **tracker.create_kwargs()
+    )
 
     kin_sim = Executor(
         world=world,
@@ -239,10 +251,12 @@ def test_executing_json_parsed_statechart():
     assert observation_copy == msc_copy.observation_state
 
 
-def test_cart_goal_simple(pr2_world: World):
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
-    tip_goal = TransformationMatrix.from_xyz_quaternion(pos_x=-0.2, reference_frame=tip)
+def test_cart_goal_simple(pr2_world_setup: World):
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
+    root = pr2_world_setup.get_kinematic_structure_entity_by_name("odom_combined")
+    tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=-0.2, reference_frame=tip
+    )
 
     msc = MotionStatechart()
     cart_goal = CartesianPose(
@@ -259,26 +273,28 @@ def test_cart_goal_simple(pr2_world: World):
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
     kin_sim = Executor(
-        world=pr2_world,
+        world=pr2_world_setup,
         controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )
 
     kin_sim.compile(motion_statechart=msc_copy)
     kin_sim.tick_until_end()
 
-    fk = pr2_world.compute_forward_kinematics_np(root, tip)
-    assert np.allclose(fk, tip_goal.to_np(), atol=cart_goal.threshold)
+    fk = pr2_world_setup.compute_forward_kinematics_np(root, tip)
+    assert np.allclose(fk, tip_goal, atol=cart_goal.threshold)
 
 
-def test_compressed_copy_can_be_plotted(pr2_world: World):
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
-    tip_goal = TransformationMatrix.from_xyz_quaternion(pos_x=-0.2, reference_frame=tip)
+def test_compressed_copy_can_be_plotted(pr2_world_setup: World):
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
+    root = pr2_world_setup.get_kinematic_structure_entity_by_name("odom_combined")
+    tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=-0.2, reference_frame=tip
+    )
 
     msc = MotionStatechart()
     cart_goal = CartesianPose(
@@ -290,6 +306,7 @@ def test_compressed_copy_can_be_plotted(pr2_world: World):
     end = EndMotion()
     msc.add_node(end)
     end.start_condition = cart_goal.observation_variable
+    msc.add_node(CancelMotion.when_true(cart_goal))
 
     msc._expand_goals(BuildContext.empty())
     json_data = msc.create_structure_copy().to_json()
@@ -297,6 +314,9 @@ def test_compressed_copy_can_be_plotted(pr2_world: World):
     new_json_data = json.loads(json_str)
 
     msc_copy = MotionStatechart.from_json(new_json_data)
+    msc_copy._add_transitions()
+    assert isinstance(msc_copy.nodes[-2], EndMotion)
+    assert isinstance(msc_copy.nodes[-1], CancelMotion)
     msc_copy.draw("muh.pdf")
 
 
@@ -350,15 +370,15 @@ def test_cancel_motion():
         kin_sim.tick_until_end()
 
 
-def test_unreachable_cart_goal(pr2_world):
-    root = pr2_world.root
-    tip = pr2_world.get_kinematic_structure_entity_by_name("base_footprint")
+def test_unreachable_cart_goal(pr2_world_setup):
+    root = pr2_world_setup.root
+    tip = pr2_world_setup.get_kinematic_structure_entity_by_name("base_footprint")
     msc = MotionStatechart()
     msc.add_node(
         cart_goal := CartesianPose(
             root_link=root,
             tip_link=tip,
-            goal_pose=TransformationMatrix.from_xyz_rpy(
+            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=-1,
                 reference_frame=root,
             ),
@@ -372,15 +392,43 @@ def test_unreachable_cart_goal(pr2_world):
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = KinematicStructureEntityKwargsTracker.from_world(pr2_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_setup)
     kwargs = tracker.create_kwargs()
     msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
 
     kin_sim = Executor(
-        world=pr2_world,
+        world=pr2_world_setup,
         controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )
 
     kin_sim.compile(motion_statechart=msc_copy)
 
     kin_sim.tick_until_end()
+
+
+def test_duplicate_condition():
+    """
+    Tests if two condition with the same name and type will be preserved.
+    """
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            node1 := ConstTrueNode(),
+            node2 := ConstTrueNode(),
+            node3 := ConstTrueNode(),
+            end := EndMotion(),
+        ]
+    )
+    node2.start_condition = node1.observation_variable
+    node3.start_condition = node1.observation_variable
+    end.start_condition = trinary_logic_and(
+        node2.observation_variable, node3.observation_variable
+    )
+
+    json_data = msc.to_json()
+    json_str = json.dumps(json_data)
+    new_json_data = json.loads(json_str)
+
+    msc_copy = MotionStatechart.from_json(new_json_data)
+    msc_copy._add_transitions()
+    assert len(msc_copy.unique_edges) == 3

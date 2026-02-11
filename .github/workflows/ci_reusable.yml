@@ -31,11 +31,26 @@ jobs:
           path: cognitive_robot_abstract_machine
           submodules: recursive
 
+      - name: Initialize submodules explicitly
+        run: |
+          cd cognitive_robot_abstract_machine
+          git config --global --add safe.directory "*"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
       - name: Install dependencies
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
           poetry install
+
+      - name: Build ORM
+        if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
+        run: |
+          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          python generate_orm.py
 
       - name: Run tests
         run: |

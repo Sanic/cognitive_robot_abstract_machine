@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .messages import MetaData, WorldStateUpdate, Message, ModificationBlock, LoadModel
-from ..world_entity_kwargs_tracker import KinematicStructureEntityKwargsTracker
+from ..world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
 from ...callbacks.callback import Callback, StateChangeCallback, ModelChangeCallback
 from ...orm.ormatic_interface import *
 from ...world import World
@@ -86,7 +86,7 @@ class Synchronizer(ABC):
         """
         Wrap the origin subscription callback by self-skipping and disabling the next world callback.
         """
-        tracker = KinematicStructureEntityKwargsTracker.from_world(self.world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
         msg = self.message_type.from_json(
             json.loads(msg.data), **tracker.create_kwargs()
         )
@@ -312,7 +312,6 @@ class ModelReloadSynchronizer(Synchronizer):
 
     def __post_init__(self):
         super().__post_init__()
-        assert self.session is not None
 
     def publish_reload_model(self):
         """
@@ -349,6 +348,5 @@ class ModelReloadSynchronizer(Synchronizer):
 
         :param new_world: The new world instance to replace the current world.
         """
-        with self.world.modify_world():
-            self.world.clear()
-            self.world.merge_world(new_world)
+        self.world.clear()
+        self.world.merge_world(new_world)

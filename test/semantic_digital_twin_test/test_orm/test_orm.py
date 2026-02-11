@@ -7,12 +7,20 @@ from krrood.ormatic.utils import create_engine
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from semantic_digital_twin.adapters.ros.world_fetcher import (
+    FetchWorldServer,
+    fetch_world_from_service,
+)
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.orm.ormatic_interface import *
@@ -66,7 +74,7 @@ def test_table_world(session, table_world):
     session.add(world_dao)
     session.commit()
 
-    bodies_from_db = session.scalars(select(BodyDAO)).all()
+    bodies_from_db = session.scalars(select(KinematicStructureEntityDAO)).all()
     assert len(bodies_from_db) == len(table_world.kinematic_structure_entities)
 
     queried_world = session.scalar(select(WorldMappingDAO))
@@ -86,7 +94,7 @@ def test_table_world(session, table_world):
 
 
 def test_insert(session):
-    origin = TransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
+    origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
     scale = Scale(1.0, 1.0, 1.0)
     color = Color(0.0, 1.0, 1.0)
     shape1 = Box(origin=origin, scale=scale, color=color)
@@ -105,3 +113,36 @@ def test_insert(session):
     result = session.scalar(select(ShapeDAO))
     assert isinstance(result, BoxDAO)
     box = result.from_dao()
+
+
+@pytest.mark.skipif(
+    os.getenv("SEMANTIC_DIGITAL_TWIN_DATABASE_URI") is None,
+    reason="Permanent Database not available",
+)
+def test_sessionmaker():
+    s = semantic_digital_twin_sessionmaker()()
+    assert s is not None
+
+
+def test_pr2_world(pr2_world_state_reset, session):
+    dao: WorldMappingDAO = to_dao(pr2_world_state_reset)
+    session.add(dao)
+    session.commit()
+
+    queried_world = session.scalar(select(WorldMappingDAO))
+    reconstructed: World = queried_world.from_dao()
+
+
+def test_pr2_semantic_annotation_and_safe_to_db(
+    rclpy_node, pr2_world_state_reset, session
+):
+    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
+
+    pr2_world_copy = fetch_world_from_service(
+        rclpy_node,
+    )
+
+    dao = to_dao(pr2_world_copy)
+
+    session.add(dao)
+    session.commit()

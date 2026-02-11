@@ -3,6 +3,7 @@ from abc import ABC
 from dataclasses import dataclass
 
 import numpy as np
+import math
 import trimesh.boolean
 from krrood.entity_query_language.predicate import (
     Predicate,
@@ -19,8 +20,8 @@ from ..spatial_computations.ik_solver import (
     UnreachableException,
 )
 from ..spatial_computations.raytracer import RayTracer
-from ..spatial_types import Vector3
-from ..spatial_types.spatial_types import TransformationMatrix
+from ..spatial_types import Vector3, Point3
+from ..spatial_types.spatial_types import HomogeneousTransformationMatrix
 from ..world import World
 from ..world_description.connections import FixedConnection
 from ..world_description.geometry import TriangleMesh
@@ -80,9 +81,9 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     cam_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
 
     seg = rt.create_segmentation_mask(
-        TransformationMatrix(cam_pose, reference_frame=camera._world.root),
+        HomogeneousTransformationMatrix(cam_pose, reference_frame=camera._world.root),
         resolution=256,
-        min_dist=0.2,
+        min_distance=0.2,
     )
     indices = np.unique(seg)
     indices = indices[indices > -1]
@@ -113,7 +114,9 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     # get camera pose
     camera_pose = np.eye(4, dtype=float)
     camera_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
-    camera_pose = TransformationMatrix(camera_pose, reference_frame=camera._world.root)
+    camera_pose = HomogeneousTransformationMatrix(
+        camera_pose, reference_frame=camera._world.root
+    )
 
     # create a world only containing the target body
     world_without_occlusion = World()
@@ -135,7 +138,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     ray_tracer_without_occlusion.update_scene()
     segmentation_mask_without_occlusion = (
         ray_tracer_without_occlusion.create_segmentation_mask(
-            camera_pose, resolution=256
+            camera_pose, resolution=256, min_distance=0.1
         )
     )
 
@@ -143,7 +146,9 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     ray_tracer_with_occlusion = RayTracer(camera._world)
     ray_tracer_with_occlusion.update_scene()
     segmentation_mask_with_occlusion = (
-        ray_tracer_with_occlusion.create_segmentation_mask(camera_pose, resolution=256)
+        ray_tracer_with_occlusion.create_segmentation_mask(
+            camera_pose, resolution=256, min_distance=0.1
+        )
     )
 
     mask_without_occluders = segmentation_mask_without_occlusion[
@@ -159,7 +164,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     return bodies
 
 
-def reachable(pose: TransformationMatrix, root: Body, tip: Body) -> bool:
+def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> bool:
     """
     Checks if a manipulator can reach a given position.
     This is determined by inverse kinematics.
@@ -192,16 +197,20 @@ def is_supported_by(
     If the intersection is higher than this value, the check returns False due to unhandled clipping.
     :return: True if the second object is supported by the first object, False otherwise
     """
-    if Below(supported_body, supporting_body, supported_body.global_pose)():
+    if Below(
+        supported_body.center_of_mass,
+        supporting_body.center_of_mass,
+        supported_body.global_pose,
+    )():
         return False
     bounding_box_supported_body = (
         supported_body.collision.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=supported_body)
+            HomogeneousTransformationMatrix(reference_frame=supported_body)
         ).event
     )
     bounding_box_supporting_body = (
         supporting_body.collision.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=supported_body)
+            HomogeneousTransformationMatrix(reference_frame=supported_body)
         ).event
     )
 
@@ -248,10 +257,10 @@ def is_body_in_region(body: Body, region: Region) -> float:
 
 
 @dataclass
-class SpatialRelation(Symbol, ABC):
+class KinematicStructureEntitySpatialRelation(Symbol, ABC):
     """
-    Check if the KSE is spatially related to the other KSE if you are looking from the point of semantic annotation.
-    The comparison is done using the centers of mass computed from the KSE's collision geometry.
+    Base class for spatial relations between two KinematicStructureEntity instances.
+    Implementations typically compare the centers of mass computed from the KSE's collision geometry.
     """
 
     body: KinematicStructureEntity
@@ -262,13 +271,30 @@ class SpatialRelation(Symbol, ABC):
     other: KinematicStructureEntity
     """
     The other KSE.
-     """
+    """
 
 
 @dataclass
-class ViewDependentSpatialRelation(SpatialRelation, ABC):
+class PointSpatialRelation(Symbol, ABC):
+    """
+    Check if the point is spatially related to the other point.
+    """
 
-    point_of_semantic_annotation: TransformationMatrix
+    point: Point3
+    """
+    The point for which the check should be done.
+    """
+
+    other: Point3
+    """
+    The other point.
+    """
+
+
+@dataclass
+class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
+
+    point_of_semantic_annotation: HomogeneousTransformationMatrix
     """
     The reference spot from where to look at the bodies.
     """
@@ -282,28 +308,27 @@ class ViewDependentSpatialRelation(SpatialRelation, ABC):
 
     def _signed_distance_along_direction(self, index: int) -> float:
         """
-        Calculate the spatial relation between self.body and self.other with respect to a given
+        Calculate the spatial relation between self.point and self.other with respect to a given
         reference point (self.point_of_semantic_annotation) and a specified axis index. This function computes the
         signed distance along a specified direction derived from the reference point
-        to compare the positions of the centers of mass of the two bodies.
+        to compare the positions.
 
         :param index: The index of the axis in the transformation matrix along which
             the spatial relation is computed.
-        :return: The signed distance between the first and the second body's centers
-            of mass along the given direction.
+        :return: The signed distance between the first and the second points along the given direction.
         """
         ref_np = self.point_of_semantic_annotation.to_np()
         front_world = ref_np[:3, index]
         front_norm = front_world / (np.linalg.norm(front_world) + self.eps)
         front_norm = Vector3(
-            x_init=front_norm[0],
-            y_init=front_norm[1],
-            z_init=front_norm[2],
+            x=front_norm[0],
+            y=front_norm[1],
+            z=front_norm[2],
             reference_frame=self.point_of_semantic_annotation.reference_frame,
         )
 
-        s_body = front_norm.dot(self.body.center_of_mass.to_vector3())
-        s_other = front_norm.dot(self.other.center_of_mass.to_vector3())
+        s_body = front_norm.dot(self.point.to_vector3())
+        s_other = front_norm.dot(self.other.to_vector3())
         return (s_body - s_other).compile()()
 
 
@@ -374,7 +399,7 @@ class InFrontOf(ViewDependentSpatialRelation):
 
 
 @dataclass
-class InsideOf(SpatialRelation):
+class InsideOf(KinematicStructureEntitySpatialRelation):
     """
     The "inside of" relation is defined as the fraction of the volume of self.body
     that lies within the bounding box of self.other.

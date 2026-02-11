@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import List
 
 import numpy as np
+
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 from semantic_digital_twin.world_description.world_entity import Body
@@ -23,16 +24,17 @@ from ....datastructures.enums import Arms, Grasp, VerticalAlignment
 from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped
-from ....designators.location_designator import ProbabilisticCostmapLocation
+from ....designators.location_designator import (
+    ProbabilisticCostmapLocation,
+    CostmapLocation,
+    GiskardLocation,
+)
 from ....designators.object_designator import BelieveObject
 from ....failures import ObjectUnfetchable, ConfigurationNotReached
-from ....has_parameters import has_parameters
 from ....language import SequentialPlan
-from ....robot_description import RobotDescription
 from ....robot_plans.actions.base import ActionDescription
 
 
-@has_parameters
 @dataclass
 class TransportAction(ActionDescription):
     """
@@ -83,10 +85,10 @@ class TransportAction(ActionDescription):
                         OpenActionDescription(sem_anno[0].handle.body, self.arm),
                     ).perform()
         SequentialPlan(self.context, ParkArmsActionDescription(Arms.BOTH)).perform()
-        pickup_loc = ProbabilisticCostmapLocation(
-            target=self.object_designator,
-            reachable_for=self.robot_view,
+        pickup_loc = CostmapLocation(
+            target=PoseStamped.from_spatial_type(self.object_designator.global_pose),
             reachable_arm=self.arm,
+            reachable_for=self.robot_view,
         )
         pickup_loc.plan_node = self.plan_node
         # Tries to find a pick-up position for the robot that uses the given arm
@@ -106,13 +108,11 @@ class TransportAction(ActionDescription):
             ),
             ParkArmsActionDescription(Arms.BOTH),
             NavigateActionDescription(
-                ProbabilisticCostmapLocation(
+                CostmapLocation(
                     target=self.target_location,
+                    reachable_arm=self.arm,
                     reachable_for=self.robot_view,
-                    reachable_arm=pickup_pose.arm,
-                    grasp_descriptions=[pickup_pose.grasp_description],
-                    object_in_hand=self.object_designator,
-                    rotation_agnostic=self.place_rotation_agnostic,
+                    grasp_descriptions=pickup_pose.grasp_description,
                 ),
                 True,
             ),
@@ -159,7 +159,7 @@ class TransportAction(ActionDescription):
         target_location: Union[Iterable[PoseStamped], PoseStamped],
         arm: Union[Iterable[Arms], Arms] = None,
         place_rotation_agnostic: Optional[bool] = False,
-    ) -> PartialDesignator[Type[TransportAction]]:
+    ) -> PartialDesignator[TransportAction]:
         return PartialDesignator(
             TransportAction,
             object_designator=object_designator,
@@ -169,7 +169,6 @@ class TransportAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class PickAndPlaceAction(ActionDescription):
     """
@@ -231,7 +230,7 @@ class PickAndPlaceAction(ActionDescription):
         target_location: Union[Iterable[PoseStamped], PoseStamped],
         arm: Union[Iterable[Arms], Arms] = None,
         grasp_description=GraspDescription,
-    ) -> PartialDesignator[Type[PickAndPlaceAction]]:
+    ) -> PartialDesignator[PickAndPlaceAction]:
         return PartialDesignator(
             PickAndPlaceAction,
             object_designator=object_designator,
@@ -241,7 +240,6 @@ class PickAndPlaceAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class MoveAndPlaceAction(ActionDescription):
     """
@@ -299,7 +297,7 @@ class MoveAndPlaceAction(ActionDescription):
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[Type[MoveAndPlaceAction]]:
+    ) -> PartialDesignator[MoveAndPlaceAction]:
         return PartialDesignator(
             MoveAndPlaceAction,
             standing_position=standing_position,
@@ -309,7 +307,6 @@ class MoveAndPlaceAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class MoveAndPickUpAction(ActionDescription):
     """
@@ -376,7 +373,7 @@ class MoveAndPickUpAction(ActionDescription):
         keep_joint_states: Union[
             Iterable[bool], bool
         ] = ActionConfig.navigate_keep_joint_states,
-    ) -> PartialDesignator[Type[MoveAndPickUpAction]]:
+    ) -> PartialDesignator[MoveAndPickUpAction]:
         return PartialDesignator(
             MoveAndPickUpAction,
             standing_position=standing_position,
@@ -387,7 +384,6 @@ class MoveAndPickUpAction(ActionDescription):
         )
 
 
-@has_parameters
 @dataclass
 class EfficientTransportAction(ActionDescription):
     """
@@ -477,7 +473,7 @@ class EfficientTransportAction(ActionDescription):
         cls,
         object_designator: Union[Iterable[Body], Body],
         target_location: Union[Iterable[PoseStamped], PoseStamped],
-    ) -> PartialDesignator[Type["EfficientTransportAction"]]:
+    ) -> PartialDesignator[EfficientTransportAction]:
         return PartialDesignator(
             cls, object_designator=object_designator, target_location=target_location
         )

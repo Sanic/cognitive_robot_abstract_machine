@@ -5,18 +5,24 @@ from uuid import UUID
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
-from krrood.ormatic.dao import AlternativeMapping
 from sqlalchemy import TypeDecorator, types
 from typing_extensions import List
 from typing_extensions import Optional
 
+from krrood.ormatic.dao import AlternativeMapping
 from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types import RotationMatrix, Vector3, Point3, TransformationMatrix
+from ..mixin import HasSimulatorProperties
+from ..spatial_types import (
+    RotationMatrix,
+    Vector3,
+    Point3,
+    HomogeneousTransformationMatrix,
+)
 from ..spatial_types.derivatives import DerivativeMap
-from ..spatial_types.spatial_types import Quaternion
+from ..spatial_types.spatial_types import Quaternion, Pose
 from ..world import World
 from ..world_description.connections import Connection
-from ..world_description.degree_of_freedom import DegreeOfFreedom
+from ..world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
 from ..world_description.world_entity import (
     SemanticAnnotation,
     KinematicStructureEntity,
@@ -34,7 +40,7 @@ class WorldMapping(AlternativeMapping[World]):
     name: Optional[str] = field(default=None)
 
     @classmethod
-    def create_instance(cls, obj: World):
+    def from_domain_object(cls, obj: World):
         return cls(
             kinematic_structure_entities=obj.kinematic_structure_entities,
             connections=obj.connections,
@@ -44,26 +50,21 @@ class WorldMapping(AlternativeMapping[World]):
             name=obj.name,
         )
 
-    def create_from_dao(self) -> World:
+    def to_domain_object(self) -> World:
         result = World(name=self.name)
 
         with result.modify_world():
             for entity in self.kinematic_structure_entities:
                 result.add_kinematic_structure_entity(entity)
             for dof in self.degrees_of_freedom:
-                d = DegreeOfFreedom(
-                    name=dof.name,
-                    lower_limits=dof.lower_limits,
-                    upper_limits=dof.upper_limits,
-                    id=dof.id,
-                )
-                result.add_degree_of_freedom(d)
+                result.add_degree_of_freedom(dof)
             for connection in self.connections:
                 result.add_connection(connection)
             for semantic_annotation in self.semantic_annotations:
                 result.add_semantic_annotation(semantic_annotation)
             result.delete_orphaned_dofs()
             result.state = self.state
+            result.state._world = result
 
         return result
 
@@ -74,13 +75,13 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
     ids: List[UUID]
 
     @classmethod
-    def create_instance(cls, obj: WorldState):
+    def from_domain_object(cls, obj: WorldState):
         return cls(
             data=obj.data.ravel().tolist(),
             ids=obj._ids,
         )
 
-    def create_from_dao(self) -> WorldState:
+    def to_domain_object(self) -> WorldState:
         return WorldState(
             data=np.array(self.data, dtype=np.float64).reshape((4, len(self.ids))),
             _ids=self.ids,
@@ -99,16 +100,14 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
     )
 
     @classmethod
-    def create_instance(cls, obj: Vector3):
+    def from_domain_object(cls, obj: Vector3):
         x, y, z, _ = obj.to_np().tolist()
         result = cls(x=x, y=y, z=z)
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> Vector3:
-        return Vector3(
-            x_init=self.x, y_init=self.y, z_init=self.z, reference_frame=None
-        )
+    def to_domain_object(self) -> Vector3:
+        return Vector3(x=self.x, y=self.y, z=self.z, reference_frame=None)
 
 
 @dataclass
@@ -122,14 +121,14 @@ class Point3Mapping(AlternativeMapping[Point3]):
     )
 
     @classmethod
-    def create_instance(cls, obj: Point3):
+    def from_domain_object(cls, obj: Point3):
         x, y, z, _ = obj.to_np().tolist()
         result = cls(x=x, y=y, z=z)
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> Point3:
-        return Point3(x_init=self.x, y_init=self.y, z_init=self.z, reference_frame=None)
+    def to_domain_object(self) -> Point3:
+        return Point3(x=self.x, y=self.y, z=self.z, reference_frame=None)
 
 
 @dataclass
@@ -144,18 +143,18 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
     )
 
     @classmethod
-    def create_instance(cls, obj: Quaternion):
+    def from_domain_object(cls, obj: Quaternion):
         x, y, z, w = obj.to_np().tolist()
         result = cls(x=x, y=y, z=z, w=w)
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> Quaternion:
+    def to_domain_object(self) -> Quaternion:
         return Quaternion(
-            x_init=self.x,
-            y_init=self.y,
-            z_init=self.z,
-            w_init=self.w,
+            x=self.x,
+            y=self.y,
+            z=self.z,
+            w=self.w,
             reference_frame=None,
         )
 
@@ -168,19 +167,21 @@ class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
     )
 
     @classmethod
-    def create_instance(cls, obj: RotationMatrix):
+    def from_domain_object(cls, obj: RotationMatrix):
         result = cls(rotation=obj.to_quaternion())
         result.reference_frame = obj.reference_frame
         return result
 
-    def create_from_dao(self) -> RotationMatrix:
+    def to_domain_object(self) -> RotationMatrix:
         result = RotationMatrix.from_quaternion(self.rotation)
         result.reference_frame = None
         return result
 
 
 @dataclass
-class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
+class HomogeneousTransformationMatrixMapping(
+    AlternativeMapping[HomogeneousTransformationMatrix]
+):
     position: Point3
     rotation: Quaternion
     reference_frame: Optional[KinematicStructureEntity] = field(
@@ -189,7 +190,7 @@ class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
     child_frame: Optional[KinematicStructureEntity] = field(init=False, default=None)
 
     @classmethod
-    def create_instance(cls, obj: TransformationMatrix):
+    def from_domain_object(cls, obj: HomogeneousTransformationMatrix):
         position = obj.to_position()
         rotation = obj.to_quaternion()
         result = cls(position=position, rotation=rotation)
@@ -198,8 +199,8 @@ class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
 
         return result
 
-    def create_from_dao(self) -> TransformationMatrix:
-        return TransformationMatrix.from_point_rotation_matrix(
+    def to_domain_object(self) -> HomogeneousTransformationMatrix:
+        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=self.position,
             rotation_matrix=RotationMatrix.from_quaternion(self.rotation),
             reference_frame=None,
@@ -208,28 +209,51 @@ class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
 
 
 @dataclass
-class DegreeOfFreedomMapping(AlternativeMapping[DegreeOfFreedom]):
+class PoseMapping(AlternativeMapping[Pose]):
+    position: Point3
+    rotation: Quaternion
+    reference_frame: Optional[KinematicStructureEntity] = field(
+        init=False, default=None
+    )
+
+    @classmethod
+    def from_domain_object(cls, obj: Pose):
+        position = obj.to_position()
+        rotation = obj.to_quaternion()
+        result = cls(position=position, rotation=rotation)
+        result.reference_frame = obj.reference_frame
+        return result
+
+    def to_domain_object(self) -> Pose:
+        return Pose(
+            position=self.position,
+            orientation=self.rotation,
+            reference_frame=None,
+        )
+
+
+@dataclass
+class DegreeOfFreedomMapping(
+    AlternativeMapping[DegreeOfFreedom], HasSimulatorProperties
+):
     name: PrefixedName
-    lower_limits: List[float]
-    upper_limits: List[float]
+    limits: DegreeOfFreedomLimits
     id: UUID
 
     @classmethod
-    def create_instance(cls, obj: DegreeOfFreedom):
+    def from_domain_object(cls, obj: DegreeOfFreedom):
         return cls(
             name=obj.name,
-            lower_limits=obj.lower_limits.data,
-            upper_limits=obj.upper_limits.data,
+            limits=obj.limits,
             id=obj.id,
         )
 
-    def create_from_dao(self) -> DegreeOfFreedom:
-        lower_limits = DerivativeMap(data=self.lower_limits)
-        upper_limits = DerivativeMap(data=self.upper_limits)
+    def to_domain_object(self) -> DegreeOfFreedom:
         return DegreeOfFreedom(
             name=self.name,
-            lower_limits=lower_limits,
-            upper_limits=upper_limits,
+            limits=DegreeOfFreedomLimits(
+                lower=self.limits.lower, upper=self.limits.upper
+            ),
             id=self.id,
         )
 

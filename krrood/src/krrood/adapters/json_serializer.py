@@ -1,14 +1,30 @@
 from __future__ import annotations
 
+import enum
 import importlib
+import inspect
 import uuid
-from dataclasses import dataclass, field
+from abc import ABC
+from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import field
 from types import NoneType
+from typing import List, Optional
 
-from typing_extensions import Dict, Any, Self, Union, Callable, Type
+import numpy as np
+from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
 
+from .exceptions import (
+    MissingTypeError,
+    InvalidTypeFormatError,
+    UnknownModuleError,
+    ClassNotFoundError,
+    ClassNotSerializableError,
+    JSON_TYPE_NAME,
+)
+from ..class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from ..ormatic.dao import HasGeneric
 from ..singleton import SingletonMeta
-from ..utils import get_full_class_name
+from ..utils import get_full_class_name, recursive_subclasses, inheritance_path_length
 
 list_like_classes = (
     list,
@@ -23,77 +39,14 @@ leaf_types = (
     NoneType,
 )  # containers that can be serialized by the built-in JSON module
 
-
-JSON_TYPE_NAME = "__json_type__"  # the key used in JSON dicts to identify the class
-
 JSON_DICT_TYPE = Dict[str, Any]  # Commonly referred JSON dict
 JSON_RETURN_TYPE = Union[
     JSON_DICT_TYPE, list[JSON_DICT_TYPE], *leaf_types
 ]  # Commonly referred JSON types
-
-
-class JSONSerializationError(Exception):
-    """Base exception for JSON (de)serialization errors."""
-
-
-class MissingTypeError(JSONSerializationError):
-    """Raised when the 'type' field is missing in the JSON data."""
-
-    def __init__(self):
-        super().__init__("Missing 'type' field in JSON data")
-
-
-@dataclass
-class InvalidTypeFormatError(JSONSerializationError):
-    """Raised when the 'type' field value is not a fully qualified class name."""
-
-    invalid_type_value: str
-
-    def __post_init__(self):
-        super().__init__(f"Invalid type format: {self.invalid_type_value}")
-
-
-@dataclass
-class UnknownModuleError(JSONSerializationError):
-    """Raised when the module specified in the 'type' field cannot be imported."""
-
-    module_name: str
-
-    def __post_init__(self):
-        super().__init__(f"Unknown module in type: {self.module_name}")
-
-
-@dataclass
-class ClassNotFoundError(JSONSerializationError):
-    """Raised when the class specified in the 'type' field cannot be found in the module."""
-
-    class_name: str
-    module_name: str
-
-    def __post_init__(self):
-        super().__init__(
-            f"Class '{self.class_name}' not found in module '{self.module_name}'"
-        )
-
-
-@dataclass
-class ClassNotSerializableError(JSONSerializationError):
-    """Raised when the class specified cannot be JSON-serialized."""
-
-    clazz: Type
-
-    def __post_init__(self):
-        super().__init__(f"Class '{self.clazz.__name__}' cannot be serialized")
-
-
-@dataclass
-class ClassNotDeserializableError(JSONSerializationError):
-    """Raised when the class specified cannot be JSON-deserialized."""
-
-    clazz: Type
-
-    def __post_init__(self):
-        super().__init__(f"Class '{self.clazz.__name__}' cannot be deserialized")
+JSON_IS_CLASS = "__is_class__"
+"""
+We need to remember if something is a class, because the type of a class is often just type.
+"""
 
 
 @dataclass
@@ -105,59 +58,32 @@ class JSONSerializableTypeRegistry(metaclass=SingletonMeta):
     control its inheritance.
     """
 
-    _serializers: Dict[Type, Callable[[Any], Dict[str, Any]]] = field(
-        default_factory=dict
-    )
-    """
-    Dictionary mapping types to their respective serializer functions.
-    Signature of functions must be like `SubclassJSONSerializer.to_json`
-    """
-
-    _deserializers: Dict[Type, Callable[[Dict[str, Any]], Any]] = field(
-        default_factory=dict
-    )
-    """
-    Dictionary mapping types to their respective deserializer functions.
-    Signature of functions must be like `SubclassJSONSerializer._from_json`
-    """
-
-    def register(
-        self,
-        type_class: Type,
-        serializer: Callable[[Any], Dict[str, Any]],
-        deserializer: Callable[[Dict[str, Any]], Any],
-    ):
+    def get_external_serializer(self, clazz: Type) -> Type[ExternalClassJSONSerializer]:
         """
-        Register a custom serializer and deserializer for a type.
+        Get the external serializer for the given class.
 
-        :param type_class: The type to register
-        :param serializer: Function to serialize instances of the type
-        :param deserializer: Function to deserialize instances of the type
-        """
-        self._serializers[type_class] = serializer
-        self._deserializers[type_class] = deserializer
+        This returns the serializer of the closest superclass if no direct match is found.
 
-    def get_serializer(
-        self, type_class: Type
-    ) -> Callable[[Any], Dict[str, Any]] | None:
+        :param clazz: The class to get the serializer for.
+        :return: The serializer class.
         """
-        Get the serializer for an object's type.
+        if issubclass(clazz, enum.Enum):
+            return EnumJSONSerializer
 
-        :param type_class: The object to get the serializer for
-        :return: The serializer function or None if not registered
-        """
-        return self._serializers.get(type_class)
+        distances = {}  # mapping of subclasses to the distance to the clazz
 
-    def get_deserializer(
-        self, type_class: Type
-    ) -> Callable[[Dict[str, Any]], Any] | None:
-        """
-        Get the deserializer for a type name.
+        for subclass in recursive_subclasses(ExternalClassJSONSerializer):
+            if subclass.matches_generic_type(clazz):
+                return subclass
+            else:
+                distance = inheritance_path_length(clazz, subclass.original_class())
+                if distance is not None:
+                    distances[subclass] = distance
 
-        :param type_class: The class to get the deserializer for
-        :return: The deserializer function or None if not registered
-        """
-        return self._deserializers.get(type_class)
+        if not distances:
+            raise ClassNotSerializableError(clazz)
+        else:
+            return min(distances, key=distances.get)
 
 
 class SubclassJSONSerializer:
@@ -219,16 +145,45 @@ class SubclassJSONSerializer:
         except AttributeError as exc:
             raise ClassNotFoundError(class_name, module_name) from exc
 
+        if data.get(JSON_IS_CLASS, False):
+            return ClassJSONSerializer.from_json(data, clazz=target_cls, **kwargs)
+
         if issubclass(target_cls, SubclassJSONSerializer):
             return target_cls._from_json(data, **kwargs)
 
-        registered_json_deserializer = JSONSerializableTypeRegistry().get_deserializer(
-            target_cls
+        external_json_deserializer = (
+            JSONSerializableTypeRegistry().get_external_serializer(target_cls)
         )
-        if not registered_json_deserializer:
-            raise ClassNotDeserializableError(target_cls)
 
-        return registered_json_deserializer(data, **kwargs)
+        return external_json_deserializer.from_json(data, clazz=target_cls, **kwargs)
+
+    def update_from_json_diff(self, diffs: List[JSONAttributeDiff], **kwargs) -> None:
+        """
+        Update the current object from a list of shallow diffs.
+
+        :param diffs: The shallow diffs to apply.
+        :param kwargs: Additional keyword arguments to pass to the constructor of the subclass.
+        """
+        for diff in diffs:
+            self._apply_diff(diff, **kwargs)
+
+    def _apply_diff(self, diff: JSONAttributeDiff, **kwargs) -> None:
+        """
+        Apply a single diff to the current object.
+        :param diff: The diff to apply.
+        """
+        current_value = getattr(self, diff.attribute_name)
+        if isinstance(current_value, list):
+            for item in diff.removed_values:
+                current_value.remove(from_json(item, **kwargs))
+            for item in diff.added_values:
+                current_value.append(from_json(item, **kwargs))
+        else:
+            setattr(
+                self,
+                diff.attribute_name,
+                from_json(diff.added_values[0], **kwargs),
+            )
 
 
 def from_json(data: Dict[str, Any], **kwargs) -> Union[SubclassJSONSerializer, Any]:
@@ -245,7 +200,7 @@ def to_json(obj: Union[SubclassJSONSerializer, Any]) -> JSON_RETURN_TYPE:
     """
     Serialize an object to a JSON dict.
 
-    :param obj: The object to serialize
+    :param obj: The object to convert to json
     :return: The JSON string
     """
 
@@ -258,38 +213,297 @@ def to_json(obj: Union[SubclassJSONSerializer, Any]) -> JSON_RETURN_TYPE:
     if isinstance(obj, SubclassJSONSerializer):
         return obj.to_json()
 
-    registered_json_serializer = JSONSerializableTypeRegistry().get_serializer(
+    if inspect.isclass(obj):
+        return ClassJSONSerializer.to_json(obj)
+
+    registered_json_serializer = JSONSerializableTypeRegistry().get_external_serializer(
         type(obj)
     )
-    if not registered_json_serializer:
-        raise ClassNotSerializableError(type(obj))
 
-    return registered_json_serializer(obj)
+    return registered_json_serializer.to_json(obj)
 
 
-# %% UUID serialization functions
-def serialize_uuid(obj: uuid.UUID) -> Dict[str, Any]:
+@dataclass
+class JSONAttributeDiff(SubclassJSONSerializer):
     """
-    Serialize a UUID to a JSON-compatible dictionary.
-
-    :param obj: The UUID to serialize
-    :return: Dictionary with type information and UUID value
+    A class representing a shallow diff for JSON-serializable keyword arguments.
     """
-    return {
-        JSON_TYPE_NAME: get_full_class_name(type(obj)),
-        "value": str(obj),
-    }
 
-
-def deserialize_uuid(data: Dict[str, Any]) -> uuid.UUID:
+    attribute_name: str = field(kw_only=True)
     """
-    Deserialize a UUID from a JSON dictionary.
-
-    :param data: Dictionary containing the UUID value
-    :return: The deserialized UUID
+    The name of the attribute that has changed.
     """
-    return uuid.UUID(data["value"])
+
+    added_values: List[Any] = field(default_factory=list)
+    """
+    The items that have been added to the attribute.
+    """
+
+    removed_values: List[Any] = field(default_factory=list)
+    """
+    The items that have been removed from the attribute.
+    """
+
+    def to_json(self) -> Dict[str, Any]:
+        super().to_json()
+        return {
+            JSON_TYPE_NAME: get_full_class_name(self.__class__),
+            "attribute_name": self.attribute_name,
+            "removed_values": to_json(self.removed_values),
+            "added_values": to_json(self.added_values),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        return cls(
+            attribute_name=data["attribute_name"],
+            removed_values=from_json(data["removed_values"]),
+            added_values=from_json(data["added_values"]),
+        )
 
 
-# Register UUID with the type registry
-JSONSerializableTypeRegistry().register(uuid.UUID, serialize_uuid, deserialize_uuid)
+def shallow_diff_json(
+    original_json: Dict[str, Any], new_json: Dict[str, Any]
+) -> List[JSONAttributeDiff]:
+    """
+    Create a shallow diff between two JSON dicts. Result describes the changes that need to be applied to first json to get second json.
+
+    :param original_json: The original JSON dict.
+    :param new_json: The new JSON dict.
+
+    :return: List of JSONAttributeDiff describing the changes that need to be applied to first json to get second json.
+    """
+    all_keys = original_json.keys() | new_json.keys()
+    diffs: List[JSONAttributeDiff] = [
+        diff
+        for key in all_keys
+        if (diff := _compute_attribute_diff(original_json, new_json, key)) is not None
+    ]
+    return diffs
+
+
+def _compute_attribute_diff(
+    original_json: Any, new_json: Any, key: str
+) -> Optional[JSONAttributeDiff]:
+    """
+    Compute the attribute diff for a single key between two JSON dicts.
+
+    :param original_json: The original JSON dict.
+    :param new_json: The new JSON dict.
+    :param key: The key to compute the diff for.
+
+    :return JSONAttributeDiff describing the changes that need to be applied to first json to get second json for a specific key.
+    """
+    original_value = original_json.get(key)
+    new_value = new_json.get(key)
+
+    if not isinstance(original_value, list_like_classes):
+        if original_value == new_value:
+            return None
+        return JSONAttributeDiff(
+            attribute_name=key, added_values=[from_json(new_value)]
+        )
+
+    add = [from_json(x) for x in new_value if x not in original_value]
+    remove = [from_json(x) for x in original_value if x not in new_value]
+    if not (add or remove):
+        return None
+    return JSONAttributeDiff(
+        attribute_name=key, added_values=add, removed_values=remove
+    )
+
+
+T = TypeVar("T")
+
+
+@dataclass
+class ExternalClassJSONSerializer(HasGeneric[T], ABC):
+    """
+    ABC for all added JSON de/serializers that are outside the control of your classes.
+
+    Create a new subclass of this class pointing to your original class whenever you can't change its inheritance path
+    to `SubclassJSONSerializer`.
+    """
+
+    @classmethod
+    def to_json(cls, obj: Any) -> Dict[str, Any]:
+        """
+        Convert an object to a JSON serializable dictionary.
+
+        :param obj: The object to convert.
+        :return: The JSON serializable dictionary.
+        """
+
+    @classmethod
+    def from_json(cls, data: Dict[str, Any], clazz: Type[T], **kwargs) -> Any:
+        """
+        Create a class instance from a JSON serializable dictionary.
+
+        :param data: The JSON serializable dictionary.
+        :param clazz: The class type to instantiate.
+        :param kwargs: Additional keyword arguments for instantiation.
+        :return: The instantiated class object.
+        """
+
+    @classmethod
+    def matches_generic_type(cls, clazz: Type) -> bool:
+        """
+        Determines if the provided class type matches the original class type.
+
+        :param clazz: The class type to compare against the original class type.
+        :return: A boolean value indicating whether the provided class type matches
+                 the original class type.
+        """
+        return cls.original_class() == clazz
+
+
+@dataclass
+class UUIDJSONSerializer(ExternalClassJSONSerializer[uuid.UUID]):
+
+    @classmethod
+    def to_json(cls, obj: uuid.UUID) -> Dict[str, Any]:
+        return {
+            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            "value": str(obj),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[uuid.UUID], **kwargs
+    ) -> uuid.UUID:
+        return clazz(data["value"])
+
+
+@dataclass
+class ClassJSONSerializer(ExternalClassJSONSerializer[None]):
+    """
+    A class that provides mechanisms for serializing and deserializing Python classes
+    to and from JSON representations.
+    """
+
+    @classmethod
+    def to_json(cls, obj: Type) -> Dict[str, Any]:
+        """
+        This is a special case because we need to remember that the type of the class is a class, not a type.
+        .. note:: We can't do type(obj) because that often returns just `type`.
+        """
+        return {
+            JSON_TYPE_NAME: get_full_class_name(obj),
+            JSON_IS_CLASS: inspect.isclass(obj),
+        }
+
+    @classmethod
+    def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs) -> Type:
+        return clazz
+
+
+@dataclass
+class EnumJSONSerializer(ExternalClassJSONSerializer[enum.Enum]):
+
+    @classmethod
+    def to_json(cls, obj: enum.Enum) -> Dict[str, Any]:
+        return {
+            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            "name": obj.name,
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[enum.Enum], **kwargs
+    ) -> enum.Enum:
+        return clazz[data["name"]]
+
+
+@dataclass
+class ExceptionJSONSerializer(ExternalClassJSONSerializer[Exception]):
+    @classmethod
+    def to_json(cls, obj: Exception) -> Dict[str, Any]:
+        return {
+            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            "value": str(obj),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[Exception], **kwargs
+    ) -> Exception:
+        return clazz(data["value"])
+
+
+@dataclass
+class NumpyNDarrayJSONSerializer(ExternalClassJSONSerializer[np.ndarray]):
+    """
+    External JSON serializer for numpy ndarrays.
+    """
+
+    @classmethod
+    def to_json(cls, obj: np.ndarray) -> Dict[str, Any]:
+        return {
+            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            "type": str(obj.dtype),
+            "data": obj.tolist(),
+        }
+
+    @classmethod
+    def from_json(
+        cls, data: Dict[str, Any], clazz: Type[np.ndarray], **kwargs
+    ) -> np.ndarray:
+        return np.array(data["data"], dtype=data["type"])
+
+
+@dataclass
+class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
+    """
+    Generic JSON serializer for dataclasses.
+    It creates a dict where all fields are serialized using the to_json function.
+    If this is not enough, you still need to implement a custom serializer.
+    """
+
+    @classmethod
+    def to_json(cls, obj) -> Dict[str, Any]:
+        result = {JSON_TYPE_NAME: get_full_class_name(type(obj))}
+        introspector = DataclassOnlyIntrospector()
+        for field_ in introspector.discover(obj.__class__):
+            value = getattr(obj, field_.public_name)
+
+            if isinstance(value, (list, set)):
+                current_result = [to_json(item) for item in value]
+            elif isinstance(value, dict):
+                keys = [to_json(k) for k in value.keys()]
+                values = [to_json(v) for v in value.values()]
+                current_result = {"keys": keys, "values": values}
+            else:
+                current_result = to_json(value)
+            result[field_.public_name] = current_result
+        return result
+
+    @classmethod
+    def matches_generic_type(cls, clazz: Type) -> bool:
+        return is_dataclass(clazz)
+
+    @classmethod
+    def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs) -> Self:
+        fields_ = {f.name: f for f in fields(clazz)}
+
+        init_args = {}
+
+        for k, v in fields_.items():
+            if k not in data.keys():
+                continue
+
+            current_data = data[k]
+
+            if isinstance(current_data, list):
+                current_result = [from_json(data, **kwargs) for data in current_data]
+            elif (
+                isinstance(current_data, dict)
+                and "keys" in current_data.keys()
+                and "values" in current_data.keys()
+            ):
+                keys = [from_json(data, **kwargs) for data in current_data["keys"]]
+                values = [from_json(data, **kwargs) for data in current_data["values"]]
+                current_result = dict(zip(keys, values))
+            else:
+                current_result = from_json(current_data, **kwargs)
+            init_args[k] = current_result
+        return clazz(**init_args)

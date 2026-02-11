@@ -10,7 +10,7 @@ import pandas
 import pandas as pd
 from line_profiler import profile
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.adapters.qp_adapter import GiskardToQPAdapter
 from giskardpy.qp.constraint_collection import ConstraintCollection
@@ -364,11 +364,11 @@ class QPController:
     degrees_of_freedom: InitVar[List[DegreeOfFreedom]]
     active_dofs: List[DegreeOfFreedom] = field(init=False)
     constraint_collection: ConstraintCollection
-    world_state_symbols: List[cas.FloatVariable]
-    life_cycle_variables: List[cas.FloatVariable]
-    external_collision_avoidance_variables: List[cas.FloatVariable]
-    self_collision_avoidance_variables: List[cas.FloatVariable]
-    auxiliary_variables: List[cas.FloatVariable]
+    world_state_symbols: List[sm.FloatVariable]
+    life_cycle_variables: List[sm.FloatVariable]
+    external_collision_avoidance_variables: List[sm.FloatVariable]
+    self_collision_avoidance_variables: List[sm.FloatVariable]
+    auxiliary_variables: List[sm.FloatVariable]
 
     qp_adapter: GiskardToQPAdapter = field(default=None, init=False)
     qp_solver: QPSolver = field(default=None, init=False)
@@ -399,7 +399,7 @@ class QPController:
             config=self.config,
         )
 
-        get_middleware().loginfo("Done compiling controller:")
+        # get_middleware().loginfo("Done compiling controller:")
         # get_middleware().loginfo(f'  #free variables: {self.num_free_variables}')
         # get_middleware().loginfo(f'  #equality constraints: {self.num_eq_constraints}')
         # get_middleware().loginfo(f'  #inequality constraints: {self.num_ineq_constraints}')

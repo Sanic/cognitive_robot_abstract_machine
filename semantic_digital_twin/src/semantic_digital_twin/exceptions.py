@@ -4,32 +4,52 @@ from dataclasses import dataclass
 from typing import Dict
 from uuid import UUID
 
-from krrood.adapters.json_serializer import JSONSerializationError
 from typing_extensions import (
     Optional,
     List,
     Type,
     TYPE_CHECKING,
     Callable,
-    Tuple,
     Union,
     Any,
 )
 
+from krrood.adapters.exceptions import JSONSerializationError
+from krrood.utils import DataclassException
+from .datastructures.definitions import JointStateType
 from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from .world import World
+    from .world_description.geometry import Scale
     from .world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
         KinematicStructureEntity,
     )
-    from .spatial_types.spatial_types import FloatVariable, SymbolicType
+    from .spatial_types.spatial_types import (
+        FloatVariable,
+        SymbolicMathType,
+        SpatialType,
+    )
+    from .spatial_types import Vector3
+    from .world_description.degree_of_freedom import DegreeOfFreedomLimits
 
 
 @dataclass
-class UnknownWorldModification(Exception):
+class NoJointStateWithType(DataclassException):
+    """
+    Raised when a JointState type is search which is not defined
+    """
+
+    joint_state: JointStateType
+
+    def __post_init__(self):
+        self.message = f"There is no JointState with the type: {self.joint_state}"
+
+
+@dataclass
+class UnknownWorldModification(DataclassException):
     """
     Raised when an unknown world modification is attempted.
     """
@@ -38,46 +58,74 @@ class UnknownWorldModification(Exception):
     kwargs: Dict[str, Any]
 
     def __post_init__(self):
-        super().__init__(
+        self.message = (
             " Make sure that world modifications are atomic and that every atomic modification is "
             "represented by exactly one subclass of WorldModelModification."
             "This module might be incomplete, you can help by expanding it."
         )
 
 
-class LogicalError(Exception):
+@dataclass
+class LogicalError(DataclassException):
     """
     An error that happens due to mistake in the logical operation or usage of the API during runtime.
     """
 
 
-class DofNotInWorldStateError(KeyError):
+@dataclass
+class DofNotInWorldStateError(DataclassException, KeyError):
     """
     An exception raised when a degree of freedom is not found in the world's state dictionary.
     """
 
     dof_id: UUID
 
-    def __init__(self, dof_id: UUID):
-        self.dof_id = dof_id
-        super().__init__(f"Degree of freedom {dof_id} not found in world state.")
+    def __post_init__(self):
+        self.message = f"Degree of freedom {self.dof_id} not found in world state."
 
 
-class IncorrectWorldStateValueShapeError(ValueError):
+@dataclass
+class IncorrectWorldStateValueShapeError(DataclassException, ValueError):
     """
     An exception raised when the shape of a value in the world's state dictionary is incorrect.
     """
 
     dof_id: UUID
 
-    def __init__(self, dof_id: UUID):
-        self.dof_id = dof_id
-        super().__init__(
-            f"Value for '{dof_id}' must be length-4 array (pos, vel, acc, jerk)."
+    def __post_init__(self):
+        self.message = (
+            f"Value for '{self.dof_id}' must be length-4 array (pos, vel, acc, jerk)."
         )
 
 
-class MismatchingCommandLengthError(ValueError):
+@dataclass
+class WrongWorldModelVersion(LogicalError):
+    """
+    Raised when a specific world model version is required.
+    """
+
+    expected_version: int
+    actual_version: int
+
+    def __post_init__(self):
+        self.message = f"Expected world model version {self.expected_version}, but got {self.actual_version}."
+
+
+@dataclass
+class NonMonotonicTimeError(LogicalError):
+    """
+    Raised when attempting to append a world state with a time that is not strictly greater than the last time.
+    """
+
+    last_time: float
+    attempted_time: float
+
+    def __post_init__(self):
+        self.message = f"Time must be strictly increasing. Last time: {self.last_time}, attempted time: {self.attempted_time}"
+
+
+@dataclass
+class MismatchingCommandLengthError(DataclassException, ValueError):
     """
     An exception raised when the length of a command does not match the expected length.
     """
@@ -85,14 +133,11 @@ class MismatchingCommandLengthError(ValueError):
     expected_length: int
     actual_length: int
 
-    def __init__(self, expected_length: int, actual_length: int):
-        self.expected_length = expected_length
-        self.actual_length = actual_length
-        super().__init__(
-            f"Commands length {self.actual_length} does not match number of free variables {self.expected_length}."
-        )
+    def __post_init__(self):
+        self.message = f"Commands length {self.actual_length} does not match number of free variables {self.expected_length}."
 
 
+@dataclass
 class UsageError(LogicalError):
     """
     An exception raised when an incorrect usage of the API is encountered.
@@ -100,12 +145,112 @@ class UsageError(LogicalError):
 
 
 @dataclass
+class InvalidConnectionLimits(UsageError):
+    """
+    Raised when the lower limit is not less than the upper limit for a degree of freedom.
+    """
+
+    name: PrefixedName
+    """
+    The name of the degree of freedom.
+    """
+
+    limits: DegreeOfFreedomLimits
+    """
+    The invalid limits.
+    """
+
+    def __post_init__(self):
+        self.message = f"Lower limit for {self.name} must be less than upper limit. Given limits: {self.limits}."
+
+
+@dataclass
+class MismatchingWorld(UsageError):
+    """
+    Raised when two entities belong to different worlds.
+    """
+
+    expected_world: World
+    """
+    The expected world.
+    """
+
+    given_world: World
+    """
+    The given world.
+    """
+
+    def __post_init__(self):
+        self.message = f"The two entities have mismatching worlds. Expected world: {self.expected_world}, given world: {self.given_world}"
+
+
+@dataclass
+class MissingSemanticAnnotationError(UsageError):
+    """
+    Raised when a semantic annotation is required but missing.
+    """
+
+    semantic_annotation_class: Type[SemanticAnnotation]
+    """
+    The semantic annotation class that requires another semantic annotation.
+    """
+
+    missing_semantic_annotation_class: Type[SemanticAnnotation]
+    """
+    The missing semantic annotation class.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"The semantic annotation of type {self.missing_semantic_annotation_class.__name__} is required"
+            f" by {self.semantic_annotation_class.__name__}, but is missing."
+        )
+
+
+@dataclass
+class InvalidPlaneDimensions(UsageError):
+    """
+    Raised when the depth of a plane is not less than its width or height.
+    """
+
+    scale: Scale
+    """
+    The scale of the plane.
+    """
+
+    clazz: Type
+    """
+    The class for which the dimensions are invalid.
+    """
+
+    def __post_init__(self):
+        self.message = f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
+
+
+@dataclass
+class InvalidHingeActiveAxis(UsageError):
+    """
+    Raised when an invalid axis is provided.
+    """
+
+    axis: Vector3
+    """
+    The invalid axis.
+    """
+
+    def __post_init__(self):
+        self.message = (
+            f"Axis {self.axis} provided when trying to calculate the hinge position is invalid. "
+            f"If you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle"
+        )
+
+
+@dataclass
 class AddingAnExistingSemanticAnnotationError(UsageError):
     semantic_annotation: SemanticAnnotation
 
     def __post_init__(self):
-        msg = f"Semantic annotation {self.semantic_annotation} already exists."
-        super().__init__(msg)
+        self.message = f"Semantic annotation {self.semantic_annotation} already exists."
 
 
 @dataclass
@@ -113,8 +258,7 @@ class MissingWorldModificationContextError(UsageError):
     function: Callable
 
     def __post_init__(self):
-        msg = f"World function '{self.function.__name__}' was called without a 'with world.modify_world():' context manager."
-        super().__init__(msg)
+        self.message = f"World function '{self.function.__name__}' was called without a 'with world.modify_world():' context manager."
 
 
 @dataclass
@@ -122,8 +266,7 @@ class DuplicateWorldEntityError(UsageError):
     world_entities: List[WorldEntity]
 
     def __post_init__(self):
-        msg = f"WorldEntities {self.world_entities} are duplicates, while world entity elements should be unique."
-        super().__init__(msg)
+        self.message = f"WorldEntities {self.world_entities} are duplicates, while world entity elements should be unique."
 
 
 @dataclass
@@ -131,10 +274,10 @@ class DuplicateKinematicStructureEntityError(UsageError):
     names: List[PrefixedName]
 
     def __post_init__(self):
-        msg = f"Kinematic structure entities with names {self.names} are duplicates, while kinematic structure entity names should be unique."
-        super().__init__(msg)
+        self.message = f"Kinematic structure entities with names {self.names} are duplicates, while kinematic structure entity names should be unique."
 
 
+@dataclass
 class SpatialTypesError(UsageError):
     pass
 
@@ -145,84 +288,35 @@ class ReferenceFrameMismatchError(SpatialTypesError):
     frame2: KinematicStructureEntity
 
     def __post_init__(self):
-        msg = f"Reference frames {self.frame1.name} and {self.frame2.name} are not the same."
-        super().__init__(msg)
+        self.message = f"Reference frames {self.frame1.name} and {self.frame2.name} are not the same."
 
 
 @dataclass
-class WrongDimensionsError(SpatialTypesError):
-    expected_dimensions: Union[Tuple[int, int], str]
-    actual_dimensions: Tuple[int, int]
-
-    def __post_init__(self):
-        msg = f"Expected {self.expected_dimensions} dimensions, but got {self.actual_dimensions}."
-        super().__init__(msg)
-
-
-@dataclass
-class NotSquareMatrixError(SpatialTypesError):
-    actual_dimensions: Tuple[int, int]
-
-    def __post_init__(self):
-        msg = f"Expected a square matrix, but got {self.actual_dimensions} dimensions."
-        super().__init__(msg)
-
-
-@dataclass
-class HasFreeVariablesError(SpatialTypesError):
+class MissingReferenceFrameError(SpatialTypesError):
     """
-    Raised when an operation can't be performed on an expression with free variables.
+    Represents an error that occurs when a spatial type lacks a reference frame, even though its required for the
+    current operation
     """
 
-    variables: List[FloatVariable]
-
-    def __post_init__(self):
-        msg = f"Operation can't be performed on expression with free variables: {self.variables}."
-        super().__init__(msg)
-
-
-class ExpressionEvaluationError(SpatialTypesError): ...
-
-
-@dataclass
-class WrongNumberOfArgsError(ExpressionEvaluationError):
-    expected_number_of_args: int
-    actual_number_of_args: int
-
-    def __post_init__(self):
-        msg = f"Expected {self.expected_number_of_args} arguments, but got {self.actual_number_of_args}."
-        super().__init__(msg)
-
-
-@dataclass
-class DuplicateVariablesError(SpatialTypesError):
+    spatial_type: SpatialType
     """
-    Raised when duplicate variables are found in an operation that requires unique variables.
+    Spatial type that lacks a reference frame.
     """
 
-    variables: List[FloatVariable]
-
     def __post_init__(self):
-        msg = f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."
-        super().__init__(msg)
+        self.message = f"Spatial type {self.spatial_type} has no reference frame."
 
 
 @dataclass
-class ParsingError(Exception):
+class ParsingError(DataclassException, Exception):
     """
     An error that happens during parsing of files.
     """
 
     file_path: Optional[str] = None
-    msg: Optional[str] = None
 
     def __post_init__(self):
-        if not self.msg:
-            if self.file_path:
-                self.msg = f"File {self.file_path} could not be parsed."
-            else:
-                self.msg = ""
-        super().__init__(self.msg)
+        self.message = f"Error parsing file {self.file_path}."
 
 
 @dataclass
@@ -231,10 +325,17 @@ class WorldEntityNotFoundError(UsageError):
 
     def __post_init__(self):
         if isinstance(self.name_or_hash, PrefixedName):
-            msg = f"WorldEntity with name {self.name_or_hash} not found"
+            self.message = f"WorldEntity with name {self.name_or_hash} not found"
         else:
-            msg = f"WorldEntity with hash {self.name_or_hash} not found"
-        super().__init__(msg)
+            self.message = f"WorldEntity with hash {self.name_or_hash} not found"
+
+
+@dataclass
+class WorldEntityWithIDNotFoundError(UsageError):
+    id: UUID
+
+    def __post_init__(self):
+        self.message = f"WorldEntity with id {self.id} not found"
 
 
 @dataclass
@@ -243,8 +344,7 @@ class AlreadyBelongsToAWorldError(UsageError):
     type_trying_to_add: Type[WorldEntity]
 
     def __post_init__(self):
-        msg = f"Cannot add a {self.type_trying_to_add} that already belongs to another world {self.world.name}."
-        super().__init__(msg)
+        self.message = f"Cannot add a {self.type_trying_to_add} that already belongs to another world {self.world.name}."
 
 
 class NotJsonSerializable(JSONSerializationError): ...
@@ -252,21 +352,29 @@ class NotJsonSerializable(JSONSerializationError): ...
 
 @dataclass
 class SpatialTypeNotJsonSerializable(NotJsonSerializable):
-    spatial_object: SymbolicType
+    spatial_object: SymbolicMathType
 
     def __post_init__(self):
-        super().__init__(
+        self.message = (
             f"Object of type '{self.spatial_object.__class__.__name__}' is not JSON serializable, because it has "
             f"free variables: {self.spatial_object.free_variables()}"
         )
 
 
 @dataclass
-class KinematicStructureEntityNotInKwargs(JSONSerializationError):
-    kinematic_structure_entity_id: UUID
+class WorldEntityWithIDNotInKwargs(JSONSerializationError):
+    world_entity_id: UUID
 
     def __post_init__(self):
-        super().__init__(
-            f"Kinematic structure entity '{self.kinematic_structure_entity_id}' is not in the kwargs of the "
+        self.message = (
+            f"World entity '{self.world_entity_id}' is not in the kwargs of the "
             f"method that created it."
         )
+
+
+class AmbiguousNameError(ValueError):
+    """Raised when more than one semantic annotation class matches a given name with the same score."""
+
+
+class UnresolvedNameError(ValueError):
+    """Raised when no semantic annotation class matches a given name."""

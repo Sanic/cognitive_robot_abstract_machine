@@ -1,7 +1,9 @@
+import logging
 import inspect
 import os
 import shutil
 import time
+import trimesh
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -24,7 +26,11 @@ from trimesh.visual import TextureVisuals
 
 from ..callbacks.callback import ModelChangeCallback
 from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types.spatial_types import TransformationMatrix, Point3, Quaternion
+from ..spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Quaternion,
+)
 from ..world import World
 from ..world_description.connections import (
     RevoluteConnection,
@@ -49,26 +55,28 @@ from ..world_description.world_entity import (
     Connection,
     WorldEntity,
     Actuator,
-    SemanticAnnotation,
 )
+from ..mixin import SimulatorAdditionalProperty
 from ..world_description.world_modification import (
     AddKinematicStructureEntityModification,
     AddActuatorModification,
 )
 
+logger = logging.getLogger(__name__)
 
-def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
+
+def cas_pose_to_list(pose: HomogeneousTransformationMatrix) -> List[float]:
     """
     Converts a CAS TransformationMatrix to a list of 7 floats (position + quaternion).
 
     :param pose: The CAS TransformationMatrix to convert.
     :return: A list of 7 floats ([px, py, pz, qw, qx, qy, qz]) representing the position and quaternion.
     """
-    pos = pose.to_position()
-    quat = pose.to_quaternion()
-    px, py, pz, _ = pos.evaluate().tolist()
-    qx, qy, qz, qw = quat.evaluate().tolist()
-    return [px, py, pz, qw, qx, qy, qz]
+    pose = pose.evaluate()
+    pos = pose[:3, 3]
+    rotation_matrix = pose[:3, :3]
+    quat = Rotation.from_matrix(rotation_matrix).as_quat(scalar_first=True)
+    return [pos[0], pos[1], pos[2], quat[0], quat[1], quat[2], quat[3]]
 
 
 class GeomVisibilityAndCollisionType(IntEnum):
@@ -120,12 +128,9 @@ class MultiSimError(Exception):
 
 
 @dataclass(eq=False)
-class MultiSimCamera(SemanticAnnotation):
-    """Semantic annotation declaring that a Body is a MultiSimCamera."""
-
-    body: Body
+class MultiSimCamera(SimulatorAdditionalProperty):
     """
-    The body which is the camera
+    Additional property representing a camera in MultiSim.
     """
 
 
@@ -178,10 +183,10 @@ class InertialConverter:
         R_diag = Rotation.from_matrix(eigenvectors)  # type: ignore
         updated_quat = (R_orig * R_diag).as_quat(scalar_first=True)
         return Quaternion(
-            x_init=updated_quat[1],
-            y_init=updated_quat[2],
-            z_init=updated_quat[3],
-            w_init=updated_quat[0],
+            x=updated_quat[1],
+            y=updated_quat[2],
+            z=updated_quat[3],
+            w=updated_quat[0],
         )
 
 
@@ -536,12 +541,17 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
                 self.pos_str: joint_pos,
                 self.quat_str: joint_quat,
                 self.axis_str: entity.axis.to_np().tolist()[:3],
-                self.range_str: [dof.lower_limits.position, dof.upper_limits.position],
+                self.range_str: [dof.limits.lower.position, dof.limits.upper.position],
                 self.armature_str: entity.dynamics.armature,
                 self.dry_friction_str: entity.dynamics.dry_friction,
                 self.damping_str: entity.dynamics.damping,
             }
         )
+        if dof.name.name != joint_props["name"]:
+            joint_props["equality_joint"] = {
+                "joint": dof.name.name,
+                "data": [entity.offset, entity.multiplier, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            }
         return joint_props
 
 
@@ -613,7 +623,7 @@ class ActuatorConverter(EntityConverter, ABC):
 
 class CameraConverter(EntityConverter, ABC):
     """
-    Converts an Camera object to a dictionary of actuator properties for Multiverse simulator.
+    Converts a Camera object to a dictionary of camera properties for Multiverse simulator.
     """
 
     entity_type: ClassVar[Type[MultiSimCamera]] = MultiSimCamera
@@ -634,11 +644,15 @@ class CameraConverter(EntityConverter, ABC):
 
 
 class MujocoError(MultiSimError):
-    """Base class for all MuJoCo-related exceptions."""
+    """
+    Base class for all MuJoCo-related exceptions.
+    """
 
 
 class MujocoEntityNotFoundError(MujocoError):
-    """Raised when a MuJoCo entity of a given type and name cannot be found."""
+    """
+    Raised when a MuJoCo entity of a given type and name cannot be found.
+    """
 
     def __init__(
         self, entity_name: str, entity_type: mujoco.mjtObj, action: str = "find"
@@ -647,8 +661,8 @@ class MujocoEntityNotFoundError(MujocoError):
         super().__init__(message)
 
 
-@dataclass(eq=False)
-class MujocoActuator(Actuator):
+@dataclass
+class MujocoActuator(SimulatorAdditionalProperty):
     """
     Represents a MuJoCo-specific actuator in the world model.
     For more information, see: https://mujoco.readthedocs.io/en/stable/XMLreference.html#actuator-general
@@ -666,14 +680,14 @@ class MujocoActuator(Actuator):
     Range for clamping the activation state. The first value must be no greater than the second value.
     """
 
-    ctrl_limited: mujoco.mjtLimited = mujoco.mjtLimited.mjLIMITED_AUTO
+    control_limited: mujoco.mjtLimited = mujoco.mjtLimited.mjLIMITED_AUTO
     """
     If mujoco.mjtLimited.mjLIMITED_TRUE, the control input to this actuator is automatically clamped to ctrl_range at runtime. 
     If mujoco.mjtLimited.mjLIMITED_FALSE, control input clamping is disabled. 
     If mujoco.mjtLimited.mjLIMITED_AUTO and autolimits is set in compiler, control clamping will automatically be set to mujoco.mjtLimited.mjLIMITED_TRUE if ctrl_range is defined without explicitly setting this attribute to mujoco.mjtLimited.mjLIMITED_TRUE.
     """
 
-    ctrl_range: List[float] = field(default_factory=lambda: [0.0, 0.0])
+    control_range: List[float] = field(default_factory=lambda: [0.0, 0.0])
     """
     The range of the control input.
     """
@@ -736,56 +750,178 @@ class MujocoActuator(Actuator):
     mujoco.mjtGain.mjGAIN_USER:     gain_term = mjcb_act_gain(…)
     """
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["activation_limited"] = self.activation_limited.value
-        result["activation_range"] = self.activation_range
-        result["ctrl_limited"] = self.ctrl_limited.value
-        result["ctrl_range"] = self.ctrl_range
-        result["force_limited"] = self.force_limited.value
-        result["force_range"] = self.force_range
-        result["bias_parameters"] = self.bias_parameters
-        result["bias_type"] = self.bias_type.value
-        result["dynamics_parameters"] = self.dynamics_parameters
-        result["dynamics_type"] = self.dynamics_type.value
-        result["gain_parameters"] = self.gain_parameters
-        result["gain_type"] = self.gain_type.value
-        return result
 
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        actuator = super()._from_json(data, **kwargs)
-        actuator.activation_limited = mujoco.mjtLimited(data["activation_limited"])
-        actuator.activation_range = data["activation_range"]
-        actuator.ctrl_limited = mujoco.mjtLimited(data["ctrl_limited"])
-        actuator.ctrl_range = data["ctrl_range"]
-        actuator.force_limited = mujoco.mjtLimited(data["force_limited"])
-        actuator.force_range = data["force_range"]
-        actuator.bias_parameters = data["bias_parameters"]
-        actuator.bias_type = mujoco.mjtBias(data["bias_type"])
-        actuator.dynamics_parameters = data["dynamics_parameters"]
-        actuator.dynamics_type = mujoco.mjtDyn(data["dynamics_type"])
-        actuator.gain_parameters = data["gain_parameters"]
-        actuator.gain_type = mujoco.mjtGain(data["gain_type"])
-        return actuator
+@dataclass
+class MujocoCamera(SimulatorAdditionalProperty):
+    """
+    Additional property representing a MuJoCo camera in the world model.
+    """
+
+    name: str = ""
+    """
+    Name of the camera.
+    """
+
+    mode: mujoco.mjtCamLight = mujoco.mjtCamLight.mjCAMLIGHT_FIXED
+    """
+    This attribute specifies how the camera position and orientation in world coordinates are computed in forward kinematics 
+    (which in turn determine what the camera sees).
+    """
+
+    orthographic: bool = False
+    """
+    Whether the camera uses a perspective projection (the default) or an orthographic projection.
+    Setting this attribute changes the semantic of the fovy attribute.
+    """
+
+    fovy: float = 45.0
+    """
+    Vertical field-of-view of the camera.
+    """
+
+    resolution: List[float] = field(default_factory=lambda: [1, 1])
+    """
+    Resolution of the camera in pixels [width height].
+    """
+
+    focal_length: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Focal length of the camera in length units. It is mutually exclusive with fovy.
+    """
+
+    focal_pixel: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Focal length of the camera in pixel units. If both focal and focalpixel are specified, the former is ignored.
+    """
+
+    principal_length: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Offset of the principal point of the camera with respect to the camera center in length units. It is mutually exclusive with fovy.
+    """
+
+    principal_pixel: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Offset of the principal point of the camera with respect to the camera center in pixel units. 
+    If both principal and principalpixel are specified, the former is ignored.
+    """
+
+    sensor_size: List[float] = field(default_factory=lambda: [0, 0])
+    """
+    Size of the camera sensor in length units. It is mutually exclusive with fovy.
+    """
+
+    inter_pupilary_distance: float = 0.068
+    """
+    Inter-pupilary distance. This attribute only has an effect during stereoscopic rendering.
+    """
+
+    position: List[float] = field(default_factory=lambda: [0, 0, 0])
+    """
+    Position of the camera frame.
+    """
+
+    quaternion: List[float] = field(default_factory=lambda: [1, 0, 0, 0])
+    """
+    Orientation of the camera frame.
+    """
+
+
+@dataclass
+class MujocoEquality(SimulatorAdditionalProperty):
+    """
+    Additional properties representing a MuJoCo equality constraint in the world model.
+    """
+
+    type: mujoco.mjtEq = field(kw_only=True)
+    """
+    The type of the equality constraint.
+    """
+
+    object_type: mujoco.mjtObj = field(kw_only=True)
+    """
+    The type of the objects being constrained.
+    """
+
+    name_1: str = field(kw_only=True)
+    """
+    The name of the first entity being constrained.
+    """
+
+    name_2: str = field(kw_only=True)
+    """
+    The name of the second entity being constrained.
+    """
+
+    data: List[float] = field(kw_only=True)
+    """
+    The data associated with the equality constraint.
+    """
 
 
 @dataclass(eq=False)
-class MujocoCamera(MultiSimCamera):
-    """Semantic annotation declaring that a Body is a MujocoCamera."""
+class MujocoGeom(SimulatorAdditionalProperty):
+    """
+    An additional property declaring that a Shape is a MujocoGeom.
+    """
 
-    mode: mujoco.mjtCamLight = mujoco.mjtCamLight.mjCAMLIGHT_FIXED
-    orthographic: bool = False
-    fovy: float = 45.0
-    resolution: list = field(default_factory=lambda: [1, 1])
-    focal_length: list = field(default_factory=lambda: [0, 0])
-    focal_pixel: list = field(default_factory=lambda: [0, 0])
-    principal_length: list = field(default_factory=lambda: [0, 0])
-    principal_pixel: list = field(default_factory=lambda: [0, 0])
-    sensor_size: list = field(default_factory=lambda: [0, 0])
-    ipd: float = 0.068
-    pos: list = field(default_factory=lambda: [0, 0, 0])
-    quat: list = field(default_factory=lambda: [1, 0, 0, 0])
+    solver_impedance: List[float] = field(
+        default_factory=lambda: [0.9, 0.95, 0.001, 0.5, 2]
+    )
+    """
+    The solver impedance parameters for the geom. See https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters for more details.
+    """
+
+    solver_reference: List[float] = field(default_factory=lambda: [0.02, 1.0])
+    """
+    The solver reference parameters for the geom. See https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters for more details.
+    """
+
+    friction: List[float] = field(default_factory=lambda: [1, 0.005, 0.0001])
+    """
+    Contact friction parameters for dynamically generated contact pairs. 
+    The first number is the sliding friction, acting along both axes of the tangent plane. 
+    The second number is the torsional friction, acting around the contact normal. 
+    The third number is the rolling friction, acting around both axes of the tangent plane. 
+    """
+
+
+@dataclass(eq=False)
+class MujocoJoint(SimulatorAdditionalProperty):
+    """
+    An additional property declaring that a Connection is a MujocoJoint.
+    """
+
+    stiffness: float = 0.0
+    """
+    The stiffness of the joint.
+    """
+
+    actuator_force_range: List[float] = field(default_factory=lambda: [0.0, 0.0])
+    """
+    Range for clamping total actuator forces acting on this joint. 
+    It is available only for scalar joints (hinge and slider) and ignored for ball and free joints.
+    The compiler expects the first value to be smaller than the second value.
+    """
+
+
+@dataclass(eq=False)
+class MujocoBody(SimulatorAdditionalProperty):
+    """
+    Additional properties representing a MuJoCo body in the world model.
+    """
+
+    gravitation_compensation_factor: float = 0.0
+    """
+    Gravity compensation force, specified as fraction of body weight. 
+    This attribute creates an upwards force applied to the body’s center of mass, countering the force of gravity. 
+    As an example, a value of 1 creates an upward force equal to the body’s weight and compensates for gravity exactly. 
+    Values greater than 1 will create a net upwards force or buoyancy effect.
+    """
+
+    motion_capture: bool = False
+    """
+    If True, the body is treated as a motion capture body.
+    """
 
 
 class MujocoConverter(EntityConverter, ABC): ...
@@ -963,32 +1099,28 @@ class Mujoco6DOFJointConverter(MujocoJointConverter, Connection6DOFConverter):
 
 
 class MujocoActuatorConverter(ActuatorConverter, ABC):
-
-    entity_type: ClassVar[Type[MujocoActuator]] = MujocoActuator
-
-    def _post_convert(
-        self, entity: MujocoActuator, actuator_props: Dict[str, Any], **kwargs
-    ) -> Dict[str, Any]:
-        return actuator_props
+    entity_type: ClassVar[Type[Actuator]] = Actuator
 
 
 class MujocoGeneralActuatorConverter(MujocoActuatorConverter, ActuatorConverter):
 
     def _post_convert(
-        self, entity: MujocoActuator, actuator_props: Dict[str, Any], **kwargs
+        self, entity: Actuator, actuator_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
-        actuator_props["actlimited"] = entity.activation_limited
-        actuator_props["actrange"] = entity.activation_range
-        actuator_props["ctrllimited"] = entity.ctrl_limited
-        actuator_props["ctrlrange"] = entity.ctrl_range
-        actuator_props["forcelimited"] = entity.force_limited
-        actuator_props["forcerange"] = entity.force_range
-        actuator_props["biasprm"] = entity.bias_parameters
-        actuator_props["biastype"] = entity.bias_type
-        actuator_props["dynprm"] = entity.dynamics_parameters
-        actuator_props["dyntype"] = entity.dynamics_type
-        actuator_props["gainprm"] = entity.gain_parameters
-        actuator_props["gaintype"] = entity.gain_type
+        for mujoco_actuator in entity.simulator_additional_properties:
+            if isinstance(mujoco_actuator, MujocoActuator):
+                actuator_props["actlimited"] = mujoco_actuator.activation_limited
+                actuator_props["actrange"] = mujoco_actuator.activation_range
+                actuator_props["ctrllimited"] = mujoco_actuator.control_limited
+                actuator_props["ctrlrange"] = mujoco_actuator.control_range
+                actuator_props["forcelimited"] = mujoco_actuator.force_limited
+                actuator_props["forcerange"] = mujoco_actuator.force_range
+                actuator_props["biasprm"] = mujoco_actuator.bias_parameters
+                actuator_props["biastype"] = mujoco_actuator.bias_type
+                actuator_props["dynprm"] = mujoco_actuator.dynamics_parameters
+                actuator_props["dyntype"] = mujoco_actuator.dynamics_type
+                actuator_props["gainprm"] = mujoco_actuator.gain_parameters
+                actuator_props["gaintype"] = mujoco_actuator.gain_type
         return actuator_props
 
 
@@ -1008,9 +1140,9 @@ class MujocoCameraConverter(CameraConverter, ABC):
         camera_props["principal_length"] = entity.principal_length
         camera_props["principal_pixel"] = entity.principal_pixel
         camera_props["sensor_size"] = entity.sensor_size
-        camera_props["ipd"] = entity.ipd
-        camera_props["pos"] = entity.pos
-        camera_props["quat"] = entity.quat
+        camera_props["ipd"] = entity.inter_pupilary_distance
+        camera_props["pos"] = entity.position
+        camera_props["quat"] = entity.quaternion
         return camera_props
 
 
@@ -1020,30 +1152,54 @@ class MultiSimBuilder(ABC):
     A builder to build a world in the Multiverse simulator.
     """
 
+    _world: Optional[World] = None
+    """
+    The world to be built.
+    """
+
     def build_world(self, world: World, file_path: str):
         """
         Builds the world in the simulator and saves it to a file.
 
-        :param world: The world to build.
+        :param world: The world to be built.
         :param file_path: The file path to save the world to.
         """
+        self._world = world
         self._asset_folder_path = os.path.join(os.path.dirname(file_path), "assets")
+
+        root = Body(name=PrefixedName("world"))
+
         if not os.path.exists(self.asset_folder_path):
             os.makedirs(self.asset_folder_path)
-        if len(world.bodies) == 0:
-            with world.modify_world():
-                root = Body(name=PrefixedName("world"))
-                world.add_body(root)
-        elif world.bodies[0].name.name != "world":
+        if len(self.world.bodies) == 0:
+            with self.world.modify_world():
+                self.world.add_body(root)
+        elif self.world.root != root:
+            # search for all Connection6DoF joints that are connected to the non "world" root
+            # to change their parent to the new "world" root later.
+            # Mujoco identifies all Connection6DoF joints as free joints.
+            # Free joints in Mujoco need to be attached to the top level link
+            # and the top level link needs the name "world"
+            free_joint_bodies = [
+                body
+                for body in self.world.bodies
+                if isinstance(body.parent_connection, Connection6DoF)
+                and body.parent_connection.parent == self.world.root
+            ]
+
             with world.modify_world():
                 root_bodies = [
-                    body for body in world.bodies if body.parent_connection is None
+                    body for body in self.world.bodies if body.parent_connection is None
                 ]
-                root = Body(name=PrefixedName("world"))
-                world.add_body(root)
+                self.world.add_body(root)
                 for root_body in root_bodies:
                     connection = FixedConnection(parent=root, child=root_body)
-                    world.add_connection(connection)
+                    self.world.add_connection(connection)
+
+            # attach free joint bodies to the new top level body in mujoco
+            with world.modify_world():
+                for free_joint_body in free_joint_bodies:
+                    self.world.move_branch(free_joint_body, root)
 
         self._start_build(file_path=file_path)
 
@@ -1077,8 +1233,9 @@ class MultiSimBuilder(ABC):
                 is_visible=shape in body.visual,
                 is_collidable=shape in body.collision,
             )
-        for camera in body.get_semantic_annotations_by_type(MultiSimCamera):
-            self._build_camera(camera=camera)
+        for camera in body.simulator_additional_properties:
+            if isinstance(camera, MultiSimCamera):
+                self._build_camera(camera=camera)
 
     def build_region(self, region: Region):
         """
@@ -1180,6 +1337,10 @@ class MultiSimBuilder(ABC):
         """
         return self._asset_folder_path
 
+    @property
+    def world(self) -> World:
+        return self._world
+
 
 @dataclass
 class MujocoBuilder(MultiSimBuilder):
@@ -1195,6 +1356,7 @@ class MujocoBuilder(MultiSimBuilder):
         self.spec.compiler.degree = 0
 
     def _end_build(self, file_path: str):
+        self._build_equalities()
         self.spec.compile()
         self.spec.to_file(file_path)
         import xml.etree.ElementTree as ET
@@ -1246,7 +1408,16 @@ class MujocoBuilder(MultiSimBuilder):
         if geom_props["type"] == mujoco.mjtGeom.mjGEOM_MESH and not self._parse_geom(
             geom_props=geom_props
         ):
+            logger.warning(
+                f"Mesh {shape.mesh} could not be parsed. Skipping geom {geom_props['name']}."
+            )
             return
+        for mujoco_geom in shape.simulator_additional_properties:
+            if isinstance(mujoco_geom, MujocoGeom):
+                geom_props["solimp"] = mujoco_geom.solver_impedance
+                geom_props["solref"] = mujoco_geom.solver_reference
+                geom_props["friction"] = mujoco_geom.friction
+                break
         geom_spec = parent_body_spec.add_geom(**geom_props)
         if geom_spec.type == mujoco.mjtGeom.mjGEOM_BOX and geom_spec.size[2] == 0:
             geom_spec.type = mujoco.mjtGeom.mjGEOM_PLANE
@@ -1257,6 +1428,22 @@ class MujocoBuilder(MultiSimBuilder):
                 entity_type=mujoco.mjtObj.mjOBJ_GEOM,
                 action="add",
             )
+
+    def _create_stl_from_dae_mesh(
+        self, original_mesh_file_path: str, stl_file_path: str
+    ):
+        """
+        Creates an .stl mesh at the location specified by stl_file_path from the original .dae mesh.
+
+        :param original_mesh_file_path: filepath to the original .dae mesh
+        :param stl_file_path: filepath to save the new .stl mesh to
+        """
+        logger.info(
+            f"Converting Collada mesh to STL for MuJoCo: {original_mesh_file_path}"
+        )
+        tm = trimesh.load(original_mesh_file_path, force="mesh")
+
+        tm.export(stl_file_path)
 
     def _parse_geom(self, geom_props: Dict[str, Any]) -> bool:
         """
@@ -1278,17 +1465,25 @@ class MujocoBuilder(MultiSimBuilder):
             )
         mesh_ext = os.path.splitext(mesh_file_path)[1].lower()
         if mesh_ext == ".dae":
-            print(f"Cannot use .dae files in Mujoco. Skipping mesh {mesh_file_path}.")
-            return False
+            # Build output .stl path
+            base_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
+            stl_file_path = os.path.join(self.asset_folder_path, base_name + ".stl")
+
+            # create a .stl mesh from the original .dae mesh, as a replacement. If it not already exists.
+            if not os.path.exists(stl_file_path):
+                self._create_stl_from_dae_mesh(
+                    original_mesh_file_path=mesh_file_path, stl_file_path=stl_file_path
+                )
+            mesh_file_path = stl_file_path
+
         mesh_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
+        mesh_scale = [mesh_entity.scale.x, mesh_entity.scale.y, mesh_entity.scale.z]
+        if not numpy.allclose(mesh_scale, [1.0, 1.0, 1.0]):
+            mesh_name += f"_{'_'.join(map(str, mesh_scale))}"
         if mesh_name not in [mesh.name for mesh in self.spec.meshes]:
             mesh = self.spec.add_mesh(name=mesh_name)
             mesh.file = mesh_file_path
-            mesh.scale[:] = (
-                mesh_entity.scale.x,
-                mesh_entity.scale.y,
-                mesh_entity.scale.z,
-            )
+            mesh.scale = mesh_scale
         geom_props["meshname"] = mesh_name
         texture_file_path = geom_props.pop("texture_file_path", None)
         if isinstance(texture_file_path, str):
@@ -1321,6 +1516,20 @@ class MujocoBuilder(MultiSimBuilder):
         if isinstance(connection, FixedConnection):
             return
         joint_props = MujocoJointConverter.convert(connection)
+        if "equality_joint" in joint_props:
+            equality_joint = joint_props.pop("equality_joint")
+            equality = self.spec.add_equality()
+            equality.type = mujoco.mjtEq.mjEQ_JOINT
+            equality.objtype = mujoco.mjtObj.mjOBJ_JOINT
+            equality.name1 = joint_props["name"]
+            equality.name2 = equality_joint["joint"]
+            equality.data = equality_joint["data"]
+        for mujoco_joint in connection.simulator_additional_properties:
+            if isinstance(mujoco_joint, MujocoJoint):
+                joint_props["stiffness"] = mujoco_joint.stiffness
+                joint_props["actfrcrange"] = mujoco_joint.actuator_force_range
+                break
+
         child_body_name = connection.child.name.name
         child_body_spec = self._find_entity(
             entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=child_body_name
@@ -1404,6 +1613,10 @@ class MujocoBuilder(MultiSimBuilder):
         if body.name.name == "world":
             return
         body_props = MujocoKinematicStructureEntityConverter.convert(body)
+        for mujoco_body in body.simulator_additional_properties:
+            if isinstance(mujoco_body, MujocoBody):
+                body_props["gravcomp"] = mujoco_body.gravitation_compensation_factor
+                body_props["mocap"] = mujoco_body.motion_capture
         parent_body_name = body.parent_connection.parent.name.name
         parent_body_spec = self._find_entity(
             entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=parent_body_name
@@ -1421,6 +1634,19 @@ class MujocoBuilder(MultiSimBuilder):
                 action="add",
             )
 
+    def _build_equalities(self):
+        """
+        Builds all equalities in the Mujoco spec.
+        """
+        for mujoco_equality in self.world.simulator_additional_properties:
+            if isinstance(mujoco_equality, MujocoEquality):
+                equality = self.spec.add_equality()
+                equality.type = mujoco_equality.type
+                equality.objtype = mujoco_equality.object_type
+                equality.name1 = mujoco_equality.name_1
+                equality.name2 = mujoco_equality.name_2
+                equality.data = mujoco_equality.data
+
     def _find_entity(
         self,
         entity_type: mujoco.mjtObj,
@@ -1431,7 +1657,7 @@ class MujocoBuilder(MultiSimBuilder):
         """
         Finds an entity in the Mujoco spec by its type and name.
 
-        :param entity_type: The type of the entity
+        :param entity_type: The type of the entity.
         :param entity_name: The name of the entity.
         :return: The entity if found, None otherwise.
         """
@@ -1619,7 +1845,7 @@ class ActuatorSpawner(EntitySpawner):
 
     def _spawn(self, simulator: MultiverseSimulator, entity: Actuator) -> bool:
         """
-        Spawns a Actuator object in the Multiverse simulator including its dofs.
+        Spawns an Actuator object in the Multiverse simulator, including its dofs.
 
         :param simulator: The Multiverse simulator to spawn the entity in.
         :param entity: The Actuator object to spawn.
@@ -1632,6 +1858,12 @@ class ActuatorSpawner(EntitySpawner):
     def _spawn_actuator(
         self, simulator: MultiverseSimulator, actuator: Actuator
     ) -> bool:
+        """
+        Spawns an Actuator object in the Multiverse simulator.
+
+        :param simulator: The Multiverse simulator to spawn the entity in.
+        :param actuator: The Actuator object to spawn.
+        """
         raise NotImplementedError
 
 
@@ -1714,10 +1946,10 @@ class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
     A spawner to spawn a MujocoActuator object in the MuJoCo simulator.
     """
 
-    entity_type: ClassVar[Type[MujocoActuator]] = MujocoActuator
+    entity_type: ClassVar[Type[Actuator]] = Actuator
 
     def _spawn_actuator(
-        self, simulator: MultiverseMujocoConnector, actuator: MujocoActuator
+        self, simulator: MultiverseMujocoConnector, actuator: Actuator
     ) -> bool:
         actuator_props = MujocoActuatorConverter.convert(actuator)
         actuator_name = actuator_props.pop("name")

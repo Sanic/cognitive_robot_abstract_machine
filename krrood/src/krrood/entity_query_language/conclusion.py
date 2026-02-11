@@ -13,6 +13,8 @@ from .symbolic import (
     Variable,
     OperationResult,
     ResultQuantifier,
+    Selectable,
+    Bindings,
 )
 from .utils import T
 
@@ -26,7 +28,7 @@ class Conclusion(SymbolicExpression[T], ABC):
     :ivar value: The value or expression used by the conclusion.
     """
 
-    var: Variable[T]
+    var: Selectable[T]
     value: Any
     _child_: Optional[SymbolicExpression[T]] = field(init=False, default=None)
 
@@ -72,18 +74,17 @@ class Set(Conclusion[T]):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, Any]] = None,
-        parent: Optional[SymbolicExpression] = None,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
-        self._eval_parent_ = parent
+
         self._yield_when_false_ = False
         if self.var._var_._id_ not in sources:
-            parent_value = next(iter(self.var._evaluate__(sources, parent=self)))[
+            parent_value = next(iter(self.var._evaluate_(sources, parent=self)))[
                 self.var._var_._id_
             ]
             sources[self.var._var_._id_] = parent_value
         sources[self.var._var_._id_] = next(
-            iter(self.value._evaluate__(sources, parent=self))
+            iter(self.value._evaluate_(sources, parent=self))
         )[self.value._id_]
         yield OperationResult(sources, False, self)
 
@@ -94,11 +95,10 @@ class Add(Conclusion[T]):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, Any]] = None,
-        parent: Optional[SymbolicExpression] = None,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
-        self._eval_parent_ = parent
+
         self._yield_when_false_ = False
-        v = next(iter(self.value._evaluate__(sources, parent=self)))[self.value._id_]
+        v = next(iter(self.value._evaluate_(sources, parent=self)))[self.value._id_]
         sources[self.var._var_._id_] = v
         yield OperationResult(sources, False, self)

@@ -15,6 +15,7 @@ from .symbolic import (
     Literal,
     OperationResult,
     LogicalBinaryOperator,
+    Bindings,
 )
 
 
@@ -43,7 +44,11 @@ class ConclusionSelector(LogicalBinaryOperator, ABC):
             return
         required_var_ids = set()
         for conclusion in conclusions:
-            vars_ = {v._id_ for v in conclusion._unique_variables_ if not isinstance(v, Literal)}
+            vars_ = {
+                v._id_
+                for v in conclusion._unique_variables_
+                if not isinstance(v, Literal)
+            }
             required_var_ids.update(vars_)
         required_output = {
             k: v for k, v in output.bindings.items() if k in required_var_ids
@@ -69,18 +74,14 @@ class ExceptIf(ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, Any]] = None,
-        parent: Optional[SymbolicExpression] = None,
+        sources: Optional[Bindings] = None,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the ExceptIf condition and yield the results.
         """
-        self._eval_parent_ = parent
-        # init an empty source if none is provided
-        sources = sources or {}
 
         # constrain left values by available sources
-        left_values = self.left._evaluate__(sources, parent=self)
+        left_values = self.left._evaluate_(sources, parent=self)
         for left_value in left_values:
 
             self._is_false_ = left_value.is_false
@@ -89,7 +90,7 @@ class ExceptIf(ConclusionSelector):
                 continue
 
             right_yielded = False
-            for right_value in self.right._evaluate__(left_value.bindings, parent=self):
+            for right_value in self.right._evaluate_(left_value.bindings, parent=self):
                 if right_value.is_false:
                     continue
                 right_yielded = True
@@ -122,10 +123,9 @@ class Alternative(ElseIf, ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, Any]] = None,
-        parent: Optional[SymbolicExpression] = None,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
-        outputs = super()._evaluate__(sources, parent=parent)
+        outputs = super()._evaluate__(sources)
         for output in outputs:
             # Only yield if conclusions were successfully added (not duplicates)
             if not self.left._is_false_:
@@ -144,10 +144,9 @@ class Next(EQLUnion, ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Optional[Dict[int, Any]] = None,
-        parent: Optional[SymbolicExpression] = None,
+        sources: Bindings,
     ) -> Iterable[OperationResult]:
-        outputs = super()._evaluate__(sources, parent=parent)
+        outputs = super()._evaluate__(sources)
         for output in outputs:
             if self.left_evaluated:
                 self.update_conclusion(output, self.left._conclusion_)

@@ -27,10 +27,11 @@ Your goals:
 :tags: [remove-input]
 from dataclasses import dataclass, field
 from typing import Optional
-from krrood.entity_query_language.entity import entity, an, let
+from krrood.entity_query_language.entity import entity, variable
+from krrood.entity_query_language.entity_result_processors import an, the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation, Body
@@ -85,21 +86,21 @@ bottle_medium = ...
 class Cap(SemanticAnnotation):
     """Semantic annotation declaring that a Body is a bottle cap."""
 
-    body: Body
+    body: Body = field(kw_only=True)
 
 
 @dataclass(eq=False)
 class Bottle(SemanticAnnotation):
     """Semantic annotation declaring that a Body is a bottle; may reference a Cap."""
 
-    body: Body
-    cap: Optional[Cap] = field(default=None)
+    body: Body = field(kw_only=True)
+    cap: Optional[Cap] = field(default=None, kw_only=True)
 
 
 # Geometries (sizes are in meters)
-cap_cylinder = Cylinder(width=0.03, height=0.02, origin=TransformationMatrix())
-bottle_large_cylinder = Cylinder(width=0.08, height=0.30, origin=TransformationMatrix())
-bottle_medium_cylinder = Cylinder(width=0.04, height=0.15, origin=TransformationMatrix())
+cap_cylinder = Cylinder(width=0.03, height=0.02, origin=HomogeneousTransformationMatrix())
+bottle_large_cylinder = Cylinder(width=0.08, height=0.30, origin=HomogeneousTransformationMatrix())
+bottle_medium_cylinder = Cylinder(width=0.04, height=0.15, origin=HomogeneousTransformationMatrix())
 
 # ShapeCollections
 cap_shapes = ShapeCollection([cap_cylinder])
@@ -169,7 +170,7 @@ with world.modify_world():
     world.add_connection(root_C_bottle_medium)
     
 z_offset = bottle_large_cylinder.height / 2.0 + cap_cylinder.height / 2.0
-cap_pose = TransformationMatrix.from_xyz_rpy(
+cap_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
     z=z_offset
 )
 bottle_large_C_cap.origin = cap_pose
@@ -222,10 +223,10 @@ Your goals:
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-bottle = let(Bottle, domain=world.semantic_annotations)
+bottle = variable(Bottle, domain=world.semantic_annotations)
 bottles_with_cap_query = an(
     entity(
-        bottle, bottle.cap != None
+        bottle).where(bottle.cap != None
     )
 )
 query_result = list(bottles_with_cap_query.evaluate())

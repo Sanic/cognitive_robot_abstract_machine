@@ -26,10 +26,12 @@ from typing_extensions import (
     Callable,
     Any,
     Iterable,
+    TYPE_CHECKING,
 )
 from typing_extensions import List
 from typing_extensions import Type, Set
 
+from .mixin import HasSimulatorProperties
 from .callbacks.callback import ModelChangeCallback
 from .collision_checking.collision_detector import CollisionDetector
 from .collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
@@ -40,12 +42,14 @@ from .exceptions import (
     WorldEntityNotFoundError,
     AlreadyBelongsToAWorldError,
     MissingWorldModificationContextError,
+    WorldEntityWithIDNotFoundError,
+    MissingReferenceFrameError,
 )
 from .robots.abstract_robot import AbstractRobot
 from .spatial_computations.forward_kinematics import ForwardKinematicsManager
 from .spatial_computations.ik_solver import InverseKinematicsSolver
 from .spatial_computations.raytracer import RayTracer
-from .spatial_types import spatial_types as cas
+from .spatial_types import HomogeneousTransformationMatrix, Quaternion
 from .spatial_types.derivatives import Derivatives
 from .utils import IDGenerator
 from .world_description.connections import (
@@ -55,11 +59,12 @@ from .world_description.connections import (
     ActiveConnection,
 )
 from .world_description.connections import HasUpdateState
-from .world_description.degree_of_freedom import DegreeOfFreedom
+from .world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
 from .world_description.visitors import CollisionBodyCollector, ConnectionCollector
 from .world_description.world_entity import (
     Connection,
     SemanticAnnotation,
+    WorldEntityWithID,
     KinematicStructureEntity,
     Region,
     GenericKinematicStructureEntity,
@@ -86,6 +91,9 @@ from .world_description.world_modification import (
     RemoveActuatorModification,
 )
 from .world_description.world_state import WorldState
+
+if TYPE_CHECKING:
+    from .spatial_types import GenericSpatialType
 
 logger = logging.getLogger(__name__)
 
@@ -444,7 +452,7 @@ _LRU_CACHE_SIZE: int = 2048
 
 
 @dataclass
-class World:
+class World(HasSimulatorProperties):
     """
     A class representing the world.
     The world manages a set of kinematic structure entities and connections represented as a tree-like graph.
@@ -691,6 +699,12 @@ class World:
         body: KinematicStructureEntity,
     ):
         return self.add_kinematic_structure_entity(body)
+
+    def add_region(
+        self,
+        region: KinematicStructureEntity,
+    ):
+        return self.add_kinematic_structure_entity(region)
 
     def add_kinematic_structure_entity(
         self,
@@ -1151,6 +1165,17 @@ class World:
     def get_degree_of_freedom_by_id(self, id: UUID) -> DegreeOfFreedom:
         return self._get_world_entity_by_hash(hash(id))
 
+    def get_world_entity_with_id_by_id(self, id: UUID) -> WorldEntityWithID:
+        result = [
+            v
+            for v in self._world_entity_hash_table.values()
+            if isinstance(v, WorldEntityWithID) and v.id == id
+        ]
+        if len(result) == 0:
+            raise WorldEntityWithIDNotFoundError(id)
+        else:
+            return result[0]
+
     def get_kinematic_structure_entity_by_id(
         self, id: UUID
     ) -> KinematicStructureEntity:
@@ -1158,6 +1183,9 @@ class World:
 
     def get_actuator_by_id(self, id: UUID) -> Actuator:
         return self._get_world_entity_by_hash(hash(id))
+
+    def get_semantic_annotation_by_id(self, id: UUID) -> SemanticAnnotation:
+        return [s for s in self.semantic_annotations if s.id == id][0]
 
     def _get_world_entity_by_hash(self, entity_hash: int) -> GenericWorldEntity:
         """
@@ -1212,7 +1240,9 @@ class World:
         return entity_hash in self._world_entity_hash_table
 
     # %% World Merging
-    def merge_world_at_pose(self, other: World, pose: cas.TransformationMatrix) -> None:
+    def merge_world_at_pose(
+        self, other: World, pose: HomogeneousTransformationMatrix
+    ) -> None:
         """
         Merge another world into the existing one, creates a 6DoF connection between the root of this world and the root
         of the other world.
@@ -1293,6 +1323,31 @@ class World:
             self.add_semantic_annotation(semantic_annotation)
 
     # %% Subgraph Targeting
+
+    def move_branch_with_fixed_connection(
+        self,
+        branch_root: KinematicStructureEntity,
+        new_parent: KinematicStructureEntity,
+    ):
+        """
+        Moves a branch of the kinematic structure starting at branch_root to a new parent.
+        Useful for example to "attach" an object (branch_root) to the gripper of the robot (new_parent), when picking up
+        an object.
+        ..warning:: the old connection is lost after calling this method
+
+        :param branch_root: The root of the branch to move.
+        :param new_parent: The new parent of the branch.
+        """
+        new_parent_T_child = self.compute_forward_kinematics(new_parent, branch_root)
+        self.remove_connection(branch_root.parent_connection)
+        self.add_connection(
+            FixedConnection(
+                parent=new_parent,
+                child=branch_root,
+                parent_T_connection_expression=new_parent_T_child,
+            )
+        )
+
     def get_connections_of_branch(
         self, root: KinematicStructureEntity
     ) -> List[Connection]:
@@ -1504,7 +1559,7 @@ class World:
             self.kinematic_structure.successors(kinematic_structure_entity.index)
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+
     def compute_parent_connection(
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> Optional[Connection]:
@@ -1524,7 +1579,7 @@ class World:
             )
         )
 
-    @lru_cache(maxsize=_LRU_CACHE_SIZE)
+
     def compute_parent_kinematic_structure_entity(
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> Optional[KinematicStructureEntity]:
@@ -1741,7 +1796,7 @@ class World:
 
     def compute_forward_kinematics(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> cas.TransformationMatrix:
+    ) -> HomogeneousTransformationMatrix:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip KinematicStructureEntity.
 
@@ -1756,7 +1811,7 @@ class World:
 
     def compose_forward_kinematics_expression(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> cas.TransformationMatrix:
+    ) -> HomogeneousTransformationMatrix:
         """
         :param root: The root KinematicStructureEntity in the kinematic chain.
             It determines the starting point of the forward kinematics calculation.
@@ -1788,12 +1843,25 @@ class World:
         """
         return self._forward_kinematic_manager.collision_fks
 
+    def update_forward_kinematics(self) -> None:
+        """
+        Recompile and recompute forward kinematics of the world.
+
+        ..warning::
+            Use this method if you need to live update the forward kinematic inside a with self.modify_world(): block.
+            Use with caution, as this only works if the world structure is not currently broken, and thus may lead to
+            crashes if its not the case. Also using this in a method that is called a lot, it may cause performance
+            issues because of unnecessary recompilations.
+        """
+        self._forward_kinematic_manager.recompile()
+        self._forward_kinematic_manager.recompute()
+
     # %% Inverse Kinematics
     def compute_inverse_kinematics(
         self,
         root: KinematicStructureEntity,
         tip: KinematicStructureEntity,
-        target: cas.TransformationMatrix,
+        target: HomogeneousTransformationMatrix,
         dt: float = 0.05,
         max_iterations: int = 200,
         translation_velocity: float = 0.2,
@@ -1835,6 +1903,8 @@ class World:
             self.semantic_annotations.clear()
             self.degrees_of_freedom.clear()
             self.state = WorldState(_world=self)
+        self._world_entity_hash_table.clear()
+        self._model_manager.model_modification_blocks.clear()
 
     def is_empty(self):
         """
@@ -1844,9 +1914,9 @@ class World:
 
     def transform(
         self,
-        spatial_object: cas.GenericSpatialType,
+        spatial_object: GenericSpatialType,
         target_frame: KinematicStructureEntity,
-    ) -> cas.GenericSpatialType:
+    ) -> GenericSpatialType:
         """
         Transform a given spatial object from its reference frame to a target frame.
 
@@ -1865,12 +1935,14 @@ class World:
             is a Quaternion, the returned object is a Quaternion. Otherwise, it is the
             transformed spatial object.
         """
+        if spatial_object.reference_frame is None:
+            raise MissingReferenceFrameError(spatial_object)
         target_frame_T_reference_frame = self.compute_forward_kinematics(
             root=target_frame, tip=spatial_object.reference_frame
         )
 
         match spatial_object:
-            case cas.Quaternion():
+            case Quaternion():
                 reference_frame_R = spatial_object.to_rotation_matrix()
                 target_frame_R = target_frame_T_reference_frame @ reference_frame_R
                 return target_frame_R.to_quaternion()
@@ -1889,12 +1961,13 @@ class World:
         with new_world.modify_world():
             for body in self.bodies:
                 new_body = Body(
-                    visual=body.visual,
-                    collision=body.collision,
                     name=body.name,
                     id=body.id,
                 )
                 new_world.add_kinematic_structure_entity(new_body)
+                new_body.visual = body.visual.copy_for_world(new_world)
+                new_body.collision = body.collision.copy_for_world(new_world)
+                new_body.collision_config = deepcopy(body.collision_config)
             for region in self.regions:
                 new_region = Region(
                     name=region.name,
@@ -1905,8 +1978,10 @@ class World:
             for dof in self.degrees_of_freedom:
                 new_dof = DegreeOfFreedom(
                     name=dof.name,
-                    lower_limits=dof.lower_limits,
-                    upper_limits=dof.upper_limits,
+                    limits=DegreeOfFreedomLimits(
+                        lower=dof.limits.lower,
+                        upper=dof.limits.upper,
+                    ),
                     id=dof.id,
                 )
                 new_world.add_degree_of_freedom(new_dof)
