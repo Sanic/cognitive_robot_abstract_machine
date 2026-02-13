@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from semantic_digital_twin.semantic_annotations.mixins import HasBody
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     SemanticEnvironmentAnnotation,
@@ -10,17 +10,17 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(eq=False)
-class Countertop(HasBody):
+class Countertop(HasRootBody):
     pass
 
 
 @dataclass(eq=False)
-class Stovetop(HasBody):
+class Stovetop(HasRootBody):
     pass
 
 
 @dataclass(eq=False)
-class Side(HasBody):
+class Side(HasRootBody):
     pass
 
 
@@ -35,7 +35,7 @@ class Things(SemanticEnvironmentAnnotation):
 
 
 @dataclass(eq=False)
-class Board(HasBody):
+class Board(HasRootBody):
     pass
 
 

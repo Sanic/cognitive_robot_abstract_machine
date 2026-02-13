@@ -173,7 +173,7 @@ class TransformGeometry(Step):
     Applies a transformation to the geometry of all collision meshes in the world.
     """
 
-    transform: TransformationMatrix
+    transform: HomogeneousTransformationMatrix
     """
     The transformation matrix to apply to the geometry.
     """

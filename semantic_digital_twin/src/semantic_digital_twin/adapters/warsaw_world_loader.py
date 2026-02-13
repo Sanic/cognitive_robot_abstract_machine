@@ -16,7 +16,7 @@ from semantic_digital_twin.pipeline.pipeline import (
     CenterLocalGeometryAndPreserveWorldPose,
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.utils import InheritanceStructureExporter
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Mesh
@@ -111,7 +111,7 @@ class WarsawWorldLoader:
         pipeline = Pipeline(
             steps=[
                 TransformGeometry(
-                    TransformationMatrix.from_xyz_rpy(roll=np.pi / 2, pitch=0, yaw=0)
+                    HomogeneousTransformationMatrix.from_xyz_rpy(roll=np.pi / 2, pitch=0, yaw=0)
                 ),
                 CenterLocalGeometryAndPreserveWorldPose(),
             ]
@@ -179,7 +179,7 @@ class WarsawWorldLoader:
             )
 
     def render_scene_from_camera_pose(
-        self, camera_transform: TransformationMatrix, output_filepath=None
+        self, camera_transform: HomogeneousTransformationMatrix, output_filepath=None
     ) -> bytes:
         """Render world from a single camera pose, return PNG bytes."""
         rt = RayTracer(world=self.world)
@@ -205,22 +205,22 @@ class WarsawWorldLoader:
         )
 
         camera_poses = []
-        camera_pose1 = TransformationMatrix.from_xyz_rpy(
+        camera_pose1 = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=-3, y=0, z=2.5, roll=-np.pi / 2, pitch=np.pi / 4, yaw=0
         ).to_np()
         camera_poses.append(camera_pose1 @ rotate_x @ rotate)
 
-        camera_pose2 = TransformationMatrix.from_xyz_rpy(
+        camera_pose2 = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=3, y=0, z=2.5, roll=-np.pi / 2, pitch=np.pi / 4, yaw=np.pi
         ).to_np()
         camera_poses.append(camera_pose2 @ rotate_x @ rotate)
 
-        camera_pose3 = TransformationMatrix.from_xyz_rpy(
+        camera_pose3 = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=0, y=-3.5, z=3, roll=-np.pi / 2, pitch=np.pi / 4, yaw=np.pi / 2
         ).to_np()
         camera_poses.append(camera_pose3 @ rotate_x @ rotate)
 
-        camera_pose4 = TransformationMatrix.from_xyz_rpy(
+        camera_pose4 = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=0, y=3.5, z=3, roll=-np.pi / 2, pitch=np.pi / 4, yaw=-np.pi / 2
         ).to_np()
         camera_poses.append(camera_pose4 @ rotate_x @ rotate)
