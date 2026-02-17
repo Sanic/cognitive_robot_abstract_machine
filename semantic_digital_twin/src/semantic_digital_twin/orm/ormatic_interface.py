@@ -29,6 +29,7 @@ import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.robots.abstract_robot
 import semantic_digital_twin.robots.hsrb
 import semantic_digital_twin.robots.pr2
+import semantic_digital_twin.semantic_annotations.generated_classes
 import semantic_digital_twin.semantic_annotations.mixins
 import semantic_digital_twin.semantic_annotations.semantic_annotations
 import semantic_digital_twin.world
@@ -560,13 +561,6 @@ class JointStateDAO(
 
     target_values: Mapped[typing.List[builtins.float]] = mapped_column(
         JSON, nullable=False, use_existing_column=True
-    )
-    state_type: Mapped[
-        semantic_digital_twin.datastructures.definitions.JointStateType
-    ] = mapped_column(
-        krrood.ormatic.custom_types.PolymorphicEnumType,
-        nullable=False,
-        use_existing_column=True,
     )
 
     name_id: Mapped[int] = mapped_column(
@@ -2099,6 +2093,25 @@ class OfficeChairDAO(
     }
 
 
+class NightstandDAO(
+    FurnitureDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.Nightstand
+    ],
+):
+
+    __tablename__ = "NightstandDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(FurnitureDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "NightstandDAO",
+        "inherit_condition": database_id == FurnitureDAO.database_id,
+    }
+
+
 class ShelvingUnitDAO(
     FurnitureDAO,
     DataAccessObject[
@@ -2398,6 +2411,27 @@ class WineBottleDAO(
     }
 
 
+class CeilingDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.Ceiling
+    ],
+):
+
+    __tablename__ = "CeilingDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "CeilingDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
 class ClothDAO(
     HasRootBodyDAO,
     DataAccessObject[
@@ -2416,6 +2450,25 @@ class ClothDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ClothDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class BlanketDAO(
+    ClothDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.Blanket
+    ],
+):
+
+    __tablename__ = "BlanketDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ClothDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "BlanketDAO",
+        "inherit_condition": database_id == ClothDAO.database_id,
     }
 
 
@@ -2603,6 +2656,44 @@ class DecorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DecorDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class ChandelierDAO(
+    DecorDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.Chandelier
+    ],
+):
+
+    __tablename__ = "ChandelierDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DecorDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ChandelierDAO",
+        "inherit_condition": database_id == DecorDAO.database_id,
+    }
+
+
+class TableLampDAO(
+    DecorDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.TableLamp
+    ],
+):
+
+    __tablename__ = "TableLampDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(DecorDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TableLampDAO",
+        "inherit_condition": database_id == DecorDAO.database_id,
     }
 
 
@@ -3178,6 +3269,27 @@ class WallDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "WallDAO",
+        "inherit_condition": database_id == HasAperturesDAO.database_id,
+    }
+
+
+class WindowDAO(
+    HasAperturesDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.Window
+    ],
+):
+
+    __tablename__ = "WindowDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasAperturesDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WindowDAO",
         "inherit_condition": database_id == HasAperturesDAO.database_id,
     }
 
@@ -3847,6 +3959,25 @@ class LiquidCapDAO(
     }
 
 
+class PadDAO(
+    HasRootBodyDAO,
+    DataAccessObject[semantic_digital_twin.semantic_annotations.generated_classes.Pad],
+):
+
+    __tablename__ = "PadDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PadDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
 class PenDAO(
     HasRootBodyDAO,
     DataAccessObject[
@@ -3885,6 +4016,27 @@ class PencilDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "PencilDAO",
+        "inherit_condition": database_id == HasRootBodyDAO.database_id,
+    }
+
+
+class PlushToyDAO(
+    HasRootBodyDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.PlushToy
+    ],
+):
+
+    __tablename__ = "PlushToyDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(HasRootBodyDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PlushToyDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
     }
 
@@ -4232,6 +4384,27 @@ class DrawerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DrawerDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+    }
+
+
+class PillowDAO(
+    SemanticAnnotationDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.Pillow
+    ],
+):
+
+    __tablename__ = "PillowDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemanticAnnotationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PillowDAO",
+        "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
     }
 
 
@@ -4922,6 +5095,46 @@ class CameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CameraDAO",
         "inherit_condition": database_id == SensorDAO.database_id,
+    }
+
+
+class TelevisionDAO(
+    SensorDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.Television
+    ],
+):
+
+    __tablename__ = "TelevisionDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SensorDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "TelevisionDAO",
+        "inherit_condition": database_id == SensorDAO.database_id,
+    }
+
+
+class WindowFrameDAO(
+    SemanticAnnotationDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.generated_classes.WindowFrame
+    ],
+):
+
+    __tablename__ = "WindowFrameDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SemanticAnnotationDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "WindowFrameDAO",
+        "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
     }
 
 

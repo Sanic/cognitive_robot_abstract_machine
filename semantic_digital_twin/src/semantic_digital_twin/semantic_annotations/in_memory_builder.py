@@ -117,9 +117,12 @@ class SemanticAnnotationClassBuilder:
                 expanded.append((name, type_, default))
         return expanded
 
-    def build(self):
+    def build(self, module: str = None):
         """
         Builds the semantic annotation class in memory as a dataclass.
+        :param module: If given, override ``__module__`` on the created class.
+            Useful so that ORMatic writes the correct fully-qualified import
+            path (e.g. ``generated_classes`` instead of ``in_memory_builder``).
         :return: The semantic annotation class.
         :raises TypeError: If at least one base class is not a subclass of SemanticAnnotation.
         """
@@ -128,13 +131,16 @@ class SemanticAnnotationClassBuilder:
                 f"At least one base class must be a subclass of SemanticAnnotation."
             )
         expanded_fields = self._expand_fields_for_make_dataclass()
-        return make_dataclass(
+        cls = make_dataclass(
             self.name,
             expanded_fields,
             bases=self.bases,
             namespace=dict(self.namespace),
             eq=False,
         )
+        if module is not None:
+            cls.__module__ = module
+        return cls
 
     # %% Jinja rendering
     def _fields_for_template(self):

@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from ..world import World
 
 
-@dataclass
+@dataclass(eq=False)
 class SemanticRobotAnnotation(RootedSemanticAnnotation, ABC):
     """
     Represents a collection of connected robot bodies, starting from a root body, and ending in a unspecified collection
@@ -299,7 +299,7 @@ class ParallelGripper(Manipulator):
         return hash((self.name, self.root, self.tool_frame))
 
 
-@dataclass
+@dataclass(eq=False)
 class Sensor(SemanticRobotAnnotation, ABC):
     """
     Abstract base class for any kind of sensor in a robot.
