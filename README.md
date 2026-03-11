@@ -1,5 +1,7 @@
 # Cognitive Robot Abstract Machine (CRAM)
 
+**Note: This branch contains the version of the code for the paper "Bootstrapping Indoor Semantic Digital Twins from 2D Video". You can find the newest version here: https://github.com/cram2/cognitive_robot_abstract_machine**
+
 Monorepo for the CRAM cognitive architecture. 
 
 ## Installation 
