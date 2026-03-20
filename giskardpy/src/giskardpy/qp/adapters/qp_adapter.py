@@ -5,6 +5,7 @@ import logging
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
+from itertools import product
 from typing import Tuple, List, Dict, TYPE_CHECKING, Type
 
 import krrood.symbolic_math.symbolic_math as sm
@@ -325,14 +326,15 @@ class DofLimits(DirectLimits):
                 Derivatives.velocity: (lower_velocity, upper_velocity),
                 Derivatives.jerk: (lower_jerk_limits, upper_jerk_limits),
             }
-        for derivative in [Derivatives.velocity, Derivatives.jerk]:
-            for t in range(config.prediction_horizon):
-                if t >= config.prediction_horizon - (max_derivative - derivative):
-                    continue
-                for degree_of_freedom in degrees_of_freedom:
-                    current_profile = cache[degree_of_freedom.id][derivative]
-                    lower_bounds.append(current_profile[0][t])
-                    upper_bounds.append(current_profile[1][t])
+        for derivative, t in product(
+            [Derivatives.velocity, Derivatives.jerk], range(config.prediction_horizon)
+        ):
+            if t >= config.prediction_horizon - (max_derivative - derivative):
+                continue
+            for degree_of_freedom in degrees_of_freedom:
+                current_profile = cache[degree_of_freedom.id][derivative]
+                lower_bounds.append(current_profile[0][t])
+                upper_bounds.append(current_profile[1][t])
 
         self.lower_bounds = sm.Vector(lower_bounds)
         self.upper_bounds = sm.Vector(upper_bounds)
@@ -344,28 +346,25 @@ class DofLimits(DirectLimits):
     ):
         max_derivative = config.max_derivative
         quadratic_weights = []
-        linear_weights = []
-        for derivative in Derivatives.range(Derivatives.velocity, max_derivative):
-            for t in range(config.prediction_horizon):
-                if t >= config.prediction_horizon - (max_derivative - derivative):
-                    continue
-                if derivative == Derivatives.acceleration:
-                    continue
-                for degree_of_freedom in degrees_of_freedom:
-                    normalized_weight = self.normalize_dof_weight(
-                        limit=degree_of_freedom.limits.upper[derivative],
-                        base_weight=config.get_dof_weight(
-                            degree_of_freedom.name, derivative
-                        ),
-                        t=t,
-                        derivative=derivative,
-                        horizon=config.prediction_horizon - 3,
-                        alpha=config.horizon_weight_gain_scalar,
-                    )
-                    quadratic_weights.append(normalized_weight)
-                    linear_weights.append(0)
+        for derivative, t in product(
+            [Derivatives.velocity, Derivatives.jerk], range(config.prediction_horizon)
+        ):
+            if t >= config.prediction_horizon - (max_derivative - derivative):
+                continue
+            for degree_of_freedom in degrees_of_freedom:
+                normalized_weight = self.normalize_dof_weight(
+                    limit=degree_of_freedom.limits.upper[derivative],
+                    base_weight=config.get_dof_weight(
+                        degree_of_freedom.name, derivative
+                    ),
+                    t=t,
+                    derivative=derivative,
+                    horizon=config.prediction_horizon - 3,
+                    alpha=config.horizon_weight_gain_scalar,
+                )
+                quadratic_weights.append(normalized_weight)
         self.quadratic_weights = sm.Vector(quadratic_weights)
-        self.linear_weights = sm.Vector(linear_weights)
+        self.linear_weights = sm.Vector.zeros(len(quadratic_weights))
 
     def normalize_dof_weight(
         self, limit, base_weight, t, derivative, horizon, alpha
