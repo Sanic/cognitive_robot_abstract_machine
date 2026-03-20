@@ -5,11 +5,10 @@ import logging
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Tuple, List, Dict, TYPE_CHECKING, DefaultDict, Type
-
-import numpy as np
+from typing import Tuple, List, Dict, TYPE_CHECKING, Type
 
 import krrood.symbolic_math.symbolic_math as sm
+import numpy as np
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.exceptions import (
     InfeasibleException,
@@ -22,6 +21,7 @@ from giskardpy.utils.math import mpc
 from krrood.symbolic_math.symbolic_math import Vector, Matrix
 from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 
@@ -177,8 +177,54 @@ class ProblemDataPart(ABC):
         free_variable_model.remove([], column_ids)
         return free_variable_model
 
+
+@dataclass
+class DirectLimits:
+    lower_bounds: sm.Vector = field(init=False)
+    upper_bounds: sm.Vector = field(init=False)
+    quadratic_weights: sm.Vector = field(init=False)
+    linear_weights: sm.Vector = field(init=False)
+
+    @classmethod
+    def create(
+        cls,
+        degrees_of_freedom: List[DegreeOfFreedom],
+        config: QPControllerConfig,
+    ) -> Self:
+        pass
+
+
+@dataclass
+class DofLimits(DirectLimits):
+    @classmethod
+    def create(
+        cls,
+        degrees_of_freedom: List[DegreeOfFreedom],
+        config: QPControllerConfig,
+    ) -> DofLimits:
+        self = cls()
+        self.free_variable_bounds(degrees_of_freedom, config)
+        return self
+
+    def construct_expression(
+        self,
+    ) -> Tuple[sm.Vector, sm.Vector]:
+        # derivative model
+        lb_params, ub_params = self.free_variable_bounds()
+        num_free_variables = sum(len(x) for x in lb_params)
+
+        lb, self.names = _sorter(*lb_params)
+        ub, _ = _sorter(*ub_params)
+        self.names_without_slack = self.names[:num_free_variables]
+        self.names_slack = self.names[num_free_variables:]
+
+        return sm.Vector(lb), sm.Vector(ub)
+
     def velocity_limit(
-        self, v: DegreeOfFreedom, max_derivative: Derivatives
+        self,
+        v: DegreeOfFreedom,
+        max_derivative: Derivatives,
+        config: QPControllerConfig,
     ) -> Tuple[sm.Vector, sm.Vector]:
         lower_limits = DerivativeMap()
         upper_limits = DerivativeMap()
@@ -193,7 +239,7 @@ class ProblemDataPart(ABC):
         # %% vel limits
         lower_limits.velocity = v.limits.lower.velocity
         upper_limits.velocity = v.limits.upper.velocity
-        if self.config.prediction_horizon == 1:
+        if config.prediction_horizon == 1:
             return sm.Vector([lower_limits.velocity]), sm.Vector(
                 [upper_limits.velocity]
             )
@@ -211,10 +257,10 @@ class ProblemDataPart(ABC):
         # %% jerk limits
         if upper_limits.jerk is None:
             upper_limits.jerk = find_best_jerk_limit(
-                self.config.prediction_horizon,
-                self.config.mpc_dt,
+                config.prediction_horizon,
+                config.mpc_dt,
                 upper_limits.velocity,
-                solver_class=self.config.qp_solver_class,
+                solver_class=config.qp_solver_class,
             )
             lower_limits.jerk = -upper_limits.jerk
         else:
@@ -226,25 +272,25 @@ class ProblemDataPart(ABC):
                 dof_symbols=v.variables,
                 lower_limits=lower_limits,
                 upper_limits=upper_limits,
-                solver_class=self.config.qp_solver_class,
-                dt=self.config.mpc_dt,
-                ph=self.config.prediction_horizon,
+                solver_class=config.qp_solver_class,
+                dt=config.mpc_dt,
+                ph=config.prediction_horizon,
             )
         except InfeasibleException as e:
             max_reachable_vel = max_velocity_from_horizon_and_jerk_qp(
-                prediction_horizon=self.config.prediction_horizon,
+                prediction_horizon=config.prediction_horizon,
                 vel_limit=100,
                 acc_limit=upper_limits.acceleration,
                 jerk_limit=upper_limits.jerk,
-                dt=self.config.mpc_dt,
+                dt=config.mpc_dt,
                 max_derivative=max_derivative,
-                solver_class=self.config.qp_solver_class,
+                solver_class=config.qp_solver_class,
             )[0]
             if max_reachable_vel < upper_limits.velocity:
                 error_msg = (
                     f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_limits.velocity}". '
-                    f'Maximum reachable with prediction horizon = "{self.config.prediction_horizon}", '
-                    f'jerk limit = "{upper_limits.jerk}" and dt = "{self.config.mpc_dt}" is "{max_reachable_vel}".'
+                    f'Maximum reachable with prediction horizon = "{config.prediction_horizon}", '
+                    f'jerk limit = "{upper_limits.jerk}" and dt = "{config.mpc_dt}" is "{max_reachable_vel}".'
                 )
                 logger.error(error_msg)
                 raise VelocityLimitUnreachableException(error_msg)
@@ -252,9 +298,94 @@ class ProblemDataPart(ABC):
                 raise
         return lb, ub
 
+    def free_variable_bounds(
+        self,
+        degrees_of_freedom: List[DegreeOfFreedom],
+        config: QPControllerConfig,
+    ):
+        max_derivative = config.max_derivative
+        quadratic_weights = []
+        linear_weights = []
+        lower_bounds = []
+        upper_bounds = []
+        for v in degrees_of_freedom:
+            lb_, ub_ = self.velocity_limit(
+                v=v, max_derivative=max_derivative, config=config
+            )
+            for derivative in Derivatives.range(Derivatives.velocity, max_derivative):
+                for t in range(config.prediction_horizon):
+                    if t >= config.prediction_horizon - (max_derivative - derivative):
+                        continue
+                    if derivative == Derivatives.acceleration:
+                        continue
+                    if derivative == Derivatives.jerk:
+                        multiplier = config.mpc_dt**2
+                    else:
+                        multiplier = 1
+                    index = t + config.prediction_horizon * (derivative - 1)
+                    lower_bounds.append(lb_[index] * multiplier)
+                    upper_bounds.append(ub_[index] * multiplier)
+        self.lower_bounds = sm.Vector(lower_bounds)
+        self.upper_bounds = sm.Vector(upper_bounds)
+
 
 @dataclass
-class EqualityDerivativeLinkModel:
+class InequalityQPComponent(ABC):
+    """
+    Describes a component of a QP problem.
+    """
+
+    matrix: sm.Matrix
+    lower_bounds: sm.Vector
+    upper_bounds: sm.Vector
+    slack_variables: DirectLimits
+
+    def inequality_constraint_slack_lower_bound(self):
+        return {
+            f"{c.name}/error": c.lower_slack_limit
+            for c in self.constraint_collection.inequality_constraints
+        }
+
+    def inequality_constraint_slack_upper_bound(self):
+        return {
+            f"{c.name}/error": c.upper_slack_limit
+            for c in self.constraint_collection.inequality_constraints
+        }
+
+
+@dataclass
+class InequalityVelocityQPComponent(ABC):
+    def derivative_slack_limits(
+        self, derivative: Derivatives
+    ) -> Tuple[Dict[str, sm.Scalar], Dict[str, sm.Scalar]]:
+        lower_slack = {}
+        upper_slack = {}
+        for t in range(self.config.prediction_horizon):
+            for (
+                c
+            ) in self.constraint_collection.get_inequality_constraints_by_derivative(
+                derivative
+            ):
+                if t < self.control_horizon:
+                    lower_slack[f"t{t:03}/{c.name}"] = c.lower_slack_limit
+                    upper_slack[f"t{t:03}/{c.name}"] = c.upper_slack_limit
+        return lower_slack, upper_slack
+
+
+@dataclass
+class EqualityQPComponent(ABC):
+    """
+    Describes a component of a QP problem.
+    """
+
+    matrix: sm.Matrix
+    slack_matrix: sm.Matrix
+    bounds: sm.Vector
+    slack_variables: DirectLimits
+
+
+@dataclass
+class EqualityDerivativeLinkModel(EqualityQPComponent):
     r"""
     The constraints produced by this class describe the discrete-time relationships between variables
     in the prediction horizon :math:`N` using a semi-implicit euler integration method:
@@ -306,20 +437,148 @@ class EqualityDerivativeLinkModel:
     degrees_of_freedom: List[DegreeOfFreedom]
     config: QPControllerConfig
 
+    def compute_matrix(self):
+        pass
+
+    def compute_bounds(self):
+        pass
+
+    def compute_weights(self):
+        pass
+
+    def construct_expression(
+        self,
+    ) -> Tuple[sm.Vector, sm.Vector]:
+        # derivative model
+        lb_params, ub_params = self.free_variable_bounds()
+        num_free_variables = sum(len(x) for x in lb_params)
+
+        # eq integral constraints
+        equality_constraint_slack_lower_bounds = (
+            self.equality_constraint_slack_lower_bound()
+        )
+        num_eq_slacks = len(equality_constraint_slack_lower_bounds)
+        lb_params.append(equality_constraint_slack_lower_bounds)
+        ub_params.append(self.equality_constraint_slack_upper_bound())
+
+        # eq vel constraints
+        num_eq_derivative_slack = 0
+        for derivative in Derivatives.range(
+            Derivatives.velocity, self.config.max_derivative
+        ):
+            lower_slack, upper_slack = self.eq_derivative_slack_limits(derivative)
+            num_eq_derivative_slack += len(lower_slack)
+            lb_params.append(lower_slack)
+            ub_params.append(upper_slack)
+
+        # neq integral constraints
+        lb_params.append(self.inequality_constraint_slack_lower_bound())
+        ub_params.append(self.inequality_constraint_slack_upper_bound())
+
+        # neq vel constraints
+        num_derivative_slack = 0
+        for derivative in Derivatives.range(
+            Derivatives.velocity, self.config.max_derivative
+        ):
+            lower_slack, upper_slack = self.derivative_slack_limits(derivative)
+            num_derivative_slack += len(lower_slack)
+            lb_params.append(lower_slack)
+            ub_params.append(upper_slack)
+
+        lb, self.names = _sorter(*lb_params)
+        ub, _ = _sorter(*ub_params)
+        self.names_without_slack = self.names[:num_free_variables]
+        self.names_slack = self.names[num_free_variables:]
+
+        derivative_slack_start = 0
+        derivative_slack_stop = (
+            derivative_slack_start + num_derivative_slack + num_eq_derivative_slack
+        )
+        self.names_derivative_slack = self.names_slack[
+            derivative_slack_start:derivative_slack_stop
+        ]
+
+        eq_slack_start = derivative_slack_stop
+        eq_slack_stop = eq_slack_start + num_eq_slacks
+        self.names_eq_slack = self.names_slack[eq_slack_start:eq_slack_stop]
+
+        neq_slack_start = eq_slack_stop
+        self.names_neq_slack = self.names_slack[neq_slack_start:]
+        return sm.Vector(lb), sm.Vector(ub)
+
 
 @dataclass
-class EqualityConstraintModel:
+class EqualityConstraintModel(EqualityQPComponent):
     """
     |   t1   |   t2   |   t1   |   t2   |   t1   |   t2   | prediction horizon
     |v1 v2 v3|v1 v2 v3|j1 j2 j3|j1 j2 j3|s1 s2 s3|s1 s2 s3| free variables / slack
     |-----------------------------------------------------|
     |  J1*sp |  J1*sp |  J3*sp | J3*sp  | sp*ch  | sp*ch  |
     |-----------------------------------------------------|
+
+    Equality constraints have the form:
+    .. math::
+        f(q) = b
+
+    where
+
+    .. math::
+
+        target - f = \Delta t \sum_{k=0}^{N-1} J_{f} * sp_k
+
+    ::
+
+        |  equality_bounds |   |           equality constraint matrix          |   | v_0 |
+        |------------------|   |-----------------------------------------------|   | v_1 |
+        | limit(target - f(q), ) |   | -1  |     |     |dt**2|     |     |     |     |   | v_2 |
+        |       v_c        |   |  2  | -1  |     |     |dt**2|     |     |     |   | j_0 |
+        |        0         | = | -1  |  2  | -1  |     |     |dt**2|     |     | @ | j_1 |
+        |        0         |   |     | -1  |  2  |     |     |     |dt**2|     |   | j_2 |
+        |        0         |   |     |     | -1  |     |     |     |     |dt**2|   | j_3 |
+        |------------------|   |-----------------------------------------------|   | j_4 |
     """
 
     degrees_of_freedom: List[DegreeOfFreedom]
     constraint_collection: ConstraintCollection
     config: QPControllerConfig
+
+    def compute_matrix(self):
+        pass
+
+    def compute_bounds(self):
+        pass
+
+    def compute_weights(self):
+        pass
+
+    def equality_constraint_slack_lower_bound(self):
+        return {
+            f"{c.name}/error": c.lower_slack_limit
+            for c in self.constraint_collection.equality_constraints
+        }
+
+    def equality_constraint_slack_upper_bound(self):
+        return {
+            f"{c.name}/error": c.upper_slack_limit
+            for c in self.constraint_collection.equality_constraints
+        }
+
+
+@dataclass
+class EqualityVelocityConstraintModel:
+    def eq_derivative_slack_limits(
+        self, derivative: Derivatives
+    ) -> Tuple[Dict[str, sm.Scalar], Dict[str, sm.Scalar]]:
+        lower_slack = {}
+        upper_slack = {}
+        for t in range(self.config.prediction_horizon):
+            for c in self.constraint_collection.get_equality_constraints_by_derivative(
+                derivative
+            ):
+                if t < self.control_horizon:
+                    lower_slack[f"t{t:03}/{c.name}"] = c.lower_slack_limit[t]
+                    upper_slack[f"t{t:03}/{c.name}"] = c.upper_slack_limit[t]
+        return lower_slack, upper_slack
 
 
 @dataclass
@@ -461,177 +720,26 @@ class Weights(ProblemDataPart):
         )[0]
 
 
-@dataclass
-class FreeVariableBounds(ProblemDataPart):
-    """
-    order:
-        free_variable_velocity
-        free_variable_acceleration
-        free_variable_jerk
-        eq integral constraints
-        eq vel constraints
-        neq integral constraints
-        neq vel constraints
-    """
-
-    names: np.ndarray = field(default=None)
-    names_without_slack: np.ndarray = field(default=None)
-    names_slack: np.ndarray = field(default=None)
-    names_neq_slack: np.ndarray = field(default=None)
-    names_derivative_slack: np.ndarray = field(default=None)
-    names_eq_slack: np.ndarray = field(default=None)
-    evaluated: bool = field(default=True)
-
-    def free_variable_bounds(
-        self,
-    ) -> Tuple[List[Dict[str, sm.ScalarData]], List[Dict[str, sm.ScalarData]]]:
-        max_derivative = self.config.max_derivative
-        lb: DefaultDict[Derivatives, Dict[str, sm.ScalarData]] = defaultdict(dict)
-        ub: DefaultDict[Derivatives, Dict[str, sm.ScalarData]] = defaultdict(dict)
-        for v in self.degrees_of_freedom:
-            lb_, ub_ = self.velocity_limit(v=v, max_derivative=max_derivative)
-            for t in range(self.config.prediction_horizon):
-                for derivative in Derivatives.range(
-                    Derivatives.velocity, max_derivative
-                ):
-                    if t >= self.config.prediction_horizon - (
-                        max_derivative - derivative
-                    ):
-                        continue
-                    if derivative == Derivatives.acceleration:
-                        continue
-                    if derivative == Derivatives.jerk:
-                        multiplier = self.config.mpc_dt**2
-                    else:
-                        multiplier = 1
-                    index = t + self.config.prediction_horizon * (derivative - 1)
-                    lb[derivative][f"t{t:03}/{v.name}/{derivative}"] = (
-                        lb_[index] * multiplier
-                    )
-                    ub[derivative][f"t{t:03}/{v.name}/{derivative}"] = (
-                        ub_[index] * multiplier
-                    )
-        lb_params = []
-        ub_params = []
-        for derivative, name_to_bound_map in sorted(lb.items()):
-            lb_params.append(name_to_bound_map)
-        for derivative, name_to_bound_map in sorted(ub.items()):
-            ub_params.append(name_to_bound_map)
-        return lb_params, ub_params
-
-    def derivative_slack_limits(
-        self, derivative: Derivatives
-    ) -> Tuple[Dict[str, sm.Scalar], Dict[str, sm.Scalar]]:
-        lower_slack = {}
-        upper_slack = {}
-        for t in range(self.config.prediction_horizon):
-            for (
-                c
-            ) in self.constraint_collection.get_inequality_constraints_by_derivative(
-                derivative
-            ):
-                if t < self.control_horizon:
-                    lower_slack[f"t{t:03}/{c.name}"] = c.lower_slack_limit
-                    upper_slack[f"t{t:03}/{c.name}"] = c.upper_slack_limit
-        return lower_slack, upper_slack
-
-    def eq_derivative_slack_limits(
-        self, derivative: Derivatives
-    ) -> Tuple[Dict[str, sm.Scalar], Dict[str, sm.Scalar]]:
-        lower_slack = {}
-        upper_slack = {}
-        for t in range(self.config.prediction_horizon):
-            for c in self.constraint_collection.get_equality_constraints_by_derivative(
-                derivative
-            ):
-                if t < self.control_horizon:
-                    lower_slack[f"t{t:03}/{c.name}"] = c.lower_slack_limit[t]
-                    upper_slack[f"t{t:03}/{c.name}"] = c.upper_slack_limit[t]
-        return lower_slack, upper_slack
-
-    def equality_constraint_slack_lower_bound(self):
-        return {
-            f"{c.name}/error": c.lower_slack_limit
-            for c in self.constraint_collection.equality_constraints
-        }
-
-    def equality_constraint_slack_upper_bound(self):
-        return {
-            f"{c.name}/error": c.upper_slack_limit
-            for c in self.constraint_collection.equality_constraints
-        }
-
-    def inequality_constraint_slack_lower_bound(self):
-        return {
-            f"{c.name}/error": c.lower_slack_limit
-            for c in self.constraint_collection.inequality_constraints
-        }
-
-    def inequality_constraint_slack_upper_bound(self):
-        return {
-            f"{c.name}/error": c.upper_slack_limit
-            for c in self.constraint_collection.inequality_constraints
-        }
-
-    def construct_expression(
-        self,
-    ) -> Tuple[sm.Vector, sm.Vector]:
-        # derivative model
-        lb_params, ub_params = self.free_variable_bounds()
-        num_free_variables = sum(len(x) for x in lb_params)
-
-        # eq integral constraints
-        equality_constraint_slack_lower_bounds = (
-            self.equality_constraint_slack_lower_bound()
-        )
-        num_eq_slacks = len(equality_constraint_slack_lower_bounds)
-        lb_params.append(equality_constraint_slack_lower_bounds)
-        ub_params.append(self.equality_constraint_slack_upper_bound())
-
-        # eq vel constraints
-        num_eq_derivative_slack = 0
-        for derivative in Derivatives.range(
-            Derivatives.velocity, self.config.max_derivative
-        ):
-            lower_slack, upper_slack = self.eq_derivative_slack_limits(derivative)
-            num_eq_derivative_slack += len(lower_slack)
-            lb_params.append(lower_slack)
-            ub_params.append(upper_slack)
-
-        # neq integral constraints
-        lb_params.append(self.inequality_constraint_slack_lower_bound())
-        ub_params.append(self.inequality_constraint_slack_upper_bound())
-
-        # neq vel constraints
-        num_derivative_slack = 0
-        for derivative in Derivatives.range(
-            Derivatives.velocity, self.config.max_derivative
-        ):
-            lower_slack, upper_slack = self.derivative_slack_limits(derivative)
-            num_derivative_slack += len(lower_slack)
-            lb_params.append(lower_slack)
-            ub_params.append(upper_slack)
-
-        lb, self.names = _sorter(*lb_params)
-        ub, _ = _sorter(*ub_params)
-        self.names_without_slack = self.names[:num_free_variables]
-        self.names_slack = self.names[num_free_variables:]
-
-        derivative_slack_start = 0
-        derivative_slack_stop = (
-            derivative_slack_start + num_derivative_slack + num_eq_derivative_slack
-        )
-        self.names_derivative_slack = self.names_slack[
-            derivative_slack_start:derivative_slack_stop
-        ]
-
-        eq_slack_start = derivative_slack_stop
-        eq_slack_stop = eq_slack_start + num_eq_slacks
-        self.names_eq_slack = self.names_slack[eq_slack_start:eq_slack_stop]
-
-        neq_slack_start = eq_slack_stop
-        self.names_neq_slack = self.names_slack[neq_slack_start:]
-        return sm.Vector(lb), sm.Vector(ub)
+# @dataclass
+# class FreeVariableBounds(ProblemDataPart):
+#     """
+#     order:
+#         free_variable_velocity
+#         free_variable_acceleration
+#         free_variable_jerk
+#         eq integral constraints
+#         eq vel constraints
+#         neq integral constraints
+#         neq vel constraints
+#     """
+#
+#     names: np.ndarray = field(default=None)
+#     names_without_slack: np.ndarray = field(default=None)
+#     names_slack: np.ndarray = field(default=None)
+#     names_neq_slack: np.ndarray = field(default=None)
+#     names_derivative_slack: np.ndarray = field(default=None)
+#     names_eq_slack: np.ndarray = field(default=None)
+#     evaluated: bool = field(default=True)
 
 
 @dataclass
@@ -1468,12 +1576,12 @@ class QPDataSymbolic:
     neq_lower_bounds: Vector
     neq_upper_bounds: Vector
 
-    _weights: Weights
-    _free_variable_bounds: FreeVariableBounds
-    _equality_model: EqualityModel
-    _equality_bounds: EqualityBounds
-    _inequality_model: InequalityModel
-    _inequality_bounds: InequalityBounds
+    # _weights: Weights
+    # _free_variable_bounds: FreeVariableBounds
+    # _equality_model: EqualityModel
+    # _equality_bounds: EqualityBounds
+    # _inequality_model: InequalityModel
+    # _inequality_bounds: InequalityBounds
 
     @classmethod
     def from_giskard(
@@ -1482,26 +1590,51 @@ class QPDataSymbolic:
         constraint_collection: ConstraintCollection,
         config: QPControllerConfig,
     ):
-        kwargs = {
-            "degrees_of_freedom": degrees_of_freedom,
-            "constraint_collection": constraint_collection,
-            "config": config,
-        }
-        weights = Weights(**kwargs)
-        free_variable_bounds = FreeVariableBounds(**kwargs)
-        equality_model = EqualityModel(**kwargs)
-        equality_bounds = EqualityBounds(**kwargs)
-        inequality_model = InequalityModel(**kwargs)
-        inequality_bounds = InequalityBounds(**kwargs)
-
-        quadratic_weights, linear_weights = weights.construct_expression()
-        box_lower_constraints, box_upper_constraints = (
-            free_variable_bounds.construct_expression()
+        direct_limits = DofLimits.create(degrees_of_freedom, config)
+        mpc_model = EqualityDerivativeLinkModel()
+        eq_constraints = EqualityConstraintModel()
+        quadratic_weights = sm.Vector(
+            [
+                direct_limits.quadratic_weights,
+                mpc_model.slack_variables.quadratic_weights,
+                eq_constraints.slack_variables.quadratic_weights,
+            ]
         )
-        eq_matrix_dofs, eq_matrix_slack = equality_model.construct_expression()
-        eq_bounds = equality_bounds.construct_expression()
-        neq_matrix_dofs, neq_matrix_slack = inequality_model.construct_expression()
-        neq_lower_bounds, neq_upper_bounds = inequality_bounds.construct_expression()
+        linear_weights = sm.Vector(
+            [
+                direct_limits.linear_weights,
+                mpc_model.slack_variables.linear_weights,
+                eq_constraints.slack_variables.linear_weights,
+            ]
+        )
+        box_lower_constraints = sm.Vector(
+            [
+                direct_limits.lower_bounds,
+                mpc_model.slack_variables.lower_bounds,
+                eq_constraints.slack_variables.lower_bounds,
+            ]
+        )
+        box_upper_constraints = sm.Vector(
+            [
+                direct_limits.upper_bounds,
+                mpc_model.slack_variables.upper_bounds,
+                eq_constraints.slack_variables.upper_bounds,
+            ]
+        )
+        eq_matrix_dofs = sm.vstack([mpc_model.matrix, eq_constraints.matrix])
+        eq_matrix_slack = sm.vstack(
+            [mpc_model.slack_variables.matrix, eq_constraints.slack_variables.matrix]
+        )
+        eq_bounds = sm.Vector([mpc_model.bounds, eq_constraints.bounds])
+
+        # quadratic_weights, linear_weights = weights.construct_expression()
+        # box_lower_constraints, box_upper_constraints = (
+        #     free_variable_bounds.construct_expression()
+        # )
+        # eq_matrix_dofs, eq_matrix_slack = equality_model.construct_expression()
+        # eq_bounds = equality_bounds.construct_expression()
+        # neq_matrix_dofs, neq_matrix_slack = inequality_model.construct_expression()
+        # neq_lower_bounds, neq_upper_bounds = inequality_bounds.construct_expression()
         return cls(
             quadratic_weights=quadratic_weights,
             linear_weights=linear_weights,
@@ -1510,16 +1643,16 @@ class QPDataSymbolic:
             eq_matrix_dofs=eq_matrix_dofs,
             eq_matrix_slack=eq_matrix_slack,
             eq_bounds=eq_bounds,
-            neq_matrix_dofs=neq_matrix_dofs,
-            neq_matrix_slack=neq_matrix_slack,
-            neq_lower_bounds=neq_lower_bounds,
-            neq_upper_bounds=neq_upper_bounds,
-            _weights=weights,
-            _free_variable_bounds=free_variable_bounds,
-            _equality_model=equality_model,
-            _equality_bounds=equality_bounds,
-            _inequality_model=inequality_model,
-            _inequality_bounds=inequality_bounds,
+            neq_matrix_dofs=sm.Matrix(),
+            neq_matrix_slack=sm.Matrix(),
+            neq_lower_bounds=sm.Vector(),
+            neq_upper_bounds=sm.Vector(),
+            # _weights=weights,
+            # _free_variable_bounds=free_variable_bounds,
+            # _equality_model=equality_model,
+            # _equality_bounds=equality_bounds,
+            # _inequality_model=inequality_model,
+            # _inequality_bounds=inequality_bounds,
         )
 
     def __hash__(self):
