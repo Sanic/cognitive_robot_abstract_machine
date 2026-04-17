@@ -49,7 +49,7 @@ class ClipAnnotator(BaseAnnotator):
             text_features = torch.stack(
                 [self.clip_model.encode_text(t) for t in tokenized_vocabulary]
             )
-            text_features /= torch.norm(text_features, p=2, dim=1, keepdim=True)
+            text_features /= torch.norm(text_features, p=2, dim=-1, keepdim=True)
             text_features = text_features.cpu().numpy()
 
         for feat in text_features:
@@ -74,7 +74,7 @@ class ClipAnnotator(BaseAnnotator):
                 [self.clip_preprocess(crop) for crop in cropped_images]
             ).to(self.device)
             crop_features = self.clip_model.encode_image(preprocessed_images)
-            crop_features /= torch.norm(crop_features, p=2, dim=1, keepdim=True)
+            crop_features /= torch.norm(crop_features, p=2, dim=-1, keepdim=True)
             crop_features = crop_features.cpu().numpy()
 
         data, idx = self.vocabulary_index.search(crop_features, k=1)
