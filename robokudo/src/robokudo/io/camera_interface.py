@@ -32,7 +32,6 @@ import message_filters
 import numpy as np
 import open3d as o3d
 import rclpy
-from cv_bridge import CvBridge
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 from rclpy.duration import Duration
 from rclpy.node import Node
@@ -45,6 +44,7 @@ from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.io import tf_listener_proxy
 from robokudo.types.tf import StampedTransform
+from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.world import setup_world_for_camera_frame, world_instance
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
@@ -387,6 +387,9 @@ class KinectCameraInterface(ROSCameraInterface):
 
         self.lock: Lock = Lock()
         """Thread synchronization lock"""
+
+        self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
+        """NumPy-compatible replacement for cv_bridge."""
         # rclpy.spin_once(self.node)
 
         Thread(
@@ -480,16 +483,22 @@ class KinectCameraInterface(ROSCameraInterface):
             color_arr = np.frombuffer(color_data.data, np.uint8)
             self.color = cv2.imdecode(color_arr, cv2.IMREAD_COLOR)
         else:
-            bridge = CvBridge()
-            self.color = bridge.imgmsg_to_cv2(color_data, "bgr8")
+            self.color = self.bridge.imgmsg_to_cv2(color_data, "bgr8")
 
         self.timestamp = color_data.header.stamp
 
         if self.compressed_depth_configured():
+            if depth_data is None:
+                raise ValueError(
+                    "Depth data is required when compressed depth is configured"
+                )
             self.depth = depth_convert_workaround(depth_data)
         else:
-            bridge = CvBridge()
-            self.depth = bridge.imgmsg_to_cv2(depth_data, "32FC1")
+            if depth_data is None:
+                raise ValueError(
+                    "Depth data is required for uncompressed depth conversion"
+                )
+            self.depth = self.bridge.imgmsg_to_cv2(depth_data, "32FC1")
 
         self.cam_info = cam_info
 

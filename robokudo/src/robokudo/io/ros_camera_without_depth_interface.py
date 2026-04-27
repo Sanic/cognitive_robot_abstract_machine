@@ -16,19 +16,21 @@ The module is used for cameras like:
 * Network cameras with ROS interfaces
 """
 
+from __future__ import annotations
+
 from threading import Lock
 
 import cv2
 import message_filters
 import numpy as np
 import open3d as o3d
-from cv_bridge import CvBridge
 from message_filters import Subscriber
 from sensor_msgs.msg import CameraInfo, Image
 from typing_extensions import Any, Tuple, TYPE_CHECKING, Optional, List
 
 from robokudo.cas import CASViews
 from robokudo.io.camera_interface import ROSCameraInterface
+from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -97,9 +99,8 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.lock: Lock = Lock()
         """Thread synchronization lock"""
 
-        # hack because my rosbag has image topic
-        self.bridge: CvBridge = CvBridge()
-        """Bridge for converting between ROS and OpenCV images"""
+        self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
+        """NumPy-compatible replacement for cv_bridge."""
 
         print("ROSCameraWithoutDepthInterface initialized")
 
