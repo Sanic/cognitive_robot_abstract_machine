@@ -20,6 +20,7 @@ Things to note:
   - Open the folder where you've cloned the CRAM repository
   - Open the ROS Workspace folder as well and choose the 'Attach' option 
   - Set your `cram-env` virtualenv as the Project Interpreter. File → Settings → Python → Interpreter
+  - In the left pane, open your ROS workspace, select `build`, `install` and `log`, right-click them and 'Mark directory as'  → 'Excluded'
   - In the left pane, open your ROS workspace and navigate to the `robokudo_ros` folder. Go to `robokudo_ros/scripts` and right-click `main.py` and choose 'Debug' to create your first run config.
 
 #### Troubleshooting
