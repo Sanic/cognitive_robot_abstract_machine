@@ -18,6 +18,8 @@ class CrDescriptorFactory:
         "realsense": KinectCameraInterface,
         "tiago": KinectCameraInterface,
         "opencv": OpenCVCameraWithoutDepthInterface,
+        "orbbec": KinectCameraInterface,
+        "orbbec_wo_tf": KinectCameraInterface,
         "file_reader": RGBDFileReaderInterface,
     }
     """Mapping of camera names to their corresponding camera interface types."""
