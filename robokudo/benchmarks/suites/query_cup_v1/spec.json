@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "mode": "query",
+  "analysis_engine": {
+    "ros_pkg_name": "robokudo",
+    "module": "query_demo_from_storage"
+  },
+  "injections": {
+    "collection_reader": {
+      "mode": "force_camera_config",
+      "camera_config": "mongo"
+    }
+  },
+  "defaults": {
+    "matching": "hungarian",
+    "tolerances": {
+      "pose_translation_m": 0.05,
+      "pose_rotation_deg": 10.0,
+      "plane_normal_deg": 5.0,
+      "plane_offset_m": 0.02
+    }
+  },
+  "query": {
+    "goal": {
+      "query": "detect cup on table",
+      "description": "single frame query benchmark",
+      "obj": {
+        "type": "cup"
+      }
+    },
+    "stop": "on_answer",
+    "timeout_s": 10.0,
+    "max_frames": 5,
+    "cas_snapshots": [
+      "start",
+      "each_frame",
+      "before_answer"
+    ]
+  },
+  "expect_query_result": {
+    "text_result": {
+      "equals": ""
+    },
+    "res": {
+      "matching": "hungarian",
+      "expected": [
+        {
+          "type": "cup",
+          "color": [
+            "red"
+          ],
+          "pose": [
+            {
+              "frame": "map",
+              "translation": [
+                0.4,
+                0.1,
+                0.9
+              ],
+              "tolerance": {
+                "pose_translation_m": 0.05,
+                "pose_rotation_deg": 10.0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "samples": [
+    {
+      "sample_index": 0,
+      "expect_cas": [
+        {
+          "type": "robokudo.types.scene.ObjectHypothesis",
+          "severity": "required",
+          "min_count": 1
+        }
+      ]
+    }
+  ]
+}

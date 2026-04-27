@@ -1,0 +1,534 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robokudo.org/schemas/benchmark_spec.v1.schema.json",
+  "title": "RoboKudo Benchmark Spec v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "mode",
+    "analysis_engine"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "stream",
+        "query"
+      ]
+    },
+    "analysis_engine": {
+      "$ref": "#/$defs/analysisEngineRef"
+    },
+    "injections": {
+      "$ref": "#/$defs/injectionsConfig"
+    },
+    "defaults": {
+      "$ref": "#/$defs/defaults"
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sampleExpectation"
+      }
+    },
+    "query": {
+      "$ref": "#/$defs/queryConfig"
+    },
+    "expect_query_result": {
+      "$ref": "#/$defs/queryResultExpectation"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "stream"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "samples"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "query"
+              ]
+            },
+            {
+              "required": [
+                "expect_query_result"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "query"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "query",
+          "expect_query_result"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "analysisEngineRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ros_pkg_name",
+        "module"
+      ],
+      "properties": {
+        "ros_pkg_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Module name resolved via ModuleLoader.load_ae(ros_pkg_name, module)."
+        },
+        "class_name": {
+          "type": "string",
+          "minLength": 1,
+          "default": "AnalysisEngine",
+          "description": "Reserved for future support of non-default AE class names."
+        }
+      }
+    },
+    "injectionsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "collection_reader": {
+          "$ref": "#/$defs/collectionReaderInjection"
+        }
+      }
+    },
+    "collectionReaderInjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "analysis_engine_default",
+            "force_camera_config"
+          ],
+          "default": "analysis_engine_default"
+        },
+        "camera_config": {
+          "type": "string",
+          "description": "Camera config key used by CrDescriptorFactory.create_descriptor(...)"
+        },
+        "camera_config_kwargs": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional kwargs forwarded to CameraConfigRegistry.create_config(...)"
+        },
+        "target_annotator_names": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "description": "Optional name filter for CollectionReaderAnnotator nodes. If omitted, all CollectionReaderAnnotators are patched."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "force_camera_config"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "camera_config"
+            ]
+          }
+        }
+      ]
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "matching": {
+          "type": "string",
+          "enum": [
+            "hungarian",
+            "greedy"
+          ],
+          "default": "hungarian"
+        },
+        "tolerances": {
+          "$ref": "#/$defs/tolerances"
+        }
+      }
+    },
+    "tolerances": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pose_translation_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "pose_rotation_deg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "plane_normal_deg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "plane_offset_m": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "sampleExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_index"
+      ],
+      "properties": {
+        "sample_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expect_cas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/casAssertion"
+          }
+        }
+      }
+    },
+    "casAssertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "required",
+            "warn"
+          ],
+          "default": "required"
+        },
+        "min_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "where": {
+          "$ref": "#/$defs/whereObject"
+        },
+        "each": {
+          "$ref": "#/$defs/eachConstraint"
+        }
+      }
+    },
+    "whereObject": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/condition"
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "equals": {},
+        "not_equals": {},
+        "gt": {
+          "type": "number"
+        },
+        "gte": {
+          "type": "number"
+        },
+        "lt": {
+          "type": "number"
+        },
+        "lte": {
+          "type": "number"
+        },
+        "contains": {},
+        "in": {
+          "type": "array"
+        },
+        "regex": {
+          "type": "string"
+        },
+        "approx": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "tolerance"
+          ],
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "tolerance": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "eachConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "has_annotation": {
+          "$ref": "#/$defs/casAssertion"
+        }
+      }
+    },
+    "queryConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal"
+      ],
+      "properties": {
+        "goal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "query",
+            "description",
+            "obj"
+          ],
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "obj": {
+              "$ref": "#/$defs/objectDesignatorExpectation"
+            }
+          }
+        },
+        "stop": {
+          "type": "string",
+          "enum": [
+            "on_answer",
+            "max_frames",
+            "timeout"
+          ],
+          "default": "on_answer"
+        },
+        "timeout_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_frames": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cas_snapshots": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "start",
+              "each_frame",
+              "before_answer",
+              "after_answer"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "queryResultExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "res"
+      ],
+      "properties": {
+        "text_result": {
+          "$ref": "#/$defs/condition"
+        },
+        "res": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "expected"
+          ],
+          "properties": {
+            "matching": {
+              "type": "string",
+              "enum": [
+                "hungarian",
+                "greedy"
+              ],
+              "default": "hungarian"
+            },
+            "expected": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/objectDesignatorExpectation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "objectDesignatorExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "shape": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "color": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "location": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string"
+        },
+        "pose": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/poseExpectation"
+          }
+        },
+        "pose_source": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "attribute": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "shape_size": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/shapeSizeExpectation"
+          }
+        }
+      }
+    },
+    "poseExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "type": "string"
+        },
+        "translation": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "rotation_xyzw": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "tolerance": {
+          "$ref": "#/$defs/tolerances"
+        }
+      }
+    },
+    "shapeSizeExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

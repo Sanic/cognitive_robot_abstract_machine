@@ -29,6 +29,9 @@ dynamic = ["version", "dependencies"]
 where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["robokudo*"]
 
+[tool.setuptools.package-data]
+"robokudo.benchmarking" = ["schemas/*.json"]
+
 [tool.setuptools.dynamic]
 version = {attr = "robokudo.__version__"}
 dependencies = {file = "requirements.txt"}

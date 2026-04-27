@@ -11,3 +11,4 @@ opencv-python>=4.11.0.86
 matplotlib
 setuptools
 pooch
+jsonschema>=4.0.0

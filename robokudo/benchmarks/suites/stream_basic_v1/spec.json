@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "mode": "stream",
+  "analysis_engine": {
+    "ros_pkg_name": "robokudo",
+    "module": "demo_from_storage"
+  },
+  "injections": {
+    "collection_reader": {
+      "mode": "force_camera_config",
+      "camera_config": "mongo"
+    }
+  },
+  "defaults": {
+    "matching": "hungarian",
+    "tolerances": {
+      "pose_translation_m": 0.05,
+      "pose_rotation_deg": 10.0,
+      "plane_normal_deg": 5.0,
+      "plane_offset_m": 0.02
+    }
+  },
+  "samples": [
+    {
+      "sample_index": 0,
+      "expect_cas": [
+        {
+          "type": "robokudo.types.annotation.Plane",
+          "severity": "required",
+          "min_count": 1,
+          "where": {
+            "model[2]": {
+              "gte": 0.95
+            }
+          }
+        },
+        {
+          "type": "robokudo.types.scene.ObjectHypothesis",
+          "severity": "required",
+          "min_count": 1,
+          "each": {
+            "has_annotation": {
+              "type": "robokudo.types.annotation.Classification",
+              "where": {
+                "classname": {
+                  "equals": "cup"
+                },
+                "confidence": {
+                  "gte": 0.7
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
