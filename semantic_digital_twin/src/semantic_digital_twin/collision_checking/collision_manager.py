@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import lru_cache
+from krrood.utils import memoize, clear_memoization_cache
 from typing import Dict, Any, Self
 
 from typing_extensions import List, TYPE_CHECKING
@@ -25,10 +25,14 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionRule,
     AllowCollisionRule,
 )
-from semantic_digital_twin.collision_checking.pybullet_collision_detector import BulletCollisionDetector
+from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
+    BulletCollisionDetector,
+)
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.world_modification import synchronized_attribute_modification
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
     from ..world import World
@@ -223,8 +227,7 @@ class CollisionManager(ModelChangeCallback):
             consumer.on_collision_matrix_update()
         if buffer is not None:
             self.collision_matrix.apply_buffer(buffer)
-        self.get_buffer_zone_distance.cache_clear()
-        self.get_violated_distance.cache_clear()
+        clear_memoization_cache(self)
 
     def set_collision_matrix(self, collision_matrix: CollisionMatrix):
         """
@@ -233,8 +236,7 @@ class CollisionManager(ModelChangeCallback):
         :param collision_matrix: New collision matrix.
         """
         self.collision_matrix = collision_matrix
-        self.get_buffer_zone_distance.cache_clear()
-        self.get_violated_distance.cache_clear()
+        clear_memoization_cache(self)
 
     def compute_collisions(self) -> CollisionCheckingResult:
         """
@@ -261,7 +263,7 @@ class CollisionManager(ModelChangeCallback):
                 return max_avoided_bodies
         raise Exception(f"No rule found for {body}")
 
-    @lru_cache
+    @memoize
     def get_buffer_zone_distance(self, body_a: Body, body_b: Body) -> float:
         """
         Returns the buffer-zone distance for the body pair by scanning rules from highest to lowest priority.
@@ -274,7 +276,7 @@ class CollisionManager(ModelChangeCallback):
                 return value
         raise ValueError(f"No buffer-zone rule found for {body_a, body_b}")
 
-    @lru_cache
+    @memoize
     def get_violated_distance(self, body_a: Body, body_b: Body) -> float:
         """
         Returns the violated distance for the body pair by scanning rules from highest to lowest priority.
@@ -315,23 +317,3 @@ class CollisionManager(ModelChangeCallback):
                 data["max_avoided_bodies_rules"], **kwargs
             ),
         )
-
-    def merge_collision_manager(self, other: CollisionManager):
-        """
-        Merges the collision rules of another collision manager into this one.
-        """
-        for default_rule in other.default_rules:
-            if default_rule not in self.default_rules:
-                self.add_default_rule(default_rule)
-
-        for ignore_collision_rule in other.ignore_collision_rules:
-            if ignore_collision_rule not in self.ignore_collision_rules:
-                self.add_ignore_collision_rule(ignore_collision_rule)
-
-        for temporary_rule in other.temporary_rules:
-            if temporary_rule not in self.temporary_rules:
-                self.add_temporary_rule(temporary_rule)
-
-        for max_avoided_bodies_rule in other.max_avoided_bodies_rules:
-            if max_avoided_bodies_rule not in self.max_avoided_bodies_rules:
-                self.extend_max_avoided_bodies_rules([max_avoided_bodies_rule])

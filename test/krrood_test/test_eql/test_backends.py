@@ -1,9 +1,12 @@
+from datetime import datetime
+
 from sqlalchemy.orm import sessionmaker
 
 from krrood.entity_query_language.backends import (
     SQLAlchemyBackend,
-    PythonBackend,
+    EntityQueryLanguageBackend,
     ProbabilisticBackend,
+    EntityQueryLanguageBackend,
 )
 from krrood.entity_query_language.factories import (
     variable,
@@ -12,19 +15,30 @@ from krrood.entity_query_language.factories import (
     underspecified,
     variable_from,
 )
-from krrood.ormatic.dao import to_dao
+from krrood.entity_query_language.query_graph import QueryGraph
+from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from random_events.set import Set
 from random_events.variable import Symbolic
-from ..dataset.example_classes import Pose, Position, Orientation
+from ..dataset.example_classes import (
+    KRROODPose,
+    KRROODPosition,
+    KRROODOrientation,
+    Atom,
+    Element,
+)
 
 
-def test_same_query_multiple_backends(session, database):
+def test_selective_query_multiple_backends(session, database):
 
-    p1 = Pose(position=Position(1, 0, 0), orientation=Orientation(0, 0, 0, 1))
-    p2 = Pose(position=Position(0, 1, 0), orientation=Orientation(0, 0, 0, 1))
+    p1 = KRROODPose(
+        position=KRROODPosition(1, 0, 0), orientation=KRROODOrientation(0, 0, 0, 1)
+    )
+    p2 = KRROODPose(
+        position=KRROODPosition(0, 1, 0), orientation=KRROODOrientation(0, 0, 0, 1)
+    )
 
     python_domain = [p1, p2]
 
@@ -33,7 +47,7 @@ def test_same_query_multiple_backends(session, database):
     session.commit()
     session_maker = sessionmaker(session.bind)
 
-    pose_variable = variable(Pose, python_domain)
+    pose_variable = variable(KRROODPose, python_domain)
 
     q = an(
         entity(pose_variable).where(
@@ -41,7 +55,7 @@ def test_same_query_multiple_backends(session, database):
         )
     )
 
-    python_backend = PythonBackend()
+    python_backend = EntityQueryLanguageBackend()
     result = list(python_backend.evaluate(q))
     assert len(result) == 1
 
@@ -49,19 +63,26 @@ def test_same_query_multiple_backends(session, database):
     result = list(database_backend.evaluate(q))
     assert len(result) == 1
 
-    prob_q = underspecified(Pose)(
-        position=underspecified(Position)(x=..., y=..., z=...),
-        orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
+
+def test_probabilistic_backend_with_symbolic_expression():
+    prob_q = underspecified(KRROODPosition)(
+        x=..., y=..., z=variable(int, domain=[1, 2, 3])
     )
-    prob_q.expression
+    parameters = UnderspecifiedParameters(prob_q)
+    assert parameters.variables["KRROODPosition.z"] == Symbolic(
+        name="KRROODPosition.z", domain=Set.from_iterable([1, 2, 3])
+    )
+
+
+def test_probabilistic_query_backend():
+    prob_q = underspecified(KRROODPose)(
+        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
+    )
+    prob_q.resolve()
     prob_q.where(prob_q.variable.position.x > 0.5)
 
-    parameters = UnderspecifiedParameters(prob_q)
-    model = fully_factorized(parameters.variables.values())
-
-    registry = DictRegistry({Pose: model})
-
-    pm_backend = ProbabilisticBackend(registry, 10)
+    pm_backend = ProbabilisticBackend(number_of_samples=10)
     values = list(pm_backend.evaluate(prob_q))
     for value in values:
         assert value.position.x > 0.5
@@ -69,9 +90,18 @@ def test_same_query_multiple_backends(session, database):
     assert pm_backend.number_of_samples == len({v.position for v in values})
 
 
-def test_probabilistic_backend_with_symbolic_expression():
-    prob_q = underspecified(Position)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
-    parameters = UnderspecifiedParameters(prob_q)
-    assert parameters.variables["Position.z"] == Symbolic(
-        "Position.z", Set.from_iterable([1, 2, 3])
+def test_generative_eql_backend():
+    q = underspecified(Atom)(
+        element=...,
+        type=variable_from([0, 1, 2]),
+        charge=variable_from([0.0, 1.0, 2.0]),
+        timestamp=datetime.now(),
     )
+    q.resolve()
+    q.where(q.variable.type > q.variable.charge)
+    backend = EntityQueryLanguageBackend()
+    results = list(backend.evaluate(q))
+    assert len(results) == 6
+    for result in results:
+        assert isinstance(result.element, Element)
+        assert result.type > result.charge

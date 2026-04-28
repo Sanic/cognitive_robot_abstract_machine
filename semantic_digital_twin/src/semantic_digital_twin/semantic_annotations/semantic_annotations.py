@@ -32,16 +32,25 @@ from semantic_digital_twin.exceptions import (
     MissingSemanticAnnotationError,
 )
 from semantic_digital_twin.reasoning.predicates import InsideOf
-from semantic_digital_twin.spatial_types import Point3, HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import (
+    Point3,
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedomLimits
-from semantic_digital_twin.world_description.geometry import Scale, TriangleMesh
-from semantic_digital_twin.world_description.shape_collection import BoundingBoxCollection, ShapeCollection
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.geometry import Scale, Mesh
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+    ShapeCollection,
+)
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
@@ -114,13 +123,19 @@ class Handle(HasRootBody):
 
         z_interval = closed(-scale.z / 2, scale.z / 2)
 
-        return SimpleEvent(
+        return SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: x_interval,
                 SpatialVariables.y.value: y_interval,
                 SpatialVariables.z.value: z_interval,
             }
         )
+
+@dataclass(eq=False)
+class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
+    """
+    A dishwasher is a kitchen appliance used for cleaning dishes, utensils, and cookware. It typically has a front door that opens to reveal racks for loading dirty items and a control panel for selecting wash cycles.
+    """
 
 
 @dataclass(eq=False)
@@ -230,6 +245,7 @@ class Door(HasHandle, HasHinge):
         if not (scale.x < scale.y and scale.x < scale.z):
             raise InvalidPlaneDimensions(scale, clazz=Door)
 
+        # This creates an event around the scale, so if the scale is 1 the event will be from -0.5 to 0.5.
         door_event = scale.to_simple_event().as_composite_set()
         door_body = Body(name=name)
         bounding_box_collection = BoundingBoxCollection.from_event(
@@ -245,7 +261,7 @@ class Door(HasHandle, HasHinge):
         )
         entry_way_region = Region(
             name=entry_way_region_name,
-            area=ShapeCollection([TriangleMesh(mesh=door_body.combined_mesh)]),
+            area=ShapeCollection([Mesh.from_trimesh(mesh=door_body.combined_mesh)]),
         )
         entry_way = EntryWay(name=entry_way_name, root=entry_way_region)
         world.add_region(entry_way.root)
@@ -272,7 +288,7 @@ class Door(HasHandle, HasHinge):
         connection = self.handle.root.parent_connection
         door_P_handle = connection.origin_expression.to_position()
         scale = self.root.collision.scale
-        world_T_door = self.root.global_pose
+        world_T_door = self.root.global_transform
 
         match opening_axis.to_np().tolist():
             case [0, 1, 0, 0]:
@@ -328,9 +344,9 @@ class DoubleDoor(SemanticAnnotation):
 
         :return: A tuple containing the left and right door. the first door is the left door, the second door is the right door.
         """
-        world_T_door_0 = self.door_0.root.global_pose
+        world_T_door_0 = self.door_0.root.global_transform
         view_point_T_door_0 = world_T_view_point.inverse() @ world_T_door_0
-        world_T_door_1 = self.door_1.root.global_pose
+        world_T_door_1 = self.door_1.root.global_transform
         view_point_T_door_1 = world_T_view_point.inverse() @ world_T_door_1
         if view_point_T_door_0.y > view_point_T_door_1.y:
             return self.door_0, self.door_1
@@ -350,9 +366,23 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasSlider, HasStorageSpace
 
 
 @dataclass(eq=False)
+class ShelfLayer(HasSupportingSurface):
+    """
+    A horizontal surface used for storing objects, typically found inside cabinets or on walls.
+    """
+
+
+@dataclass(eq=False)
 class Table(Furniture, HasSupportingSurface):
     """
     A semantic annotation that represents a table.
+    """
+
+
+@dataclass(eq=False)
+class CounterTop(Furniture, HasSupportingSurface):
+    """
+    A semantic annotation that represents a counter top.
     """
 
 
@@ -366,6 +396,8 @@ class Cabinet(Furniture, HasCaseAsRootBody):
 @dataclass(eq=False)
 class Fridge(Cabinet, HasDoors, HasDrawers): ...
 
+@dataclass(eq=False)
+class Oven(HasRootBody): ...
 
 @dataclass(eq=False)
 class Dresser(Cabinet, HasDrawers, HasDoors): ...
@@ -480,6 +512,7 @@ class Wall(HasApertures):
             raise InvalidPlaneDimensions(scale, clazz=Wall)
 
         wall_body = Body(name=name)
+        # This creates an event exactly as the scale, so if the scale is 1 the event will be from 0 to 1.
         wall_event = cls._create_wall_event(scale).as_composite_set()
         wall_collision = BoundingBoxCollection.from_event(
             wall_body, wall_event
@@ -511,7 +544,7 @@ class Wall(HasApertures):
         y_interval = closed(-scale.y / 2, scale.y / 2)
         z_interval = closed(0, scale.z)
 
-        return SimpleEvent(
+        return SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: x_interval,
                 SpatialVariables.y.value: y_interval,
@@ -622,7 +655,10 @@ class Bowl(HasSupportingSurface, IsPerceivable):
 
 # Food Items
 @dataclass(eq=False)
-class Food(HasRootBody): ...
+class Food(HasRootBody):
+    """
+    A Group class for Food.
+    """
 
 
 @dataclass(eq=False)
@@ -730,39 +766,66 @@ class Produce(Food):
 
 
 @dataclass(eq=False)
-class Tomato(Produce):
+class Fruit(Produce):
+    """
+    Fruit.
+    """
+
+
+@dataclass(eq=False)
+class Vegetable(Produce):
+    """
+    Vegetable.
+    """
+
+
+@dataclass(eq=False)
+class Tomato(Fruit):
     """
     A tomato.
     """
 
 
 @dataclass(eq=False)
-class Lettuce(Produce):
+class Lettuce(Vegetable):
     """
     Lettuce.
     """
 
 
 @dataclass(eq=False)
-class Apple(Produce):
+class Carrot(Vegetable):
+    """
+    A carrot.
+    """
+
+
+@dataclass(eq=False)
+class Apple(Fruit):
     """
     An apple.
     """
 
 
 @dataclass(eq=False)
-class Banana(Produce):
+class Banana(Fruit):
     """
     A banana.
     """
 
 
 @dataclass(eq=False)
-class Orange(Produce):
+class Orange(Fruit):
     """
     An orange.
     """
 
+
+@dataclass(eq=False)
+class Salt(Food):
+    """
+    A pack or container of salt (e.g., salt shaker or salt can).
+    """
 
 @dataclass(eq=False)
 class CoffeeTable(Table):
@@ -814,6 +877,13 @@ class Armchair(Chair):
 
 
 @dataclass(eq=False)
+class TrashCan(HasRootBody, Furniture):
+    """
+    Abstract class for Trash Can.
+    """
+
+
+@dataclass(eq=False)
 class ShelvingUnit(Furniture):
     """
     A shelving unit.
@@ -828,7 +898,7 @@ class Bed(Furniture):
 
 
 @dataclass(eq=False)
-class Sofa(Furniture):
+class Sofa(Furniture, HasSupportingSurface):
     """
     A sofa.
     """

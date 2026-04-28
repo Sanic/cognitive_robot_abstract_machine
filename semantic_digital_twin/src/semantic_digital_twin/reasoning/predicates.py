@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 import math
 import trimesh.boolean
+from trimesh.collision import CollisionManager
+
 from krrood.entity_query_language.predicate import (
     Predicate,
     Symbol,
@@ -13,7 +15,9 @@ from krrood.entity_query_language.predicate import (
 from random_events.interval import Interval
 from typing_extensions import List, TYPE_CHECKING, Iterable, Type
 
-from semantic_digital_twin.collision_checking.trimesh_collision_detector import FCLCollisionDetector
+from semantic_digital_twin.collision_checking.trimesh_collision_detector import (
+    FCLCollisionDetector,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_computations.ik_solver import (
@@ -22,11 +26,17 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
 )
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import Vector3, Point3
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.world_description.geometry import TriangleMesh
-from semantic_digital_twin.world_description.world_entity import Body, Region, KinematicStructureEntity
+from semantic_digital_twin.world_description.geometry import BoundingBox
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    Region,
+    KinematicStructureEntity,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.robots.abstract_robot import (
@@ -82,7 +92,7 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
 
     # This ignores the camera orientation and sets it to identity
     cam_pose = np.eye(4, dtype=float)
-    cam_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
+    cam_pose[:3, 3] = camera.root.global_transform.to_np()[:3, 3]
 
     seg = rt.create_segmentation_mask(
         HomogeneousTransformationMatrix(cam_pose, reference_frame=camera._world.root),
@@ -119,7 +129,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
 
     # get camera pose
     camera_pose = np.eye(4, dtype=float)
-    camera_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
+    camera_pose[:3, 3] = camera.root.global_transform.to_np()[:3, 3]
     camera_pose = HomogeneousTransformationMatrix(
         camera_pose, reference_frame=camera._world.root
     )
@@ -130,7 +140,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     with world_without_occlusion.modify_world():
         world_without_occlusion.add_body(root)
         copied_body = Body.from_json(body.to_json())
-        root_T_body = body.global_pose
+        root_T_body = body.global_transform
         root_T_body.reference_frame = root
         root_to_copied_body = FixedConnection(
             parent=root,
@@ -193,6 +203,44 @@ def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> b
 
 
 @symbolic_function
+def compute_euclidean_planar_distance(body1: Body, body2: Body, ignore_dimension: Vector3):
+    """
+    Computes the Euclidean distance between two bodies in 2D space, ignoring a specific dimension
+    specified by the user. The ignored dimension is set to zero before the distance calculation. This
+    function can be used to handle scenarios where computations are restricted to certain spatial
+    planes.
+
+    :param body1: The first body to compute the distance from. It uses the global pose of the body
+                      to extract the position.
+    :param body2: The second body to compute the distance to. It also utilizes the global pose of
+                      the body to extract the position.
+    :param ignore_dimension: Specifies which dimension (x, y, or z) should be ignored in the
+                                     computation. The ignored dimension is set to zero for both
+                                     positions prior to calculating the distance.
+
+    :return: The Euclidean distance between the two bodies in the 2D plane after ignoring the
+               specified dimension.
+    """
+    body1_position = body1.global_pose.to_position()
+    body2_position = body2.global_pose.to_position()
+
+    if np.allclose(ignore_dimension, Vector3.X()):
+        body1_position.x = 0.0
+        body2_position.x = 0.0
+    elif np.allclose(ignore_dimension, Vector3.Y()):
+        body1_position.y = 0.0
+        body2_position.y = 0.0
+    elif np.allclose(ignore_dimension, Vector3.Z()):
+        body1_position.z = 0.0
+        body2_position.z = 0.0
+
+
+    return body1_position.euclidean_distance(
+        body2_position
+    )
+
+
+@symbolic_function
 def is_supported_by(
     supported_body: Body, supporting_body: Body, max_intersection_height: float = 0.1
 ) -> bool:
@@ -208,7 +256,7 @@ def is_supported_by(
     if Below(
         supported_body.center_of_mass,
         supporting_body.center_of_mass,
-        supported_body.global_pose,
+        supported_body.global_transform,
     )():
         return False
     bounding_box_supported_body = (
@@ -233,6 +281,31 @@ def is_supported_by(
     size = sum([si.upper - si.lower for si in z_intersection.simple_sets])
     return size < max_intersection_height
 
+@symbolic_function
+def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -> bool:
+    """
+    Determine if any body in the world is supported by a given supporting body.
+
+    This function iterates over all bodies in the provided world and checks
+    if any of them are supported by the specified supporting body. The
+    support determination is performed using the helper function `is_supported_by`.
+    Bodies for which the computation fails are skipped.
+
+    :param supporting_body: The body that is being checked to determine if it is supporting other bodies in the world.
+    :param max_intersection_height: The maximum allowable intersection
+    height for a body to be considered supported. Defaults to 0.1.
+
+    :return: True if any body in the world is supported by the supporting_body,
+    False otherwise.
+    """
+    for candidate in supporting_body._world.bodies_with_collision:
+        if candidate is supporting_body:
+            continue
+        if is_supported_by(candidate, supporting_body, max_intersection_height):
+            return True
+
+    return False
+
 
 @symbolic_function
 def is_body_in_region(body: Body, region: Region) -> float:
@@ -253,8 +326,10 @@ def is_body_in_region(body: Body, region: Region) -> float:
     region_mesh_local = region.area.combined_mesh
 
     # Transform copies of the meshes into the world frame
-    body_mesh = body_mesh_local.copy().apply_transform(body.global_pose.to_np())
-    region_mesh = region_mesh_local.copy().apply_transform(region.global_pose.to_np())
+    body_mesh = body_mesh_local.copy().apply_transform(body.global_transform.to_np())
+    region_mesh = region_mesh_local.copy().apply_transform(
+        region.global_transform.to_np()
+    )
     intersection = trimesh.boolean.intersection([body_mesh, region_mesh])
 
     # no body volume -> zero fraction
@@ -444,10 +519,10 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
 
         # Transform meshes from body frame to world frame
         mesh_a = mesh_a_local.copy()
-        mesh_a.apply_transform(self.body.global_pose.to_np())
+        mesh_a.apply_transform(self.body.global_transform.to_np())
 
         mesh_b = mesh_b_local.copy()
-        mesh_b.apply_transform(self.other.global_pose.to_np())
+        mesh_b.apply_transform(self.other.global_transform.to_np())
 
         # Use bounding box of mesh_b to check if mesh_a is inside mesh_b
         mesh_b_bbox = mesh_b.bounding_box
@@ -479,3 +554,61 @@ class ContainsType(Predicate):
 
     def __call__(self) -> bool:
         return any(isinstance(obj, self.obj_type) for obj in self.iterable)
+
+
+@symbolic_function
+def is_place_occupied(
+    box: BoundingBox, world: World, allowed_bodies: List[Body] = None
+) -> bool:
+    """
+    Checks if the given region (as a box at its pose) intersects with any collidable
+    object in the world, excluding `allowed_bodies`.
+
+    The region is converted to a box mesh at the region pose and tested against
+    each body's world-aligned collision mesh using trimesh's collision manager.
+
+    :param box: The region (axis-aligned box in its own local frame with pose in `region.origin`).
+    :param world: The world providing bodies with enabled collisions.
+    :param allowed_bodies: Bodies to ignore during the check.
+    :return: True if any collision is found, False otherwise.
+    """
+    allowed_bodies = set(allowed_bodies or [])
+
+    # Build a mesh for the region box at its current pose
+    region_box_shape = box.as_shape()  # returns a Box centered at the region
+    region_mesh = region_box_shape.mesh.copy()
+    # region_mesh.apply_transform(region_box_shape.origin.to_np())
+    region_mesh.apply_transform(
+        world.transform(region_box_shape.origin, world.root).to_np()
+    )
+
+    # Prepare collision manager with the region mesh
+    cm = CollisionManager()
+    cm.add_object("region", region_mesh)
+
+    # Iterate over collidable bodies and test collision
+    for body in world.bodies_with_collision:
+        if body in allowed_bodies:
+            continue
+
+        mesh_local = getattr(body.collision, "combined_mesh", None)
+        if mesh_local is None or getattr(mesh_local, "is_empty", False):
+            continue
+
+        # Transform body mesh into world frame
+        body_mesh = mesh_local.copy()
+        body_mesh.apply_transform(body.global_pose.to_np())
+
+        # Early exit on first collision
+        if cm.in_collision_single(body_mesh):
+            return True
+
+    return False
+
+
+@symbolic_function
+def allclose(array1: np.ndarray, array2: np.ndarray, atol=1e-3) -> bool:
+    """
+    Symbolic wrapper around `np.allclose`.
+    """
+    return np.allclose(array1, array2, atol=atol)

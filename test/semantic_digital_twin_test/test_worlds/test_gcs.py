@@ -38,12 +38,12 @@ class GCSTestCase(unittest.TestCase):
             cls.world.add_kinematic_structure_entity(Body())
         gcs = GraphOfConvexSets(cls.world)
 
-        obstacle = BoundingBox(0, 0, 0, 1, 1, 1, cls.world.root)
+        obstacle = BoundingBox(0, 0, 0, 1, 1, 1, cls.world.root.global_pose)
 
-        z_lim = SimpleInterval(0.45, 0.55)
-        x_lim = SimpleInterval(-2, 3)
-        y_lim = SimpleInterval(-2, 3)
-        limiting_event = SimpleEvent(
+        z_lim = SimpleInterval.from_data(0.45, 0.55)
+        x_lim = SimpleInterval.from_data(-2, 3)
+        y_lim = SimpleInterval.from_data(-2, 3)
+        limiting_event = SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: x_lim,
                 SpatialVariables.y.value: y_lim,

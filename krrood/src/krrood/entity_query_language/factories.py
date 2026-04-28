@@ -4,11 +4,15 @@ User interface (grammar & vocabulary) for entity query language.
 
 from __future__ import annotations
 
+import inspect
 import operator
 
-from typing_extensions import Union, Iterable
+from typing_extensions import Union, Iterable, List
 
-from krrood.entity_query_language.core.base_expressions import SymbolicExpression, TruthValueOperator
+from krrood.entity_query_language.core.base_expressions import (
+    SymbolicExpression,
+    TruthValueOperator,
+)
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
     CanBehaveLikeAVariable,
@@ -118,13 +122,15 @@ def match_variable(
 
 
 def underspecified(
-    expression: Union[Type[T], Callable[..., T]],
+    expression: Union[Type[T], Callable[..., T]], target_type: Type[T] | None = None
 ) -> Union[Type[T], Match[T]]:
     """
     Same as :py:func:`krrood.entity_query_language.factories.match` but instead of searching for solutions in
     the domain objects, it is used as a query for generative processes to infer solutions that satisfy the constraints
     in the query.
     """
+    if target_type is not None:
+        return Match(factory=expression, type_=target_type)
     return Match(factory=expression)
 
 
@@ -134,7 +140,7 @@ def underspecified(
 def variable(
     type_: Type[T],
     domain: Optional[DomainType],
-) -> Union[T, Selectable[T]]:
+) -> Union[T, Selectable[T], Variable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
 
@@ -561,3 +567,58 @@ def distinct(
             return entity(expression).distinct(*on)
         case _:
             raise UnsupportedExpressionTypeForDistinct(type(expression))
+
+
+def get_conditioned_statements(
+    statement, condition: Callable[OperationResult, bool]
+) -> List[SymbolicExpression]:
+    """
+    Iterates over all sub-statements of the statement and returns all statements that satisfy the condition.
+
+    :param statement: The statement to iterate over.
+    :param condition: The condition to evaluate each sub-statement against.
+    :return: A list of sub-statements that satisfy the condition.
+    """
+    condition_results = []
+    for node in [
+        s
+        for s in statement._children_
+        if not isinstance(s, (Variable, inspect.Attribute))
+    ]:
+        node_result = node.evaluate()
+        if condition(node_result):
+            condition_results.append(node)
+    if statement in condition_results:
+        condition_results.remove(statement)
+
+    return condition_results
+
+
+def get_false_statements(statement: SymbolicExpression) -> List[SymbolicExpression]:
+    """
+    The false statements of all statements of this condition.
+
+    :return: The false statements of all statements of this condition.
+    """
+    return get_conditioned_statements(statement, lambda x: not x == [])
+
+
+def get_true_statements(statement: SymbolicExpression) -> List[SymbolicExpression]:
+    """
+    The true statements of all statements of this condition.
+
+    :return: The true statements of this condition.
+    """
+    return get_conditioned_statements(statement, lambda x: x == [])
+
+
+def evaluate_condition(condition: ConditionType) -> bool:
+    """
+    Evaluates the condition to True or False.
+
+    :param condition: The condition to evaluate.
+    :return: True if there is a possible solution, False otherwise.
+    """
+    if type(condition) is bool:
+        return condition
+    return any(condition.evaluate())

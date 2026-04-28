@@ -1,31 +1,34 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import timedelta
+from dataclasses import dataclass
 
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.world_description.connections import Connection6DoF
-from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Union, Optional, Type, Any, Iterable
+import numpy as np
+from typing_extensions import Any, Dict
 
-from pycram.robot_plans.actions.core.pick_up import ReachActionDescription, PickUpAction
-from pycram.config.action_conf import ActionConfig
-from pycram.robot_plans.motions.gripper import MoveTCPMotion, MoveGripperMotion, ReachMotion
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.factories import or_, not_, and_
+from pycram.datastructures.dataclasses import Context
 from pycram.datastructures.enums import (
     Arms,
     ApproachDirection,
     VerticalAlignment,
 )
 from pycram.datastructures.grasp import GraspDescription
-from pycram.datastructures.partial_designator import PartialDesignator
-from pycram.datastructures.pose import PoseStamped
-from pycram.failures import ObjectNotPlacedAtTargetLocation, ObjectStillInContact
-from pycram.language import SequentialPlan
+from pycram.plans.factories import sequential, execute_single
+from pycram.querying.predicates import GripperIsFree
+from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
+from pycram.robot_plans.actions.core.pick_up import PickUpAction, ReachAction
+from pycram.robot_plans.motions.gripper import (
+    MoveGripperMotion,
+    MoveToolCenterPointMotion,
+)
 from pycram.view_manager import ViewManager
-from pycram.robot_plans.actions.base import ActionDescription
-from pycram.utils import translate_pose_along_local_axis
-from pycram.validation.error_checkers import PoseErrorChecker
-from pycram.visualization import plot_rustworkx_interactive
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.reasoning.predicates import allclose
+from semantic_digital_twin.reasoning.robot_predicates import is_body_in_gripper
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -38,7 +41,7 @@ class PlaceAction(ActionDescription):
     """
     Object designator_description describing the object that should be place
     """
-    target_location: PoseStamped
+    target_location: Pose
     """
     Pose in the world at which the object should be placed
     """
@@ -46,39 +49,35 @@ class PlaceAction(ActionDescription):
     """
     Arm that is currently holding the object
     """
-    _pre_perform_callbacks = []
-    """
-    List to save the callbacks which should be called before performing the action.
-    """
-
-    def __post_init__(self):
-        super().__post_init__()
 
     def execute(self) -> None:
-        arm = ViewManager.get_arm_view(self.arm, self.robot_view)
+        arm = ViewManager.get_arm_view(self.arm, self.robot)
         manipulator = arm.manipulator
 
-        previous_pick = self.plan.get_previous_node_by_designator_type(
-            self.plan_node, PickUpAction
+        previous_pick = self.plan_node.get_previous_node_by_designator_type(
+            PickUpAction
         )
         previous_grasp = (
-            previous_pick.designator_ref.grasp_description
+            previous_pick.designator.grasp_description
             if previous_pick
             else GraspDescription(
                 ApproachDirection.FRONT, VerticalAlignment.NoAlignment, manipulator
             )
         )
 
-        SequentialPlan(
-            self.context,
-            ReachActionDescription(
-                self.target_location,
-                self.arm,
-                previous_grasp,
-                self.object_designator,
-                reverse_reach_order=True,
-            ),
-            MoveGripperMotion(GripperState.OPEN, self.arm),
+        self.add_subplan(
+            sequential(
+                [
+                    ReachAction(
+                        self.target_location,
+                        self.arm,
+                        previous_grasp,
+                        self.object_designator,
+                        reverse_reach_order=True,
+                    ),
+                    MoveGripperMotion(GripperState.OPEN, self.arm),
+                ]
+            )
         ).perform()
 
         # Detaches the object from the robot
@@ -98,58 +97,37 @@ class PlaceAction(ActionDescription):
             self.target_location, self.object_designator, reverse=True
         )
 
-        SequentialPlan(self.context, MoveTCPMotion(retract_pose, self.arm)).perform()
+        self.add_subplan(
+            execute_single(MoveToolCenterPointMotion(retract_pose, self.arm))
+        ).perform()
 
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
+    @staticmethod
+    def pre_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
         """
-        Check if the object is placed at the target location.
+        The object needs to be in the gripper frame
         """
-        self.validate_loss_of_contact()
-        self.validate_placement_location()
-
-    def validate_loss_of_contact(self):
-        """
-        Check if the object is still in contact with the robot after placing it.
-        """
-        contact_links = self.object_designator.get_contact_points_with_body(
-            World.robot
-        ).get_all_bodies()
-        if contact_links:
-            raise ObjectStillInContact(
-                self.object_designator,
-                contact_links,
-                self.target_location,
-                World.robot,
-                self.arm,
-            )
-
-    def validate_placement_location(self):
-        """
-        Check if the object is placed at the target location.
-        """
-        pose_error_checker = PoseErrorChecker(World.conf.get_pose_tolerance())
-        if not pose_error_checker.is_error_acceptable(
-            self.object_designator.pose, self.target_location
-        ):
-            raise ObjectNotPlacedAtTargetLocation(
-                self.object_designator, self.target_location, World.robot, self.arm
-            )
-
-    @classmethod
-    def description(
-        cls,
-        object_designator: Union[Iterable[Body], Body],
-        target_location: Union[Iterable[PoseStamped], PoseStamped],
-        arm: Union[Iterable[Arms], Arms],
-    ) -> PartialDesignator[PlaceAction]:
-        return PartialDesignator[PlaceAction](
-            PlaceAction,
-            object_designator=object_designator,
-            target_location=target_location,
-            arm=arm,
+        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        return or_(
+            not_(GripperIsFree(manipulator)),
+            is_body_in_gripper(kwargs["object_designator"], manipulator) > 0.9,
         )
 
-
-PlaceActionDescription = PlaceAction.description
+    @staticmethod
+    def post_condition(
+        variables, context: Context, kwargs: Dict[str, Any]
+    ) -> SymbolicExpression:
+        """
+        the gripper must be free again and the object needs to be at the target location
+        """
+        manipulator = ViewManager.get_end_effector_view(variables["arm"], context.robot)
+        return and_(
+            GripperIsFree(manipulator),
+            is_body_in_gripper(kwargs["object_designator"], manipulator) < 0.1,
+            allclose(
+                kwargs["object_designator"].global_pose,
+                kwargs["target_location"].to_spatial_type(),
+                atol=0.03,
+            ),
+        )

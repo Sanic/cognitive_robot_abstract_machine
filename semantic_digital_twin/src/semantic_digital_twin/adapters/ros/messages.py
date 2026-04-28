@@ -1,7 +1,7 @@
 import uuid
 from abc import ABC
 from dataclasses import dataclass, field
-from functools import lru_cache
+from krrood.utils import memoize
 from uuid import UUID
 
 from typing_extensions import Dict, Any, Self, List
@@ -29,7 +29,7 @@ class MetaData(SubclassJSONSerializer):
     world_id: UUID = field(default_factory=uuid.uuid4)
     """The id of the origin world. This is used to identify messages that were published by the same publisher."""
 
-    @lru_cache(maxsize=None)
+    @memoize
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
@@ -193,5 +193,5 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         if not assign_pairs:
             return
         for i, s in assign_pairs:
-            world.state.data[0, i] = s
+            world.state._data[0, i] = s
         world.notify_state_change()

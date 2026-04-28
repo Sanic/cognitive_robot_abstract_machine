@@ -35,7 +35,10 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     Connection6DoF,
 )
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Sphere,
@@ -43,7 +46,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     Shape,
     Color,
-    FileMesh,
+    Mesh,
 )
 from semantic_digital_twin.world_description.inertial_properties import (
     Inertial,
@@ -85,6 +88,13 @@ class MJCFParser:
         self.tree = ET.fromstring(self.spec.to_xml())
         self.world = World()
 
+    @classmethod
+    def from_xml_string(cls, xml_string: str) -> "MJCFParser":
+        file_path = "/tmp/scene.xml"
+        with open(file_path, "w") as f:
+            f.write(xml_string)
+        return cls(file_path)
+
     def parse(self) -> World:
         """
         Parse the MJCF file and convert it into a World object.
@@ -125,6 +135,7 @@ class MJCFParser:
         collisions = []
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
+            shape.origin.reference_frame = body
             shape.simulator_additional_properties.append(
                 MujocoGeom(
                     solver_impedance=mujoco_geom.solimp.tolist(),
@@ -298,7 +309,7 @@ class MJCFParser:
                 )
                 meshscale = Scale(*mujoco_mesh.scale)
                 if mujoco_material is None:
-                    return FileMesh(
+                    return Mesh(
                         filename=filename,
                         origin=origin_transform,
                         color=color,
@@ -309,7 +320,7 @@ class MJCFParser:
                     mujoco_texture: mujoco.MjsTexture = self.spec.texture(texture_name)
                     if mujoco_texture is None:
                         color = Color(*mujoco_material.rgba)
-                        return FileMesh(
+                        return Mesh(
                             filename=filename,
                             origin=origin_transform,
                             color=color,
@@ -320,7 +331,7 @@ class MJCFParser:
                     )
                     texture_file_path = os.path.join(texturedir, mujoco_texture.file)
                     if os.path.isfile(texture_file_path):
-                        return FileMesh.from_file(
+                        return Mesh.from_file(
                             file_path=filename,
                             origin=origin_transform,
                             color=color,
@@ -328,7 +339,7 @@ class MJCFParser:
                             scale=meshscale,
                         )
                     else:
-                        return FileMesh(
+                        return Mesh(
                             filename=filename,
                             origin=origin_transform,
                             color=color,
@@ -563,6 +574,7 @@ class MJCFParser:
         body = self.world.get_body_by_name(body_name)
         body.simulator_additional_properties.append(
             MujocoCamera(
+                body=body,
                 name=camera_name,
                 mode=mujoco_camera.mode,
                 orthographic=(

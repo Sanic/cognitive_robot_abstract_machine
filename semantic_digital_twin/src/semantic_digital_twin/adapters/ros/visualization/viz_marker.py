@@ -1,9 +1,11 @@
+from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 from uuid import UUID
 
+import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from visualization_msgs.msg import MarkerArray
@@ -11,6 +13,11 @@ from visualization_msgs.msg import MarkerArray
 from semantic_digital_twin.adapters.ros.msg_converter import SemDTToRos2Converter
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....world import World
 
 
 class ShapeSource(Enum):
@@ -64,6 +71,11 @@ class VizMarkerPublisher(ModelChangeCallback):
     Which shapes to use for each body
     """
 
+    alpha: float = field(kw_only=True, default=1.0)
+    """
+    Marker transparency in [0.0, 1.0]. 0.0 is fully transparent.
+    """
+
     markers: MarkerArray = field(init=False, default_factory=MarkerArray)
     """Maker message to be published."""
     qos_profile: QoSProfile = field(
@@ -107,6 +119,8 @@ class VizMarkerPublisher(ModelChangeCallback):
             marker_ns = str(body.name)
             for i, shape in enumerate(shapes):
                 marker = SemDTToRos2Converter.convert(shape)
+                if not marker.mesh_use_embedded_materials:
+                    marker.color.a = self.alpha
                 marker.frame_locked = True
                 marker.id = i
                 marker.ns = marker_ns

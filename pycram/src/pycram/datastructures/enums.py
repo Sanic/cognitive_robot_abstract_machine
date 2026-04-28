@@ -2,8 +2,6 @@
 
 from enum import Enum, auto, IntEnum
 
-from pycram.failures import UnsupportedJointType
-
 
 class AdjacentBodyMethod(Enum):
     ClosestPoints = auto()
@@ -89,7 +87,7 @@ class TaskStatus(int, Enum):
     SUCCEEDED = 2
     FAILED = 3
     INTERRUPTED = 4
-    SLEEPING = 5
+    PAUSE = 5
 
 class JointType(Enum):
     """
@@ -162,9 +160,9 @@ class VerticalAlignment(Grasp, Enum):
      that axis.
     """
 
+    NoAlignment = (AxisIdentifier.Undefined, 0)
     TOP = (AxisIdentifier.Z, -1)
     BOTTOM = (AxisIdentifier.Z, 1)
-    NoAlignment = (AxisIdentifier.Undefined, 0)
 
 
 class GripperType(Enum):

@@ -13,7 +13,7 @@ from typing_extensions import List, Type, Dict
 from typing_extensions import Optional, TextIO
 
 from krrood.ormatic.custom_types import TypeType, PolymorphicEnumType
-from krrood.ormatic.dao import AlternativeMapping
+from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import InheritanceStrategy
@@ -114,6 +114,7 @@ class ORMatic:
         Fill the type mappings of this with needed defaults
         """
         self.type_mappings[Type] = TypeType
+        self.type_mappings[type] = TypeType
         self.type_mappings[Enum] = PolymorphicEnumType
         self.type_mappings[SubclassJSONSerializer] = JSON
         self.type_mappings[uuid.UUID] = sqlalchemy.UUID

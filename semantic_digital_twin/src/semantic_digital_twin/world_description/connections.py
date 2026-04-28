@@ -10,12 +10,25 @@ from typing_extensions import List, TYPE_CHECKING, Union, Optional, Dict, Any, S
 
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
-from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from semantic_digital_twin.world_description.world_entity import Connection, KinematicStructureEntity
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.world_entity import (
+    Connection,
+    KinematicStructureEntity,
+)
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3, Point3, Quaternion
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+    Point3,
+    Quaternion,
+)
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 
 if TYPE_CHECKING:
@@ -45,6 +58,18 @@ class FixedConnection(Connection):
     """
     Has 0 degrees of freedom.
     """
+
+    @classmethod
+    def create_with_dofs(
+        cls,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+        name: Optional[PrefixedName] = None,
+        *args,
+        **kwargs,
+    ) -> Self:
+        return FixedConnection(parent=parent, child=child, name=name, **kwargs)
 
 
 @dataclass(eq=False)
@@ -847,7 +872,7 @@ class OmniDrive(ActiveConnection, HasUpdateState):
 
 
 @dataclass(eq=False)
-class DiffDrive(ActiveConnection, HasUpdateState):
+class DifferentialDrive(ActiveConnection, HasUpdateState):
     """
     A connection describing a differential drive.
     It can rotate around its z-axis and drive in x-direction. It allows movement in the x-y plane.
@@ -1093,7 +1118,7 @@ class DiffDrive(ActiveConnection, HasUpdateState):
         self.x_velocity.has_hardware_interface = value
         self.yaw.has_hardware_interface = value
 
-    def copy_for_world(self, world: World) -> DiffDrive:
+    def copy_for_world(self, world: World) -> DifferentialDrive:
         """
         Copies this DiffDriveConnection for the provided world. This finds the references for the parent and child in
         the new world and returns a new connection with references to the new parent and child.
@@ -1107,7 +1132,7 @@ class DiffDrive(ActiveConnection, HasUpdateState):
             connection_T_child_expression,
         ) = self._find_references_in_world(world)
 
-        return DiffDrive(
+        return DifferentialDrive(
             name=deepcopy(self.name),
             parent=other_parent,
             child=other_child,

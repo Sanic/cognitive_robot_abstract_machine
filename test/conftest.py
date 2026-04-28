@@ -4,8 +4,14 @@ import time
 from copy import deepcopy
 
 import numpy as np
+import objgraph
 import pytest
 
+try:
+    from pycram.datastructures.dataclasses import Context
+except ModuleNotFoundError:
+    # ROS dependencies.
+    Context = None
 from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -18,7 +24,6 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.utils import recursive_subclasses
-from pycram.datastructures.dataclasses import Context  # type: ignore
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -29,13 +34,14 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk, Table, Apple, Orange, Carrot, Lettuce, \
+    Banana
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.utils import rclpy_installed, tracy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
-    DiffDrive,
+    DifferentialDrive,
     FixedConnection,
     Connection6DoF,
     RevoluteConnection,
@@ -44,7 +50,7 @@ from semantic_digital_twin.world_description.geometry import (
     Box,
     Scale,
     Cylinder,
-    Sphere,
+    Sphere, Color,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
@@ -103,22 +109,17 @@ def cleanup_after_test():
     yield
     # runs AFTER each test (even if the test fails or errors)
     SymbolGraph.clear()
+    class_diagram.clear()
 
 
-@pytest.fixture(autouse=True, scope="session")
-def cleanup_ros():
-    """
-    Fixture to ensure that ROS is properly cleaned up after all tests.
-    """
-    if os.environ.get("ROS_VERSION") == "2":
-        import rclpy
-
-        if not rclpy.ok():
-            rclpy.init()
+@pytest.fixture(autouse=True, scope="module")
+def count_worlds():
     yield
-    if os.environ.get("ROS_VERSION") == "2":
-        if rclpy.ok():
-            rclpy.shutdown()
+    world_in_mem = objgraph.count("World")
+    if world_in_mem > 30:
+        raise MemoryError(
+            "Something is leaking worlds, there are more than 20 worlds in memory after the test"
+        )
 
 
 #############################################
@@ -317,7 +318,7 @@ def cylinder_bot_diff_world():
         )
         world.add_connection(env_connection)
 
-        connection = DiffDrive.create_with_dofs(
+        connection = DifferentialDrive.create_with_dofs(
             world=world, parent=body, child=robot_world.root
         )
         world.merge_world(robot_world, connection)
@@ -329,9 +330,10 @@ def cylinder_bot_diff_world():
 def world_with_urdf_factory(
     urdf_path: str,
     robot_semantic_annotation: Type[AbstractRobot] | None,
-    drive_connection_type: Type[OmniDrive | DiffDrive],
+    drive_connection_type: Type[OmniDrive | DifferentialDrive],
     robot_starting_pose: HomogeneousTransformationMatrix | None = None,
     urdf_path_resolver: PathResolver | None = None,
+    robot_localization_pose: HomogeneousTransformationMatrix | None = None,
 ):
     """
     Builds this tree:
@@ -345,6 +347,7 @@ def world_with_urdf_factory(
         robot_semantic_annotation.from_world(world_with_urdf)
 
     with world_with_urdf.modify_world():
+        old_root = world_with_urdf.root
         map = Body(name=PrefixedName("map"))
         localization_body = Body(name=PrefixedName("odom_combined"))
 
@@ -355,13 +358,16 @@ def world_with_urdf_factory(
 
         c_root_bf = drive_connection_type.create_with_dofs(
             parent=localization_body,
-            child=world_with_urdf.root,
+            child=old_root,
             world=world_with_urdf,
         )
         world_with_urdf.add_connection(c_root_bf)
         c_root_bf.has_hardware_interface = True
-        if robot_starting_pose is not None:
-            c_root_bf.origin = robot_starting_pose
+    if robot_localization_pose is not None:
+        map_C_localization.origin = robot_localization_pose
+
+    if robot_starting_pose is not None:
+        c_root_bf.origin = robot_starting_pose
 
     return world_with_urdf
 
@@ -420,13 +426,13 @@ def stretch_world():
         "robots",
     )
     stretch = os.path.join(urdf_dir, "stretch_description.urdf")
-    return world_with_urdf_factory(stretch, Stretch, DiffDrive)
+    return world_with_urdf_factory(stretch, Stretch, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")
 def tiago_world():
     tiago = "package://iai_tiago_description/urdf/tiago_from_our_robot.urdf"
-    return world_with_urdf_factory(tiago, Tiago, DiffDrive)
+    return world_with_urdf_factory(tiago, Tiago, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")
@@ -470,7 +476,7 @@ def apartment_world_setup():
     apartment_world.merge_world_at_pose(
         cereal_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 1.8, 1.05, reference_frame=apartment_world.root
+            2.37, 2.5, 1.05, reference_frame=apartment_world.root
         ),
     )
     milk_view = Milk(
@@ -615,7 +621,6 @@ def pr2_apartment_world(pr2_world_setup, apartment_world_setup):
     """
     pr2_copy = deepcopy(pr2_world_setup)
     PR2.from_world(pr2_copy)  # semantic annotations are lost on copy
-
     apartment_copy = deepcopy(apartment_world_setup)
 
     pr2_copy.merge_world(apartment_copy)
@@ -629,9 +634,8 @@ def pr2_apartment_world(pr2_world_setup, apartment_world_setup):
 def simple_pr2_world_setup(pr2_world_setup, simple_apartment_setup):
     apartment_world = deepcopy(simple_apartment_setup)
     pr2_copy = deepcopy(pr2_world_setup)
-    robot_view = PR2.from_world(pr2_copy)
     pr2_copy.merge_world(apartment_world)
-
+    robot_view = PR2.from_world(pr2_copy)  # semantic annotations are lost on copy
     return pr2_copy, robot_view, Context(pr2_copy, robot_view)
 
 
@@ -677,10 +681,19 @@ def tiago_apartment_world(tiago_world, apartment_world_setup):
 @pytest.fixture
 def pr2_world_state_reset(pr2_world_setup):
     world = deepcopy(pr2_world_setup)
-    PR2.from_world(world)
-    state = world.state.data.copy()
+    PR2.from_world(world)  # semantic annotations are lost on copy
+    state = world.state._data.copy()
     yield world
-    world.state.data[:] = state
+    world.state._data[:] = state
+
+
+@pytest.fixture
+def pr2_apartment_state_reset(pr2_apartment_world):
+    world = deepcopy(pr2_apartment_world)
+    state = deepcopy(world.state._data)
+    PR2.from_world(world)
+    yield world
+    world.state._data = state
 
 
 ###############################
@@ -723,3 +736,118 @@ def rclpy_node():
 
         # Shut down the ROS client library
         rclpy.shutdown()
+
+
+@pytest.fixture(scope="session")
+def kitchen_environment_fixture():
+    world = World()
+    all_elements_connections = []
+    root = Body(name=PrefixedName("root"))
+
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        fruit_table = Table.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("fruit_table"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=0),
+            scale=Scale(2, 2, 1),
+        )
+
+        vegetable_table = Table.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("vegetable_table"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=2),
+            scale=Scale(2, 2, 1),
+        )
+
+        empty_table = Table.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("empty_table"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=4),
+            scale=Scale(2, 2, 1),
+        )
+
+        empty_table2 = Table.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("empty_table2"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=6),
+            scale=Scale(2, 2, 1),
+        )
+
+
+        apple = Apple.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("apple"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=0.55),
+            scale=Scale(0.10, 0.10, 0.10),
+        )
+        for color in apple.bodies[0].visual.shapes:
+            color.color = Color.RED()
+
+        orange = Orange.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("orange"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=0.5, z=0.55),
+            scale=Scale(0.10, 0.10, 0.10),
+        )
+        for color in orange.bodies[0].visual.shapes:
+            color.color = Color.ORANGE()
+
+        banana1 = Banana.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("banana1"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=0.6, z=0.75),
+            scale=Scale(0.10, 0.10, 0.60),
+        )
+        for color in banana1.bodies[0].visual.shapes:
+            color.color = Color.YELLOW()
+
+        carrot = Carrot.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("carrot"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1, z=2.6),
+            scale=Scale(0.05, 0.05, 0.20),
+        )
+        for color in carrot.bodies[0].visual.shapes:
+            color.color = Color.ORANGE()
+
+        lettuce = Lettuce.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("lettuce"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=1.5, z=2.55),
+            scale=Scale(0.15, 0.15, 0.10),
+        )
+        for color in lettuce.bodies[0].visual.shapes:
+            color.color = Color.GREEN()
+
+        banana = Banana.create_with_new_body_in_world(
+            world=world,
+            name=PrefixedName("banana"),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=10, y=10, z=10),
+            scale=Scale(0.20, 0.05, 0.05),
+        )
+        for color in banana.bodies[0].visual.shapes:
+            color.color = Color.YELLOW()
+
+
+    fake_robot = Cylinder(width=0.45, height=1.5)
+    shape_geometry = ShapeCollection([fake_robot])
+    fake_robot_body = Body(
+        name=PrefixedName("base_link_body"),
+        collision=shape_geometry,
+        visual=shape_geometry,
+    )
+
+    root_C_fake_robot = FixedConnection(
+        parent=root,
+        child=fake_robot_body,
+        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(),
+    )
+    all_elements_connections.append(root_C_fake_robot)
+
+
+    with world.modify_world():
+        for conn in all_elements_connections:
+            world.add_connection(conn)
+
+    return world

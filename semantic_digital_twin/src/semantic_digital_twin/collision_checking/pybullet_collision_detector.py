@@ -3,7 +3,7 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
-from functools import lru_cache
+from krrood.utils import memoize, clear_memoization_cache
 from pathlib import Path
 from typing import Dict
 from typing import List, Tuple, Optional
@@ -29,8 +29,6 @@ from semantic_digital_twin.world_description.geometry import (
     Sphere,
     Cylinder,
     Scale,
-    TriangleMesh,
-    FileMesh,
     Mesh,
 )
 from semantic_digital_twin.world_description.world_entity import Body
@@ -132,17 +130,7 @@ def create_shape_from_geometry(geometry: Shape) -> bullet.CollisionShape:
                 diameter=geometry.width, height=geometry.height
             )
 
-        case TriangleMesh():
-            f = tempfile.NamedTemporaryFile(delete=False, suffix=".obj")
-            with open(f.name, "w") as fd:
-                fd.write(trimesh.exchange.obj.export_obj(geometry.mesh))
-            shape = load_convex_mesh_shape(
-                mesh=geometry,
-                single_shape=False,
-                scale=geometry.scale,
-            )
-
-        case FileMesh():
+        case Mesh():
             shape = load_convex_mesh_shape(
                 mesh=geometry,
                 single_shape=False,
@@ -318,12 +306,12 @@ class BulletCollisionDetector(CollisionDetector):
         self.body_to_bullet_object[body] = o
 
     def reset_cache(self):
-        self.collision_matrix_to_bullet_query.cache_clear()
+        clear_memoization_cache(self)
 
     def __hash__(self):
         return hash(id(self))
 
-    @lru_cache(maxsize=100)
+    @memoize
     def collision_matrix_to_bullet_query(
         self, collision_matrix: CollisionMatrix
     ) -> Optional[Dict[Tuple[bullet.CollisionObject, bullet.CollisionObject], float]]:

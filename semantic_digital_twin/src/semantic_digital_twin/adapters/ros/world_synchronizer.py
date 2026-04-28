@@ -1,23 +1,20 @@
 import json
 import os
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
-import threading
 from typing import ClassVar, Optional, Set, Type, List, Dict
 from uuid import UUID
 
 import numpy as np
 import rclpy  # type: ignore
 import std_msgs.msg
-from krrood.ormatic.dao import to_dao
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.ormatic.data_access_objects.helper import to_dao
 from rclpy.node import Node as RosNode
 from rclpy.publisher import Publisher
 from rclpy.subscription import Subscription
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from semantic_digital_twin.adapters.ros.messages import (
     MetaData,
     WorldStateUpdate,
@@ -26,15 +23,22 @@ from semantic_digital_twin.adapters.ros.messages import (
     LoadModel,
     Acknowledgment,
 )
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import WorldEntityWithIDKwargsTracker
-from semantic_digital_twin.callbacks.callback import Callback, StateChangeCallback, ModelChangeCallback
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
+from semantic_digital_twin.callbacks.callback import (
+    Callback,
+    StateChangeCallback,
+    ModelChangeCallback,
+)
 from semantic_digital_twin.exceptions import MissingPublishChangesKWARG
 from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
-    WorldEntityWithClassBasedID,
     WorldEntityWithID,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 @dataclass
@@ -122,23 +126,23 @@ class Synchronizer(WorldEntityWithID):
     """
 
     def __post_init__(self):
-        self.publisher = self.node.create_publisher(
-            std_msgs.msg.String, topic=self.topic_name, qos_profile=10
-        )
         self.subscriber = self.node.create_subscription(
             std_msgs.msg.String,
             topic=self.topic_name,
             callback=self.subscription_callback,
             qos_profile=10,
         )
-        self.acknowledge_publisher = self.node.create_publisher(
-            std_msgs.msg.String, topic=self.acknowledge_topic_name, qos_profile=10
-        )
         self.acknowledge_subscriber = self.node.create_subscription(
             std_msgs.msg.String,
             topic=self.acknowledge_topic_name,
             callback=self.acknowledge_callback,
             qos_profile=10,
+        )
+        self.publisher = self.node.create_publisher(
+            std_msgs.msg.String, topic=self.topic_name, qos_profile=10
+        )
+        self.acknowledge_publisher = self.node.create_publisher(
+            std_msgs.msg.String, topic=self.acknowledge_topic_name, qos_profile=10
         )
 
     @cached_property
@@ -206,6 +210,7 @@ class Synchronizer(WorldEntityWithID):
                 >= self._expected_acknowledgment_count
             ):
                 self._acknowledge_condition_variable.notify_all()
+                return
 
     def _snapshot_subscribers(self) -> int:
         """
@@ -241,7 +246,6 @@ class Synchronizer(WorldEntityWithID):
             with self._acknowledge_condition_variable:
                 self._expected_acknowledgment_count = self._snapshot_subscribers()
                 self._received_acknowledgments = set()
-
                 self.publisher.publish(
                     std_msgs.msg.String(data=json.dumps(to_json(msg)))
                 )
@@ -338,11 +342,12 @@ class SynchronizerOnCallback(Synchronizer, Callback, ABC):
         if not self.missed_messages:
             return
         with self._world.modify_world(publish_changes=False):
-            for msg in self.missed_messages:
+            missed_message_to_be_acknowledged = self.missed_messages
+            self.missed_messages = []
+            for msg in missed_message_to_be_acknowledged:
                 self.apply_message(msg)
+            for msg in missed_message_to_be_acknowledged:
                 self.acknowledge_message(msg)
-
-        self.missed_messages = []
 
 
 @dataclass
@@ -369,9 +374,12 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
         indices = [self._world.state._index[_id] for _id in msg.ids]
 
         if indices:
-            self._world.state.data[0, indices] = np.asarray(msg.states, dtype=float)
-            self.update_previous_world_state()
-            self._world.notify_state_change(publish_changes=False)
+            with self._world._world_lock:
+                self._world.state._data[0, indices] = np.asarray(
+                    msg.states, dtype=float
+                )
+                self.update_previous_world_state()
+                self._world.notify_state_change(publish_changes=False)
 
     def world_callback(self, publish_changes: bool = True, synchronous: bool = False):
         """

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod, ABC
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 from typing_extensions import (
@@ -27,10 +28,13 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     OmniDrive,
     ActiveConnection1DOF,
+    DifferentialDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import BoundingBox
-from semantic_digital_twin.world_description.shape_collection import BoundingBoxCollection
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     RootedSemanticAnnotation,
@@ -559,8 +563,11 @@ class AbstractRobot(Agent, ABC):
     @abstractmethod
     def _setup_collision_rules(self): ...
 
-    @abstractmethod
-    def _setup_velocity_limits(self): ...
+    def _setup_velocity_limits(self):
+        vel_limits = defaultdict(
+            lambda: 1.0,
+        )
+        self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
     @abstractmethod
     def _setup_hardware_interfaces(self): ...
@@ -575,7 +582,7 @@ class AbstractRobot(Agent, ABC):
         """
         try:
             parent_connection = self.root.parent_connection
-            if isinstance(parent_connection, OmniDrive):
+            if isinstance(parent_connection, (OmniDrive, DifferentialDrive)):
                 return parent_connection
         except AttributeError:
             pass
