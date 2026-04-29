@@ -256,7 +256,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         if on_plane_point_count < self.descriptor.parameters.min_on_plane_point_count:
             self.feedback_message = (
                 f"above plane point cloud has not enough "
-                f"points ({self.descriptor.parameters.on_plane_point_count} "
+                f"points ({on_plane_point_count} "
                 f"< {self.descriptor.parameters.min_on_plane_point_count}). Skipping"
             )
             raise Exception(self.feedback_message)
