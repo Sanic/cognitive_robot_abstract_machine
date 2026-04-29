@@ -1,0 +1,67 @@
+from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec, RegionSpec
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.geometry import Scale, Color
+
+
+class WorldDescriptor(BaseWorldDescriptor):
+    """A compact tabletop world for SemDT RayTracer-based camera simulation."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        root = self.world.root
+
+        table_top_height = 0.75
+
+        object_specs = [
+            ObjectSpec(
+                name="table",
+                box_scale=Scale(0.80, 0.50, table_top_height),
+                color=Color(0.65, 0.58, 0.48, 1.0),
+                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-1.10,
+                    y=1.25,
+                    z=table_top_height / 2.0,
+                    reference_frame=root,
+                ),
+            ),
+            ObjectSpec(
+                name="box_red",
+                box_scale=Scale(0.10, 0.08, 0.10),
+                color=Color(0.83, 0.20, 0.20, 1.0),
+                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-1.20,
+                    y=1.20,
+                    z=table_top_height + (0.10 / 2.0),
+                    reference_frame=root,
+                ),
+            ),
+            ObjectSpec(
+                name="box_blue",
+                box_scale=Scale(0.08, 0.08, 0.14),
+                color=Color(0.22, 0.37, 0.82, 1.0),
+                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-1.00,
+                    y=1.32,
+                    z=table_top_height + (0.14 / 2.0),
+                    yaw=0.40,
+                    reference_frame=root,
+                ),
+            ),
+        ]
+
+        region_specs = [
+            RegionSpec(
+                name="table_surface_region",
+                box_scale=Scale(0.65, 0.35, 0.03),
+                color=Color(0.10, 0.70, 0.30, 0.20),
+                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-1.10,
+                    y=1.25,
+                    z=table_top_height + 0.015,
+                    reference_frame=root,
+                ),
+            )
+        ]
+
+        self.build_objects(root, object_specs)
+        self.build_regions(root, region_specs)
