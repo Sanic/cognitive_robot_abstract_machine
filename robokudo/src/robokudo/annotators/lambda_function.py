@@ -78,4 +78,4 @@ class LambdaFunctionAnnotator(BaseAnnotator):
 
             func(self, *func_args, **func_kwargs)
 
-        return py_trees.common.Status.SUCCESS
+        return Status.SUCCESS
