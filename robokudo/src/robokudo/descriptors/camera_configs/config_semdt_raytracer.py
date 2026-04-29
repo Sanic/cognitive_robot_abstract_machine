@@ -22,16 +22,16 @@ class SemDTRayTracerCameraConfig(BaseCameraConfig):
     world_frame: Optional[str] = None
     """World frame to use as camera pose reference. If None, descriptor root is used."""
 
-    camera_frame: str = "semdt_camera_frame"
-    """Name of the camera body/frame in the SemDT world."""
+    camera_frame: str = "semdt_camera_optical_frame"
+    """Name of the camera optical frame in the SemDT world."""
 
-    camera_x: float = -1.35
-    camera_y: float = 0.2
+    camera_x: float = -1.20
+    camera_y: float = 0.40
     camera_z: float = 1.05
-    camera_roll: float = 0.0
-    camera_pitch: float = -0.2
-    camera_yaw: float = 1.3
-    """Camera pose in the chosen world frame (xyz + rpy)."""
+    camera_roll: float = -2.2689280275926285
+    camera_pitch: float = 0.0
+    camera_yaw: float = -0.2707963267948965
+    """Camera optical-frame pose (x right, y down, z forward) in world frame (xyz + rpy)."""
 
     resolution: int = 512
     """Square output resolution in pixels (width == height)."""

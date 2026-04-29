@@ -37,7 +37,10 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         world = self._load_runtime_world()
         world_frame_body = self._ensure_world_frame(world)
         camera_body = self._ensure_camera_body(world, world_frame_body)
-        cam_to_world = self._set_camera_pose(world, world_frame_body, camera_body)
+        (
+            render_camera_to_world,
+            optical_cam_to_world,
+        ) = self._set_camera_pose(world, world_frame_body, camera_body)
 
         resolution = int(self.camera_config.resolution)
         fov_deg = float(self.camera_config.fov_deg)
@@ -45,16 +48,11 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         max_distance = float(self.camera_config.max_distance)
 
         ray_tracer = world.ray_tracer
-        segmentation = ray_tracer.create_segmentation_mask(
-            cam_to_world,
-            resolution=resolution,
-            min_distance=min_distance,
-            max_distance=max_distance,
-        )
-        depth_m = self._render_depth_map(
+        segmentation, depth_m = self._render_segmentation_and_depth(
             ray_tracer=ray_tracer,
-            cam_to_world=cam_to_world,
+            cam_to_world=render_camera_to_world,
             resolution=resolution,
+            fov_deg=fov_deg,
             min_distance=min_distance,
             max_distance=max_distance,
         )
@@ -62,7 +60,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         color_bgr, object_color_map = self._render_color_image(
             world=world,
             ray_tracer=ray_tracer,
-            cam_to_world=cam_to_world,
+            cam_to_world=render_camera_to_world,
             segmentation=segmentation,
             resolution=resolution,
             fov_deg=fov_deg,
@@ -87,7 +85,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         cas.set(CASViews.OBJECT_IMAGE, segmentation)
         cas.set(CASViews.OBJECT_COLOR_MAP, object_color_map)
 
-        cas.cam_to_world_transform = cam_to_world
+        cas.cam_to_world_transform = optical_cam_to_world
         cas.data_timestamp = timestamp_ns
         ROSCameraInterface.store_legacy_cam_to_world_transform_from_cas(cas)
 
@@ -142,8 +140,10 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
     def _set_camera_pose(
         self, world: World, world_frame_body: Body, camera_body: Body
-    ) -> HomogeneousTransformationMatrix:
-        cam_to_world = HomogeneousTransformationMatrix.from_xyz_rpy(
+    ) -> Tuple[HomogeneousTransformationMatrix, HomogeneousTransformationMatrix]:
+        # Config pose is given in ROS optical-frame convention:
+        # x right, y down, z forward.
+        camera_optical_to_world = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=float(self.camera_config.camera_x),
             y=float(self.camera_config.camera_y),
             z=float(self.camera_config.camera_z),
@@ -153,30 +153,91 @@ class SemDTRayTracerCameraInterface(CameraInterface):
             reference_frame=world_frame_body,
             child_frame=camera_body,
         )
+        # SemDT ray tracer expects a camera_link-like frame:
+        # x forward, y left, z up.
+        camera_link_to_world = HomogeneousTransformationMatrix(
+            data=(
+                camera_optical_to_world.to_np()
+                @ SemDTRayTracerCameraInterface._camera_optical_to_link_np()
+            ),
+            reference_frame=world_frame_body,
+        )
 
         with world.modify_world():
             if camera_body.parent_connection is not None:
-                camera_body.parent_connection.origin = cam_to_world
+                camera_body.parent_connection.origin = camera_optical_to_world
 
-        return cam_to_world
+        return camera_link_to_world, camera_optical_to_world
 
-    def _render_depth_map(
-        self,
+    @staticmethod
+    def _camera_link_to_optical_np() -> np.ndarray:
+        return np.array(
+            [
+                [0.0, 0.0, 1.0, 0.0],
+                [-1.0, 0.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            dtype=np.float64,
+        )
+
+    @staticmethod
+    def _camera_optical_to_link_np() -> np.ndarray:
+        return np.linalg.inv(SemDTRayTracerCameraInterface._camera_link_to_optical_np())
+
+    @staticmethod
+    def _render_segmentation_and_depth(
         ray_tracer,
         cam_to_world: HomogeneousTransformationMatrix,
         resolution: int,
+        fov_deg: float,
         min_distance: float,
         max_distance: float,
-    ) -> np.ndarray:
-        try:
-            return ray_tracer.create_depth_map(
-                cam_to_world,
-                resolution=resolution,
-                min_distance=min_distance,
-                max_distance=max_distance,
-            )
-        except IndexError:
-            return np.zeros((resolution, resolution), dtype=np.float32) - 1.0
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        segmentation = np.zeros((resolution, resolution), dtype=np.int32) - 1
+        depth_m = np.zeros((resolution, resolution), dtype=np.float32) - 1.0
+
+        ray_origins, ray_directions, pixels = ray_tracer.create_camera_rays(
+            cam_to_world, resolution=resolution, fov=fov_deg
+        )
+        target_points = ray_origins + ray_directions * 10.0
+        points, index_ray, bodies = ray_tracer.ray_test(
+            ray_origins,
+            target_points,
+            multiple_hits=True,
+            min_distance=min_distance,
+            max_distance=max_distance,
+        )
+
+        if len(index_ray) == 0:
+            return segmentation, depth_m
+
+        unique_index = np.unique(index_ray, return_index=True)[1]
+        index_ray = index_ray[unique_index]
+        points = points[unique_index]
+        body_indices = np.asarray([body.index for body in bodies], dtype=np.int32)[
+            unique_index
+        ]
+        pixel_ray = pixels[index_ray]
+        segmentation[pixel_ray[:, 0], pixel_ray[:, 1]] = body_indices
+
+        # Trimesh camera looks along -z in its local frame. Convert hit points to
+        # that camera frame and use projective z-depth (not range) for RGB-D.
+        scene_camera_transform = ray_tracer.scene.graph[ray_tracer.scene.camera.name]
+        if isinstance(scene_camera_transform, tuple):
+            scene_camera_transform = scene_camera_transform[0]
+        world_to_camera = np.linalg.inv(np.asarray(scene_camera_transform))
+        points_h = np.concatenate(
+            [points, np.ones((points.shape[0], 1), dtype=points.dtype)], axis=1
+        )
+        points_cam = (world_to_camera @ points_h.T).T
+        z_depth = -points_cam[:, 2]
+        valid_depth = z_depth > 0.0
+        pixel_ray = pixel_ray[valid_depth]
+        z_depth = z_depth[valid_depth]
+        depth_m[pixel_ray[:, 0], pixel_ray[:, 1]] = z_depth.astype(np.float32)
+
+        return segmentation, depth_m
 
     def _render_color_image(
         self,
@@ -282,8 +343,8 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         height = int(resolution)
         fov_rad = np.deg2rad(float(fov_deg))
         focal = (0.5 * width) / np.tan(0.5 * fov_rad)
-        cx = width / 2.0
-        cy = height / 2.0
+        cx = (width - 1.0) / 2.0
+        cy = (height - 1.0) / 2.0
 
         cam_info = CameraInfo()
         cam_info.header.frame_id = frame_id

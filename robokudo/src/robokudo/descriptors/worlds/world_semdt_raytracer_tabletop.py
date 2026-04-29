@@ -10,17 +10,18 @@ class WorldDescriptor(BaseWorldDescriptor):
         super().__init__()
         root = self.world.root
 
-        table_top_height = 0.75
+        table_top_z = 0.78
+        table_thickness = 0.06
 
         object_specs = [
             ObjectSpec(
                 name="table",
-                box_scale=Scale(0.80, 0.50, table_top_height),
+                box_scale=Scale(1.20, 0.80, table_thickness),
                 color=Color(0.65, 0.58, 0.48, 1.0),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.10,
                     y=1.25,
-                    z=table_top_height / 2.0,
+                    z=table_top_z - (table_thickness / 2.0),
                     reference_frame=root,
                 ),
             ),
@@ -31,7 +32,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.20,
                     y=1.20,
-                    z=table_top_height + (0.10 / 2.0),
+                    z=table_top_z + (0.10 / 2.0),
                     reference_frame=root,
                 ),
             ),
@@ -42,7 +43,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.00,
                     y=1.32,
-                    z=table_top_height + (0.14 / 2.0),
+                    z=table_top_z + (0.14 / 2.0),
                     yaw=0.40,
                     reference_frame=root,
                 ),
@@ -52,12 +53,12 @@ class WorldDescriptor(BaseWorldDescriptor):
         region_specs = [
             RegionSpec(
                 name="table_surface_region",
-                box_scale=Scale(0.65, 0.35, 0.03),
+                box_scale=Scale(1.00, 0.60, 0.03),
                 color=Color(0.10, 0.70, 0.30, 0.20),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.10,
                     y=1.25,
-                    z=table_top_height + 0.015,
+                    z=table_top_z + 0.015,
                     reference_frame=root,
                 ),
             )
