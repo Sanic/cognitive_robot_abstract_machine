@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.spatial_types.spatial_types import (
         HomogeneousTransformationMatrix,
     )
+    from semantic_digital_twin.world import World
 
 
 class CASViews:
@@ -105,6 +106,14 @@ class CASViews:
 
     OBJECT_COLOR_MAP: str = "object_color_map"
     """Object color mapping data which assigns objects visible in OBJECT_IMAGE to entity names."""
+
+    GROUND_TRUTH_WORLD_REF: str = "ground_truth_world_ref"
+    """Read-only reference to the SemDT ground-truth world used for this CAS frame.
+
+    This view is intended for in-process consumers only and should be written
+    by producers via `CAS.set_ref(...)` to avoid deep-copying the world object.
+    Consumers must treat this object as strictly read-only.
+    """
 
 
 @dataclass
@@ -239,6 +248,14 @@ class CAS:
     @cas_id.setter
     def cas_id(self, value: int) -> None:
         self.views[CASViews.CAS_ID] = value
+
+    @property
+    def ground_truth_world_ref(self) -> Optional["World"]:
+        return self.views.get(CASViews.GROUND_TRUTH_WORLD_REF)
+
+    @ground_truth_world_ref.setter
+    def ground_truth_world_ref(self, value: "World") -> None:
+        self.views[CASViews.GROUND_TRUTH_WORLD_REF] = value
 
     def get(self, view_name: str) -> Any:
         """Get a view by name.
