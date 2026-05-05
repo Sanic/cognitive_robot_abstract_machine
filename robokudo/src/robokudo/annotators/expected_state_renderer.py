@@ -38,6 +38,7 @@ class RefinementResult:
     pixel_error: float
     iterations: int
     converged: bool
+    stop_reason: str
     score_history: list[float]
     center_history_world: list[list[float]]
     pixel_error_history: list[float]
@@ -50,25 +51,45 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         class Parameters:
             def __init__(self) -> None:
                 """Define tunable parameters for expected-object rendering and matching."""
+                #: Classification label used to select the detected object hypothesis.
                 self.target_classname: str = "box_blue"
+                #: Name assigned to the expected object in the synthesized world model.
                 self.expected_object_name: str = "expected_blue_box"
+                #: Expected object size along x in meters.
                 self.scale_x: float = 0.08
+                #: Expected object size along y in meters.
                 self.scale_y: float = 0.08
+                #: Expected object size along z in meters.
                 self.scale_z: float = 0.14
+                #: Expected object color red channel in [0, 1].
                 self.color_r: float = 0.22
+                #: Expected object color green channel in [0, 1].
                 self.color_g: float = 0.37
+                #: Expected object color blue channel in [0, 1].
                 self.color_b: float = 0.82
+                #: Minimum accepted object depth from camera in meters.
                 self.min_distance: float = 0.05
+                #: Maximum accepted object depth from camera in meters.
                 self.max_distance: float = 8.0
+                #: PoseAnnotation source name used to read initial target pose.
                 self.pose_annotation_source: str = "ClusterPoseBBAnnotator"
-                self.contour_thickness: int = 2
+                #: Pixel thickness for drawing expected/detected outlines.
+                self.contour_thickness: int = 1
+                #: Max random translation magnitude applied to initialize refinement (m).
                 self.random_offset_translation_m: float = 0.12
+                #: Upper bound on optimization iterations per update.
                 self.refinement_max_iterations: int = 10
+                #: Finite-difference perturbation size for Jacobian estimation (m).
                 self.refinement_jacobian_delta_m: float = 0.01
+                #: Maximum translation step applied per refinement iteration (m).
                 self.refinement_max_step_m: float = 0.03
+                #: Convergence threshold for centroid error in pixels.
                 self.refinement_convergence_pixel_error: float = 2.0
+                #: Convergence threshold for score change between iterations.
                 self.refinement_convergence_score_delta: float = 0.001
+                #: Enable writing visualization and mask images for each run.
                 self.save_run_images: bool = True
+                #: Directory where run and per-iteration images are written.
                 self.run_image_output_dir: str = "/tmp"
 
         parameters = Parameters()
@@ -203,6 +224,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         visualization_bgr: np.ndarray,
         expected_mask: np.ndarray,
         detected_mask: np.ndarray,
+        file_suffix: str = "",
     ) -> None:
         """Persist this run's visualization and masks under /tmp."""
         if not bool(self.descriptor.parameters.save_run_images):
@@ -210,10 +232,11 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         output_dir = Path(str(self.descriptor.parameters.run_image_output_dir))
         output_dir.mkdir(parents=True, exist_ok=True)
         run_id = self._create_run_id()
+        suffix = str(file_suffix)
 
-        vis_path = output_dir / f"{run_id}_vis.png"
-        expected_path = output_dir / f"{run_id}_expected_mask.png"
-        detected_path = output_dir / f"{run_id}_detected_mask.png"
+        vis_path = output_dir / f"{run_id}{suffix}_vis.png"
+        expected_path = output_dir / f"{run_id}{suffix}_expected_mask.png"
+        detected_path = output_dir / f"{run_id}{suffix}_detected_mask.png"
         cv2.imwrite(str(vis_path), visualization_bgr)
         cv2.imwrite(str(expected_path), expected_mask)
         cv2.imwrite(str(detected_path), detected_mask)
@@ -272,6 +295,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         score_history: list[float] = []
         center_history_world: list[list[float]] = []
         pixel_error_history: list[float] = []
+        stop_reason = "max_iterations_reached"
 
         for iteration in range(max_iterations):
             executed_iterations = iteration + 1
@@ -298,6 +322,43 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 outline_match=outline_match,
                 pixel_error=pixel_error,
             )
+            iteration_vis = self._draw_outlines(
+                render_bgr.copy(), expected_mask, detected_mask
+            )
+            cv2.putText(
+                iteration_vis,
+                (
+                    f"iter {iteration + 1}/{max_iterations} | "
+                    f"outline_match {outline_match.combined_score:.3f} | "
+                    f"px_err {pixel_error:.2f}"
+                ),
+                (10, 24),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.52,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                iteration_vis,
+                (
+                    f"iou {outline_match.outline_iou:.3f} | "
+                    f"dice {outline_match.outline_dice:.3f} | "
+                    f"shape_dist {outline_match.shape_distance:.2f}"
+                ),
+                (10, 44),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.50,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+            self._save_run_images(
+                visualization_bgr=iteration_vis,
+                expected_mask=expected_mask,
+                detected_mask=detected_mask,
+                file_suffix=f"_iter_{iteration + 1:02d}",
+            )
 
             current_result = RefinementResult(
                 center_world=current_center.copy(),
@@ -307,6 +368,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 pixel_error=pixel_error,
                 iterations=iteration + 1,
                 converged=False,
+                stop_reason="in_progress",
                 score_history=list(score_history),
                 center_history_world=[list(xyz) for xyz in center_history_world],
                 pixel_error_history=list(pixel_error_history),
@@ -326,6 +388,10 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             previous_score = outline_match.combined_score
             if pixel_error <= convergence_pixel_error:
                 current_result.converged = True
+                current_result.stop_reason = (
+                    "pixel_error_converged "
+                    f"(px_err={pixel_error:.2f} <= {convergence_pixel_error:.2f})"
+                )
                 current_result.score_history = list(score_history)
                 current_result.center_history_world = [
                     list(xyz) for xyz in center_history_world
@@ -335,6 +401,10 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             if score_delta <= convergence_score_delta and iteration > 0:
                 if best_result is not None:
                     best_result.converged = True
+                    best_result.stop_reason = (
+                        "score_delta_converged "
+                        f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f})"
+                    )
                     best_result.iterations = executed_iterations
                     best_result.score_history = list(score_history)
                     best_result.center_history_world = [
@@ -343,6 +413,10 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                     best_result.pixel_error_history = list(pixel_error_history)
                     return best_result
                 current_result.converged = True
+                current_result.stop_reason = (
+                    "score_delta_converged "
+                    f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f})"
+                )
                 current_result.score_history = list(score_history)
                 current_result.center_history_world = [
                     list(xyz) for xyz in center_history_world
@@ -351,6 +425,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 return current_result
 
             if centroid_shift_px is None:
+                stop_reason = "centroid_shift_unavailable"
                 break
 
             shift_world = self._estimate_translation_shift_world(
@@ -361,8 +436,10 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 cam_to_world_optical=cam_to_world_optical,
             )
             if shift_world is None:
+                stop_reason = "shift_estimation_failed"
                 break
             if np.linalg.norm(shift_world) < 1e-6:
+                stop_reason = "step_too_small"
                 break
             current_center = current_center + shift_world
 
@@ -381,12 +458,14 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 pixel_error=float("inf"),
                 iterations=executed_iterations,
                 converged=False,
+                stop_reason=stop_reason,
                 score_history=list(score_history),
                 center_history_world=[list(xyz) for xyz in center_history_world],
                 pixel_error_history=list(pixel_error_history),
             )
         else:
             best_result.iterations = executed_iterations
+            best_result.stop_reason = stop_reason
             best_result.score_history = list(score_history)
             best_result.center_history_world = [
                 list(xyz) for xyz in center_history_world
@@ -435,7 +514,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             (
                 "ExpectedState refinement summary: "
                 "initial=[%.4f, %.4f, %.4f], final=[%.4f, %.4f, %.4f], "
-                "score=%.4f->%.4f, iterations=%d, converged=%s, final_px_err=%.2f"
+                "score=%.4f->%.4f, iterations=%d, converged=%s, final_px_err=%.2f, stop=%s"
             ),
             float(initial_center_world[0]),
             float(initial_center_world[1]),
@@ -448,6 +527,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             int(refinement.iterations),
             bool(refinement.converged),
             float(refinement.pixel_error),
+            str(refinement.stop_reason),
         )
 
     def _render_expected_mask_for_center(
