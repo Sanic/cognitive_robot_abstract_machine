@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import time
 
@@ -15,9 +16,13 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Classification, Encoding, PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
+from robokudo.utils.semdt_ground_truth import (
+    get_ground_truth_world_ref,
+    get_gt_pose_from_runtime_world,
+)
 from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.geometry import Scale, Color
+from semantic_digital_twin.world_description.geometry import Box, Cylinder, Scale, Color
 
 
 @dataclass
@@ -44,6 +49,26 @@ class RefinementResult:
     pixel_error_history: list[float]
 
 
+@dataclass
+class GroundTruthPoseEvaluation:
+    body_name: str
+    gt_center_world: np.ndarray
+    initial_translation_error_m: float
+    final_translation_error_m: float
+    translation_error_history_m: list[float]
+
+
+@dataclass
+class GroundTruthObjectModel:
+    body_name: str
+    shape_type: str
+    box_scale: Scale | None
+    cylinder_width: float | None
+    cylinder_height: float | None
+    color: Color
+    rotation_world: np.ndarray
+
+
 class ExpectedStateRendererAnnotator(BaseAnnotator):
     """Render a stubbed expected world state containing only one known object."""
 
@@ -55,18 +80,6 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 self.target_classname: str = "box_blue"
                 #: Name assigned to the expected object in the synthesized world model.
                 self.expected_object_name: str = "expected_blue_box"
-                #: Expected object size along x in meters.
-                self.scale_x: float = 0.08
-                #: Expected object size along y in meters.
-                self.scale_y: float = 0.08
-                #: Expected object size along z in meters.
-                self.scale_z: float = 0.14
-                #: Expected object color red channel in [0, 1].
-                self.color_r: float = 0.22
-                #: Expected object color green channel in [0, 1].
-                self.color_g: float = 0.37
-                #: Expected object color blue channel in [0, 1].
-                self.color_b: float = 0.82
                 #: Minimum accepted object depth from camera in meters.
                 self.min_distance: float = 0.05
                 #: Maximum accepted object depth from camera in meters.
@@ -87,10 +100,26 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 self.refinement_convergence_pixel_error: float = 2.0
                 #: Convergence threshold for score change between iterations.
                 self.refinement_convergence_score_delta: float = 0.001
+                #: Require px_err to be below this value before score-delta stop can trigger.
+                self.refinement_score_delta_pixel_error_gate: float = 5.0
+                #: Stop when px_err shows no meaningful improvement for this many iterations.
+                self.refinement_pixel_error_patience_iterations: int = 3
+                #: Minimum px_err decrease counted as meaningful improvement for patience.
+                self.refinement_pixel_error_patience_min_delta: float = 0.25
+                #: GT body name used as expected object model and quality reference.
+                self.ground_truth_body_name: str = "box_blue"
+                #: Fixed RNG seed for deterministic random initialization (-1 disables).
+                self.random_seed: int = -1
                 #: Enable writing visualization and mask images for each run.
                 self.save_run_images: bool = True
                 #: Directory where run and per-iteration images are written.
                 self.run_image_output_dir: str = "/tmp"
+                #: Target threshold for translation error metrics (meters).
+                self.translation_error_goal_m: float = 0.02
+                #: Enable appending one JSON log line per update for tuning.
+                self.save_tuning_log_jsonl: bool = True
+                #: JSONL file path used to store run-level tuning records.
+                self.tuning_log_jsonl_path: str = "/tmp/expected_state_tuning_log.jsonl"
 
         parameters = Parameters()
 
@@ -118,6 +147,18 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             self.get_annotator_output_struct().set_image(blank)
             return Status.SUCCESS
 
+        gt_object_model = self._resolve_ground_truth_object_model()
+        if gt_object_model is None:
+            self.feedback_message = (
+                "No usable GT object model. Set 'ground_truth_body_name' and ensure CAS "
+                "contains a valid GROUND_TRUTH_WORLD_REF."
+            )
+            blank = np.zeros(
+                (int(cam_info.height), int(cam_info.width), 3), dtype=np.uint8
+            )
+            self.get_annotator_output_struct().set_image(blank)
+            return Status.FAILURE
+
         target_center_world = self._target_center_world_from_pose_annotation(
             object_hypothesis=target_oh,
             cam_to_world_optical=cam_to_world_optical,
@@ -141,8 +182,13 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         refinement = self._refine_expected_pose_translation(
             initial_center_world=initial_center_world,
             detected_mask=detected_mask,
+            gt_object_model=gt_object_model,
             cam_info=cam_info,
             cam_to_world_optical=cam_to_world_optical,
+        )
+        gt_evaluation = self._evaluate_refinement_against_ground_truth(
+            initial_center_world=initial_center_world,
+            refinement=refinement,
         )
 
         self._store_outline_match_annotation(
@@ -156,6 +202,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             score_history=refinement.score_history,
             center_history_world=refinement.center_history_world,
             pixel_error_history=refinement.pixel_error_history,
+            gt_evaluation=gt_evaluation,
         )
         outline_match = refinement.outline_match
         render_bgr = refinement.render_bgr
@@ -175,6 +222,13 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         self._log_refinement_summary(
             initial_center_world=initial_center_world,
             refinement=refinement,
+            gt_evaluation=gt_evaluation,
+        )
+        self._log_tuning_snapshot(
+            initial_center_world=initial_center_world,
+            target_center_world=target_center_world,
+            refinement=refinement,
+            gt_evaluation=gt_evaluation,
         )
 
         cv2.putText(
@@ -203,6 +257,20 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             1,
             cv2.LINE_AA,
         )
+        if gt_evaluation is not None:
+            cv2.putText(
+                render_bgr,
+                (
+                    f"gt_err_m {gt_evaluation.initial_translation_error_m:.4f}"
+                    f"->{gt_evaluation.final_translation_error_m:.4f}"
+                ),
+                (10, 68),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.48,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
         self._save_run_images(
             visualization_bgr=render_bgr,
             expected_mask=expected_mask,
@@ -217,6 +285,18 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             f"init_xyz={[round(float(v), 3) for v in initial_center_world]}, "
             f"final_xyz={[round(float(v), 3) for v in refinement.center_world]})."
         )
+        if gt_evaluation is not None:
+            goal_m = max(
+                float(self.descriptor.parameters.translation_error_goal_m), 0.0
+            )
+            self.feedback_message += (
+                f" GT '{gt_evaluation.body_name}' err_m "
+                f"{gt_evaluation.initial_translation_error_m:.4f}"
+                f"->{gt_evaluation.final_translation_error_m:.4f}, "
+                f"goal={goal_m:.4f}, "
+                f"init_ok={gt_evaluation.initial_translation_error_m <= goal_m}, "
+                f"final_ok={gt_evaluation.final_translation_error_m <= goal_m}."
+            )
         return Status.SUCCESS
 
     def _save_run_images(
@@ -260,20 +340,167 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         magnitude = float(self.descriptor.parameters.random_offset_translation_m)
         if magnitude <= 0.0:
             return center_world.copy()
-        random_direction = np.random.normal(size=3).astype(np.float64)
+        random_seed = int(self.descriptor.parameters.random_seed)
+        if random_seed >= 0:
+            rng = np.random.default_rng(random_seed)
+        else:
+            rng = np.random.default_rng()
+        random_direction = rng.normal(size=3).astype(np.float64)
         direction_norm = float(np.linalg.norm(random_direction))
         if direction_norm < 1e-9:
             random_direction = np.array([1.0, 0.0, 0.0], dtype=np.float64)
             direction_norm = 1.0
         random_direction /= direction_norm
-        random_radius = float(np.random.uniform(0.0, magnitude))
+        random_radius = float(rng.uniform(0.0, magnitude))
         offset = random_direction * random_radius
         return center_world + offset
+
+    def _evaluate_refinement_against_ground_truth(
+        self, initial_center_world: np.ndarray, refinement: RefinementResult
+    ) -> GroundTruthPoseEvaluation | None:
+        """Evaluate initial/final refinement translation error against GT world pose."""
+        body_name = str(self.descriptor.parameters.ground_truth_body_name).strip()
+        if body_name == "":
+            return None
+        pose_world = get_gt_pose_from_runtime_world(self.get_cas(), body_name)
+        if pose_world is None:
+            self.rk_logger.warning(
+                "ExpectedState GT body '%s' not available in CAS ground-truth world.",
+                body_name,
+            )
+            return None
+        gt_center_world = np.asarray(pose_world[:3, 3], dtype=np.float64)
+        initial_error = float(np.linalg.norm(initial_center_world - gt_center_world))
+        final_error = float(np.linalg.norm(refinement.center_world - gt_center_world))
+        error_history = [
+            float(
+                np.linalg.norm(np.asarray(center, dtype=np.float64) - gt_center_world)
+            )
+            for center in refinement.center_history_world
+        ]
+        return GroundTruthPoseEvaluation(
+            body_name=body_name,
+            gt_center_world=gt_center_world,
+            initial_translation_error_m=initial_error,
+            final_translation_error_m=final_error,
+            translation_error_history_m=error_history,
+        )
+
+    def _resolve_ground_truth_object_model(self) -> GroundTruthObjectModel | None:
+        """Read expected object box scale/color/orientation from GT world."""
+        body_name = str(self.descriptor.parameters.ground_truth_body_name).strip()
+        if body_name == "":
+            self.rk_logger.warning(
+                "ExpectedState ground_truth_body_name is empty; GT model is unavailable."
+            )
+            return None
+        world = get_ground_truth_world_ref(self.get_cas())
+        if world is None:
+            self.rk_logger.warning(
+                "ExpectedState CAS has no GROUND_TRUTH_WORLD_REF; GT model unavailable."
+            )
+            return None
+        bodies = world.get_bodies_by_name(body_name)
+        if len(bodies) == 0:
+            self.rk_logger.warning(
+                "ExpectedState GT body '%s' not found in ground-truth world.",
+                body_name,
+            )
+            return None
+        body = bodies[0]
+        if len(body.collision) == 0:
+            self.rk_logger.warning(
+                "ExpectedState GT body '%s' has no collision geometry.",
+                body_name,
+            )
+            return None
+
+        pose_world = np.asarray(body.global_pose.to_np(), dtype=np.float64)
+        if pose_world.shape != (4, 4) or not np.all(np.isfinite(pose_world)):
+            self.rk_logger.warning(
+                "ExpectedState GT body '%s' has invalid global pose.",
+                body_name,
+            )
+            return None
+        rotation_world = pose_world[:3, :3]
+        if not np.all(np.isfinite(rotation_world)):
+            self.rk_logger.warning(
+                "ExpectedState GT body '%s' has invalid pose rotation.",
+                body_name,
+            )
+            return None
+
+        shape = body.collision[0]
+        shape_type: str
+        box_scale: Scale | None = None
+        cylinder_width: float | None = None
+        cylinder_height: float | None = None
+        if isinstance(shape, Box):
+            shape_type = "box"
+            box_scale = shape.scale
+            if (
+                box_scale is None
+                or box_scale.x <= 0.0
+                or box_scale.y <= 0.0
+                or box_scale.z <= 0.0
+                or not np.all(np.isfinite([box_scale.x, box_scale.y, box_scale.z]))
+            ):
+                self.rk_logger.warning(
+                    "ExpectedState GT body '%s' has invalid box scale.",
+                    body_name,
+                )
+                return None
+        elif isinstance(shape, Cylinder):
+            shape_type = "cylinder"
+            cylinder_width = float(shape.width)
+            cylinder_height = float(shape.height)
+            if (
+                cylinder_width <= 0.0
+                or cylinder_height <= 0.0
+                or not np.all(np.isfinite([cylinder_width, cylinder_height]))
+            ):
+                self.rk_logger.warning(
+                    "ExpectedState GT body '%s' has invalid cylinder dimensions.",
+                    body_name,
+                )
+                return None
+        else:
+            self.rk_logger.warning(
+                "ExpectedState GT body '%s' has unsupported shape type '%s'.",
+                body_name,
+                type(shape).__name__,
+            )
+            return None
+        shape_color = shape.color
+
+        return GroundTruthObjectModel(
+            body_name=body_name,
+            shape_type=shape_type,
+            box_scale=(
+                Scale(float(box_scale.x), float(box_scale.y), float(box_scale.z))
+                if box_scale is not None
+                else None
+            ),
+            cylinder_width=(
+                float(cylinder_width) if cylinder_width is not None else None
+            ),
+            cylinder_height=(
+                float(cylinder_height) if cylinder_height is not None else None
+            ),
+            color=Color(
+                float(shape_color.R),
+                float(shape_color.G),
+                float(shape_color.B),
+                float(shape_color.A),
+            ),
+            rotation_world=rotation_world.copy(),
+        )
 
     def _refine_expected_pose_translation(
         self,
         initial_center_world: np.ndarray,
         detected_mask: np.ndarray,
+        gt_object_model: GroundTruthObjectModel,
         cam_info: CameraInfo,
         cam_to_world_optical: np.ndarray,
     ) -> RefinementResult:
@@ -287,6 +514,17 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         convergence_score_delta = float(
             self.descriptor.parameters.refinement_convergence_score_delta
         )
+        score_delta_pixel_error_gate = float(
+            self.descriptor.parameters.refinement_score_delta_pixel_error_gate
+        )
+        pixel_error_patience_iterations = max(
+            int(self.descriptor.parameters.refinement_pixel_error_patience_iterations),
+            0,
+        )
+        pixel_error_patience_min_delta = max(
+            float(self.descriptor.parameters.refinement_pixel_error_patience_min_delta),
+            0.0,
+        )
 
         current_center = initial_center_world.astype(np.float64).copy()
         previous_score = None
@@ -296,11 +534,14 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         center_history_world: list[list[float]] = []
         pixel_error_history: list[float] = []
         stop_reason = "max_iterations_reached"
+        best_pixel_error = float("inf")
+        last_pixel_error_improvement_iteration = 0
 
         for iteration in range(max_iterations):
             executed_iterations = iteration + 1
             render_bgr, expected_mask = self._render_expected_mask_for_center(
                 object_center_world=current_center,
+                gt_object_model=gt_object_model,
                 cam_info=cam_info,
                 cam_to_world_optical=cam_to_world_optical,
             )
@@ -374,9 +615,32 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 pixel_error_history=list(pixel_error_history),
             )
             if (
+                np.isfinite(pixel_error)
+                and pixel_error + pixel_error_patience_min_delta < best_pixel_error
+            ):
+                best_pixel_error = pixel_error
+                last_pixel_error_improvement_iteration = executed_iterations
+            if (
                 best_result is None
-                or current_result.outline_match.combined_score
-                > best_result.outline_match.combined_score
+                or (
+                    np.isfinite(current_result.pixel_error)
+                    and not np.isfinite(best_result.pixel_error)
+                )
+                or (
+                    np.isfinite(current_result.pixel_error)
+                    and np.isfinite(best_result.pixel_error)
+                    and current_result.pixel_error < best_result.pixel_error - 1e-3
+                )
+                or (
+                    (
+                        not np.isfinite(current_result.pixel_error)
+                        or not np.isfinite(best_result.pixel_error)
+                        or abs(current_result.pixel_error - best_result.pixel_error)
+                        <= 1e-3
+                    )
+                    and current_result.outline_match.combined_score
+                    > best_result.outline_match.combined_score
+                )
             ):
                 best_result = current_result
 
@@ -398,12 +662,17 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 ]
                 current_result.pixel_error_history = list(pixel_error_history)
                 return current_result
-            if score_delta <= convergence_score_delta and iteration > 0:
+            if (
+                score_delta <= convergence_score_delta
+                and iteration > 0
+                and pixel_error <= score_delta_pixel_error_gate
+            ):
                 if best_result is not None:
                     best_result.converged = True
                     best_result.stop_reason = (
                         "score_delta_converged "
-                        f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f})"
+                        f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f}, "
+                        f"px_err={pixel_error:.2f} <= {score_delta_pixel_error_gate:.2f})"
                     )
                     best_result.iterations = executed_iterations
                     best_result.score_history = list(score_history)
@@ -415,7 +684,8 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 current_result.converged = True
                 current_result.stop_reason = (
                     "score_delta_converged "
-                    f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f})"
+                    f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f}, "
+                    f"px_err={pixel_error:.2f} <= {score_delta_pixel_error_gate:.2f})"
                 )
                 current_result.score_history = list(score_history)
                 current_result.center_history_world = [
@@ -423,6 +693,18 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 ]
                 current_result.pixel_error_history = list(pixel_error_history)
                 return current_result
+            if (
+                pixel_error_patience_iterations > 0
+                and executed_iterations - last_pixel_error_improvement_iteration
+                >= pixel_error_patience_iterations
+                and pixel_error > convergence_pixel_error
+            ):
+                stop_reason = (
+                    "pixel_error_plateau "
+                    f"(no improvement >= {pixel_error_patience_min_delta:.2f}px for "
+                    f"{pixel_error_patience_iterations} iterations)"
+                )
+                break
 
             if centroid_shift_px is None:
                 stop_reason = "centroid_shift_unavailable"
@@ -432,6 +714,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 current_center_world=current_center,
                 expected_mask=expected_mask,
                 detected_mask=detected_mask,
+                gt_object_model=gt_object_model,
                 cam_info=cam_info,
                 cam_to_world_optical=cam_to_world_optical,
             )
@@ -446,6 +729,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         if best_result is None:
             render_bgr, expected_mask = self._render_expected_mask_for_center(
                 object_center_world=current_center,
+                gt_object_model=gt_object_model,
                 cam_info=cam_info,
                 cam_to_world_optical=cam_to_world_optical,
             )
@@ -497,7 +781,10 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         )
 
     def _log_refinement_summary(
-        self, initial_center_world: np.ndarray, refinement: RefinementResult
+        self,
+        initial_center_world: np.ndarray,
+        refinement: RefinementResult,
+        gt_evaluation: GroundTruthPoseEvaluation | None = None,
     ) -> None:
         """Emit final refinement summary with initial/final poses and score progression."""
         score_start = (
@@ -529,15 +816,169 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             float(refinement.pixel_error),
             str(refinement.stop_reason),
         )
+        if gt_evaluation is not None:
+            self.rk_logger.info(
+                (
+                    "ExpectedState GT eval (%s): gt=[%.4f, %.4f, %.4f], "
+                    "err_m=%.4f->%.4f"
+                ),
+                gt_evaluation.body_name,
+                float(gt_evaluation.gt_center_world[0]),
+                float(gt_evaluation.gt_center_world[1]),
+                float(gt_evaluation.gt_center_world[2]),
+                float(gt_evaluation.initial_translation_error_m),
+                float(gt_evaluation.final_translation_error_m),
+            )
+
+    def _log_tuning_snapshot(
+        self,
+        initial_center_world: np.ndarray,
+        target_center_world: np.ndarray,
+        refinement: RefinementResult,
+        gt_evaluation: GroundTruthPoseEvaluation | None,
+    ) -> None:
+        """Emit and persist a structured tuning snapshot for offline parameter search."""
+        goal_m = max(float(self.descriptor.parameters.translation_error_goal_m), 0.0)
+        run_id = self._create_run_id()
+        score_start = (
+            float(refinement.score_history[0])
+            if len(refinement.score_history) > 0
+            else float(refinement.outline_match.combined_score)
+        )
+        score_final = (
+            float(refinement.score_history[-1])
+            if len(refinement.score_history) > 0
+            else float(refinement.outline_match.combined_score)
+        )
+
+        record = {
+            "run_id": run_id,
+            "target_classname": str(self.descriptor.parameters.target_classname),
+            "ground_truth_body_name": str(
+                self.descriptor.parameters.ground_truth_body_name
+            ),
+            "random_seed": int(self.descriptor.parameters.random_seed),
+            "random_offset_translation_m": float(
+                self.descriptor.parameters.random_offset_translation_m
+            ),
+            "refinement_max_iterations": int(
+                self.descriptor.parameters.refinement_max_iterations
+            ),
+            "refinement_jacobian_delta_m": float(
+                self.descriptor.parameters.refinement_jacobian_delta_m
+            ),
+            "refinement_max_step_m": float(
+                self.descriptor.parameters.refinement_max_step_m
+            ),
+            "refinement_convergence_pixel_error": float(
+                self.descriptor.parameters.refinement_convergence_pixel_error
+            ),
+            "refinement_convergence_score_delta": float(
+                self.descriptor.parameters.refinement_convergence_score_delta
+            ),
+            "refinement_score_delta_pixel_error_gate": float(
+                self.descriptor.parameters.refinement_score_delta_pixel_error_gate
+            ),
+            "refinement_pixel_error_patience_iterations": int(
+                self.descriptor.parameters.refinement_pixel_error_patience_iterations
+            ),
+            "refinement_pixel_error_patience_min_delta": float(
+                self.descriptor.parameters.refinement_pixel_error_patience_min_delta
+            ),
+            "outline_score_start": float(score_start),
+            "outline_score_final": float(score_final),
+            "outline_score_best": float(refinement.outline_match.combined_score),
+            "final_centroid_pixel_error": float(refinement.pixel_error),
+            "refinement_iterations": int(refinement.iterations),
+            "refinement_converged": bool(refinement.converged),
+            "refinement_stop_reason": str(refinement.stop_reason),
+            "initial_center_world_xyz": list(initial_center_world.astype(float)),
+            "pose_annotation_center_world_xyz": list(target_center_world.astype(float)),
+            "refined_center_world_xyz": list(refinement.center_world.astype(float)),
+            "init_offset_from_pose_annotation_m": float(
+                np.linalg.norm(initial_center_world - target_center_world)
+            ),
+            "translation_error_goal_m": float(goal_m),
+        }
+
+        if gt_evaluation is not None:
+            pose_annotation_error = float(
+                np.linalg.norm(target_center_world - gt_evaluation.gt_center_world)
+            )
+            record.update(
+                {
+                    "ground_truth_center_world_xyz": list(
+                        gt_evaluation.gt_center_world.astype(float)
+                    ),
+                    "ground_truth_translation_error_initial_m": float(
+                        gt_evaluation.initial_translation_error_m
+                    ),
+                    "ground_truth_translation_error_final_m": float(
+                        gt_evaluation.final_translation_error_m
+                    ),
+                    "ground_truth_translation_error_pose_annotation_m": pose_annotation_error,
+                    "ground_truth_initial_meets_goal": bool(
+                        gt_evaluation.initial_translation_error_m <= goal_m
+                    ),
+                    "ground_truth_final_meets_goal": bool(
+                        gt_evaluation.final_translation_error_m <= goal_m
+                    ),
+                }
+            )
+            self.rk_logger.info(
+                (
+                    "ExpectedState tuning: run=%s, init_err=%.4fm, final_err=%.4fm, "
+                    "goal=%.4fm, init_ok=%s, final_ok=%s, stop=%s, iters=%d"
+                ),
+                run_id,
+                float(gt_evaluation.initial_translation_error_m),
+                float(gt_evaluation.final_translation_error_m),
+                float(goal_m),
+                bool(gt_evaluation.initial_translation_error_m <= goal_m),
+                bool(gt_evaluation.final_translation_error_m <= goal_m),
+                str(refinement.stop_reason),
+                int(refinement.iterations),
+            )
+            if gt_evaluation.initial_translation_error_m > goal_m:
+                self.rk_logger.warning(
+                    (
+                        "ExpectedState initial translation error above goal: "
+                        "%.4fm > %.4fm (run=%s)"
+                    ),
+                    float(gt_evaluation.initial_translation_error_m),
+                    float(goal_m),
+                    run_id,
+                )
+        else:
+            self.rk_logger.info(
+                "ExpectedState tuning: run=%s, no GT evaluation available.",
+                run_id,
+            )
+
+        self._append_tuning_log_jsonl(record)
+
+    def _append_tuning_log_jsonl(self, record: dict[str, object]) -> None:
+        """Append one JSON object per line for later batch analysis."""
+        if not bool(self.descriptor.parameters.save_tuning_log_jsonl):
+            return
+        log_path = Path(str(self.descriptor.parameters.tuning_log_jsonl_path))
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True))
+            fh.write("\n")
 
     def _render_expected_mask_for_center(
         self,
         object_center_world: np.ndarray,
+        gt_object_model: GroundTruthObjectModel,
         cam_info: CameraInfo,
         cam_to_world_optical: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Render expected-world BGR and binary mask for a concrete object translation."""
-        expected_world = self._build_expected_world(object_center_world)
+        expected_world = self._build_expected_world(
+            object_center_world=object_center_world,
+            gt_object_model=gt_object_model,
+        )
         render_bgr, expected_mask, _ = self._render_expected_world(
             expected_world=expected_world,
             cam_info=cam_info,
@@ -550,6 +991,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         current_center_world: np.ndarray,
         expected_mask: np.ndarray,
         detected_mask: np.ndarray,
+        gt_object_model: GroundTruthObjectModel,
         cam_info: CameraInfo,
         cam_to_world_optical: np.ndarray,
     ) -> np.ndarray | None:
@@ -570,6 +1012,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             perturbed_center[axis] += delta_m
             _, perturbed_mask = self._render_expected_mask_for_center(
                 object_center_world=perturbed_center,
+                gt_object_model=gt_object_model,
                 cam_info=cam_info,
                 cam_to_world_optical=cam_to_world_optical,
             )
@@ -822,6 +1265,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         score_history: list[float],
         center_history_world: list[list[float]],
         pixel_error_history: list[float],
+        gt_evaluation: GroundTruthPoseEvaluation | None = None,
     ) -> None:
         """Store outline-match metrics as an Encoding annotation on target object."""
         source = "ExpectedStateRendererOutlineMatch"
@@ -849,6 +1293,30 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             ],
             "refinement_pixel_error_history": [float(x) for x in pixel_error_history],
         }
+        if gt_evaluation is not None:
+            goal_m = max(
+                float(self.descriptor.parameters.translation_error_goal_m), 0.0
+            )
+            annotation.encoding["ground_truth_body_name"] = gt_evaluation.body_name
+            annotation.encoding["ground_truth_center_world_xyz"] = list(
+                gt_evaluation.gt_center_world.astype(float)
+            )
+            annotation.encoding["ground_truth_translation_error_initial_m"] = float(
+                gt_evaluation.initial_translation_error_m
+            )
+            annotation.encoding["ground_truth_translation_error_final_m"] = float(
+                gt_evaluation.final_translation_error_m
+            )
+            annotation.encoding["ground_truth_translation_error_goal_m"] = float(goal_m)
+            annotation.encoding["ground_truth_initial_meets_goal"] = bool(
+                gt_evaluation.initial_translation_error_m <= goal_m
+            )
+            annotation.encoding["ground_truth_final_meets_goal"] = bool(
+                gt_evaluation.final_translation_error_m <= goal_m
+            )
+            annotation.encoding["ground_truth_translation_error_history_m"] = [
+                float(x) for x in gt_evaluation.translation_error_history_m
+            ]
         object_hypothesis.annotations.append(annotation)
 
     def _draw_outlines(
@@ -868,33 +1336,61 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             cv2.drawContours(vis, [detected_contour], -1, (0, 0, 255), thickness)
         return vis
 
-    def _build_expected_world(self, object_center_world: np.ndarray):
+    def _build_expected_world(
+        self,
+        object_center_world: np.ndarray,
+        gt_object_model: GroundTruthObjectModel,
+    ):
         """Create a temporary SemDT world with only the expected object asserted."""
         world_descriptor = BaseWorldDescriptor(
             root_name="expected_world_root",
             root_prefix="world",
         )
         root = world_descriptor.world.root
-        expected_object = ObjectSpec(
-            name=self.descriptor.parameters.expected_object_name,
-            box_scale=Scale(
-                float(self.descriptor.parameters.scale_x),
-                float(self.descriptor.parameters.scale_y),
-                float(self.descriptor.parameters.scale_z),
+        pose_world = np.eye(4, dtype=np.float64)
+        pose_world[:3, :3] = gt_object_model.rotation_world
+        pose_world[:3, 3] = object_center_world.astype(np.float64)
+        expected_object_kwargs = {
+            "name": self.descriptor.parameters.expected_object_name,
+            "color": Color(
+                float(gt_object_model.color.R),
+                float(gt_object_model.color.G),
+                float(gt_object_model.color.B),
+                float(gt_object_model.color.A),
             ),
-            color=Color(
-                float(self.descriptor.parameters.color_r),
-                float(self.descriptor.parameters.color_g),
-                float(self.descriptor.parameters.color_b),
-                1.0,
-            ),
-            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=float(object_center_world[0]),
-                y=float(object_center_world[1]),
-                z=float(object_center_world[2]),
+            "pose": HomogeneousTransformationMatrix(
+                data=pose_world,
                 reference_frame=root,
             ),
-        )
+        }
+        if gt_object_model.shape_type == "box":
+            if gt_object_model.box_scale is None:
+                raise ValueError("GT object model for box requires box_scale.")
+            expected_object = ObjectSpec(
+                box_scale=Scale(
+                    float(gt_object_model.box_scale.x),
+                    float(gt_object_model.box_scale.y),
+                    float(gt_object_model.box_scale.z),
+                ),
+                **expected_object_kwargs,
+            )
+        elif gt_object_model.shape_type == "cylinder":
+            if (
+                gt_object_model.cylinder_width is None
+                or gt_object_model.cylinder_height is None
+            ):
+                raise ValueError(
+                    "GT object model for cylinder requires width and height."
+                )
+            expected_object = ObjectSpec(
+                cylinder_width=float(gt_object_model.cylinder_width),
+                cylinder_height=float(gt_object_model.cylinder_height),
+                **expected_object_kwargs,
+            )
+        else:
+            raise ValueError(
+                f"Unsupported GT object model shape '{gt_object_model.shape_type}'."
+            )
         world_descriptor.build_objects(root, [expected_object])
         return world_descriptor.world
 

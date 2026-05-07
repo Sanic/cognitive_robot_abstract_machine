@@ -108,7 +108,10 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "semdt_raytracer"
 
     def implementation(self) -> Pipeline:
-        raytracer_config = CrDescriptorFactory.create_descriptor("semdt_raytracer")
+        raytracer_config = CrDescriptorFactory.create_descriptor(
+            "semdt_raytracer",
+            world_descriptor_name="world_semdt_raytracer_cylinders",
+        )
         color_classifier_descriptor = LambdaFunctionAnnotator.Descriptor()
         color_classifier_descriptor.parameters.func = classify_boxes_by_color
 
