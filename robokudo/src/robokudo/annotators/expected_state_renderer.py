@@ -91,21 +91,23 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 #: Max random translation magnitude applied to initialize refinement (m).
                 self.random_offset_translation_m: float = 0.12
                 #: Upper bound on optimization iterations per update.
-                self.refinement_max_iterations: int = 10
+                self.refinement_max_iterations: int = 25
                 #: Finite-difference perturbation size for Jacobian estimation (m).
-                self.refinement_jacobian_delta_m: float = 0.01
+                self.refinement_jacobian_delta_m: float = 0.005
                 #: Maximum translation step applied per refinement iteration (m).
-                self.refinement_max_step_m: float = 0.03
+                self.refinement_max_step_m: float = 0.05
+                #: Minimum iterations before any convergence criterion can terminate.
+                self.refinement_min_iterations_before_convergence: int = 3
                 #: Convergence threshold for centroid error in pixels.
-                self.refinement_convergence_pixel_error: float = 2.0
+                self.refinement_convergence_pixel_error: float = 0.15
                 #: Convergence threshold for score change between iterations.
                 self.refinement_convergence_score_delta: float = 0.001
                 #: Require px_err to be below this value before score-delta stop can trigger.
                 self.refinement_score_delta_pixel_error_gate: float = 5.0
                 #: Stop when px_err shows no meaningful improvement for this many iterations.
-                self.refinement_pixel_error_patience_iterations: int = 3
+                self.refinement_pixel_error_patience_iterations: int = 8
                 #: Minimum px_err decrease counted as meaningful improvement for patience.
-                self.refinement_pixel_error_patience_min_delta: float = 0.25
+                self.refinement_pixel_error_patience_min_delta: float = 0.03
                 #: GT body name used as expected object model and quality reference.
                 self.ground_truth_body_name: str = "box_blue"
                 #: Fixed RNG seed for deterministic random initialization (-1 disables).
@@ -511,6 +513,12 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         convergence_pixel_error = float(
             self.descriptor.parameters.refinement_convergence_pixel_error
         )
+        min_iterations_before_convergence = max(
+            int(
+                self.descriptor.parameters.refinement_min_iterations_before_convergence
+            ),
+            1,
+        )
         convergence_score_delta = float(
             self.descriptor.parameters.refinement_convergence_score_delta
         )
@@ -650,11 +658,15 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 else float("inf")
             )
             previous_score = outline_match.combined_score
-            if pixel_error <= convergence_pixel_error:
+            if (
+                executed_iterations >= min_iterations_before_convergence
+                and pixel_error <= convergence_pixel_error
+            ):
                 current_result.converged = True
                 current_result.stop_reason = (
                     "pixel_error_converged "
-                    f"(px_err={pixel_error:.2f} <= {convergence_pixel_error:.2f})"
+                    f"(px_err={pixel_error:.2f} <= {convergence_pixel_error:.2f}, "
+                    f"iter={executed_iterations} >= {min_iterations_before_convergence})"
                 )
                 current_result.score_history = list(score_history)
                 current_result.center_history_world = [
@@ -663,7 +675,8 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 current_result.pixel_error_history = list(pixel_error_history)
                 return current_result
             if (
-                score_delta <= convergence_score_delta
+                executed_iterations >= min_iterations_before_convergence
+                and score_delta <= convergence_score_delta
                 and iteration > 0
                 and pixel_error <= score_delta_pixel_error_gate
             ):
@@ -672,7 +685,8 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                     best_result.stop_reason = (
                         "score_delta_converged "
                         f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f}, "
-                        f"px_err={pixel_error:.2f} <= {score_delta_pixel_error_gate:.2f})"
+                        f"px_err={pixel_error:.2f} <= {score_delta_pixel_error_gate:.2f}, "
+                        f"iter={executed_iterations} >= {min_iterations_before_convergence})"
                     )
                     best_result.iterations = executed_iterations
                     best_result.score_history = list(score_history)
@@ -685,7 +699,8 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 current_result.stop_reason = (
                     "score_delta_converged "
                     f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f}, "
-                    f"px_err={pixel_error:.2f} <= {score_delta_pixel_error_gate:.2f})"
+                    f"px_err={pixel_error:.2f} <= {score_delta_pixel_error_gate:.2f}, "
+                    f"iter={executed_iterations} >= {min_iterations_before_convergence})"
                 )
                 current_result.score_history = list(score_history)
                 current_result.center_history_world = [
@@ -870,6 +885,9 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             "refinement_max_step_m": float(
                 self.descriptor.parameters.refinement_max_step_m
             ),
+            "refinement_min_iterations_before_convergence": int(
+                self.descriptor.parameters.refinement_min_iterations_before_convergence
+            ),
             "refinement_convergence_pixel_error": float(
                 self.descriptor.parameters.refinement_convergence_pixel_error
             ),
@@ -939,13 +957,13 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 str(refinement.stop_reason),
                 int(refinement.iterations),
             )
-            if gt_evaluation.initial_translation_error_m > goal_m:
+            if gt_evaluation.final_translation_error_m > goal_m:
                 self.rk_logger.warning(
                     (
-                        "ExpectedState initial translation error above goal: "
+                        "ExpectedState final translation error above goal: "
                         "%.4fm > %.4fm (run=%s)"
                     ),
-                    float(gt_evaluation.initial_translation_error_m),
+                    float(gt_evaluation.final_translation_error_m),
                     float(goal_m),
                     run_id,
                 )
