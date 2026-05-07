@@ -12,7 +12,13 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
-from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale, Color
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    Cylinder,
+    Mesh,
+    Scale,
+    Color,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -34,6 +40,8 @@ class ObjectSpec:
     pose: HomogeneousTransformationMatrix
     mesh_path: Optional[Path] = None
     box_scale: Optional[Scale] = None
+    cylinder_width: Optional[float] = None
+    cylinder_height: Optional[float] = None
     center_mesh: bool = True
     color: Color = field(default_factory=lambda: Color(0.1, 0.2, 0.8, 1.0))
 
@@ -111,13 +119,28 @@ class BaseWorldDescriptor:
                     shapes = [box, mesh]
                     collision = ShapeCollection([box])
                 else:
-                    if spec.box_scale is None:
-                        raise ValueError(
-                            f"ObjectSpec {spec.name} requires mesh_path or box_scale."
+                    if spec.box_scale is not None:
+                        box = Box(scale=spec.box_scale, color=spec.color)
+                        shapes = [box]
+                        collision = ShapeCollection([box])
+                    elif (
+                        spec.cylinder_width is not None
+                        and spec.cylinder_height is not None
+                    ):
+                        cylinder = Cylinder(
+                            width=float(spec.cylinder_width),
+                            height=float(spec.cylinder_height),
+                            color=spec.color,
                         )
-                    box = Box(scale=spec.box_scale, color=spec.color)
-                    shapes = [box]
-                    collision = ShapeCollection([box])
+                        shapes = [cylinder]
+                        collision = ShapeCollection([cylinder])
+                    else:
+                        raise ValueError(
+                            (
+                                f"ObjectSpec {spec.name} requires mesh_path, box_scale, "
+                                "or cylinder_width+cylinder_height."
+                            )
+                        )
 
                 body = Body(
                     name=PrefixedName(name=spec.name),
