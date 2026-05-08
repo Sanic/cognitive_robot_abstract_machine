@@ -243,10 +243,8 @@ class ProbabilisticBackend(GenerativeBackend):
         if parameters.truncation_assignments_from_krrood_variables:
             complete_event = parameters.truncation_assignments_from_krrood_variables[0]
             complete_event.fill_missing_variables(parameters.variables.values())
-            [complete_event] = [
-                complete_event.intersection_with(event)
-                for event in parameters.truncation_assignments_from_krrood_variables[1:]
-            ]
+            for event in parameters.truncation_assignments_from_krrood_variables[1:]:
+                complete_event = complete_event.intersection_with(event)
             truncated, _ = conditioned.truncated(complete_event, singleton_allowed=True)
 
             if truncated is None:

@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from typing_extensions import Type
+
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.operators.comparator import Comparator
@@ -26,3 +28,11 @@ class EmptyVariableDomain(InputError):
 
     def __post_init__(self):
         self.message = f"The domain of the variable {self.variable} is empty. Domains must be non-empty for the variable to be valid."
+
+
+@dataclass
+class InvalidEllipsis(InputError):
+    type_: Type
+
+    def __post_init__(self):
+        self.message = f"You have set an ellipsis for the type {self.type_}. Ellipses are only allowed for leaf objects."

@@ -1121,7 +1121,10 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                     )
                 else:
                     unit: InnerUnit
-                    unit.log_forward()
+                    if isinstance(unit, SumUnit):
+                        unit.log_forward_conditioning()
+                    else:
+                        unit.log_forward()
 
         root = self.root
         [

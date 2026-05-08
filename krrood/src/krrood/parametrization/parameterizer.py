@@ -4,11 +4,12 @@ import types
 from dataclasses import dataclass, field
 from enum import Enum, EnumType
 from functools import cached_property
-from typing import Dict, Optional, Tuple, List, Iterable
+from types import UnionType
+from typing import Dict, Optional, Tuple, List, Iterable, Union
 
 import numpy as np
 from typing_extensions import Any, get_args
-from krrood.parametrization.exceptions import EmptyVariableDomain
+from krrood.parametrization.exceptions import EmptyVariableDomain, InvalidEllipsis
 import random_events.variable
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Literal, Variable
@@ -26,7 +27,11 @@ from krrood.parametrization.feature_extractor import FeatureExtractor
 from random_events.interval import singleton
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.set import Set, SetElement
-from random_events.variable import compatible_types, variable_from_name_and_type
+from random_events.variable import (
+    compatible_types,
+    variable_from_name_and_type,
+    most_appropriate_variable_type,
+)
 
 
 @dataclass
@@ -137,16 +142,19 @@ class UnderspecifiedParameters:
         name = attribute_match.name_from_variable_access_path
         value = attribute_match.assigned_value
         krrood_variable = attribute_match.assigned_variable
+        type_ = self._process_attribute_match_type(krrood_variable._type_)
 
-        if isinstance(value, compatible_types) or isinstance(
-            krrood_variable._type_, compatible_types
-        ):
+        if isinstance(value, compatible_types) or isinstance(type_, compatible_types):
             result = {name: variable_from_name_and_type(name=name, type_=type(value))}
             self.conditioning_assignments_from_literal_values[result[name]] = value
             return result
 
-        if isinstance(value, types.EllipsisType):
-            return {name: random_events.variable.Continuous(name=name)}
+        if isinstance(value, types.EllipsisType) and not issubclass(
+            type_, compatible_types
+        ):
+            raise InvalidEllipsis(type_)
+        elif isinstance(value, types.EllipsisType):
+            return {name: variable_from_name_and_type(name=name, type_=type_)}
 
         return self._extract_variables_from_non_primitive_literal(attribute_match)
 
@@ -181,6 +189,9 @@ class UnderspecifiedParameters:
         :param attribute_match: The attribute match with a KRROOD variable assigned value.
         :return: A dictionary of extracted variables.
         """
+        type_ = self._process_attribute_match_type(
+            attribute_match.assigned_variable._type_
+        )
         if attribute_match.assigned_value in self._symbolic_expression_event_cache:
             return self._symbolic_expression_event_cache[
                 attribute_match.assigned_value
@@ -191,9 +202,7 @@ class UnderspecifiedParameters:
         if not domain_objects:
             raise EmptyVariableDomain(attribute_match.variable)
 
-        if not attribute_match.assigned_variable._type_ is None and issubclass(
-            attribute_match.assigned_variable._type_, compatible_types
-        ):
+        if not type_ is None and issubclass(type_, compatible_types):
             return self._extract_variables_from_primitive_krrood_variable(
                 attribute_match, domain_objects
             )
@@ -213,12 +222,13 @@ class UnderspecifiedParameters:
         :return: A dictionary of extracted variables.
         """
         name = attribute_match.name_from_variable_access_path
-        re_variable = variable_from_name_and_type(
-            name=name, type_=attribute_match.assigned_variable._type_
+        type_ = self._process_attribute_match_type(
+            attribute_match.assigned_variable._type_
         )
+        re_variable = variable_from_name_and_type(name=name, type_=type_)
         result = {re_variable.name: re_variable}
 
-        if issubclass(type(attribute_match.assigned_variable._type_), EnumType):
+        if isinstance(type_, EnumType):
             simple_events = [
                 SimpleEvent.from_data({re_variable: Set.from_iterable(domain_objects)})
             ]
@@ -359,8 +369,22 @@ class UnderspecifiedParameters:
             mapping = attribute.apply_mapping_on_external_root(
                 attribute_match.assigned_value
             )
+            if not isinstance(mapping, attribute._type_):
+                mapping = attribute._type_(mapping)
         else:
             mapping = attribute_match.assigned_value
         self.conditioning_assignments_from_literal_values[result[attribute._name_]] = (
             mapping
         )
+
+    def _process_attribute_match_type(self, type_):
+        """
+        Process the type of an attribute matches assigned variable such that there are no unions.
+        :param type_: The type to process
+        :return: The processed type.
+        """
+        if isinstance(type_, UnionType):
+            types = get_args(type_)
+            return most_appropriate_variable_type(types)
+        else:
+            return type_

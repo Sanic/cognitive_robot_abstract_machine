@@ -73,6 +73,7 @@ import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
 import krrood.ormatic.type_dict
 import numpy
+import pathlib
 import pycram.alternative_motion_mapping
 import pycram.alternative_motion_mappings.hsrb_motion_mapping
 import pycram.alternative_motion_mappings.stretch_motion_mapping
@@ -202,6 +203,7 @@ class Base(DeclarativeBase):
         enum.Enum: krrood.ormatic.custom_types.PolymorphicEnumType,
         krrood.adapters.json_serializer.SubclassJSONSerializer: sqlalchemy.sql.sqltypes.JSON,
         uuid.UUID: sqlalchemy.sql.sqltypes.UUID,
+        pathlib.Path: krrood.ormatic.custom_types.PathType,
         numpy.ndarray: pycram.orm.model.NumpyType,
     }
 
@@ -8842,6 +8844,31 @@ class MonitorNodeDAO(
     }
 
 
+class PointOccupiedErrorDAO(
+    Base, DataAccessObject[semantic_digital_twin.exceptions.PointOccupiedError]
+):
+
+    __tablename__ = "PointOccupiedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    message: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    point_id: Mapped[int] = mapped_column(
+        ForeignKey("Point3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    point: Mapped[Point3MappingDAO] = relationship(
+        "Point3MappingDAO", uselist=False, foreign_keys=[point_id], post_update=True
+    )
+
+
 class PointSpatialRelationDAO(
     Base,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.PointSpatialRelation],
@@ -10264,6 +10291,10 @@ class Sage10kDatasetLoaderDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
+    directory: Mapped[pathlib.Path] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
+    )
+
 
 class Sage10kEclecticResidenceDAO(
     Sage10kAbstractDemoDAO,
@@ -10725,6 +10756,10 @@ class Sage10kSceneDAO(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
     total_area: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+
+    directory: Mapped[typing.Optional[pathlib.Path]] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=True, use_existing_column=True
+    )
 
     rooms: Mapped[builtins.list[Sage10kSceneDAO_rooms_association]] = relationship(
         "Sage10kSceneDAO_rooms_association",
@@ -13592,6 +13627,10 @@ class MoveToReachTrainingEnvironmentDAO(
         ForeignKey(TrainingEnvironmentDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    model_path: Mapped[typing.Optional[pathlib.Path]] = mapped_column(
+        krrood.ormatic.custom_types.PathType, nullable=True, use_existing_column=True
     )
 
     __mapper_args__ = {

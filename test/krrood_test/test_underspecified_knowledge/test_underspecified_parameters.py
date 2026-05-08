@@ -1,23 +1,17 @@
-from copy import deepcopy
-import numpy as np
 import pytest
 
+from krrood.parametrization.exceptions import InvalidEllipsis
+from ..dataset.semantic_world_like_classes import Body
 from krrood.entity_query_language.factories import (
     variable,
     underspecified,
-    variable_from,
 )
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.interval import singleton, reals
 
 from krrood_test.dataset.example_classes import (
     KRROODPosition,
-    KRROODPose,
-    KRROODOrientation,
-    ListOfEnum,
     TestEnum,
-    Atom,
-    Element,
     EnumAction,
 )
 
@@ -27,7 +21,7 @@ def test_enum_domain():
     Test that a KRROOD variable with an Enum domain is correctly handled.
     """
     prob_q = underspecified(EnumAction)(
-        obj=...,
+        obj=Body(name="body"),
         enum=variable(
             TestEnum, [TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C]
         ),
@@ -37,6 +31,17 @@ def test_enum_domain():
 
     assert len(variables) == 2
     assert len(parameters.truncation_assignments_from_krrood_variables) == 1
+
+
+def test_invalid_ellipsis():
+    prob_q = underspecified(EnumAction)(
+        obj=...,
+        enum=variable(
+            TestEnum, [TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C]
+        ),
+    )
+    with pytest.raises(InvalidEllipsis):
+        parameters = UnderspecifiedParameters(prob_q)
 
 
 def test_assignments_for_conditioning():

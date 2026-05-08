@@ -5,7 +5,7 @@ from types import EllipsisType
 import pytest
 from sqlalchemy.orm import sessionmaker
 
-from ..dataset.semantic_world_like_classes import Apple
+from ..dataset.semantic_world_like_classes import Apple, Body
 from krrood.entity_query_language.backends import (
     SQLAlchemyBackend,
     EntityQueryLanguageBackend,
@@ -187,7 +187,12 @@ def test_underspecified_parameters_with_only_literals():
 
 
 def test_enum_value_as_literal():
-    prob_q = underspecified(EnumAction)(obj=..., enum=TestEnum.OPTION_A)
+    prob_q = underspecified(EnumAction)(
+        obj=Body(
+            "x",
+        ),
+        enum=TestEnum.OPTION_A,
+    )
     pm_backend = ProbabilisticBackend(number_of_samples=10)
     values = list(pm_backend.evaluate(prob_q))
     for value in values:
