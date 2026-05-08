@@ -15,6 +15,7 @@ from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import SIFTAnnotation
 from robokudo.types.scene import ObjectHypothesis
+from robokudo.utils.decorators import timer_decorator
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -94,6 +95,19 @@ class SIFTAnnotator(ThreadedAnnotator):
         self._last_object_descriptors: Dict[int, npt.NDArray[np.float32]] = {}
         """The per-object descriptors of the last image."""
 
+    def compute_matches(
+        self,
+        last_descriptors: npt.NDArray[np.float32],
+        current_descriptors: npt.NDArray[np.float32],
+    ) -> List[cv2.DMatch]:
+        distance_threshold = self.descriptor.parameters.match_distance_threshold
+        all_matches = self._matcher.knnMatch(last_descriptors, current_descriptors, k=2)
+        matches = [
+            m for m, n in all_matches if m.distance < distance_threshold * n.distance
+        ]
+        return matches
+
+    @timer_decorator
     def compute(self) -> Status:
         """Compute the SIFT features of the current image and match them to the last image.
 
@@ -116,23 +130,15 @@ class SIFTAnnotator(ThreadedAnnotator):
 
         mode = self.descriptor.parameters.detection_mode
         vis_mode = self.descriptor.parameters.visualization_mode
-        distance_threshold = self.descriptor.parameters.match_distance_threshold
 
         vis_image = self._get_vis_image(color_image, vis_mode)
 
         if mode == SIFTAnnotatorMode.IMAGE:
-            keypoints, descriptors = self._sift.detectAndCompute(grey_image, None)
+            all_keypoints, descriptors = self._sift.detectAndCompute(grey_image, None)
 
             matches: List[cv2.DMatch] = []
             if self._last_image is not None:
-                all_matches = self._matcher.knnMatch(
-                    self._last_descriptors, descriptors, k=2
-                )
-                matches = [
-                    m
-                    for m, n in all_matches
-                    if m.distance < distance_threshold * n.distance
-                ]
+                matches = self.compute_matches(self._last_descriptors, descriptors)
                 self.rk_logger.debug(f"Found {len(matches)} matches")
 
             vis_image = self._draw_visualization(
@@ -140,13 +146,19 @@ class SIFTAnnotator(ThreadedAnnotator):
                 vis_image,
                 vis_mode,
                 self._last_keypoints,
-                keypoints,
+                all_keypoints,
                 matches,
             )
 
-            cas.set("SIFT_KEYPOINTS", keypoints)
-            cas.set("SIFT_DESCRIPTORS", keypoints)
-            cas.set("SIFT_MATCHES", matches)
+            # Full image SIFT features
+            sift_annotation = SIFTAnnotation(
+                keypoints=all_keypoints,
+                descriptors=descriptors,
+            )
+            cas.annotations.append(sift_annotation)
+
+            self._last_keypoints = all_keypoints
+            self._last_descriptors = descriptors
         elif mode == SIFTAnnotatorMode.OBJECT:
             match_map: Dict[int, Tuple[Optional[int], float]] = {}
 
@@ -155,52 +167,60 @@ class SIFTAnnotator(ThreadedAnnotator):
             object_descriptors: Dict[int, npt.NDArray[np.float32]] = {}
             for i, oh in enumerate(ohs):
                 roi = oh.roi.roi.get_corner_points()
-                mask = np.zeros(color_image.shape[:2], dtype=np.uint8)
-                mask[roi[1] : roi[3], roi[0] : roi[2]] = oh.roi.mask
 
-                kp, des = self._sift.detectAndCompute(grey_image, mask)
+                # Get ROI image and mask
+                roi_image = grey_image[roi[1] : roi[3], roi[0] : roi[2]]
+                if oh.roi.mask.shape[:2] != roi_image.shape[:2]:
+                    roi_mask = oh.roi.mask[roi[1] : roi[3], roi[0] : roi[2]]
+                else:
+                    roi_mask = oh.roi.mask
 
-                kp_ann = SIFTAnnotation(
-                    keypoints=kp,
-                    descriptors=des,
+                keypoints, descriptors = self._sift.detectAndCompute(
+                    roi_image, roi_mask
                 )
-                oh.annotations.append(kp_ann)
 
-                if self._last_image is not None:
-                    no_des = len(des)
+                # Correct keypoint coordinates to full image
+                for k in keypoints:
+                    k.pt = (k.pt[0] + roi[0], k.pt[1] + roi[1])
 
-                    best_score = 0.0
-                    best_match_id = None
-                    best_matches: List[cv2.DMatch] = []
-                    for j, d in self._last_object_descriptors.items():
-                        all_matches = self._matcher.knnMatch(d, des, k=2)
-                        matches = [
-                            m
-                            for m, n in all_matches
-                            if m.distance < distance_threshold * n.distance
-                        ]
+                sift_annotation = SIFTAnnotation(
+                    keypoints=keypoints,
+                    descriptors=descriptors,
+                )
+                oh.annotations.append(sift_annotation)
 
-                        score = len(matches) / max(no_des, 1.0)
-                        if score > best_score:
-                            best_score = score
-                            best_match_id = j
-                            best_matches = matches
+                object_keypoints[i] = keypoints
+                object_descriptors[i] = descriptors
 
-                    if best_match_id is not None:
-                        vis_image = self._draw_visualization(
-                            color_image,
-                            vis_image,
-                            vis_mode,
-                            self._last_object_keypoints[best_match_id],
-                            kp,
-                            best_matches,
-                        )
+                if self._last_image is None:
+                    continue
 
-                    match_map[i] = (best_match_id, best_score)
-                    all_best_matches.extend(best_matches)
+                # Find the object from the last frame with the highest match ratio
+                best_score = 0.0
+                best_match_id = None
+                best_matches: List[cv2.DMatch] = []
+                for object_id, d in self._last_object_descriptors.items():
+                    matches = self.compute_matches(d, descriptors)
+                    score = len(matches) / max(len(descriptors), 1.0)
+                    if score > best_score:
+                        best_score = score
+                        best_match_id = object_id
+                        best_matches = matches
 
-                object_keypoints[i] = kp
-                object_descriptors[i] = des
+                if best_match_id is None:
+                    continue
+
+                vis_image = self._draw_visualization(
+                    color_image,
+                    vis_image,
+                    vis_mode,
+                    self._last_object_keypoints[best_match_id],
+                    keypoints,
+                    best_matches,
+                )
+
+                match_map[i] = (best_match_id, best_score)
+                all_best_matches.extend(best_matches)
 
             match_string = [
                 f"\n{o1}->{match[0]} ({match[1]:.2f})"
@@ -209,9 +229,7 @@ class SIFTAnnotator(ThreadedAnnotator):
             ]
             self.rk_logger.debug(f"Matched objects:{''.join(match_string)}")
 
-            keypoints = list(chain.from_iterable(object_keypoints.values()))
-            descriptors = list(chain.from_iterable(object_descriptors.values()))
-
+            all_keypoints = list(chain.from_iterable(object_keypoints.values()))
             self._last_object_keypoints = object_keypoints
             self._last_object_descriptors = object_descriptors
         else:
@@ -219,11 +237,9 @@ class SIFTAnnotator(ThreadedAnnotator):
             return Status.FAILURE
 
         self._last_image = color_image
-        self._last_keypoints = keypoints
-        self._last_descriptors = descriptors
 
         pcd = self._keypoints_to_point_cloud(
-            keypoints, depth_image, intrinsic, depth_ratio
+            all_keypoints, depth_image, intrinsic, depth_ratio
         )
         self.get_annotator_output_struct().set_image(vis_image)
         self.get_annotator_output_struct().set_geometries(pcd)
