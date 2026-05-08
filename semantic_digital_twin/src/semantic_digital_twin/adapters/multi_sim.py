@@ -19,6 +19,7 @@ from physics_simulators.base_simulator import (
     SimulatorConstraints,
 )
 from krrood.utils import recursive_subclasses
+from krrood.exceptions import DataclassException
 from scipy.spatial.transform import Rotation
 from trimesh.visual import TextureVisuals
 
@@ -122,7 +123,7 @@ class GeomVisibilityAndCollisionType(IntEnum):
 
 
 @dataclass
-class MultiSimError(Exception):
+class MultiSimError(DataclassException):
     """Base class for all MultiSim-related exceptions."""
 
 
@@ -676,11 +677,13 @@ class MujocoEntityNotFoundError(MujocoError):
     Raised when a MuJoCo entity of a given type and name cannot be found.
     """
 
-    def __init__(
-        self, entity_name: str, entity_type: mujoco.mjtObj, action: str = "find"
-    ):
-        message = f"Failed to {action}: type={entity_type}, name='{entity_name}'"
-        super().__init__(message)
+    entity_name: str
+    entity_type: mujoco.mjtObj
+    action: str = "find"
+
+    def __post_init__(self):
+        self.message = f"Failed to {self.action}: type={self.entity_type}, name='{self.entity_name}'"
+        super().__post_init__()
 
 
 @dataclass
