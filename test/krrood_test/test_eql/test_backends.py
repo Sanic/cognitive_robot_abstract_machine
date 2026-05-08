@@ -5,6 +5,7 @@ from types import EllipsisType
 import pytest
 from sqlalchemy.orm import sessionmaker
 
+from ..dataset.semantic_world_like_classes import Apple
 from krrood.entity_query_language.backends import (
     SQLAlchemyBackend,
     EntityQueryLanguageBackend,
@@ -24,72 +25,36 @@ from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.entity_query_language.core.variable import Variable as KRROODVariable
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
-from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import ApproachDirection
-from pycram.datastructures.grasp import GraspDescription
-from pycram.robot_plans.actions.composite.transporting import MoveAndPickUpAction
-from pycram.robot_plans.actions.core.misc import MoveToReach
-from random_events.interval import Interval, reals, singleton
+from random_events.interval import reals
 from random_events.set import Set
-from random_events.variable import Symbolic, Variable
-from semantic_digital_twin.orm.model import (
-    PoseMapping,
-    Point3Mapping,
-    QuaternionMapping,
-)
-from semantic_digital_twin.robots.abstract_robot import Manipulator
-from semantic_digital_twin.robots.pr2 import PR2
+from random_events.variable import Symbolic
 from ..dataset.example_classes import (
     KRROODPose,
     KRROODPosition,
     KRROODOrientation,
     Atom,
     Element,
+    TestEnum,
+    NestedAction,
+    EnumAction,
 )
 from ..dataset.ormatic_interface import *  # type: ignore
-from ..test_ripple_down_rules.test_results.datasets_physical_object_is_a_robot import (
-    physical_object_is_a_robot_output__scrdr,
-)
 
 
-@pytest.fixture(scope="function")
-def mutable_model_world(pr2_apartment_world):
-    world = deepcopy(pr2_apartment_world)
-    pr2 = PR2.from_world(world)
-    return world, pr2, Context(world, pr2)
+def test_nested_action():
 
+    apple = Apple("apple", 7)
 
-def test_nested_action(mutable_model_world):
-    world, robot_view, context = mutable_model_world
-    milk = world.get_body_by_name("milk.stl")
-
-    milk_variable = variable_from([milk])
-
-    manipulation_offset = 0.05
-    prob_q = underspecified(MoveAndPickUpAction)(
-        keep_joint_states=...,
-        standing_position=underspecified(
-            PoseMapping.from_point_mapping_quaternion_mapping
-        )(
-            position=underspecified(Point3Mapping)(
-                x=..., y=..., z=..., reference_frame=None
+    prob_q = underspecified(NestedAction)(
+        obj=variable(Apple, domain=[apple]),
+        pose=underspecified(KRROODPose)(
+            position=underspecified(KRROODPosition)(x=0.02, y=..., z=...),
+            orientation=underspecified(KRROODOrientation)(
+                x=..., y=..., z=..., w=variable(float, domain=[0.0, 1.0])
             ),
-            orientation=underspecified(QuaternionMapping)(
-                x=..., y=..., z=..., w=..., reference_frame=None
-            ),
-            reference_frame=variable_from([robot_view.root]),
-        ),
-        object_designator=milk_variable,
-        arm=...,
-        grasp_description=underspecified(GraspDescription)(
-            approach_direction=...,
-            vertical_alignment=...,
-            rotate_gripper=...,
-            manipulation_offset=manipulation_offset,
-            manipulator=variable(Manipulator, world.semantic_annotations),
         ),
     )
+
     parameters = UnderspecifiedParameters(prob_q)
     variables = parameters.variables
     names_of_actual_specified_parameters = [
@@ -102,24 +67,22 @@ def test_nested_action(mutable_model_world):
         and not isinstance(match.assigned_value, EllipsisType)
         and not match.assigned_value is None
     ]
-    random_events_names = [
-        name
-        for name, variable in variables.items()
-        if isinstance(variable, Symbolic)
-        and name in names_of_actual_specified_parameters
-    ]
 
     assert names_of_actual_specified_parameters == [
-        "MoveAndPickUpAction.object_designator",
-        "MoveAndPickUpAction.standing_position.reference_frame",
-        "MoveAndPickUpAction.grasp_description.manipulation_offset",
-        "MoveAndPickUpAction.grasp_description.manipulator",
+        "NestedAction.obj",
+        "NestedAction.pose.position.x",
+        "NestedAction.pose.orientation.w",
     ]
     assert (
-        variables[
-            "MoveAndPickUpAction.grasp_description.manipulation_offset"
-        ].domain.simple_sets
-        == singleton(manipulation_offset).simple_sets
+        variables["NestedAction.pose.position.x"].domain.simple_sets
+        == reals().simple_sets
+    )
+    assert len(parameters.conditioning_assignments_from_literal_values) == 1
+
+    assert 0.02 == (
+        parameters.conditioning_assignments_from_literal_values.get(
+            variables["NestedAction.pose.position.x"]
+        )
     )
 
 
@@ -177,8 +140,19 @@ def test_underspecified_parameters_with_partly_symbolic_expression():
     assert variables["KRROODPosition.x"].is_numeric
     assert variables["KRROODPosition.y"].domain == reals()
     assert variables["KRROODPosition.y"].is_numeric
-    assert variables["KRROODPosition.z"].domain == Set.from_iterable([1, 2, 3])
-    assert not variables["KRROODPosition.z"].is_numeric
+    assert variables["KRROODPosition.z"].domain == reals()
+    assert variables["KRROODPosition.z"].is_numeric
+    assert (
+        len(parameters.truncation_assignments_from_krrood_variables[0].simple_sets) == 3
+    )
+    assert (
+        len(
+            parameters.truncation_assignments_from_krrood_variables[0]
+            .simplify()
+            .simple_sets
+        )
+        == 1
+    )
 
 
 def test_underspecified_parameters_with_full_symbolic_expression():
@@ -189,14 +163,9 @@ def test_underspecified_parameters_with_full_symbolic_expression():
 
 
 def test_underspecified_parameters_with_only_underspecified():
-    prob_q = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
-        position=underspecified(Point3Mapping)(
-            x=..., y=..., z=..., reference_frame=None
-        ),
-        orientation=underspecified(QuaternionMapping)(
-            x=..., y=..., z=..., w=..., reference_frame=None
-        ),
-        reference_frame=None,
+    prob_q = underspecified(KRROODPose)(
+        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
+        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
     )
     parameters = UnderspecifiedParameters(prob_q)
     variables = parameters.variables
@@ -205,34 +174,24 @@ def test_underspecified_parameters_with_only_underspecified():
 
 
 def test_underspecified_parameters_with_only_literals():
-    prob_q = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
+    prob_q = underspecified(KRROODPose)(
         position=KRROODPosition(1, 2, 3),
         orientation=KRROODOrientation(0, 0, 0, 1),
-        reference_frame=None,
     )
     parameters = UnderspecifiedParameters(prob_q)
     variables = parameters.variables
 
     assert len(variables) == 7
+    assert len(parameters.truncation_assignments_from_krrood_variables) == 0
+    assert len(parameters.conditioning_assignments_from_literal_values) == 7
 
 
 def test_enum_value_as_literal():
-    prob_q = underspecified(MoveToReach)(
-        target_pose=None,
-        robot_x=...,
-        robot_y=...,
-        hip_rotation=...,
-        grasp_description=underspecified(GraspDescription)(
-            approach_direction=ApproachDirection.FRONT,
-            vertical_alignment=...,
-            manipulator=None,
-            rotate_gripper=...,
-        ),
-    )
+    prob_q = underspecified(EnumAction)(obj=..., enum=TestEnum.OPTION_A)
     pm_backend = ProbabilisticBackend(number_of_samples=10)
     values = list(pm_backend.evaluate(prob_q))
     for value in values:
-        assert value.grasp_description.approach_direction == ApproachDirection.FRONT
+        assert value.enum == TestEnum.OPTION_A
 
 
 def test_probabilistic_query_backend():

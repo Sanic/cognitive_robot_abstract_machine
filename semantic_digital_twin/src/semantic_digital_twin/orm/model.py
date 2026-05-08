@@ -134,7 +134,7 @@ class Point3Mapping(AlternativeMapping[Point3]):
 
     @classmethod
     def from_domain_object(cls, obj: Point3):
-        x, y, z, _ = obj.to_np().tolist()
+        x, y, z, _ = float(obj.x), float(obj.y), float(obj.z), obj.reference_frame
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
 
@@ -155,7 +155,7 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
     @classmethod
     def from_domain_object(cls, obj: Quaternion):
-        x, y, z, w = obj.to_np().tolist()
+        x, y, z, w = float(obj.x), float(obj.y), float(obj.z), float(obj.w)
         result = cls(x=x, y=y, z=z, w=w, reference_frame=obj.reference_frame)
         return result
 
@@ -234,8 +234,8 @@ class PoseMapping(AlternativeMapping[Pose]):
 
     @classmethod
     def from_domain_object(cls, obj: Pose):
-        position = obj.to_position()
-        orientation = obj.to_quaternion()
+        position = obj.position
+        orientation = obj.orientation
         result = cls(position=position, orientation=orientation)
         result.reference_frame = obj.reference_frame
         return result

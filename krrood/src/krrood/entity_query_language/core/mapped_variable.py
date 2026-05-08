@@ -219,6 +219,18 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
             current = next(domain_mapping._apply_mapping_(current))
         return current
 
+    def get_clean_name_from_mapped_variable(self) -> str:
+        """
+        Get a clean name from a mapped variable by joining its attribute names.
+
+        :return: The clean name.
+        """
+        names = []
+        for step in self._access_path_:
+            if isinstance(step, Attribute):
+                names.append(step._attribute_name_)
+        return ".".join(names)
+
 
 @dataclass(eq=False, repr=False)
 class Attribute(MappedVariable):

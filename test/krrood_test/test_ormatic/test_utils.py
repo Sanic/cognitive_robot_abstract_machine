@@ -3,9 +3,7 @@ from _pytest import raises
 
 from krrood.ormatic.exceptions import UnsupportedColumnType
 from krrood.utils import inheritance_path_length
-from probabilistic_model.probabilistic_circuit.relational.learn_rspn import (
-    get_python_type_from_sqlalchemy_column,
-)
+from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world_description.world_entity import Body
 from ..dataset.example_classes import *

@@ -223,20 +223,37 @@ class ProbabilisticBackend(GenerativeBackend):
 
         model = self.model_registry.get_model(parameters)
 
-        # apply conditions from the parameters
-        conditioned, _ = model.conditional(parameters.assignments_for_conditioning)
+        # apply conditions from literal assignments to underspecified variables
+        conditioned, _ = model.conditional(
+            parameters.conditioning_assignments_from_literal_values
+        )
+        print(
+            list(variable.domain.simple_sets[0] for variable in conditioned.variables)
+        )
 
         if conditioned is None:
             raise NoSolutionFound(expression.expression)
 
         # apply conditions from the where statements
-        if parameters.truncation_event:
-            truncated, _ = conditioned.truncated(parameters.truncation_event)
+        if parameters.truncation_assignments_from_where_conditions:
+            truncated, _ = conditioned.truncated(
+                parameters.truncation_assignments_from_where_conditions
+            )
+        else:
+            truncated = conditioned
+
+        # apply conditions from variable assignments to underspecified variables
+        if parameters.truncation_assignments_from_krrood_variables:
+            complete_event = parameters.truncation_assignments_from_krrood_variables[0]
+            complete_event.fill_missing_variables(parameters.variables.values())
+            [complete_event] = [
+                complete_event.intersection_with(event)
+                for event in parameters.truncation_assignments_from_krrood_variables[1:]
+            ]
+            truncated, _ = conditioned.truncated(complete_event, singleton_allowed=True)
 
             if truncated is None:
                 raise NoSolutionFound(expression.expression)
-        else:
-            truncated = conditioned
 
         number_of_samples = expression.expression._limit_ or self.number_of_samples
 
@@ -247,7 +264,7 @@ class ProbabilisticBackend(GenerativeBackend):
 
         # create new objects with the values from the samples
         for sample in samples:
-            instance = parameters.create_instance_from_variables_and_sample(
+            instance = parameters.construct_instance_from_model_sample(
                 truncated.variables, sample
             )
             yield instance

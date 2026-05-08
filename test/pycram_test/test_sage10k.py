@@ -144,10 +144,12 @@ def test_translate_free_space_to_where_condition(wall_door_handle_world):
     parameters = UnderspecifiedParameters(query)
     # assert that the parameters truncation event is the same as the free space
 
-    result_to_compare = parameters.truncation_event.update_variables(
-        {
-            Continuous("MoveToReach.robot_x"): SpatialVariables.x.value,
-            Continuous("MoveToReach.robot_y"): SpatialVariables.y.value,
-        }
+    result_to_compare = (
+        parameters.truncation_assignments_from_where_conditions.update_variables(
+            {
+                Continuous("MoveToReach.robot_x"): SpatialVariables.x.value,
+                Continuous("MoveToReach.robot_y"): SpatialVariables.y.value,
+            }
+        )
     )
     assert result_to_compare == gcs.free_space_event.marginal(SpatialVariables.xy)

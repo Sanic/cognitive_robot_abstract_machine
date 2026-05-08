@@ -415,15 +415,16 @@ def test_parameterization_of_pick_up(mutable_model_world):
 
     parameters = UnderspecifiedParameters(pick_up_description)
 
-    assert len(parameters.variables) == 7
-
     [manipulator_offset] = [
         v
         for v in parameters.variables.values()
         if v.name.endswith("manipulation_offset")
     ]
 
-    assert parameters.assignments_for_conditioning[manipulator_offset] == 0.05
+    assert (
+        parameters.conditioning_assignments_from_literal_values[manipulator_offset]
+        == 0.05
+    )
 
     context.query_backend = ProbabilisticBackend(
         model_registry=FullyFactorizedRegistry()

@@ -1119,12 +1119,9 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
                     unit.log_truncated_of_simple_event_in_place(
                         simple_event, singleton_allowed
                     )
-                elif isinstance(unit, ProductUnit):
-                    unit.log_forward()
-                elif isinstance(unit, SumUnit):
-                    unit.log_forward_conditioning()
                 else:
-                    raise IntractableError(f"Unit of type {type(unit)} not supported.")
+                    unit: InnerUnit
+                    unit.log_forward()
 
         root = self.root
         [

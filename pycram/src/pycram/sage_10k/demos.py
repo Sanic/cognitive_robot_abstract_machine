@@ -187,6 +187,15 @@ class Sage10kGymDemo(Sage10kAbstractDemo):
             [
                 open_door,
                 ParkArmsAction(Arms.BOTH),
+                NavigateAction(
+                    Pose.from_xyz_rpy(2.81, -3.76, reference_frame=self.world.root)
+                ),
+                NavigateAction(
+                    Pose.from_xyz_rpy(-0.75, -3.33, reference_frame=self.world.root)
+                ),
+                NavigateAction(
+                    Pose.from_xyz_rpy(0, 0.8, reference_frame=self.world.root)
+                ),
                 MoveAndPickUpAction(
                     object_designator=body,
                     standing_position=self.pickup_navigation_pose,
@@ -420,6 +429,16 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemo):
             manipulator=context.robot.arm.manipulator,
             rotate_gripper=False,
         )
+        navigate1 = NavigateAction(
+            target_location=Pose.from_xyz_rpy(
+                2.86, 5.89, reference_frame=self.world.root
+            )
+        )
+        navigate2 = NavigateAction(
+            target_location=Pose.from_xyz_rpy(
+                2.86, 5.89, reference_frame=self.world.root
+            )
+        )
         mpu = MoveAndPickUpAction(
             standing_position=self.pickup_navigation_pose,
             object_designator=self.target_to_pick,
@@ -431,7 +450,10 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemo):
         park_arms = ParkArmsAction(arm=Arms.LEFT)
         present = NavigateAction(target_location=self.robot_starting_pose)
 
-        return sequential([open_door, park_arms, mpu, present], context=context).plan
+        return sequential(
+            [open_door, park_arms, navigate1, mpu, park_arms, navigate2, present],
+            context=context,
+        ).plan
 
 
 @dataclass
