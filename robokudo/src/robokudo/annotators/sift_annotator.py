@@ -100,6 +100,12 @@ class SIFTAnnotator(ThreadedAnnotator):
         last_descriptors: npt.NDArray[np.float32],
         current_descriptors: npt.NDArray[np.float32],
     ) -> List[cv2.DMatch]:
+        """Compute the matches between the last and current descriptors.
+
+        :param last_descriptors: The descriptors from the last image.
+        :param current_descriptors: The descriptors from the current image.
+        :return: The list of matches.
+        """
         distance_threshold = self.descriptor.parameters.match_distance_threshold
         all_matches = self._matcher.knnMatch(last_descriptors, current_descriptors, k=2)
         matches = [
@@ -377,7 +383,7 @@ class SIFTAnnotator(ThreadedAnnotator):
         rgb = []
         for kp, v in zip(keypoints, values):
             seed = hash((round(kp.pt[0], 1), round(kp.pt[1], 1), round(kp.size, 1)))
-            rng = np.random.default_rng(abs(seed) % (2**32))
+            rng: npt.NDArray[np.float32] = np.random.default_rng(abs(seed) % (2**32))
 
             hue = rng.uniform(0.0, 1.0)
             r, g, b = colorsys.hsv_to_rgb(hue, 1.0, v)
