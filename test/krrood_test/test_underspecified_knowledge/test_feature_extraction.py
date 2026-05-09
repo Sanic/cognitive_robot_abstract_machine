@@ -43,8 +43,8 @@ def test_features_extraction():
     )
     samples_to_daos = [to_dao(sample) for sample in samples]
 
-    feature_extractor = FeatureExtractor(samples_to_daos)
-    dataframe = feature_extractor.create_dataframe()
+    feature_extractor = FeatureExtractor.from_instances(samples_to_daos)
+    dataframe = feature_extractor.create_dataframe(samples_to_daos)
 
     assert [
         dataframe[column].dtype in (np.float64, np.int64)

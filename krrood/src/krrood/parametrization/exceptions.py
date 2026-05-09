@@ -35,4 +35,4 @@ class InvalidEllipsis(InputError):
     type_: Type
 
     def __post_init__(self):
-        self.message = f"You have set an ellipsis for the type {self.type_}. Ellipses are only allowed for leaf objects."
+        self.message = f"Ellipsis is not allowed for type {self.type_}. Ellipsis are only allowed for the leaf objects (random events compatible types, see `random_events.variable.Variable.compatible_types`)."

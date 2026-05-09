@@ -117,12 +117,11 @@ class Handle(HasRootBody):
         """
 
         x_interval = closed(-scale.x + thickness, 0)
+        y_interval = closed(-scale.y / 2, scale.y / 2)
         z_interval = closed(
             -scale.z / 2 + thickness,
             scale.z / 2 - thickness,
         )
-
-        y_interval = closed(-scale.y / 2, scale.y / 2)
 
         return SimpleEvent.from_data(
             {
@@ -138,9 +137,14 @@ class Handle(HasRootBody):
 
         :return: The pre grasp pose.
         """
-        return Pose.from_xyz_rpy(
-            reference_frame=self.root, x=(self.root.collision.min_point.x - 0.05)
-        )
+        min_p = self.root.collision.min_point
+        max_p = self.root.collision.max_point
+
+        x = min_p.x - 0.05
+        y = (min_p.y + max_p.y) / 2
+        z = (min_p.z + max_p.z) / 2
+
+        return Pose.from_xyz_rpy(x=x, y=y, z=z, reference_frame=self.root)
 
 
 @dataclass(eq=False)

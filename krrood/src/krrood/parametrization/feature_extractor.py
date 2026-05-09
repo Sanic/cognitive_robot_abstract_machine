@@ -26,25 +26,38 @@ if TYPE_CHECKING:
 class FeatureExtractor:
     """
     A class to extract features from a given class. Features are all attributes of the class, propagating custom types/objects down. The features are represented as symbolic variables.
+    A feature extractor provides additional knowledge about the class.
     """
 
-    instances: List[DataAccessObject]
+    features: List[MappedVariable]
     """
-    The instances to extract features from. Can be a single instance or a list.
+    The features extracted from the class/instances.
     """
 
     def __post_init__(self):
-        if not self.instances:
-            raise ValueError("No instances provided.")
+        if not self.features:
+            raise ValueError(
+                "No features provided. If list of instances available, use `FeatureExtractor.from_instances` for instantiation."
+            )
 
-    @cached_property
-    def features(self) -> List[MappedVariable]:
+    @classmethod
+    def from_instances(cls, instances: List[DataAccessObject]) -> FeatureExtractor:
+        """
+        Create a new feature extractor from the given instances.
+        :param instances: The instances to create the feature extractor from.
+        :return: A new feature extractor.
+        """
+        if not instances:
+            raise ValueError("No instances provided")
+
         dao_state = FromDataAccessObjectState()
-        root = variable(type(self.instances[0].from_dao(dao_state)), [])
-        return self._extract_features(self.instances[0], root)
+        root = variable(type(instances[0].from_dao(dao_state)), [])
+        features = cls._extract_features(instances[0], root)
+        return FeatureExtractor(features)
 
+    @classmethod
     def _extract_features(
-        self, example_instance: DataAccessObject, symbolic_root: Variable
+        cls, example_instance: DataAccessObject, symbolic_root: Variable
     ) -> List[MappedVariable]:
         result = []
         seen = set()
@@ -95,12 +108,14 @@ class FeatureExtractor:
             for feature in self.features
         ]
 
-    def create_dataframe(self) -> pd.DataFrame:
+    def create_dataframe(self, instances: List[DataAccessObject]) -> pd.DataFrame:
         """
         Create a dataframe from the given instances.
+        :param instances: The instances to create the dataframe from.
+        :return: A dataframe containing the mapped values for each feature.
         """
         result = []
-        for instance in self.instances:
+        for instance in instances:
             result.append(self.apply_mapping(instance))
         features_names = [feature._name_ for feature in self.features]
         return pd.DataFrame(columns=features_names, data=result)

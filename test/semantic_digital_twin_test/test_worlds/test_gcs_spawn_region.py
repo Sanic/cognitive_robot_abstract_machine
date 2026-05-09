@@ -59,7 +59,7 @@ def test_spawn_as_region(simple_world):
     gcs = navigation_map_at_target(target=target)
 
     # Spawn GCS as region
-    region = gcs.spawn_as_region()
+    region = gcs.create_as_region()
 
     assert isinstance(region, Region)
     assert region in world.regions

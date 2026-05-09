@@ -170,7 +170,7 @@ class UnderspecifiedParameters:
         result = {}
         dao_state = ToDataAccessObjectState()
 
-        extractor = FeatureExtractor(
+        extractor = FeatureExtractor.from_instances(
             [to_dao(attribute_match.assigned_value, dao_state)]
         )
         for feature in extractor.features:
@@ -256,7 +256,7 @@ class UnderspecifiedParameters:
         hashes = [hash(obj) for obj in domain_objects]
         data_access_objects = [to_dao(obj, state=state) for obj in domain_objects]
 
-        extractor = FeatureExtractor(data_access_objects)
+        extractor = FeatureExtractor.from_instances(data_access_objects)
 
         result = {}
 
@@ -370,6 +370,7 @@ class UnderspecifiedParameters:
                 attribute_match.assigned_value
             )
             if not isinstance(mapping, attribute._type_):
+                # this cast is necessary because of the way the mapping is applied to the attribute. For instance, mapping might be Scalar(), but the attribute type is float.
                 mapping = attribute._type_(mapping)
         else:
             mapping = attribute_match.assigned_value

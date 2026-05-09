@@ -646,7 +646,7 @@ class GraphOfConvexSets:
             *[node.simple_event for node in self.graph.nodes()]
         )
 
-    def spawn_as_region(
+    def create_as_region(
         self,
         name: Optional[PrefixedName] = None,
         color: Color = Color(0.5, 1.0, 0.5, 0.5),

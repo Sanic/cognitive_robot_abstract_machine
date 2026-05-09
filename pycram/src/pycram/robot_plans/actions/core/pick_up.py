@@ -150,17 +150,12 @@ class PickUpAction(ActionDescription):
     """
 
     def execute(self) -> None:
-        target_pose = Pose(
-            position=self.object_designator.center_of_mass,
-            orientation=self.object_designator.global_pose.orientation,
-            reference_frame=self.world.root,
-        )
         self.add_subplan(
             sequential(
                 children=[
                     MoveGripperMotion(motion=GripperState.OPEN, gripper=self.arm),
                     ReachAction(
-                        target_pose=target_pose,
+                        target_pose=self.object_designator.global_pose,
                         object_designator=self.object_designator,
                         arm=self.arm,
                         grasp_description=self.grasp_description,

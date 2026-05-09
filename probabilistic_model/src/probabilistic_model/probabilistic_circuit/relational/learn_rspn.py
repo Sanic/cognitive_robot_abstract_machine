@@ -55,12 +55,12 @@ def learn_probabilistic_circuit(
     if c45queue is None:
         c45queue = deque()
 
-    extractor = FeatureExtractor(instances)
+    extractor = FeatureExtractor.from_instances(instances)
 
     if not instances:
         raise ValueError("No instances provided")
 
-    df: pd.DataFrame = extractor.create_dataframe()
+    df: pd.DataFrame = extractor.create_dataframe(instances)
     df = extractor.preprocess_dataframe(df)
     df = df.sort_index(axis=1)
     variables = infer_variables_from_dataframe(df)
