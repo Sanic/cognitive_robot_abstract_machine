@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from collections import UserDict
 from copy import copy
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, lru_cache
 
 from typing_extensions import (
     Dict,
@@ -109,7 +109,8 @@ class SymbolicExpression(ABC):
     def __post_init__(self):
         self._expression_ = self
 
-    @memoize
+    # @memoize
+    @lru_cache
     def _get_expression_by_id_(self, id_: uuid.UUID) -> SymbolicExpression:
         try:
             return next(
@@ -405,12 +406,9 @@ class SymbolicExpression(ABC):
         Does not recurse into ``ResultQuantifier`` children so that inner query
         subtrees remain isolated from outer query traversals.
         """
-        from krrood.entity_query_language.query.quantifiers import ResultQuantifier
-
         yield from self._children_
         for child in self._children_:
-            if not isinstance(child, ResultQuantifier):
-                yield from child._descendants_
+            yield from child._descendants_
 
     @classmethod
     def _current_parent_in_context_stack_(cls) -> Optional[SymbolicExpression]:

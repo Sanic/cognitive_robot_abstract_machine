@@ -1,14 +1,13 @@
-import math
-from typing import List, Union, Optional
-from krrood.entity_query_language.factories import variable_from, entity, flat_variable, in_, the, contains, variable, \
-    an, or_, and_, distinct, exists, not_, concatenation
+from typing import List, Optional
+from krrood.entity_query_language.factories import variable_from, entity, contains, variable, \
+    an, and_, exists, not_, set_of
 from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.predicate import symbolic_function, length
-from krrood.utils import inheritance_path_length, recursive_subclasses
+from krrood.utils import recursive_subclasses
 
 from semantic_digital_twin.reasoning.predicates import (
     is_supported_by,
-    is_supporting, compute_euclidean_planar_distance, issubclass_, type_, inheritance_path_length_,
+    is_supporting, compute_euclidean_planar_distance, type_, inheritance_path_length_,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasSupportingSurface, IsPerceivable, HasRootBody
 from semantic_digital_twin.world import World
@@ -21,7 +20,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 def semantic_annotations_on_surfaces(
-    supporting_surfaces: List[HasSupportingSurface], world: World
+        supporting_surfaces: List[HasSupportingSurface], world: World
 ) -> List[HasRootBody]:
     """
     Queries a list of Semantic annotations that are on top of a given list of other annotations (ex. Tables).
@@ -37,10 +36,11 @@ def semantic_annotations_on_surfaces(
 
     return objects
 
+
 def get_next_object_using_planar_distance(
-    main_body: Body,
-    supporting_surface,
-    ignore_dimension,
+        main_body: Body,
+        supporting_surface,
+        ignore_dimension,
 ) -> Entity[SemanticAnnotation]:
     """
     Queries the next object based on Euclidean distance in x and y coordinates
@@ -69,9 +69,9 @@ def get_next_object_using_planar_distance(
 
 
 def goal_surface_of_object(
-    object_of_interest: SemanticAnnotation,
-    supporting_surfaces: List[HasSupportingSurface],
-    threshold: int = 1,
+        object_of_interest: SemanticAnnotation,
+        supporting_surfaces: List[HasSupportingSurface],
+        threshold: int = 1,
 ) -> Optional[HasSupportingSurface]:
     """
     Finds the most similar object to a given semantic annotation among a list of tables
@@ -88,85 +88,24 @@ def goal_surface_of_object(
     """
     if not supporting_surfaces:
         return None
-
-    # Find the surface that is not supporting anything
-    non_supporting_table = None
-    for supporting_surface in supporting_surfaces:
-        if not is_supporting(supporting_surface.bodies[0]):
-            non_supporting_table = supporting_surface
-            break
-
-    # Query annotations on the surfaces of the tables
-    objects = semantic_annotations_on_surfaces(
-        supporting_surfaces, object_of_interest._world
-    )
-
-    best_distance = math.inf
-    most_similar = None
-
-    # Iterate over each object to find the most similar based on inheritance path length
-    for obj in objects:
-        for cls in type(obj).__mro__:
-            dist = inheritance_path_length(type(object_of_interest), cls)
-            if dist is None:
-                continue
-            if dist < best_distance:
-                best_distance = dist
-                most_similar = obj
-            break  # Once a match is found, no need to check further classes for this object
-
-    # Apply threshold to determine if the match is acceptable
-    if best_distance > threshold or most_similar is None:
-        return non_supporting_table
-
-    # Find the table supporting the most similar object
-    for supporting_surface in supporting_surfaces:
-        if is_supported_by(most_similar.bodies[0], supporting_surface.bodies[0]):
-            return supporting_surface
-
-def goal_surface_of_object_eql(
-    object_of_interest: SemanticAnnotation,
-    supporting_surfaces: List[HasSupportingSurface],
-    threshold: int = 1,
-) -> Optional[HasSupportingSurface]:
-    """
-    Finds the most similar object to a given semantic annotation among a list of tables
-    based on the inheritance path length. If the similarity does not meet the provided
-    threshold, the method attempts to return the table that is not supporting any object.
-    The similarity metric leverages the class hierarchy to compute distances.
-
-    :param object_of_interest: The semantic annotation to compare.
-    :param supporting_surfaces: A list of supporting surfaces semantic annotations to search on top of them for similar objects to the object_of_interest.
-    :param threshold: The maximum acceptable inheritance path length to classify objects
-                      as similar. Defaults to 1.
-    :return: The semantic annotation of the most appropriate surface based on similarity
-             metrics or the non-supporting table when no viable candidate is found, or None if there are no supporting surfaces.
-    """
-    if not supporting_surfaces:
-        return None
-    supporting_surface = variable_from(supporting_surfaces)
+    supporting_surface = variable(HasSupportingSurface, supporting_surfaces)
     supporting_body = supporting_surface.bodies[0]
-    non_supporting_table = entity(supporting_surface).where(exists(supporting_surface, not_(is_supporting(supporting_body))))
+    non_supporting_table = entity(supporting_surface).where(
+        exists(supporting_surface, not_(is_supporting(supporting_body))))
 
     # Query annotations on the surfaces of the tables
-    obj = variable_from(semantic_annotations_on_surfaces(
+    obj = variable(SemanticAnnotation, semantic_annotations_on_surfaces(
         supporting_surfaces, object_of_interest._world
     ))
-    object_filtered_by_type = entity(obj).where(
-        issubclass_(type(object_of_interest), type_(obj))
-        )
 
     inheritance_distance = lambda obj_: inheritance_path_length_(type(object_of_interest), type_(obj_))
-    most_similar = entity(eql.max(object_filtered_by_type, key=inheritance_distance))
-    most_similar_distance = inheritance_distance(most_similar)
-    most_similar = concatenation(most_similar, non_supporting_table)
-    return entity(most_similar).where(or_(and_(most_similar_distance != None,
-                                               most_similar_distance > threshold,
-                                               is_supported_by(most_similar.bodies[0], supporting_surface.bodies[0])
-                                               ),
-                                          most_similar == non_supporting_table
-                                          )
-                                      ).first()
+
+    query = set_of(obj, supporting_surface).where(
+                                                    (distance:=inheritance_distance(obj)) <= threshold,
+                                             is_supported_by(obj.bodies[0],
+                                                             supporting_body)).ordered_by(distance)
+    return next(query[supporting_surface].evaluate(), next(non_supporting_table.evaluate(), None))
+
 
 def filter_annotations_by_color(color: Color, objects: list[SemanticAnnotation]) -> Entity[SemanticAnnotation]:
     """
@@ -186,17 +125,12 @@ def filter_annotations_by_color(color: Color, objects: list[SemanticAnnotation])
     body = object_var.bodies[0]
 
     matching_body = entity(body).where(
-        or_(
-            and_(
-                body.visual != None,
-                length(body.visual.shapes) > 0,
-                body.visual.shapes[0].color == color,
-            ),
-            and_(body.collision != None,
-            length(body.collision.shapes) > 0,
-            body.collision.shapes[0].color == color,
+        and_(
+            body.visual != None,
+            length(body.visual.shapes) > 0,
+            body.visual.shapes[0].color == color,
         )
-    ))
+    )
     semantic_annotation = variable(HasRootBody, world.semantic_annotations)
     return entity(semantic_annotation).where(semantic_annotation.root == matching_body)
 
@@ -209,12 +143,12 @@ def annotation_class_by_label(label: str) -> Optional[type]:
     :param label: The string input from perception (e.g., "bowl_collapsable_yellowgrey").
     :return: The matching class (e.g., Bowl) or None if no match is found.
     """
-    semantic_class = variable_from(recursive_subclasses(IsPerceivable))
+    semantic_class = variable(type_(IsPerceivable), recursive_subclasses(IsPerceivable))
     matching_class = an(entity(semantic_class).where(contains(label.lower(), semantic_class.__name__.lower())))
     return next(matching_class.evaluate(), None)
 
 
-def sort_annotations_by_volume(annotations: List[HasRootBody], order: Optional[bool]=True) -> List[HasRootBody]:
+def sort_annotations_by_volume(annotations: List[HasRootBody], order: Optional[bool] = True) -> List[HasRootBody]:
     """
     Sorts a list of SemanticAnnotations by volume in descending order (largest to smallest).
     Volume is calculated by multiplying the scale dimensions (x * y * z) of the object's shape.

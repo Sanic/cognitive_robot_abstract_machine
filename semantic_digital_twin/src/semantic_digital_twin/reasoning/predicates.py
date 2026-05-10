@@ -308,16 +308,11 @@ def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -
 
     return False
 
-@symbolic_function
-def show_path(annotations: List[SemanticAnnotation]) -> List[List[str]]:
-    result = []
-    for annotation in annotations:
-        result.append(type(annotation).__mro__)
-    return result
 
 @symbolic_function
 def issubclass_(child: Type, parent: Type) -> bool:
     return issubclass(child, parent)
+
 
 @symbolic_function
 def type_(obj: Any):
@@ -326,7 +321,12 @@ def type_(obj: Any):
 
 @symbolic_function
 def inheritance_path_length_(child_class: Type, parent_class: Type) -> Optional[int]:
-    return inheritance_path_length(child_class, parent_class)
+    result = None
+    for t in parent_class.__mro__:
+        result = inheritance_path_length(child_class, t)
+        if result is not None:
+            break
+    return result if result is not None else math.inf
 
 
 
