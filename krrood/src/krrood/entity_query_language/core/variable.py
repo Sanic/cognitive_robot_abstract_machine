@@ -7,6 +7,7 @@ It contains classes for simple variables, constant literals, and variables that 
 from __future__ import annotations
 
 import uuid
+import inspect
 from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -42,6 +43,10 @@ from krrood.entity_query_language.utils import (
     is_iterable,
     make_list,
 )
+from krrood.entity_query_language.explanation import (
+    monitored,
+    record_inferences,
+)
 
 DomainType = Iterable[T]
 """
@@ -69,6 +74,7 @@ class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
         super().__post_init__()
 
 
+@monitored
 @dataclass(eq=False, repr=False)
 class Variable(CanHaveDomainSource[T]):
     """
@@ -167,6 +173,7 @@ class Literal(Variable[T]):
         return super()._name_
 
 
+@monitored
 @dataclass(eq=False, repr=False)
 class InstantiatedVariable(
     MultiArityExpressionThatPerformsACartesianProduct, CanHaveDomainSource[T]
@@ -227,6 +234,7 @@ class InstantiatedVariable(
     ) -> Iterable[OperationResult]:
         yield from self._instantiate_using_child_vars_and_yield_results_(sources)
 
+    @record_inferences
     def _instantiate_using_child_vars_and_yield_results_(
         self, sources: Bindings
     ) -> Iterator[OperationResult]:
@@ -241,6 +249,7 @@ class InstantiatedVariable(
                 if id_ in self._child_var_id_name_map_
             }
             instance = self._type_(**kwargs)
+            
             bindings = {self._id_: instance} | child_result.bindings
             result = self._build_operation_result_and_update_truth_value_(
                 bindings, child_result
@@ -250,6 +259,7 @@ class InstantiatedVariable(
 
     def _replace_child_field_(
         self, old_child: SymbolicExpression, new_child: SymbolicExpression
+
     ):
         MultiArityExpressionThatPerformsACartesianProduct._replace_child_field_(
             self, old_child, new_child

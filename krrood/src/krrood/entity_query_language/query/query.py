@@ -72,6 +72,9 @@ from krrood.entity_query_language.operators.aggregators import Aggregator, Count
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
+from krrood.entity_query_language.explanation import (
+    monitored,
+)
 from krrood.entity_query_language.utils import (
     T,
 )
@@ -85,6 +88,7 @@ A function that maps the results of a query to a new set of results.
 """
 
 
+@monitored
 @dataclass(eq=False, repr=False)
 class Query(
     MultiArityExpressionThatPerformsACartesianProduct, CanBehaveLikeAVariable[T], ABC
