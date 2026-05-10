@@ -121,14 +121,22 @@ def cartesian_product_while_passing_the_bindings_around(
     :param parent: The parent expression.
     :return: An Iterable of Bindings for each combination of values.
     """
-    expression_evaluation_generators = [
-        (
-            lambda bindings, inner_expression=expression: (
+    def _make_stage(inner_expression):
+        def stage(bindings):
+            for result in inner_expression._evaluate_(bindings, parent=parent):
                 result.update(bindings)
-                for result in inner_expression._evaluate_(bindings, parent=parent)
-            )
-        )
-        for expression in expressions
+                # Carry forward satisfied_condition_ids from accumulated bindings
+                # when the current result doesn't have its own satisfaction data
+                if result.satisfied_condition_ids is None:
+                    prev = getattr(bindings, "satisfied_condition_ids", None)
+                    if prev is not None:
+                        result.satisfied_condition_ids = prev
+                yield result
+
+        return stage
+
+    expression_evaluation_generators = [
+        _make_stage(expression) for expression in expressions
     ]
 
     yield from chain_stages(expression_evaluation_generators, sources)

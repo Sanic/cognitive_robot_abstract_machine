@@ -1,10 +1,22 @@
 import pytest
 from dataclasses import dataclass
-from krrood.entity_query_language.factories import inference, entity
+from krrood.entity_query_language.factories import inference, entity, variable_from, and_, or_, not_
 from krrood.entity_query_language.explanation import (
     explain_inference,
     format_inference_explanation, register_inference,
 )
+from krrood.entity_query_language.query.query import Query
+from krrood.rustworkx_utils import GraphVisualizer
+
+
+@dataclass(frozen=True)
+class Person:
+    name: str
+
+
+@dataclass(frozen=True)
+class Item:
+    value: int
 
 @dataclass(frozen=True)
 class Person:
@@ -198,6 +210,321 @@ def test_robust_monitoring_check():
     
     # Should NOT raise AttributeError or any other error
     register_inference(dummy_instance, dummy_var)
-    
+
     # Check that it was NOT recorded
     assert explain_inference(dummy_instance) is None
+
+
+# ============================================================
+# Tests for satisfied condition tracking and condition graph
+# ============================================================
+
+
+def _get_true_results(query: Query):
+    """Build, evaluate a query and return only the true raw OperationResults."""
+    raw_results = list(query._evaluate_())
+    return [r for r in raw_results if r.is_true]
+
+
+def _get_satisfied_names(ids, condition_root):
+    """Get expression names from satisfied condition IDs by traversing the condition tree."""
+    all_cond = [condition_root] + list(condition_root._descendants_)
+    return {e._name_ for e in all_cond if e._id_ in ids}
+
+
+def test_satisfied_conditions_simple():
+    """A single Comparator condition tracks its ID as satisfied."""
+    val = variable_from([6, 3])
+    query = entity(val).where(val > 5)
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    assert result.satisfied_condition_ids is not None
+    assert len(result.satisfied_condition_ids) > 0
+
+
+def test_satisfied_conditions_and_both_true():
+    """AND with both children true: AND and both comparators are satisfied."""
+    val = variable_from([6])
+    query = entity(val).where(and_(val > 5, val < 10))
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    ids = result.satisfied_condition_ids
+    assert ids is not None
+    # Find expressions by traversing condition tree
+    condition_root = val._conditions_root_
+    all_cond = [condition_root] + list(condition_root._descendants_)
+    expressions = {e._name_ for e in all_cond if e._id_ in ids}
+    assert "AND" in expressions
+    assert ">" in expressions
+    assert "<" in expressions
+
+
+def test_satisfied_conditions_and_short_circuit():
+    """AND short-circuits when left is false: only the false comparator recorded."""
+    val = variable_from([3])
+    query = entity(val).where(and_(val > 5, val < 10))
+
+    true_results = _get_true_results(query)
+    # AND is false, so no true results pass the Where filter
+    assert len(true_results) == 0
+
+
+def test_satisfied_conditions_or_first_true():
+    """OR with first child true: short-circuits, right never evaluated."""
+    val = variable_from([6])
+    query = entity(val).where(or_(val > 5, val < 0))
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    ids = result.satisfied_condition_ids
+    assert ids is not None
+    expressions = _get_satisfied_names(ids, val._conditions_root_)
+    assert "OR" in expressions
+    assert ">" in expressions
+    # The right side was short-circuited, should NOT be in satisfied set
+    assert "<" not in expressions
+
+
+def test_satisfied_conditions_or_fallback():
+    """OR with first false, second true: both children evaluated, OR satisfied."""
+    val = variable_from([3])
+    query = entity(val).where(or_(val > 5, val < 10))
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    ids = result.satisfied_condition_ids
+    assert ids is not None
+    expressions = _get_satisfied_names(ids, val._conditions_root_)
+    assert "OR" in expressions
+    # The right side (< 10) is satisfied
+    assert "<" in expressions
+    # The left side (> 5) is false, so NOT satisfied
+    assert ">" not in expressions
+
+
+def test_satisfied_conditions_not():
+    """Not inverts satisfaction: Not is satisfied when its child is false."""
+    val = variable_from([3])
+    query = entity(val).where(not_(val > 5))
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    ids = result.satisfied_condition_ids
+    assert ids is not None
+    expressions = _get_satisfied_names(ids, val._conditions_root_)
+    # Not should be satisfied
+    assert "Not" in expressions
+    # The inner comparator is false, so not satisfied
+    assert ">" not in expressions
+
+
+def test_satisfied_conditions_nested_and_or():
+    """Nested and_(x > 5, or_(x < 2, x == 3)) with x=3: test tree structure."""
+    val = variable_from([3])
+    query = entity(val).where(and_(val > 5, or_(val < 2, val == 3)))
+
+    # val=3: val > 5 is False → AND short-circuits, no true results
+    true_results = _get_true_results(query)
+    assert len(true_results) == 0
+
+
+def test_satisfied_conditions_nested_and_or_satisfied():
+    """Nested and_(x > 5, or_(x < 10, x == -1)) with x=6: AND and OR satisfied."""
+    val = variable_from([6])
+    query = entity(val).where(and_(val > 5, or_(val < 10, val == -1)))
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    ids = result.satisfied_condition_ids
+    assert ids is not None
+    expressions = _get_satisfied_names(ids, val._conditions_root_)
+    assert "AND" in expressions
+    assert "OR" in expressions
+    assert ">" in expressions  # val > 5 is true
+    assert "<" in expressions  # val < 10 is true (first child of OR)
+    # val == -1 is short-circuited by OR, so NOT satisfied
+    assert "==" not in expressions
+
+
+def test_satisfied_conditions_no_where():
+    """Query without where clause: satisfied_condition_ids is None."""
+    val = variable_from([1, 2])
+    query = entity(val)
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 2
+    for result in true_results:
+        assert result.satisfied_condition_ids is None
+
+
+def test_condition_graph_simple():
+    """condition_graph() returns a PyDAG with correct structure for a simple condition."""
+    val = variable_from([6])
+    query = entity(val).where(val > 5)
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    ids = result.satisfied_condition_ids
+    assert ids is not None
+
+    # Build graph manually (without going through InferenceExplanation)
+    from krrood.entity_query_language.core.base_expressions import Filter
+    import rustworkx as rx
+
+    condition_root = val._conditions_root_
+    assert condition_root is not val._root_  # There is a Filter
+
+    # Quick inline graph construction to verify the data is correct
+    graph = rx.PyDAG()
+    expr_to_idx = {}
+
+    def add_node(expr, parent_idx=None):
+        if expr._id_ in expr_to_idx:
+            return expr_to_idx[expr._id_]
+        is_sat = expr._id_ in ids
+        idx = graph.add_node({
+            "name": expr._name_,
+            "is_satisfied": is_sat,
+            "expression": expr,
+        })
+        expr_to_idx[expr._id_] = idx
+        if parent_idx is not None:
+            graph.add_edge(idx, parent_idx, None)
+        for child in expr._children_:
+            add_node(child, idx)
+        return idx
+
+    add_node(condition_root)
+    # Verify graph structure
+    assert graph.num_nodes() > 0
+    # Find the Comparator node
+    comp_nodes = [
+        graph.get_node_data(i)
+        for i in graph.node_indices()
+        if graph.get_node_data(i)["name"] == ">"
+    ]
+    assert len(comp_nodes) == 1
+    assert comp_nodes[0]["is_satisfied"] is True
+
+
+def test_condition_graph_nested():
+    """condition_graph() preserves nested AND/OR tree structure."""
+    val = variable_from([6])
+    query = entity(val).where(and_(val > 5, or_(val < 10, val == -1)))
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    ids = result.satisfied_condition_ids
+    assert ids is not None
+
+    import rustworkx as rx
+    condition_root = val._conditions_root_
+
+    graph = rx.PyDAG()
+    expr_to_idx = {}
+
+    def add_node(expr, parent_idx=None):
+        if expr._id_ in expr_to_idx:
+            return expr_to_idx[expr._id_]
+        is_sat = expr._id_ in ids
+        idx = graph.add_node({
+            "name": expr._name_,
+            "is_satisfied": is_sat,
+            "expression": expr,
+        })
+        expr_to_idx[expr._id_] = idx
+        if parent_idx is not None:
+            graph.add_edge(idx, parent_idx, None)
+        for child in expr._children_:
+            add_node(child, idx)
+        return idx
+
+    add_node(condition_root)
+
+    # Verify structure
+    nodes_by_name = {
+        graph.get_node_data(i)["name"]: graph.get_node_data(i)
+        for i in graph.node_indices()
+    }
+    assert "AND" in nodes_by_name
+    assert "OR" in nodes_by_name
+    assert nodes_by_name["AND"]["is_satisfied"] is True
+    assert nodes_by_name["OR"]["is_satisfied"] is True
+    assert nodes_by_name[">"]["is_satisfied"] is True
+    assert nodes_by_name["<"]["is_satisfied"] is True
+    # == was short-circuited
+    assert nodes_by_name["=="]["is_satisfied"] is False
+
+
+def test_condition_graph_not():
+    """condition_graph() correctly represents a Not condition."""
+    val = variable_from([3])
+    query = entity(val).where(not_(val > 5))
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 1
+    result = true_results[0]
+
+    ids = result.satisfied_condition_ids
+    assert ids is not None
+
+    import rustworkx as rx
+    condition_root = val._conditions_root_
+
+    graph = rx.PyDAG()
+    expr_to_idx = {}
+
+    def add_node(expr, parent_idx=None):
+        if expr._id_ in expr_to_idx:
+            return expr_to_idx[expr._id_]
+        is_sat = expr._id_ in ids
+        idx = graph.add_node({
+            "name": expr._name_,
+            "is_satisfied": is_sat,
+            "expression": expr,
+        })
+        expr_to_idx[expr._id_] = idx
+        if parent_idx is not None:
+            graph.add_edge(idx, parent_idx, None)
+        for child in expr._children_:
+            add_node(child, idx)
+        return idx
+
+    add_node(condition_root)
+
+    nodes_by_name = {
+        graph.get_node_data(i)["name"]: graph.get_node_data(i)
+        for i in graph.node_indices()
+    }
+    assert "Not" in nodes_by_name
+    assert nodes_by_name["Not"]["is_satisfied"] is True
+    assert nodes_by_name[">"]["is_satisfied"] is False
+
+
+def test_condition_graph_no_conditions():
+    """condition_graph() returns None when there are no conditions."""
+    val = variable_from([1, 2])
+    query = entity(val)
+
+    true_results = _get_true_results(query)
+    assert len(true_results) == 2
+    for result in true_results:
+        assert result.satisfied_condition_ids is None

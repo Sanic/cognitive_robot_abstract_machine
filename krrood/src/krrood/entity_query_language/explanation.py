@@ -1,8 +1,17 @@
 import inspect
+import uuid
 import weakref
 from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any, List, Optional, Type, Callable
+
+from typing_extensions import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.core.base_expressions import (
+        OperationResult,
+        Filter,
+    )
 
 
 def filter_stack(
@@ -76,6 +85,68 @@ class InferenceExplanation:
     """
     The root of the query that was used to create the instance.
     """
+    satisfied_condition_ids: Optional[frozenset] = None
+    """
+    A frozenset of UUIDs of condition expressions that were satisfied (truth value = True)
+    during the evaluation that produced this instance. None if no condition information is available.
+    """
+
+    def condition_graph(self):
+        """
+        Build a rustworkx PyDAG of the condition expression tree.
+
+        Each node in the graph has attributes:
+          - ``name``: the expression name (str)
+          - ``is_satisfied``: True if the condition was satisfied, False otherwise
+          - ``expression``: the SymbolicExpression object
+
+        Edges go from child to parent, preserving the original tree structure.
+
+        :return: A ``rustworkx.PyDAG``, or None if no conditions exist or no satisfaction
+            data is available.
+        """
+        if not self.satisfied_condition_ids or self.query_root is None:
+            return None
+
+        condition_root = self.query_node._conditions_root_
+
+        # If condition_root is the overall root, there are no Filter conditions
+        from krrood.entity_query_language.core.base_expressions import Filter
+
+        if not any(
+            isinstance(e, Filter) for e in self.query_root._all_expressions_
+        ):
+            return None
+
+        import rustworkx as rx
+
+        graph = rx.PyDAG()
+        expression_to_index: dict = {}
+
+        def add_node(expr, parent_index=None):
+            if expr._id_ in expression_to_index:
+                return expression_to_index[expr._id_]
+
+            is_satisfied = expr._id_ in self.satisfied_condition_ids
+            node_index = graph.add_node(
+                {
+                    "name": expr._name_,
+                    "is_satisfied": is_satisfied,
+                    "expression": expr,
+                }
+            )
+            expression_to_index[expr._id_] = node_index
+
+            if parent_index is not None:
+                graph.add_edge(node_index, parent_index, None)
+
+            for child in expr._children_:
+                add_node(child, node_index)
+
+            return node_index
+
+        add_node(condition_root)
+        return graph
 
 
 # Dictionary to store inference explanations for instances.
@@ -83,17 +154,25 @@ class InferenceExplanation:
 INFERENCE_RECORD: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 
 
-def register_inference(instance: Any, variable_node: Any) -> None:
+def register_inference(
+    instance: Any, variable_node: Any, result: Optional[Any] = None
+) -> None:
     """
     Register an instance created via inference into the internal records.
 
     :param instance: The instance to record.
     :param variable_node: The variable node that produced the instance.
+    :param result: The OperationResult from the evaluation, carrying satisfied condition IDs.
     """
     # Robust check: Verify monitoring at the class level using type()
     if not getattr(type(variable_node), "_is_monitored_", False):
         return
 
+    satisfied_ids = (
+        result.satisfied_condition_ids
+        if result is not None and hasattr(result, "satisfied_condition_ids")
+        else None
+    )
     explanation = InferenceExplanation(
         instance=instance,
         query_node=variable_node,
@@ -101,6 +180,7 @@ def register_inference(instance: Any, variable_node: Any) -> None:
         stack=variable_node._creation_stack,
         # _root_ is guaranteed by the SymbolicExpression base class
         query_root=variable_node._root_,
+        satisfied_condition_ids=satisfied_ids,
     )
     try:
         INFERENCE_RECORD[instance] = explanation
@@ -122,7 +202,7 @@ def record_inferences(func: Callable) -> Callable:
             # If the current variable produced a binding for itself, record it
             # self._id_ is always present on SymbolicExpression
             if self._id_ in result.bindings:
-                register_inference(result.bindings[self._id_], self)
+                register_inference(result.bindings[self._id_], self, result)
             yield result
 
     return wrapper
