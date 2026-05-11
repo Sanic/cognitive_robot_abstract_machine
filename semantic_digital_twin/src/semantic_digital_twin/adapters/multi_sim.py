@@ -34,7 +34,7 @@ from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     ActiveConnection1DOF,
     FixedConnection,
-    Connection6DoF,
+    Connection6DoF, OmniDrive, DifferentialDrive,
 )
 from semantic_digital_twin.world_description.geometry import (
     Box,
@@ -1550,7 +1550,7 @@ class MujocoBuilder(MultiSimBuilder):
         qpos = []
         for body in self.world.bodies:
             parent_connection = body.parent_connection
-            if isinstance(parent_connection, FixedConnection) or parent_connection is None:
+            if parent_connection is None or any([isinstance(parent_connection, connection_type) for connection_type in [FixedConnection, OmniDrive, DifferentialDrive]]):
                 continue
             qpos += [self.world.state[dof.id].position for dof in parent_connection.active_dofs + parent_connection.passive_dofs]
         key_element.set("qpos", " ".join(map(str, qpos)))
@@ -1684,7 +1684,7 @@ class MujocoBuilder(MultiSimBuilder):
         return True
 
     def _build_connection(self, connection: Connection):
-        if isinstance(connection, FixedConnection):
+        if any([isinstance(connection, connection_type) for connection_type in [FixedConnection, OmniDrive, DifferentialDrive]]):
             return
         joint_props = MujocoJointConverter.convert(connection)
         if "equality_joint" in joint_props:
