@@ -622,3 +622,26 @@ def evaluate_condition(condition: ConditionType) -> bool:
     if type(condition) is bool:
         return condition
     return any(condition.evaluate())
+
+
+@symbolic_function
+def issubclass_(child: Type, parent: Type) -> bool:
+    """
+    Check if a class is a subclass of another class.
+
+    :param child: The class to be checked.
+    :param parent: The class to compare against.
+    :return: True if `child` is a subclass of `parent`, False otherwise.
+    """
+    return issubclass(child, parent)
+
+
+@symbolic_function
+def type_(obj: Any):
+    """
+    Determines the type of the given object.
+
+    :param obj: The object whose type is to be determined.
+    :return: The type of the given object.
+    """
+    return type(obj)

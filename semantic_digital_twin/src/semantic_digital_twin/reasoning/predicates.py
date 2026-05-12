@@ -309,14 +309,7 @@ def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -
     return False
 
 
-@symbolic_function
-def issubclass_(child: Type, parent: Type) -> bool:
-    return issubclass(child, parent)
 
-
-@symbolic_function
-def type_(obj: Any):
-    return type(obj)
 
 
 @symbolic_function

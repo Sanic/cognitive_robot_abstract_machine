@@ -1,13 +1,13 @@
 from typing import List, Optional
 from krrood.entity_query_language.factories import variable_from, entity, contains, variable, \
-    an, and_, exists, not_, set_of
+    an, and_, exists, not_, set_of, type_
 from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.predicate import symbolic_function, length
 from krrood.utils import recursive_subclasses
 
 from semantic_digital_twin.reasoning.predicates import (
     is_supported_by,
-    is_supporting, compute_euclidean_planar_distance, type_, inheritance_path_length_,
+    is_supporting, compute_euclidean_planar_distance, inheritance_path_length_,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasSupportingSurface, IsPerceivable, HasRootBody
 from semantic_digital_twin.world import World
@@ -143,7 +143,7 @@ def annotation_class_by_label(label: str) -> Optional[type]:
     :param label: The string input from perception (e.g., "bowl_collapsable_yellowgrey").
     :return: The matching class (e.g., Bowl) or None if no match is found.
     """
-    semantic_class = variable(type_(IsPerceivable), recursive_subclasses(IsPerceivable))
+    semantic_class = variable_from(recursive_subclasses(IsPerceivable))
     matching_class = an(entity(semantic_class).where(contains(label.lower(), semantic_class.__name__.lower())))
     return next(matching_class.evaluate(), None)
 
