@@ -10,9 +10,11 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
+from semantic_digital_twin.robots.abstract_robot import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
+    Pose,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -26,7 +28,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body, Region, Actuator
 
 from physics_simulators.mujoco_simulator import MujocoSimulator
-from physics_simulators.base_simulator import SimulatorState
+from physics_simulators.base_simulator import SimulatorState, SimulatorConstraints
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoActuator
 
@@ -477,6 +479,7 @@ def test_spawn_body_with_connections():
     finally:
         stop_multisim_if_running(multi_sim)
 
+
 def test_hsrb_loading(hsr_world_copy):
     try:
         multi_sim = MujocoSim(world=hsr_world_copy, headless=headless)
@@ -519,7 +522,9 @@ def test_world_sim_state_sync():
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         reference_frame=falling_box
                     ),
-                    scale=Scale(box_half_size * 2, box_half_size * 2, box_half_size * 2),
+                    scale=Scale(
+                        box_half_size * 2, box_half_size * 2, box_half_size * 2
+                    ),
                     color=Color(1.0, 0.0, 0.0, 1.0),
                 )
             ],
@@ -552,9 +557,9 @@ def test_world_sim_state_sync():
         falling_box, box_connection = spawn_state_sync_scene(world)
 
         body_names = multi_sim.simulator.get_all_body_names().result
-        assert {"ground_plane", "falling_box"}.issubset(body_names), (
-            f"scene bodies were not spawned in the simulator; bodies={body_names}"
-        )
+        assert {"ground_plane", "falling_box"}.issubset(
+            body_names
+        ), f"scene bodies were not spawned in the simulator; bodies={body_names}"
 
         box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=float(init_pos[0]),
@@ -577,3 +582,19 @@ def test_world_sim_state_sync():
         )
     finally:
         stop_multisim_if_running(multi_sim)
+
+
+def test_position_setting_with_hsr(hsr_world_copy):
+    [robot] = hsr_world_copy.get_semantic_annotations_by_type(AbstractRobot)
+    robot.root.parent_connection.origin = Pose.from_xyz_rpy(
+        x=3, y=3, z=0, reference_frame=robot._world.root
+    )
+    multi_sim = MujocoSim(world=hsr_world_copy, headless=headless)
+    constraints = SimulatorConstraints(max_number_of_steps=1)
+    multi_sim.start_simulation(constraints=constraints)
+
+    time.sleep(0.1)
+
+    root_body_name = robot.root.name.name
+    position = multi_sim.simulator.get_body_position(root_body_name).result
+    assert position == pytest.approx([3, 3, 0], abs=1e-3)
