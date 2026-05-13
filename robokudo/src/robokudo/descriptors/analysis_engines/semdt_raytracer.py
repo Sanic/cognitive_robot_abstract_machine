@@ -117,6 +117,8 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01
+        expected_state_desc = ExpectedStateRendererAnnotator.Descriptor()
+        expected_state_desc.parameters.use_support_surface_constraint = True
 
         seq = Pipeline("SemDTRayTracerPipeline")
         seq.add_children(
@@ -132,7 +134,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                     name="RayTracerColorClassifier",
                     descriptor=color_classifier_descriptor,
                 ),
-                ExpectedStateRendererAnnotator(),
+                ExpectedStateRendererAnnotator(descriptor=expected_state_desc),
             ]
         )
         return seq

@@ -57,6 +57,7 @@ class RegionSpec:
     name: str
     pose: HomogeneousTransformationMatrix
     box_scale: Scale
+    parent_name: Optional[str] = None
     color: Color = field(default_factory=Color)
 
 
@@ -176,8 +177,17 @@ class BaseWorldDescriptor:
                 area.append(box)
                 region.area = area
 
+                parent = root
+                if spec.parent_name is not None:
+                    parent_candidates = self.world.get_bodies_by_name(spec.parent_name)
+                    if len(parent_candidates) == 0:
+                        raise ValueError(
+                            f"RegionSpec {spec.name} references unknown parent_name '{spec.parent_name}'."
+                        )
+                    parent = parent_candidates[0]
+
                 connection = Connection6DoF.create_with_dofs(
-                    parent=root, child=region, world=self.world
+                    parent=parent, child=region, world=self.world
                 )
                 self.world.add_connection(connection)
                 connections[spec.name] = connection
