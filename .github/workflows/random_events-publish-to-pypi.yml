@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'random_events/**'
+  workflow_dispatch:
 
 defaults:
   run:
