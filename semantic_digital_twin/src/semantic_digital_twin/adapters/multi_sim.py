@@ -2470,8 +2470,18 @@ class MujocoSynchronizer(MultiSimSynchronizer):
 
     sync_rate_hz: float = 30
     """
-    Rate at which the *sim → world* direction pulls ``_mj_data`` back into
-    ``world.state`` from the physics thread. Set ``<= 0`` to disable.
+    Throttle (in wall-clock Hz) for the *sim → world* direction: how often
+    :meth:`_sim_to_world` is allowed to pull ``_mj_data.qpos`` back into
+    ``world.state`` from the physics thread. ``_sim_to_world`` is invoked
+    after every ``mj_step``, but a call is skipped if less than
+    ``1 / sync_rate_hz`` seconds have elapsed since the last successful sync.
+
+    Set ``<= 0`` to **disable the sim → world direction entirely**: no qpos
+    values are pulled back, so ``world.state`` will not reflect joint motion
+    produced by the simulator (gravity, contacts, actuator dynamics, etc.).
+    The opposite *world → sim* direction (driven by ``_on_state_change``) is
+    independent of this setting and continues to push ``world.state`` changes
+    into MuJoCo regardless.
     """
 
     _last_sync_time: float = field(init=False, default=0.0, repr=False)
