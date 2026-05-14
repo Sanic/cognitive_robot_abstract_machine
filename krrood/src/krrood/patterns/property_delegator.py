@@ -50,8 +50,16 @@ class PropertyDelegator(SubClassSafeGeneric[T], ABC):
 
     @cached_property
     def delegatee(self) -> T:
-        """Return the delegatee instance."""
-        return getattr(self, self.delegatee_attribute_name())
+        """
+        Retrieves the role taker instance.
+
+        Uses object.__getattribute__ to avoid triggering __getattr__ recursion.
+        """
+        attr_name = self.delegatee_attribute_name()
+        try:
+            return object.__getattribute__(self, attr_name)
+        except AttributeError:
+            raise AttributeError(f"Delegatee attribute '{attr_name}' not found.")
 
     @classmethod
     def get_delegatee_type(cls) -> Type[T]:

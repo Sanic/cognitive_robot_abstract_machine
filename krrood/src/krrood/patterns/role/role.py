@@ -28,15 +28,8 @@ from krrood.symbol_graph.symbol_graph import Symbol, PredicateClassRelation, Sym
 from krrood.utils import get_generic_type_param
 
 
-@dataclass(eq=False)
-class HasRoles:
-    """Mixin that gives a role taker a registry of its active roles."""
-
-    roles: Dict[type, Any] = field(default_factory=dict, init=False)
-
-
 @dataclass
-class Role(Symbol, PropertyDelegator[T], HasRoles, ABC):
+class Role(Symbol, PropertyDelegator[T], ABC):
     """
     Represents a role with generic typing. This is used in Role Design Pattern in OOP.
 
@@ -204,38 +197,9 @@ class Role(Symbol, PropertyDelegator[T], HasRoles, ABC):
         return current_cls
 
     @classmethod
-    @lru_cache
-    def get_role_generic_type(cls) -> Type[T] | TypeVar:
-        """
-        :return: The type of the role taker.
-        """
-        if cls is Role:
-            return T
-        res = get_generic_type_param(cls, Role)
-        return res[0] if res else T
-
-    @classmethod
     def get_role_taker_type(cls) -> Type[T]:
         """:return: The type of the role taker."""
         return cls.get_delegatee_type()
-
-    @classmethod
-    @lru_cache
-    def updates_role_taker_type(cls) -> bool:
-        """
-        :return: True if this role inherits from another role and updates its role-taker type, False otherwise.
-        """
-        if Role in cls.__bases__:
-            return False
-        role_taker_type = cls.get_role_taker_type()
-        for parent in cls.__bases__:
-            if not issubclass(parent, Role):
-                continue
-            parent_origin_type = get_origin(parent) or parent
-            parent_role_taker_type = parent_origin_type.get_role_taker_type()
-            if parent_role_taker_type is not role_taker_type:
-                return True
-        return False
 
     @classmethod
     @abstractmethod
@@ -257,25 +221,12 @@ class Role(Symbol, PropertyDelegator[T], HasRoles, ABC):
         """:return: The name of the delegatee field (alias for role_taker_attribute_name)."""
         return cls.role_taker_attribute_name()
 
-    @cached_property
-    def delegatee(self) -> T:
-        """
-        Retrieves the role taker instance.
-
-        Uses object.__getattribute__ to avoid triggering __getattr__ recursion.
-        """
-        attr_name = self.role_taker_attribute_name()
-        try:
-            return object.__getattribute__(self, attr_name)
-        except AttributeError:
-            raise AttributeError(f"Role taker attribute '{attr_name}' not found.")
-
     @property
     def role_taker(self) -> T:
         """The role taker instance — semantic alias for ``delegatee``."""
         return self.delegatee
 
-    @property
+    @cached_property
     def root_persistent_entity(self):
         """
         :return: The root persistent entity in the role hierarchy.
