@@ -10,7 +10,7 @@ from typing_extensions import Optional, Union, List
 
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.role.role import Role
+from krrood.patterns.role import Role
 from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import (

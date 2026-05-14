@@ -24,12 +24,13 @@ from krrood.class_diagrams.utils import (
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.patterns.property_delegator import PropertyDelegator
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol, PredicateClassRelation, SymbolGraph
 from krrood.utils import get_generic_type_param
 
 
 @dataclass
-class Role(Symbol, PropertyDelegator[T], ABC):
+class Role(Symbol, SubClassSafeGeneric[T], ABC):
     """
     Represents a role with generic typing. This is used in Role Design Pattern in OOP.
 
@@ -38,11 +39,8 @@ class Role(Symbol, PropertyDelegator[T], ABC):
     data or behaviour, only extend it.
 
     Role-native attributes are accessed directly from the role instance.  Attributes that
-    belong to the role taker are exposed on the role through the generated ``RoleFor<Taker>``
-    mixin properties (produced by :class:`RoleTransformer`).
-
-    Role takers that inherit from :class:`HasRoles` automatically receive a ``roles`` dict
-    keyed by role type, populated when each role is instantiated.
+    belong to the role taker are exposed on the role through dynamic delegation by overriding
+    the ``__getattr__`` and ``__setattr__`` methods.
 
     Roles and role takers are considered the same entity (same hash, equal):
     >>> student = Student(person=person)
@@ -221,10 +219,39 @@ class Role(Symbol, PropertyDelegator[T], ABC):
             current_cls = current_cls.get_role_taker_type()
         return current_cls
 
+    @cached_property
+    def role_taker(self) -> T:
+        """
+        Retrieves the role taker instance.
+
+        Uses object.__getattribute__ to avoid triggering __getattr__ recursion.
+        """
+        attr_name = self.role_taker_attribute_name()
+        try:
+            return object.__getattribute__(self, attr_name)
+        except AttributeError:
+            raise AttributeError(f"Role taker attribute '{attr_name}' not found.")
+
     @classmethod
     def get_role_taker_type(cls) -> Type[T]:
-        """:return: The type of the role taker."""
-        return cls.get_delegatee_type()
+        """Return the type of the role taker field."""
+        try:
+            type_ = next(
+                f.type for f in fields(cls) if f.name == cls.role_taker_attribute_name()
+            )
+        except StopIteration:
+            type_ = get_generic_type_param(cls, Role)[0]
+        if isinstance(type_, str):
+            try:
+                type_ = sys.modules[cls.__module__].__dict__[type_]
+            except KeyError:
+                type_ = eval(type_, sys.modules[cls.__module__].__dict__)
+        if isinstance(type_, TypeVar):
+            if type_.__bound__ is not None:
+                type_ = type_.__bound__
+            else:
+                raise ValueError(f"TypeVar {type_} has no bound")
+        return type_
 
     @classmethod
     @abstractmethod
@@ -240,16 +267,6 @@ class Role(Symbol, PropertyDelegator[T], ABC):
         :return: The name of the attribute that holds the role taker instance.
         """
         return cls.role_taker_attribute()._attribute_name_
-
-    @classmethod
-    def delegatee_attribute_name(cls) -> str:
-        """:return: The name of the delegatee field (alias for role_taker_attribute_name)."""
-        return cls.role_taker_attribute_name()
-
-    @property
-    def role_taker(self) -> T:
-        """The role taker instance — semantic alias for ``delegatee``."""
-        return self.delegatee
 
     @cached_property
     def root_persistent_entity(self):

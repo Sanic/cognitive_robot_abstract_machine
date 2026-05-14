@@ -6,7 +6,7 @@ import os
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass, is_dataclass
-from dataclasses import field as dataclass_field, InitVar
+from dataclasses import field as dataclass_field
 from functools import cached_property, lru_cache
 from typing import _GenericAlias
 
@@ -18,7 +18,6 @@ from krrood.class_diagrams.utils import resolve_type, get_type_hints_of_object
 from krrood.utils import (
     module_and_class_name,
     own_dataclass_fields,
-    get_generic_type_param,
     memoize,
 )
 
@@ -37,7 +36,6 @@ from typing_extensions import (
     Type,
     TYPE_CHECKING,
     TypeVar,
-    get_type_hints,
     Iterator,
     Generic,
 )
@@ -52,7 +50,7 @@ from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 
 if TYPE_CHECKING:
-    from krrood.patterns.role.role import Role
+    from krrood.patterns.role import Role
 
 
 @dataclass
@@ -397,7 +395,7 @@ class ClassDiagram:
         """
         :return: all classes that are role takers.
         """
-        from krrood.patterns.role.role import Role
+        from krrood.patterns.role import Role
 
         all_takers = []
         for wrapped_class in self.wrapped_classes:
@@ -812,7 +810,7 @@ class ClassDiagram:
 
         :raises: This method does not explicitly raise any exceptions.
         """
-        from krrood.patterns.role.role import Role
+        from krrood.patterns.role import Role
 
         for clazz in self.wrapped_classes:
             for wrapped_field in clazz.fields:

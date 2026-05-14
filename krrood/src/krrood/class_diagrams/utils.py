@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import builtins
 import inspect
 import sys
 from copy import copy
@@ -458,7 +457,7 @@ def issubclass_or_role(child: Type, parent: Type | Tuple[Type, ...]) -> bool:
     :param parent: The parent class.
     :return: True if `child` is a subclass of `parent` or if `child` is a Role for `parent`, False otherwise.
     """
-    from krrood.patterns.role.role import Role
+    from krrood.patterns.role import Role
 
     if issubclass(child, parent):
         return True
@@ -492,7 +491,7 @@ def role_aware_all_nearest_common_ancestors(classes) -> Iterator[Type]:
     if not classes:
         return
 
-    from krrood.patterns.role.role import Role
+    from krrood.patterns.role import Role
 
     # Get MROs as lists
     method_resolution_orders = {cls: copy(cls.mro()) for cls in classes}

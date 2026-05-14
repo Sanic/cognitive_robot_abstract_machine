@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, Field, fields
+from dataclasses import dataclass, field
 
 from typing_extensions import Set, List, Type
 
-from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.role.role import Role
+from krrood.patterns.role import Role
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ontomatic.property_descriptor.mixins import (
     HasInverseProperty,

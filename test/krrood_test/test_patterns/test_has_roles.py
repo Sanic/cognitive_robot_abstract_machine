@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from krrood.patterns.role.role import HasRoles
+from krrood.patterns.role import HasRoles
 from ..dataset.role_and_ontology._ground_truth_transformed_university_ontology_like_classes_without_descriptors import (
     PersonInRoleAndOntology,
     CEOAsFirstRole,

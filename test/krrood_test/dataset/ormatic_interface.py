@@ -2,16 +2,10 @@
 
 from __future__ import annotations
 from sqlalchemy import (
-    Column,
     ForeignKey,
     Integer,
     String,
-    Float,
-    Boolean,
-    DateTime,
-    Enum,
     JSON,
-    Table,
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 
@@ -24,8 +18,7 @@ import krrood.entity_query_language.predicate
 import krrood.ontomatic.property_descriptor.property_descriptor
 import krrood.ormatic.custom_types
 import krrood.ormatic.data_access_objects.alternative_mappings
-import krrood.ormatic.type_dict
-import krrood.patterns.role.role
+import krrood.patterns.role
 import krrood.symbol_graph.symbol_graph
 import sqlalchemy.sql.sqltypes
 import test.krrood_test.dataset.alternative_mappings_construction_order
@@ -35,7 +28,6 @@ import test.krrood_test.dataset.role_and_ontology.role_takers_in_another_module
 import test.krrood_test.dataset.role_and_ontology.university_ontology_like_classes_without_descriptors
 import test.krrood_test.dataset.semantic_world_like_classes
 import typing
-import typing_extensions
 import uuid
 
 
@@ -697,34 +689,6 @@ class GenericClassDAO(
     }
 
 
-class GenericClass_floatDAO(
-    GenericClassDAO,
-    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
-):
-
-    __tablename__ = "GenericClass_floatDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(GenericClassDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
-        use_existing_column=True
-    )
-
-    container: Mapped[typing.List[builtins.float]] = mapped_column(
-        JSON, nullable=False, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "GenericClass_floatDAO",
-        "inherit_condition": database_id == GenericClassDAO.database_id,
-    }
-
-
 class GenericClass_KRROODPositionDAO(
     GenericClassDAO,
     DataAccessObject[
@@ -773,6 +737,34 @@ class GenericClass_KRROODPositionDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "GenericClass_KRROODPositionDAO",
+        "inherit_condition": database_id == GenericClassDAO.database_id,
+    }
+
+
+class GenericClass_floatDAO(
+    GenericClassDAO,
+    DataAccessObject[test.krrood_test.dataset.example_classes.GenericClass[float]],
+):
+
+    __tablename__ = "GenericClass_floatDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(GenericClassDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    optional_value: Mapped[typing.Optional[builtins.float]] = mapped_column(
+        use_existing_column=True
+    )
+
+    container: Mapped[typing.List[builtins.float]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "GenericClass_floatDAO",
         "inherit_condition": database_id == GenericClassDAO.database_id,
     }
 
@@ -2553,7 +2545,7 @@ class RelationshipChildDAO(
     }
 
 
-class RoleDAO(SymbolDAO, DataAccessObject[krrood.patterns.role.role.Role]):
+class RoleDAO(SymbolDAO, DataAccessObject[krrood.patterns.role.Role]):
 
     __tablename__ = "RoleDAO"
 

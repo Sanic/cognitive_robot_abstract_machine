@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.role.role import Role
+from krrood.patterns.role import Role
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 

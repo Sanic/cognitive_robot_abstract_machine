@@ -11,7 +11,7 @@ from krrood.entity_query_language.factories import (
     variable_from,
 )
 from krrood.ormatic.utils import classproperty
-from krrood.patterns.role.role import Role
+from krrood.patterns.role import Role
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent

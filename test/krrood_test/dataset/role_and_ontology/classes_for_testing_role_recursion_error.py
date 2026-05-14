@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.role.role import Role
+from krrood.patterns.role import Role
 
 # ---------------------------------------------------------------------------
 # Simple two-role / one-taker scenario

@@ -1,3 +1,5 @@
+from krrood.patterns.role import Rolefrom krrood.patterns.role import Rolefrom krrood.patterns.role import Rolefrom krrood.patterns.role import Rolefrom krrood.patterns.role import Role
+
 # Role Pattern
 
 ## What is it?
@@ -6,29 +8,17 @@ The **Role** pattern lets an existing object take on a new semantic context — 
 attributes and behaviour — while **remaining the same entity**. A role and its role taker share
 identity: they compare equal, have the same hash, and point to each other through a role registry.
 
-This is the key difference from [PropertyDelegator](property_delegator.md). A `PropertyDelegator`
-wraps a contained object (A has-a B, A ≠ B). A `Role` extends an existing object in context (A is a
-contextual view of B, A == B).
-
-`Role[T]` extends `PropertyDelegator[T]`, so all delegation mechanics described in the
-PropertyDelegator guide apply here too. The Role pattern adds identity sharing, a role registry, and
-support for role chaining on top.
-
 ---
 
 ## Quick example
 
 ### Defining a role taker
 
-The object that *takes on* a role must include `HasRoles`. This mixin adds a `roles` dictionary that
-maps each active role type to the role instance:
-
 ```python
-from krrood.patterns.role import HasRoles
 from dataclasses import dataclass, field
 
 @dataclass(eq=False)
-class Room(SemanticAnnotation, HasRoles):
+class Room(SemanticAnnotation):
     floor: Floor = field(kw_only=True)
 ```
 
@@ -38,20 +28,19 @@ Inherit from `Role[T]` (where `T` is the role taker type), add the role taker as
 implement `role_taker_attribute()` to point to that field:
 
 ```python
-from krrood.patterns.role.role import Role
+from krrood.patterns.role import Role
 from krrood.entity_query_language.factories import variable_from
 
+
 @dataclass(eq=False)
-class Kitchen(Role[Room], DelegatorForRoom):
-    room: Room          # the role taker
+class Kitchen(Role[Room], Room): # The Role should also inherit from the role taker type (only for the IDE support).
+    room: Room = field(kw_only=True) # the role taker should be a keyword-only argument
+    utilities: list[str] = field(default_factory=list)
 
     @classmethod
     def role_taker_attribute(cls) -> Attribute[Room]:
         return variable_from(cls).room
 ```
-
-`DelegatorForRoom` is the generated mixin (see [PropertyDelegator](property_delegator.md)) that
-forwards `Room`'s attributes onto `Kitchen`.
 
 ### Using the role
 
@@ -64,7 +53,7 @@ assert kitchen == room
 assert hash(kitchen) == hash(room)
 
 # Role registry: the room knows about the kitchen
-assert room.roles[Kitchen] is kitchen
+assert Role.roles_for(room, Kitchen)[0] is kitchen
 
 # Room attributes are accessible directly on the kitchen (via delegation)
 kitchen.floor   # → room.floor
@@ -88,36 +77,32 @@ The `semantic_digital_twin` package defines four room roles, all following the s
 
 ```python
 @dataclass(eq=False)
-class Room(SemanticAnnotation, HasRoles):
-    floor: Floor = field(kw_only=True)
-
-@dataclass(eq=False)
-class Kitchen(Role[Room], DelegatorForRoom):
-    room: Room
+class Kitchen(Role[Room], Room):
+    room: Room = field(kw_only=True)
 
     @classmethod
     def role_taker_attribute(cls) -> Attribute[Room]:
         return variable_from(cls).room
 
 @dataclass(eq=False)
-class Bedroom(Role[Room], DelegatorForRoom):
-    room: Room
+class Bedroom(Role[Room], Room):
+    room: Room = field(kw_only=True)
 
     @classmethod
     def role_taker_attribute(cls) -> Attribute[Room]:
         return variable_from(cls).room
 
 @dataclass(eq=False)
-class Bathroom(Role[Room], DelegatorForRoom):
-    room: Room
+class Bathroom(Role[Room], Room):
+    room: Room = field(kw_only=True)
 
     @classmethod
     def role_taker_attribute(cls) -> Attribute[Room]:
         return variable_from(cls).room
 
 @dataclass(eq=False)
-class LivingRoom(Role[Room], DelegatorForRoom):
-    room: Room
+class LivingRoom(Role[Room], Room):
+    room: Room = field(kw_only=True)
 
     @classmethod
     def role_taker_attribute(cls) -> Attribute[Room]:
@@ -138,7 +123,7 @@ assert kitchen == bedroom == living_room == room
 assert hash(kitchen) == hash(bedroom) == hash(living_room) == hash(room)
 
 # The room's registry sees all active roles
-assert room.roles == {Kitchen: kitchen, Bedroom: bedroom, LivingRoom: living_room}
+assert len(Role.roles_for(room, Room)) == 4
 
 # Room attributes are accessible on every role (via DelegatorForRoom)
 kitchen.floor       # → room.floor
@@ -147,8 +132,7 @@ living_room.floor   # → room.floor
 ```
 
 This is the key insight of the Role pattern: the physical entity (`Room`) has a stable identity,
-while its semantic roles come and go. No subclassing is needed, and no separate wrapper objects
-fragment the identity of the thing being modelled.
+while its semantic roles come and go. Accessing of role-taker attributes is direct.
 
 ---
 
@@ -163,12 +147,12 @@ they are contextual relationships that come and go.
 
 ```python
 @dataclass(eq=False)
-class Person(Symbol, HasRoles):
+class Person(Symbol):
     name: str
 
 @dataclass(eq=False)
-class CEO(Role[Person]):
-    person: Person
+class CEO(Role[Person], Person):
+    person: Person = field(kw_only=True)
     head_of: Company = None
 
     @classmethod
@@ -176,8 +160,8 @@ class CEO(Role[Person]):
         return variable_from(cls).person
 
 @dataclass(eq=False)
-class Professor(Role[Person]):
-    person: Person
+class Professor(Role[Person], Person):
+    person: Person = field(kw_only=True)
     teacher_of: List[Course] = field(default_factory=list)
 
     @classmethod
@@ -197,8 +181,8 @@ assert ceo == prof == alice
 assert hash(ceo) == hash(prof) == hash(alice)
 
 # Alice knows about all her roles
-assert alice.roles[CEO] is ceo
-assert alice.roles[Professor] is prof
+assert Role.roles_for(alice, CEO)[0] is ceo
+assert Role.roles_for(alice, Professor)[0] is prof
 
 # Each role carries its own context
 ceo.head_of         # → acme_corp
@@ -212,8 +196,8 @@ A role's role taker can itself be a role, creating a **role chain**. A `CEO` can
 
 ```python
 @dataclass(eq=False)
-class Representative(Role[CEO]):
-    ceo: CEO
+class Representative(Role[CEO], CEO):
+    ceo: CEO = field(kw_only=True)
     represents: Company = None
 
     @classmethod
@@ -231,11 +215,11 @@ assert rep == ceo == alice
 assert hash(rep) == hash(ceo) == hash(alice)
 
 # The root entity sees the full chain
-assert alice.roles[CEO] is ceo
-assert alice.roles[Representative] is rep
+assert Role.roles_for(alice, CEO)[0] is ceo
+assert Role.roles_for(alice, Representative)[0] is rep
 
 # The chain is transparent: each role taker sees all roles
-ceo.roles[Representative] is rep   # CEO knows about its Representative role
+Role.roles_for(ceo, Representative)[0] is rep   # CEO knows about its Representative role
 ```
 
 ### Why roles, not subclasses?
@@ -296,38 +280,34 @@ assert rep == ceo == alice
 assert hash(rep) == hash(ceo) == hash(alice)
 
 # Each role taker in the chain sees all roles
-assert alice.roles[CEO] is ceo
-assert alice.roles[Representative] is rep
+assert Role.roles_for(alice, CEO)[0] is ceo
+assert Role.roles_for(alice, Representative)[0] is rep
 ```
 
 The `Role` class provides helpers to navigate chains:
 
-| Method / Property | Description |
-|---|---|
-| `role.role_taker` | The immediate role taker (may itself be a role). |
-| `Role.get_root_role_taker_type()` | Walks the chain to find the non-Role base type. |
-| `role.role_taker_roles` | All roles registered on the root role taker. |
-| `Role.has_role(entity, RoleType)` | Checks if `entity` (or anything equal to it) has the given role. |
-| `Role.get_taker_roles_of_type(entity, RoleType)` | Returns all roles of a given type. |
-
+| Method / Property                                | Description                                                      |
+|--------------------------------------------------|------------------------------------------------------------------|
+| `role.role_taker`                                | The immediate role taker (may itself be a role).                 |
+| `Role.get_root_role_taker_type()`                | Walks the chain to find the non-Role base type.                  |
+| `role.role_taker_roles`                          | All roles registered on the root role taker.                     |
+| `Role.has_role(entity, RoleType)`                | Checks if `entity` (or anything equal to it) has the given role. |
+| `Role.roles_for(entity, RoleType)`               | Returns all roles of a given type.                               |
 ---
 
 ## How it works
 
 ### `__post_init__`
 
-When a role is constructed, `Role.__post_init__` runs automatically (because `Role` is a
-`@dataclass`). It:
+When a role is constructed, `Role.__init__` runs automatically. It:
 
 1. Retrieves the role taker from the declared field (`role_taker_attribute_name()`).
-2. Registers `self` in `role_taker.roles[type(self)]`.
-3. Updates the symbol graph to link the role and role taker.
+2. Updates the symbol graph to link the role and role taker.
 
 ### `role_taker_attribute()`
 
 This abstract classmethod must be implemented by every role subclass. It returns a symbolic
-`Attribute` reference to the role-taker field, which both the transformer and EQL use for type
-introspection and query generation:
+`Attribute` reference to the role-taker field. This is how `Role` knows which field holds the role taker:
 
 ```python
 @classmethod
@@ -339,13 +319,7 @@ def role_taker_attribute(cls) -> Attribute[Room]:
 
 If the role class and the role taker class share a common base (e.g. both inherit `Symbol`), the
 shared fields — such as a persistent `id` — are not duplicated. The role's fields for those
-attributes are set to `init=False` and delegate to the role taker via the generated mixin.
-
-### The generated `DelegatorFor` mixin
-
-`RoleTransformer` generates a `DelegatorFor<RoleTaker>` mixin (identical in structure to the
-[PropertyDelegator](property_delegator.md) mixin) that forwards every public attribute and method of
-the role taker onto the role. This is how `kitchen.floor` reaches `kitchen.room.floor`.
+attributes are set to `init=False` and delegate to the role taker.
 
 ---
 
@@ -365,17 +339,16 @@ the role taker onto the role. This is how `kitchen.floor` reaches `kitchen.room.
 
 ## When NOT to use the Role pattern
 
-- **The new class changes persistent, identifying properties of the original** — if a `Person` could
-  not exist without being a `CEO`, or if being a `CEO` fundamentally altered what the object *is*
+- **The new class changes persistent, identifying properties of the original** — if a `Fruit` could
+  not exist without being an `Apple`, or if being a `Apple` fundamentally altered what the fruit *is*
   rather than what it *does*, subclassing is the right choice.
 - **The new class has its own persistent identity** — if the concept is a permanently different kind
-  of thing that exists independently (e.g., a `Student` who is always a student, with their own
-  student-ID and enrollment records), it is a subclass, not a role.
-- **You do not need identity sharing** — if the wrapper and the wrapped object can be separate
-  entities, a plain [PropertyDelegator](property_delegator.md) is simpler.
+  of thing that exists independently to its parent class (e.g., a `MustardBottle` is a kind of `Bottle` that has a permenant
+  shape and functionality that identifies it from any other borrle.), it is a subclass, not a role.
+- **You do not need identity sharing**.
 - **You need more than one role of the same type at the same time** — the `roles` dict is keyed by
   type, so only one instance of each role type per role taker is supported.
-- **The role taker type changes after construction** — `delegatee` is a `cached_property`; the role
+- **The role taker type changes after construction** — `role_taker` is a `cached_property`; the role
   taker is fixed.
 
 ---
@@ -387,46 +360,14 @@ the role taker onto the role. This is how `kitchen.floor` reaches `kitchen.room.
 flowchart TD
     Q1{"Should the wrapper and<br/>the original object be<br/>the same entity?"}
     Q2{"Is this a temporary<br/>contextual role, or does it<br/>change persistent identity?"}
-    Q3{"Does the wrapper need<br/>its own attributes beyond<br/>what the original has?"}
     ROLE["<b>Role[T]</b><br/>Identity-sharing, role registry,<br/>optional chaining."]
     SUBCLASS["<b>Subclass / Inheritance</b><br/>The new class has its own<br/>persistent identifying properties."]
-    PD["<b>PropertyDelegator[T]</b><br/>Transparent forwarding,<br/>no identity sharing."]
-    NEITHER["Plain composition or inheritance<br/>may be sufficient."]
+    ASSOCIATION["<b>Association</b><br/>The new class is a different kind<br/>of thing from the original."]
 
     Q1 -->|Yes| Q2
-    Q1 -->|No| Q3
+    Q1 -->|No| Association
     Q2 -->|Temporary / contextual| ROLE
     Q2 -->|Persistent identity change| SUBCLASS
-    Q3 -->|Yes| PD
-    Q3 -->|No| NEITHER
 ```
 
 ---
-
-## API reference
-
-### `Role[T]`
-
-`krrood.patterns.role.role.Role`
-
-| Member | Kind | Description |
-|---|---|---|
-| `role_taker_attribute()` | abstract classmethod | Returns a symbolic `Attribute[T]` pointing to the role-taker field. |
-| `role_taker_attribute_name()` | classmethod | Name of the role-taker field (derived from `role_taker_attribute()`). |
-| `role_taker` | property | Semantic alias for `delegatee`; returns the role taker instance. |
-| `get_role_taker_type()` | classmethod | Returns the type of `T`. |
-| `get_root_role_taker_type()` | classmethod | Walks the chain to find the non-Role base type. |
-| `has_role(entity, RoleType)` | classmethod | `True` if `entity` or any entity equal to it has a role of `RoleType`. |
-| `get_taker_roles_of_type(entity, RoleType)` | classmethod | Returns all roles of `RoleType` for the given entity. |
-| `role_taker_roles` | property | All roles registered on the root role taker. |
-| `all_role_takers` | property | All role taker instances for this role. |
-
-### `HasRoles`
-
-`krrood.patterns.role.role.HasRoles`
-
-A mixin that must be added to any class that will be used as a role taker. It adds:
-
-| Member | Kind | Description |
-|---|---|---|
-| `roles` | field (`Dict[type, Any]`) | Registry mapping role type → role instance. Populated automatically on role construction. |

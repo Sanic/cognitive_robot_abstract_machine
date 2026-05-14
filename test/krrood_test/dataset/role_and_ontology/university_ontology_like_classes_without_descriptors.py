@@ -10,12 +10,12 @@ from test.krrood_test.dataset.role_and_ontology.role_takers_in_another_module im
 from krrood.entity_query_language.factories import variable_from
 from krrood.entity_query_language.predicate import (
     Symbol,
-    Predicate,  # type: ignore
-    HasType,  # type: ignore
-    HasTypes,  # type: ignore
-    length,  # type: ignore
+    # type: ignore
+    # type: ignore
+    # type: ignore
+    # type: ignore
 )
-from krrood.patterns.role.role import Role
+from krrood.patterns.role import Role
 
 
 @dataclass(eq=False)
