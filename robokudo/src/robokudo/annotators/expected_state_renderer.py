@@ -129,6 +129,12 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 self.refinement_convergence_pixel_error: float = 0.15
                 #: Convergence threshold for score change between iterations.
                 self.refinement_convergence_score_delta: float = 0.001
+                #: Require at least this silhouette score before any convergence can trigger.
+                self.refinement_min_outline_score_for_convergence: float = 0.60
+                #: Pixel scale used to normalize centroid error for joint pose-agreement score.
+                self.pose_agreement_centroid_scale_px: float = 25.0
+                #: Weight of centroid penalty in joint pose-agreement score.
+                self.pose_agreement_centroid_weight: float = 0.25
                 #: Require px_err to be below this value before score-delta stop can trigger.
                 self.refinement_score_delta_pixel_error_gate: float = 5.0
                 #: Stop when px_err shows no meaningful improvement for this many iterations.
@@ -504,7 +510,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             return candidate_centers_world[0].astype(np.float64).copy()
 
         best_center = candidate_centers_world[0].astype(np.float64).copy()
-        best_key = (1, float("inf"), float("inf"))
+        best_key = (float("inf"), float("inf"), 1, float("inf"))
         for center_world in candidate_centers_world:
             _, expected_mask = self._render_expected_mask_for_center(
                 object_center_world=center_world,
@@ -522,10 +528,15 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 else float("inf")
             )
             finite_flag = 0 if np.isfinite(pixel_error) else 1
+            agreement_score = self._pose_agreement_score(
+                outline_score=float(outline_match.combined_score),
+                pixel_error=pixel_error,
+            )
             rank_key = (
+                float(-agreement_score),
+                float(-outline_match.combined_score),
                 finite_flag,
                 float(pixel_error),
-                float(-outline_match.combined_score),
             )
             if rank_key < best_key:
                 best_key = rank_key
@@ -563,6 +574,52 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         random_direction /= direction_norm
         random_radius = float(rng.uniform(0.0, magnitude_m))
         return center_world.astype(np.float64) + (random_direction * random_radius)
+
+    def _is_refinement_result_better(
+        self, candidate: RefinementResult, incumbent: RefinementResult
+    ) -> bool:
+        """Rank results by joint silhouette/centroid agreement, then silhouette, then centroid."""
+        candidate_agreement = self._pose_agreement_score(
+            outline_score=float(candidate.outline_match.combined_score),
+            pixel_error=float(candidate.pixel_error),
+        )
+        incumbent_agreement = self._pose_agreement_score(
+            outline_score=float(incumbent.outline_match.combined_score),
+            pixel_error=float(incumbent.pixel_error),
+        )
+        if candidate_agreement > incumbent_agreement + 1e-6:
+            return True
+        if candidate_agreement < incumbent_agreement - 1e-6:
+            return False
+
+        candidate_score = float(candidate.outline_match.combined_score)
+        incumbent_score = float(incumbent.outline_match.combined_score)
+        if candidate_score > incumbent_score + 1e-6:
+            return True
+        if candidate_score < incumbent_score - 1e-6:
+            return False
+
+        candidate_px = float(candidate.pixel_error)
+        incumbent_px = float(incumbent.pixel_error)
+        if np.isfinite(candidate_px) and not np.isfinite(incumbent_px):
+            return True
+        if np.isfinite(candidate_px) and np.isfinite(incumbent_px):
+            return candidate_px < incumbent_px - 1e-3
+        return False
+
+    def _pose_agreement_score(self, outline_score: float, pixel_error: float) -> float:
+        """Combine silhouette score with centroid closeness into one scalar objective."""
+        scale_px = max(
+            float(self.descriptor.parameters.pose_agreement_centroid_scale_px), 1e-3
+        )
+        weight = max(
+            float(self.descriptor.parameters.pose_agreement_centroid_weight), 0.0
+        )
+        clipped_px = float(np.clip(pixel_error, 0.0, scale_px))
+        normalized_penalty = clipped_px / scale_px
+        if not np.isfinite(pixel_error):
+            normalized_penalty = 1.0
+        return float(outline_score) - (weight * normalized_penalty)
 
     def _sample_candidate_centers_free_xyz(
         self,
@@ -945,6 +1002,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         convergence_score_delta = float(
             self.descriptor.parameters.refinement_convergence_score_delta
         )
+        min_outline_score_for_convergence = float(
+            self.descriptor.parameters.refinement_min_outline_score_for_convergence
+        )
         score_delta_pixel_error_gate = float(
             self.descriptor.parameters.refinement_score_delta_pixel_error_gate
         )
@@ -1060,27 +1120,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             ):
                 best_pixel_error = pixel_error
                 last_pixel_error_improvement_iteration = executed_iterations
-            if (
-                best_result is None
-                or (
-                    np.isfinite(current_result.pixel_error)
-                    and not np.isfinite(best_result.pixel_error)
-                )
-                or (
-                    np.isfinite(current_result.pixel_error)
-                    and np.isfinite(best_result.pixel_error)
-                    and current_result.pixel_error < best_result.pixel_error - 1e-3
-                )
-                or (
-                    (
-                        not np.isfinite(current_result.pixel_error)
-                        or not np.isfinite(best_result.pixel_error)
-                        or abs(current_result.pixel_error - best_result.pixel_error)
-                        <= 1e-3
-                    )
-                    and current_result.outline_match.combined_score
-                    > best_result.outline_match.combined_score
-                )
+            if best_result is None or self._is_refinement_result_better(
+                current_result, best_result
             ):
                 best_result = current_result
 
@@ -1093,11 +1134,14 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             if (
                 executed_iterations >= min_iterations_before_convergence
                 and pixel_error <= convergence_pixel_error
+                and outline_match.combined_score >= min_outline_score_for_convergence
             ):
                 current_result.converged = True
                 current_result.stop_reason = (
                     "pixel_error_converged "
                     f"(px_err={pixel_error:.2f} <= {convergence_pixel_error:.2f}, "
+                    f"score={outline_match.combined_score:.3f} >= "
+                    f"{min_outline_score_for_convergence:.3f}, "
                     f"iter={executed_iterations} >= {min_iterations_before_convergence})"
                 )
                 current_result.score_history = list(score_history)
@@ -1111,6 +1155,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 and score_delta <= convergence_score_delta
                 and iteration > 0
                 and pixel_error <= score_delta_pixel_error_gate
+                and outline_match.combined_score >= min_outline_score_for_convergence
             ):
                 if best_result is not None:
                     best_result.converged = True
@@ -1118,6 +1163,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                         "score_delta_converged "
                         f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f}, "
                         f"px_err={pixel_error:.2f} <= {score_delta_pixel_error_gate:.2f}, "
+                        f"score={outline_match.combined_score:.3f} >= "
+                        f"{min_outline_score_for_convergence:.3f}, "
                         f"iter={executed_iterations} >= {min_iterations_before_convergence})"
                     )
                     best_result.iterations = executed_iterations
@@ -1132,6 +1179,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                     "score_delta_converged "
                     f"(delta={score_delta:.6f} <= {convergence_score_delta:.6f}, "
                     f"px_err={pixel_error:.2f} <= {score_delta_pixel_error_gate:.2f}, "
+                    f"score={outline_match.combined_score:.3f} >= "
+                    f"{min_outline_score_for_convergence:.3f}, "
                     f"iter={executed_iterations} >= {min_iterations_before_convergence})"
                 )
                 current_result.score_history = list(score_history)
@@ -1350,6 +1399,15 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             ),
             "refinement_convergence_score_delta": float(
                 self.descriptor.parameters.refinement_convergence_score_delta
+            ),
+            "refinement_min_outline_score_for_convergence": float(
+                self.descriptor.parameters.refinement_min_outline_score_for_convergence
+            ),
+            "pose_agreement_centroid_scale_px": float(
+                self.descriptor.parameters.pose_agreement_centroid_scale_px
+            ),
+            "pose_agreement_centroid_weight": float(
+                self.descriptor.parameters.pose_agreement_centroid_weight
             ),
             "refinement_score_delta_pixel_error_gate": float(
                 self.descriptor.parameters.refinement_score_delta_pixel_error_gate
@@ -1821,16 +1879,18 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         center_world: np.ndarray,
         support_constraint: SupportSurfaceConstraint,
     ) -> tuple[np.ndarray, bool]:
-        """Project center to satisfy signed_distance >= configured non-penetration bound."""
+        """Snap center to configured support-surface contact distance."""
         signed_distance = float(
             np.dot(support_constraint.plane_normal_world, center_world)
             + support_constraint.plane_offset_world
         )
-        deficit = support_constraint.min_center_signed_distance_m - signed_distance
-        if deficit <= 0.0:
+        correction_distance = (
+            support_constraint.min_center_signed_distance_m - signed_distance
+        )
+        if abs(correction_distance) <= 1e-9:
             return center_world, False
         corrected_center = center_world + (
-            support_constraint.plane_normal_world * deficit
+            support_constraint.plane_normal_world * correction_distance
         )
         return corrected_center, True
 

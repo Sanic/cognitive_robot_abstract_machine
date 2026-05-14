@@ -122,8 +122,17 @@ class AnalysisEngine(AnalysisEngineInterface):
         expected_state_desc.parameters.candidate_pose_generation_mode = (
             "support_surface_sampling"
         )
-        expected_state_desc.parameters.candidate_pose_sample_count = 20
+        expected_state_desc.parameters.candidate_pose_sample_count = 60
         expected_state_desc.parameters.candidate_pose_include_seed_center = True
+        expected_state_desc.parameters.candidate_pose_sampling_radius_m = 0.16
+        expected_state_desc.parameters.refinement_max_iterations = 40
+        expected_state_desc.parameters.refinement_max_step_m = 0.02
+        expected_state_desc.parameters.refinement_min_iterations_before_convergence = 5
+        expected_state_desc.parameters.refinement_convergence_pixel_error = 0.05
+        expected_state_desc.parameters.refinement_score_delta_pixel_error_gate = 0.25
+        expected_state_desc.parameters.refinement_pixel_error_patience_iterations = 12
+        expected_state_desc.parameters.refinement_pixel_error_patience_min_delta = 0.01
+        expected_state_desc.parameters.support_surface_plane_clearance_m = 0.002
         expected_state_desc.parameters.save_tuning_log_jsonl = True
         expected_state_desc.parameters.tuning_log_jsonl_path = (
             "/tmp/expected_state_tuning_log.jsonl"
