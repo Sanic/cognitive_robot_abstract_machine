@@ -171,6 +171,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     ) -> None:
         """Initialize renderer with descriptor-based expected-object settings."""
         super().__init__(name, descriptor)
+        # RNG is stateful across updates; recreate only when the configured seed changes.
+        self._candidate_sampling_rng: np.random.Generator | None = None
+        self._candidate_sampling_rng_seed: int | None = None
 
     def compute(self) -> Status:
         """Render expected object view, compare outlines, and publish visualization/metrics."""
@@ -532,9 +535,16 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _create_candidate_sampling_rng(self) -> np.random.Generator:
         """Create RNG instance for candidate generation, honoring descriptor seed."""
         random_seed = int(self.descriptor.parameters.random_seed)
-        if random_seed >= 0:
-            return np.random.default_rng(random_seed)
-        return np.random.default_rng()
+        if (
+            self._candidate_sampling_rng is None
+            or self._candidate_sampling_rng_seed != random_seed
+        ):
+            if random_seed >= 0:
+                self._candidate_sampling_rng = np.random.default_rng(random_seed)
+            else:
+                self._candidate_sampling_rng = np.random.default_rng()
+            self._candidate_sampling_rng_seed = random_seed
+        return self._candidate_sampling_rng
 
     @staticmethod
     def _sample_random_offset_translation(
