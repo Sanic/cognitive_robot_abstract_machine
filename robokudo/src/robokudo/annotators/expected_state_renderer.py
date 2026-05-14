@@ -9,13 +9,18 @@ import time
 
 import cv2
 import numpy as np
+import open3d as o3d
 from py_trees.common import Status
 from sensor_msgs.msg import CameraInfo
 
-from robokudo.annotators.core import BaseAnnotator
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Classification, Encoding, Plane, PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
+from robokudo.utils.annotator_helper import (
+    get_cam_to_world_transform_matrix,
+    get_world_to_cam_transform_matrix,
+)
 from robokudo.utils.semdt_ground_truth import (
     get_ground_truth_world_ref,
     get_gt_pose_from_runtime_world,
@@ -78,7 +83,7 @@ class SupportSurfaceConstraint:
     min_center_signed_distance_m: float
 
 
-class ExpectedStateRendererAnnotator(BaseAnnotator):
+class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     """Render a stubbed expected world state containing only one known object."""
 
     class Descriptor(BaseAnnotator.Descriptor):
@@ -99,6 +104,19 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 self.contour_thickness: int = 1
                 #: Max random translation magnitude applied to initialize refinement (m).
                 self.random_offset_translation_m: float = 0.12
+                #: Candidate-pose generation mode:
+                #: - "free_xyz"
+                #: - "free_xyz_non_intersecting"
+                #: - "support_surface_sampling"
+                self.candidate_pose_generation_mode: str = "free_xyz"
+                #: Number of candidate centers sampled before refinement.
+                self.candidate_pose_sample_count: int = 1
+                #: Include pose-annotation center as an explicit candidate.
+                self.candidate_pose_include_seed_center: bool = False
+                #: Sampling radius around seed center for candidate generation (m).
+                self.candidate_pose_sampling_radius_m: float = 0.12
+                #: Maximum random draws for rejection-based candidate generation.
+                self.candidate_pose_max_sampling_trials: int = 200
                 #: Upper bound on optimization iterations per update.
                 self.refinement_max_iterations: int = 25
                 #: Finite-difference perturbation size for Jacobian estimation (m).
@@ -139,6 +157,10 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
                 self.support_surface_plane_clearance_m: float = 0.003
                 #: Inference margin for lateral on-surface footprint check (meters).
                 self.support_surface_lateral_margin_m: float = 0.04
+                #: Publish 3D visualizer geometry comparing GT and refined pose.
+                self.visualize_pose_comparison_3d: bool = True
+                #: Coordinate-frame size for GT/refined pose markers (meters).
+                self.visualize_pose_comparison_frame_size_m: float = 0.08
 
         parameters = Parameters()
 
@@ -150,7 +172,7 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         """Initialize renderer with descriptor-based expected-object settings."""
         super().__init__(name, descriptor)
 
-    def update(self) -> Status:
+    def compute(self) -> Status:
         """Render expected object view, compare outlines, and publish visualization/metrics."""
         update_start_s = time.perf_counter()
         cam_info, cam_to_world_optical = self._read_camera_context()
@@ -196,8 +218,20 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             image_width=int(cam_info.width),
             image_height=int(cam_info.height),
         )
-        initial_center_world = self._apply_random_translation_offset(
+        random_initial_center_world = self._apply_random_translation_offset(
             target_center_world
+        )
+        candidate_centers_world = self._generate_candidate_pose_centers_world(
+            seed_center_world=random_initial_center_world,
+            gt_object_model=gt_object_model,
+            cam_to_world_optical=cam_to_world_optical,
+        )
+        initial_center_world = self._select_initial_center_from_candidates(
+            candidate_centers_world=candidate_centers_world,
+            detected_mask=detected_mask,
+            gt_object_model=gt_object_model,
+            cam_info=cam_info,
+            cam_to_world_optical=cam_to_world_optical,
         )
         refinement = self._refine_expected_pose_translation(
             initial_center_world=initial_center_world,
@@ -296,6 +330,11 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             expected_mask=expected_mask,
             detected_mask=detected_mask,
         )
+        self._set_pose_comparison_geometries(
+            gt_object_model=gt_object_model,
+            refinement=refinement,
+            gt_evaluation=gt_evaluation,
+        )
 
         self.get_annotator_output_struct().set_image(render_bgr)
         self.feedback_message = (
@@ -363,22 +402,373 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
     def _apply_random_translation_offset(self, center_world: np.ndarray) -> np.ndarray:
         """Return center pose with a uniformly sampled translation perturbation."""
         magnitude = float(self.descriptor.parameters.random_offset_translation_m)
-        if magnitude <= 0.0:
-            return center_world.copy()
+        rng = self._create_candidate_sampling_rng()
+        return self._sample_random_offset_translation(
+            center_world=center_world,
+            magnitude_m=max(magnitude, 0.0),
+            rng=rng,
+        )
+
+    def _generate_candidate_pose_centers_world(
+        self,
+        seed_center_world: np.ndarray,
+        gt_object_model: GroundTruthObjectModel,
+        cam_to_world_optical: np.ndarray,
+    ) -> list[np.ndarray]:
+        """Generate candidate object centers according to configured strategy mode."""
+        mode = (
+            str(self.descriptor.parameters.candidate_pose_generation_mode)
+            .strip()
+            .lower()
+        )
+        sample_count = max(
+            int(self.descriptor.parameters.candidate_pose_sample_count), 1
+        )
+        include_seed = bool(
+            self.descriptor.parameters.candidate_pose_include_seed_center
+        )
+        sampling_radius_m = max(
+            float(self.descriptor.parameters.candidate_pose_sampling_radius_m), 0.0
+        )
+        max_trials = max(
+            int(self.descriptor.parameters.candidate_pose_max_sampling_trials),
+            sample_count,
+        )
+        rng = self._create_candidate_sampling_rng()
+
+        if mode == "free_xyz":
+            centers = self._sample_candidate_centers_free_xyz(
+                seed_center_world=seed_center_world,
+                sample_count=sample_count,
+                include_seed=include_seed,
+                sampling_radius_m=sampling_radius_m,
+                rng=rng,
+            )
+        elif mode == "free_xyz_non_intersecting":
+            centers = self._sample_candidate_centers_free_xyz_non_intersecting(
+                seed_center_world=seed_center_world,
+                sample_count=sample_count,
+                include_seed=include_seed,
+                sampling_radius_m=sampling_radius_m,
+                max_trials=max_trials,
+                gt_object_model=gt_object_model,
+                rng=rng,
+            )
+        elif mode == "support_surface_sampling":
+            centers = self._sample_candidate_centers_support_surface(
+                seed_center_world=seed_center_world,
+                sample_count=sample_count,
+                include_seed=include_seed,
+                sampling_radius_m=sampling_radius_m,
+                gt_object_model=gt_object_model,
+                cam_to_world_optical=cam_to_world_optical,
+                rng=rng,
+            )
+        else:
+            self.rk_logger.warning(
+                "ExpectedState unknown candidate_pose_generation_mode '%s'; falling back to free_xyz.",
+                mode,
+            )
+            centers = self._sample_candidate_centers_free_xyz(
+                seed_center_world=seed_center_world,
+                sample_count=sample_count,
+                include_seed=include_seed,
+                sampling_radius_m=sampling_radius_m,
+                rng=rng,
+            )
+
+        if len(centers) == 0:
+            centers = [seed_center_world.astype(np.float64).copy()]
+        self.rk_logger.info(
+            "ExpectedState candidate generation mode=%s produced %d candidate(s).",
+            mode,
+            len(centers),
+        )
+        return centers
+
+    def _select_initial_center_from_candidates(
+        self,
+        candidate_centers_world: list[np.ndarray],
+        detected_mask: np.ndarray,
+        gt_object_model: GroundTruthObjectModel,
+        cam_info: CameraInfo,
+        cam_to_world_optical: np.ndarray,
+    ) -> np.ndarray:
+        """Choose best initial center by evaluating candidate render-vs-detection agreement."""
+        if len(candidate_centers_world) == 0:
+            raise ValueError("candidate_centers_world must not be empty.")
+        if len(candidate_centers_world) == 1:
+            return candidate_centers_world[0].astype(np.float64).copy()
+
+        best_center = candidate_centers_world[0].astype(np.float64).copy()
+        best_key = (1, float("inf"), float("inf"))
+        for center_world in candidate_centers_world:
+            _, expected_mask = self._render_expected_mask_for_center(
+                object_center_world=center_world,
+                gt_object_model=gt_object_model,
+                cam_info=cam_info,
+                cam_to_world_optical=cam_to_world_optical,
+            )
+            outline_match = self._compute_outline_match(expected_mask, detected_mask)
+            centroid_shift_px = self._centroid_shift_px(
+                expected_mask=expected_mask, detected_mask=detected_mask
+            )
+            pixel_error = (
+                float(np.linalg.norm(centroid_shift_px))
+                if centroid_shift_px is not None
+                else float("inf")
+            )
+            finite_flag = 0 if np.isfinite(pixel_error) else 1
+            rank_key = (
+                finite_flag,
+                float(pixel_error),
+                float(-outline_match.combined_score),
+            )
+            if rank_key < best_key:
+                best_key = rank_key
+                best_center = center_world.astype(np.float64).copy()
+        return best_center
+
+    def _create_candidate_sampling_rng(self) -> np.random.Generator:
+        """Create RNG instance for candidate generation, honoring descriptor seed."""
         random_seed = int(self.descriptor.parameters.random_seed)
         if random_seed >= 0:
-            rng = np.random.default_rng(random_seed)
-        else:
-            rng = np.random.default_rng()
+            return np.random.default_rng(random_seed)
+        return np.random.default_rng()
+
+    @staticmethod
+    def _sample_random_offset_translation(
+        center_world: np.ndarray,
+        magnitude_m: float,
+        rng: np.random.Generator,
+    ) -> np.ndarray:
+        """Sample one isotropic random 3D offset around center."""
+        if magnitude_m <= 0.0:
+            return center_world.astype(np.float64).copy()
         random_direction = rng.normal(size=3).astype(np.float64)
         direction_norm = float(np.linalg.norm(random_direction))
         if direction_norm < 1e-9:
             random_direction = np.array([1.0, 0.0, 0.0], dtype=np.float64)
             direction_norm = 1.0
         random_direction /= direction_norm
-        random_radius = float(rng.uniform(0.0, magnitude))
-        offset = random_direction * random_radius
-        return center_world + offset
+        random_radius = float(rng.uniform(0.0, magnitude_m))
+        return center_world.astype(np.float64) + (random_direction * random_radius)
+
+    def _sample_candidate_centers_free_xyz(
+        self,
+        seed_center_world: np.ndarray,
+        sample_count: int,
+        include_seed: bool,
+        sampling_radius_m: float,
+        rng: np.random.Generator,
+    ) -> list[np.ndarray]:
+        """Sample candidate centers with unconstrained free XYZ perturbations."""
+        candidates: list[np.ndarray] = []
+        if include_seed:
+            candidates.append(seed_center_world.astype(np.float64).copy())
+
+        for _ in range(sample_count):
+            candidates.append(
+                self._sample_random_offset_translation(
+                    center_world=seed_center_world,
+                    magnitude_m=sampling_radius_m,
+                    rng=rng,
+                )
+            )
+        return candidates
+
+    def _sample_candidate_centers_free_xyz_non_intersecting(
+        self,
+        seed_center_world: np.ndarray,
+        sample_count: int,
+        include_seed: bool,
+        sampling_radius_m: float,
+        max_trials: int,
+        gt_object_model: GroundTruthObjectModel,
+        rng: np.random.Generator,
+    ) -> list[np.ndarray]:
+        """Sample free-XYZ candidates that do not intersect other world geometry."""
+        candidates: list[np.ndarray] = []
+        if include_seed and not self._candidate_center_intersects_world(
+            center_world=seed_center_world,
+            gt_object_model=gt_object_model,
+        ):
+            candidates.append(seed_center_world.astype(np.float64).copy())
+
+        trials = 0
+        while len(candidates) < sample_count and trials < max_trials:
+            trials += 1
+            candidate_center = self._sample_random_offset_translation(
+                center_world=seed_center_world,
+                magnitude_m=sampling_radius_m,
+                rng=rng,
+            )
+            if self._candidate_center_intersects_world(
+                center_world=candidate_center,
+                gt_object_model=gt_object_model,
+            ):
+                continue
+            candidates.append(candidate_center)
+
+        if len(candidates) == 0:
+            self.rk_logger.warning(
+                "ExpectedState free_xyz_non_intersecting generated no collision-free candidate."
+            )
+        return candidates
+
+    def _sample_candidate_centers_support_surface(
+        self,
+        seed_center_world: np.ndarray,
+        sample_count: int,
+        include_seed: bool,
+        sampling_radius_m: float,
+        gt_object_model: GroundTruthObjectModel,
+        cam_to_world_optical: np.ndarray,
+        rng: np.random.Generator,
+    ) -> list[np.ndarray]:
+        """Sample candidate centers in local tangent plane of inferred support surface."""
+        support_constraint = self._resolve_support_surface_constraint(
+            gt_object_model=gt_object_model,
+            cam_to_world_optical=cam_to_world_optical,
+            respect_parameter_gate=False,
+        )
+        if support_constraint is None:
+            self.rk_logger.warning(
+                "ExpectedState support_surface_sampling fallback to free_xyz (no support surface)."
+            )
+            return self._sample_candidate_centers_free_xyz(
+                seed_center_world=seed_center_world,
+                sample_count=sample_count,
+                include_seed=include_seed,
+                sampling_radius_m=sampling_radius_m,
+                rng=rng,
+            )
+
+        seed_projected, _ = self._project_center_onto_support_surface_halfspace(
+            center_world=seed_center_world.astype(np.float64).copy(),
+            support_constraint=support_constraint,
+        )
+        normal = support_constraint.plane_normal_world.astype(np.float64)
+        tangent_a = np.cross(normal, np.array([1.0, 0.0, 0.0], dtype=np.float64))
+        if np.linalg.norm(tangent_a) < 1e-6:
+            tangent_a = np.cross(normal, np.array([0.0, 1.0, 0.0], dtype=np.float64))
+        tangent_a = tangent_a / max(float(np.linalg.norm(tangent_a)), 1e-9)
+        tangent_b = np.cross(normal, tangent_a)
+        tangent_b = tangent_b / max(float(np.linalg.norm(tangent_b)), 1e-9)
+
+        candidates: list[np.ndarray] = []
+        if include_seed:
+            candidates.append(seed_projected.copy())
+
+        for _ in range(sample_count):
+            radius = float(rng.uniform(0.0, sampling_radius_m))
+            angle = float(rng.uniform(-np.pi, np.pi))
+            lateral_offset = (
+                np.cos(angle) * tangent_a + np.sin(angle) * tangent_b
+            ) * radius
+            candidate = seed_projected + lateral_offset
+            candidate, _ = self._project_center_onto_support_surface_halfspace(
+                center_world=candidate,
+                support_constraint=support_constraint,
+            )
+            candidates.append(candidate)
+        return candidates
+
+    def _candidate_center_intersects_world(
+        self,
+        center_world: np.ndarray,
+        gt_object_model: GroundTruthObjectModel,
+    ) -> bool:
+        """Check whether candidate object AABB overlaps with any other collidable body AABB."""
+        world = get_ground_truth_world_ref(self.get_cas())
+        if world is None:
+            return False
+        target_bodies = world.get_bodies_by_name(gt_object_model.body_name)
+        target_body = target_bodies[0] if len(target_bodies) > 0 else None
+        candidate_min, candidate_max = self._candidate_object_world_aabb(
+            center_world=center_world,
+            gt_object_model=gt_object_model,
+        )
+        epsilon_m = 1e-4
+        candidate_bodies = world.get_kinematic_structure_entity_by_type(Body)
+        if candidate_bodies is None:
+            return False
+
+        for body in candidate_bodies:
+            if (
+                body is target_body
+                or body.collision is None
+                or len(body.collision) == 0
+            ):
+                continue
+            obstacle_bb = body.collision.as_bounding_box_collection_in_frame(
+                world.root
+            ).bounding_box()
+            obstacle_min = np.array(
+                [
+                    float(obstacle_bb.origin.x + obstacle_bb.min_x),
+                    float(obstacle_bb.origin.y + obstacle_bb.min_y),
+                    float(obstacle_bb.origin.z + obstacle_bb.min_z),
+                ],
+                dtype=np.float64,
+            )
+            obstacle_max = np.array(
+                [
+                    float(obstacle_bb.origin.x + obstacle_bb.max_x),
+                    float(obstacle_bb.origin.y + obstacle_bb.max_y),
+                    float(obstacle_bb.origin.z + obstacle_bb.max_z),
+                ],
+                dtype=np.float64,
+            )
+            overlap = np.minimum(candidate_max, obstacle_max) - np.maximum(
+                candidate_min, obstacle_min
+            )
+            if np.all(overlap > epsilon_m):
+                return True
+        return False
+
+    @staticmethod
+    def _candidate_object_world_aabb(
+        center_world: np.ndarray, gt_object_model: GroundTruthObjectModel
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Compute candidate object's world-aligned AABB from model geometry/orientation."""
+        if (
+            gt_object_model.shape_type == "box"
+            and gt_object_model.box_scale is not None
+        ):
+            half_extents_local = 0.5 * np.array(
+                [
+                    float(gt_object_model.box_scale.x),
+                    float(gt_object_model.box_scale.y),
+                    float(gt_object_model.box_scale.z),
+                ],
+                dtype=np.float64,
+            )
+            half_extents_world = (
+                np.abs(gt_object_model.rotation_world) @ half_extents_local
+            )
+        elif (
+            gt_object_model.shape_type == "cylinder"
+            and gt_object_model.cylinder_width is not None
+            and gt_object_model.cylinder_height is not None
+        ):
+            axis_world = gt_object_model.rotation_world[:, 2].astype(np.float64)
+            axis_norm = max(float(np.linalg.norm(axis_world)), 1e-9)
+            axis_world = axis_world / axis_norm
+            radius = 0.5 * float(gt_object_model.cylinder_width)
+            half_height = 0.5 * float(gt_object_model.cylinder_height)
+            half_extents_world = np.zeros(3, dtype=np.float64)
+            for axis_idx in range(3):
+                axial_component = abs(float(axis_world[axis_idx]))
+                radial_component = float(np.sqrt(max(0.0, 1.0 - (axial_component**2))))
+                half_extents_world[axis_idx] = (axial_component * half_height) + (
+                    radial_component * radius
+                )
+        else:
+            half_extents_world = np.zeros(3, dtype=np.float64)
+
+        center = center_world.astype(np.float64)
+        return center - half_extents_world, center + half_extents_world
 
     def _evaluate_refinement_against_ground_truth(
         self, initial_center_world: np.ndarray, refinement: RefinementResult
@@ -918,6 +1308,21 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
             "random_offset_translation_m": float(
                 self.descriptor.parameters.random_offset_translation_m
             ),
+            "candidate_pose_generation_mode": str(
+                self.descriptor.parameters.candidate_pose_generation_mode
+            ),
+            "candidate_pose_sample_count": int(
+                self.descriptor.parameters.candidate_pose_sample_count
+            ),
+            "candidate_pose_include_seed_center": bool(
+                self.descriptor.parameters.candidate_pose_include_seed_center
+            ),
+            "candidate_pose_sampling_radius_m": float(
+                self.descriptor.parameters.candidate_pose_sampling_radius_m
+            ),
+            "candidate_pose_max_sampling_trials": int(
+                self.descriptor.parameters.candidate_pose_max_sampling_trials
+            ),
             "refinement_max_iterations": int(
                 self.descriptor.parameters.refinement_max_iterations
             ),
@@ -1139,9 +1544,12 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         self,
         gt_object_model: GroundTruthObjectModel,
         cam_to_world_optical: np.ndarray,
+        respect_parameter_gate: bool = True,
     ) -> SupportSurfaceConstraint | None:
         """Infer support surface from SemDT world, then fall back to Plane annotation."""
-        if not bool(self.descriptor.parameters.use_support_surface_constraint):
+        if respect_parameter_gate and not bool(
+            self.descriptor.parameters.use_support_surface_constraint
+        ):
             return None
 
         inferred = self._infer_support_surface_constraint_from_ground_truth_world(
@@ -1448,10 +1856,11 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         cam_info = cas.get(CASViews.CAM_INFO)
         if not isinstance(cam_info, CameraInfo):
             return None, None
-        cam_to_world_optical = cas.cam_to_world_transform
-        if cam_to_world_optical is None:
+        try:
+            cam_to_world_optical = get_cam_to_world_transform_matrix(cas)
+        except KeyError:
             return cam_info, None
-        return cam_info, cam_to_world_optical.to_np()
+        return cam_info, cam_to_world_optical
 
     def _find_target_object(self) -> ObjectHypothesis | None:
         """Return best-matching target hypothesis by classname and highest confidence."""
@@ -1730,6 +2139,146 @@ class ExpectedStateRendererAnnotator(BaseAnnotator):
         if detected_contour is not None:
             cv2.drawContours(vis, [detected_contour], -1, (0, 0, 255), thickness)
         return vis
+
+    def _set_pose_comparison_geometries(
+        self,
+        gt_object_model: GroundTruthObjectModel,
+        refinement: RefinementResult,
+        gt_evaluation: GroundTruthPoseEvaluation | None,
+    ) -> None:
+        """Publish cloud + GT/final object geometries into the 3D visualizer output."""
+        if not bool(self.descriptor.parameters.visualize_pose_comparison_3d):
+            return
+
+        cloud = self.get_cas().get(CASViews.CLOUD)
+        vis_geometries = []
+        if cloud is not None:
+            vis_geometries.append({"name": "cloud", "geometry": cloud})
+
+        try:
+            world_to_cam_optical = get_world_to_cam_transform_matrix(self.get_cas())
+        except KeyError as err:
+            self.rk_logger.warning(
+                "ExpectedState pose-comparison 3D visualization unavailable: %s",
+                str(err),
+            )
+            self.get_annotator_output_struct().set_geometries(vis_geometries)
+            return
+        frame_size = max(
+            float(self.descriptor.parameters.visualize_pose_comparison_frame_size_m),
+            0.01,
+        )
+
+        final_pose_world = np.eye(4, dtype=np.float64)
+        final_pose_world[:3, :3] = gt_object_model.rotation_world
+        final_pose_world[:3, 3] = refinement.center_world.astype(np.float64)
+        vis_geometries.extend(
+            self._build_pose_visual_geometries(
+                object_pose_world=final_pose_world,
+                world_to_cam_optical=world_to_cam_optical,
+                gt_object_model=gt_object_model,
+                mesh_color_rgb=np.array([0.1, 0.85, 0.25], dtype=np.float64),
+                frame_size_m=frame_size,
+                geometry_name_prefix="expected_final_refined",
+            )
+        )
+
+        gt_center_world = None
+        if gt_evaluation is not None:
+            gt_center_world = gt_evaluation.gt_center_world.astype(np.float64)
+        else:
+            gt_pose_world = get_gt_pose_from_runtime_world(
+                self.get_cas(), gt_object_model.body_name
+            )
+            if gt_pose_world is not None:
+                gt_center_world = np.asarray(gt_pose_world[:3, 3], dtype=np.float64)
+
+        if gt_center_world is not None:
+            gt_pose_world = np.eye(4, dtype=np.float64)
+            gt_pose_world[:3, :3] = gt_object_model.rotation_world
+            gt_pose_world[:3, 3] = gt_center_world
+            vis_geometries.extend(
+                self._build_pose_visual_geometries(
+                    object_pose_world=gt_pose_world,
+                    world_to_cam_optical=world_to_cam_optical,
+                    gt_object_model=gt_object_model,
+                    mesh_color_rgb=np.array([0.95, 0.2, 0.2], dtype=np.float64),
+                    frame_size_m=frame_size,
+                    geometry_name_prefix="ground_truth",
+                )
+            )
+        else:
+            self.rk_logger.warning(
+                "ExpectedState pose-comparison 3D visualization skipped GT pose "
+                "(no runtime GT pose available for '%s').",
+                gt_object_model.body_name,
+            )
+
+        self.get_annotator_output_struct().set_geometries(vis_geometries)
+
+    def _build_pose_visual_geometries(
+        self,
+        object_pose_world: np.ndarray,
+        world_to_cam_optical: np.ndarray,
+        gt_object_model: GroundTruthObjectModel,
+        mesh_color_rgb: np.ndarray,
+        frame_size_m: float,
+        geometry_name_prefix: str,
+    ) -> list[dict[str, object]]:
+        """Build mesh + frame geometry for one object pose in camera coordinates."""
+        object_pose_cam = world_to_cam_optical @ object_pose_world
+        object_mesh = self._create_o3d_mesh_for_gt_object_model(gt_object_model)
+        object_mesh.paint_uniform_color(mesh_color_rgb.astype(float))
+        object_mesh.transform(object_pose_cam)
+
+        pose_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
+            size=float(frame_size_m)
+        )
+        pose_frame.transform(object_pose_cam)
+
+        return [
+            {"name": f"{geometry_name_prefix}_mesh", "geometry": object_mesh},
+            {"name": f"{geometry_name_prefix}_frame", "geometry": pose_frame},
+        ]
+
+    @staticmethod
+    def _create_o3d_mesh_for_gt_object_model(
+        gt_object_model: GroundTruthObjectModel,
+    ) -> o3d.geometry.TriangleMesh:
+        """Create centered Open3D mesh matching GT object primitive dimensions."""
+        if (
+            gt_object_model.shape_type == "box"
+            and gt_object_model.box_scale is not None
+        ):
+            sx = float(gt_object_model.box_scale.x)
+            sy = float(gt_object_model.box_scale.y)
+            sz = float(gt_object_model.box_scale.z)
+            mesh = o3d.geometry.TriangleMesh.create_box(
+                width=sx,
+                height=sy,
+                depth=sz,
+            )
+            mesh.translate(
+                np.array([-0.5 * sx, -0.5 * sy, -0.5 * sz], dtype=np.float64)
+            )
+            mesh.compute_vertex_normals()
+            return mesh
+        if (
+            gt_object_model.shape_type == "cylinder"
+            and gt_object_model.cylinder_width is not None
+            and gt_object_model.cylinder_height is not None
+        ):
+            radius = 0.5 * float(gt_object_model.cylinder_width)
+            height = float(gt_object_model.cylinder_height)
+            mesh = o3d.geometry.TriangleMesh.create_cylinder(
+                radius=radius,
+                height=height,
+            )
+            mesh.compute_vertex_normals()
+            return mesh
+        raise ValueError(
+            f"Unsupported GT object model shape '{gt_object_model.shape_type}' for visualization."
+        )
 
     def _build_expected_world(
         self,

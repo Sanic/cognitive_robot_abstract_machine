@@ -119,6 +119,18 @@ class AnalysisEngine(AnalysisEngineInterface):
         plane_desc.parameters.distance_threshold = 0.01
         expected_state_desc = ExpectedStateRendererAnnotator.Descriptor()
         expected_state_desc.parameters.use_support_surface_constraint = True
+        expected_state_desc.parameters.candidate_pose_generation_mode = (
+            "support_surface_sampling"
+        )
+        expected_state_desc.parameters.candidate_pose_sample_count = 20
+        expected_state_desc.parameters.candidate_pose_include_seed_center = True
+        expected_state_desc.parameters.save_tuning_log_jsonl = True
+        expected_state_desc.parameters.tuning_log_jsonl_path = (
+            "/tmp/expected_state_tuning_log.jsonl"
+        )
+        expected_state_desc.parameters.save_run_images = True
+        expected_state_desc.parameters.run_image_output_dir = "/tmp/expected_state_runs"
+        expected_state_desc.parameters.random_seed = 0
 
         seq = Pipeline("SemDTRayTracerPipeline")
         seq.add_children(
