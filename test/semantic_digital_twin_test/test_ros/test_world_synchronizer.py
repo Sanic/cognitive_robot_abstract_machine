@@ -422,51 +422,54 @@ def test_callback_pausing(rclpy_node):
 
 
 def test_ChangeDifHasHardwareInterface(rclpy_node):
+    n = 0
+    while n < 10:
+        w1 = World(name="w1")
+        w2 = World(name="w2")
 
-    w1 = World(name="w1")
-    w2 = World(name="w2")
-
-    synchronizer_1 = ModelSynchronizer(
-        node=rclpy_node,
-        _world=w1,
-    )
-    synchronizer_2 = ModelSynchronizer(
-        node=rclpy_node,
-        _world=w2,
-    )
-
-    with w1.modify_world():
-        body1 = Body(name=PrefixedName("b1"))
-        body2 = Body(name=PrefixedName("b2"))
-        w1.add_kinematic_structure_entity(body1)
-        w1.add_kinematic_structure_entity(body2)
-        dof = DegreeOfFreedom(name=PrefixedName("dof"))
-        w1.add_degree_of_freedom(dof)
-        connection = PrismaticConnection(
-            dof_id=dof.id, parent=body1, child=body2, axis=Vector3(1, 1, 1)
+        synchronizer_1 = ModelSynchronizer(
+            node=rclpy_node,
+            _world=w1,
         )
-        w1.add_connection(connection)
-    assert len(w1.kinematic_structure_entities) == 2
-    assert len(w1.connections) == 1
+        synchronizer_2 = ModelSynchronizer(
+            node=rclpy_node,
+            _world=w2,
+        )
 
-    time.sleep(0.2)
-    assert len(w1.kinematic_structure_entities) == 2
-    assert len(w2.kinematic_structure_entities) == 2
-    assert len(w2.connections) == 1
-    assert not w2.connections[0].dof.has_hardware_interface
-    assert not w2.connections[0].dof.has_hardware_interface
+        with w1.modify_world():
+            body1 = Body(name=PrefixedName("b1"))
+            body2 = Body(name=PrefixedName("b2"))
+            w1.add_kinematic_structure_entity(body1)
+            w1.add_kinematic_structure_entity(body2)
+            dof = DegreeOfFreedom(name=PrefixedName("dof"))
+            w1.add_degree_of_freedom(dof)
+            connection = PrismaticConnection(
+                dof_id=dof.id, parent=body1, child=body2, axis=Vector3(1, 1, 1)
+            )
+            w1.add_connection(connection)
+        assert len(w1.kinematic_structure_entities) == 2
+        assert len(w1.connections) == 1
 
-    assert w2.get_kinematic_structure_entity_by_name("b2")
+        time.sleep(0.2)
+        assert len(w1.kinematic_structure_entities) == 2
+        assert len(w2.kinematic_structure_entities) == 2
+        assert len(w2.connections) == 1
+        assert not w2.connections[0].dof.has_hardware_interface
+        assert not w2.connections[0].dof.has_hardware_interface
 
-    with w1.modify_world():
-        w1.set_dofs_has_hardware_interface(w1.degrees_of_freedom, True)
+        assert w2.get_kinematic_structure_entity_by_name("b2")
 
-    time.sleep(0.2)
-    assert w1.connections[0].dof.has_hardware_interface
-    assert w2.connections[0].dof.has_hardware_interface
+        with w1.modify_world():
+            w1.set_dofs_has_hardware_interface(w1.degrees_of_freedom, True)
 
-    synchronizer_1.close()
-    synchronizer_2.close()
+        time.sleep(0.2)
+        assert w1.connections[0].dof.has_hardware_interface
+        assert w2.connections[0].dof.has_hardware_interface
+
+        synchronizer_1.close()
+        synchronizer_2.close()
+
+        n += 1
 
 
 def test_semantic_annotation_modifications(rclpy_node):
