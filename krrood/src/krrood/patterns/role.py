@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import sys
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, fields, is_dataclass, MISSING
+from dataclasses import dataclass, field, fields, is_dataclass, MISSING, Field
 from functools import lru_cache, cached_property
 
 from typing_extensions import (
     Type,
-    get_origin,
     Any,
     Dict,
     List,
@@ -23,7 +22,6 @@ from krrood.class_diagrams.utils import (
 )
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.core.mapped_variable import Attribute
-from krrood.entity_query_language.utils import merge_args_and_kwargs
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol, PredicateClassRelation, SymbolGraph
 from krrood.utils import get_generic_type_param
@@ -63,42 +61,107 @@ class Role(Symbol, SubClassSafeGeneric[T], ABC):
              the role class are not provided in kwargs and are not present on the role taker, it attempts to set them
               to their default values if available, otherwise raises a ValueError.
             """
-            role_taker_name = self.__class__.role_taker_attribute_name()
-            init_kwargs = merge_args_and_kwargs(
-                self.__class__.__init__, args, init_kwargs, ignore_first=True
-            )
+            role_taker_name = self.role_taker_attribute_name()
+
             if role_taker_name not in init_kwargs:
-                # Assumes that you want to create a new role taker instance as well, if the role taker is not provided
-                # in the kwargs.
-                role_taker_init_kwargs = {
-                    k: v
-                    for k, v in init_kwargs.items()
-                    if k in self.role_taker_field_names
-                }
-                setattr(
-                    self,
-                    role_taker_name,
-                    self.get_role_taker_type()(**role_taker_init_kwargs),
-                )
-                for k, v in init_kwargs.items():
-                    if k not in self.role_taker_field_names:
-                        setattr(self, k, v)
+                self._initialize_role_taker_and_self(*args, **init_kwargs)
                 return
+
             setattr(self, role_taker_name, init_kwargs.pop(role_taker_name))
             for k, v in init_kwargs.items():
                 setattr(self, k, v)
-            self._overwrite_defaults_by_role_taker_values()
             self._set_default_fields_not_in_kwargs(**init_kwargs)
 
+        cls._handle_conflicting_fields_of_role_with_role_taker()
         cls.__init__ = new_init
 
-    def _overwrite_defaults_by_role_taker_values(self):
+    def _initialize_role_taker_and_self(self, *args, **init_kwargs):
         """
-        Overwrite default values of fields with values from the role taker.
+        Initializes the role taker instance and sets attributes for the role instance.
+        Assumes that you want to create a new role taker instance as well, if the role taker is not provided
+        in the kwargs.
+
+        :param args: Positional arguments passed to the role instance.
+        :param init_kwargs: Keyword arguments passed to the role instance.
         """
-        for f in fields(self):
-            if f.default != MISSING and hasattr(self.role_taker, f.name):
-                setattr(self, f.name, getattr(self.role_taker, f.name))
+        role_taker_init_kwargs = {
+            k: v for k, v in init_kwargs.items() if k in self.role_taker_field_names
+        }
+        setattr(
+            self,
+            self.role_taker_attribute_name(),
+            self.get_role_taker_type()(*args, **role_taker_init_kwargs),
+        )
+        for k, v in init_kwargs.items():
+            if k not in self.role_taker_field_names:
+                setattr(self, k, v)
+
+    @classmethod
+    def _handle_conflicting_fields_of_role_with_role_taker(cls):
+        """Make fields from common bases (shared between the role class and its role-taker
+        type) init=False so the dataclass constructor does not require them.
+        """
+        for common_base in all_nearest_common_ancestors(
+            (cls.get_role_taker_type(), cls)
+        ):
+            if common_base in [ABC, object, Role] or not is_dataclass(common_base):
+                continue
+            for field_ in fields(common_base):
+                if cls._is_not_conflicting_field_or_already_resolved(
+                    field_, common_base
+                ):
+                    continue
+                cls._make_field_init_false_and_delegate_to_role_taker(
+                    field_, common_base
+                )
+
+    @classmethod
+    def _is_not_conflicting_field_or_already_resolved(
+        cls, field_: Field, common_base: Type
+    ) -> bool:
+        """
+        :param field_: The field to check.
+        :param common_base: The common base class.
+
+        :return: True if the field is conflicting or already resolved, False otherwise.
+        """
+        if not field_.init:
+            return True
+        if field_.name == cls.role_taker_attribute_name():
+            return True
+        if issubclass(common_base, Role) and field_.name in Role.__annotations__:
+            return True
+        if hasattr(common_base, field_.name) and isinstance(
+            getattr(common_base, field_.name), property
+        ):
+            # That means this field was already seen before and was assigned a property.
+            return True
+        return False
+
+    @classmethod
+    def _make_field_init_false_and_delegate_to_role_taker(
+        cls, field_: Field, field_owner: Type
+    ):
+        """Make a field init=False and delegate to the role taker.
+
+        :param field_: The field to make init=False and delegate to the role taker.
+        :param field_owner: The type that owns the field.
+        """
+        type_ = field_.type
+        if isinstance(field_.type, str):
+            try:
+                type_ = eval(
+                    field_.type,
+                    sys.modules[field_owner.__module__].__dict__,
+                )
+            except NameError:
+                pass
+        cls._update_field_kwargs(field_.name, {"init": False}, type_=type_)
+        setattr(
+            cls,
+            field_.name,
+            delegate_property(field_.name, cls.role_taker_attribute_name()),
+        )
 
     def _set_default_fields_not_in_kwargs(self, **kwargs):
         """
@@ -337,7 +400,7 @@ class Role(Symbol, SubClassSafeGeneric[T], ABC):
         """
         Returns a list of field names that are defined on the role taker class.
         """
-        return list(self.get_role_taker_type().__annotations__.keys())
+        return [f.name for f in fields(self.get_role_taker_type())]
 
     def _set_role_taker(self, value: T):
         """

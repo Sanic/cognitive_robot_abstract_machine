@@ -47,7 +47,7 @@ class Person(Symbol):
 
 @dataclass(eq=False)
 class CEOAsFirstRole(Role[Person], Symbol):
-    person: Person
+    person: Person = field(kw_only=True)
     head_of: RecognizedGroup = None
 
     @classmethod
@@ -57,7 +57,7 @@ class CEOAsFirstRole(Role[Person], Symbol):
 
 @dataclass(eq=False)
 class RepresentativeAsSecondRole(Role[CEOAsFirstRole], Symbol):
-    ceo: CEOAsFirstRole
+    ceo: CEOAsFirstRole = field(kw_only=True)
     representative_of: RecognizedGroup = None
 
     @classmethod
