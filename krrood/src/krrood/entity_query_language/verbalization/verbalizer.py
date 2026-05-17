@@ -133,7 +133,7 @@ class EQLVerbalizer:
         ctx: Optional[VerbalizationContext] = None,
     ) -> str:
         if ctx is None:
-            ctx = VerbalizationContext()
+            ctx = VerbalizationContext.from_expression(expr)
         method = getattr(self, f"_v_{type(expr).__name__}_", self._v_default_)
         return method(expr, ctx)
 
@@ -176,8 +176,12 @@ class EQLVerbalizer:
             return self._verbalize_plural_(expr._child_, ctx)
 
         if isinstance(expr, Variable):
-            ctx.seen[expr._id_] = expr._type_.__name__
-            return _engine.plural(expr._type_.__name__)
+            type_name = expr._type_.__name__
+            label = ctx.disambiguation_map.get(expr._id_, type_name)
+            ctx.seen[expr._id_] = label
+            if label != type_name:
+                return label
+            return _engine.plural(type_name)
 
         if isinstance(expr, Attribute):
             # Walk the chain to find root variable and single attribute hop.
@@ -188,8 +192,13 @@ class EQLVerbalizer:
                 current = current._child_
             root = current
             if isinstance(root, Variable) and len(chain) == 1 and isinstance(chain[0], Attribute):
-                ctx.seen[root._id_] = root._type_.__name__
-                root_possessive = _plural_possessive(root._type_.__name__)
+                type_name = root._type_.__name__
+                label = ctx.disambiguation_map.get(root._id_, type_name)
+                ctx.seen[root._id_] = label
+                if label != type_name:
+                    root_possessive = f"{label}'s"
+                else:
+                    root_possessive = _plural_possessive(type_name)
                 attr_plural = _ensure_plural(chain[0]._attribute_name_)
                 return f"{root_possessive} {attr_plural}"
 

@@ -890,6 +890,54 @@ def test_verbalize_1arg_predicate_generic_fallback():
     assert "Employee" in text
 
 
+# ── Same-type variable disambiguation ─────────────────────────────────────────
+
+
+def test_two_same_type_variables_are_disambiguated():
+    """Two distinct variables of the same type must get numbered labels to tell them apart.
+
+    Currently both variables produce 'an Employee', making the output ambiguous:
+    'an Employee's salary is greater than an Employee's salary'
+    Expected: 'Employee 1's salary is greater than Employee 2's salary'
+    """
+    emp1 = variable(Employee, [])
+    emp2 = variable(Employee, [])
+    cond = emp1.salary > emp2.salary
+    text = _v(cond)
+    assert "Employee 1" in text, f"Expected 'Employee 1' in: {text!r}"
+    assert "Employee 2" in text, f"Expected 'Employee 2' in: {text!r}"
+
+
+def test_two_same_type_variables_in_query_are_disambiguated():
+    """Two same-type variables inside a query must each get distinct numbered labels."""
+    emp1 = variable(Employee, [])
+    emp2 = variable(Employee, [])
+    query = an(entity(emp1).where(emp1.salary > emp2.salary))
+    text = _vq(query)
+    assert "Employee 1" in text, f"Expected 'Employee 1' in: {text!r}"
+    assert "Employee 2" in text, f"Expected 'Employee 2' in: {text!r}"
+
+
+def test_three_same_type_variables_are_disambiguated():
+    """Three variables of the same type each get distinct numbered labels."""
+    emp1 = variable(Employee, [])
+    emp2 = variable(Employee, [])
+    emp3 = variable(Employee, [])
+    query = an(entity(emp1).where(and_(emp1.salary > emp2.salary, emp2.salary > emp3.salary)))
+    text = _vq(query)
+    assert "Employee 1" in text, f"Expected 'Employee 1' in: {text!r}"
+    assert "Employee 2" in text, f"Expected 'Employee 2' in: {text!r}"
+    assert "Employee 3" in text, f"Expected 'Employee 3' in: {text!r}"
+
+
+def test_single_type_variable_not_numbered():
+    """A single variable of a type must keep the plain 'an Employee' form — no numbering."""
+    emp = variable(Employee, [])
+    text = _v(emp)
+    assert "an Employee" in text, f"Expected 'an Employee' in: {text!r}"
+    assert "Employee 1" not in text, f"Did not expect numbering in: {text!r}"
+
+
 # ── Fixture ────────────────────────────────────────────────────────────────────
 
 
