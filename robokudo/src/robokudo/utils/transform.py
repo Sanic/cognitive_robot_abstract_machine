@@ -326,3 +326,29 @@ def get_rotation_matrix_from_direction_vector(
     # Compose 3x3 rotation matrix
     rot = np.column_stack((x_axis, y_axis, z_axis))
     return rot
+
+
+def transform_plane_from_source_to_target(
+    plane_normal_source: npt.NDArray,
+    plane_offset_source: float,
+    source_to_target_transform: npt.NDArray,
+) -> Tuple[Union[npt.NDArray, None], float]:
+    """Transform a normalized plane model from source to target frame.
+
+    The plane is represented by ``n^T x + d = 0`` where ``n`` is unit-normalized.
+    """
+    rotation_target_source = source_to_target_transform[:3, :3]
+    translation_target_source = source_to_target_transform[:3, 3]
+
+    plane_normal_target = rotation_target_source @ plane_normal_source
+    normal_norm = float(np.linalg.norm(plane_normal_target))
+    if normal_norm < 1e-9:
+        return None, 0.0
+    plane_normal_target /= normal_norm
+
+    plane_point_source = -float(plane_offset_source) * plane_normal_source
+    plane_point_target = (
+        rotation_target_source @ plane_point_source
+    ) + translation_target_source
+    plane_offset_target = -float(np.dot(plane_normal_target, plane_point_target))
+    return plane_normal_target, plane_offset_target

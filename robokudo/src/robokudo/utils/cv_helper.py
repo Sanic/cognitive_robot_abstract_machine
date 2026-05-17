@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     import cv2.typing as cv2t
     import numpy.typing as npt
     from robokudo.cas import CAS
+    from robokudo.types.scene import ObjectHypothesis
 
 
 def crop_image(image: npt.NDArray, xy: tuple, wh: tuple) -> npt.NDArray:
@@ -341,3 +342,126 @@ def adjust_mask(mask: npt.NDArray, offset: int, fill_value: int = 0) -> npt.NDAr
         new_mask = mask
 
     return new_mask
+
+
+def object_hypothesis_to_mask(
+    object_hypothesis: ObjectHypothesis, image_width: int, image_height: int
+) -> npt.NDArray:
+    """Create a full-image uint8 mask from an ObjectHypothesis ROI and optional ROI mask."""
+    mask_full = np.zeros((image_height, image_width), dtype=np.uint8)
+    roi = object_hypothesis.roi.roi
+    x = max(int(roi.pos.x), 0)
+    y = max(int(roi.pos.y), 0)
+    w = max(int(roi.width), 0)
+    h = max(int(roi.height), 0)
+    if w == 0 or h == 0:
+        return mask_full
+
+    x2 = min(x + w, image_width)
+    y2 = min(y + h, image_height)
+    if x2 <= x or y2 <= y:
+        return mask_full
+
+    roi_h = y2 - y
+    roi_w = x2 - x
+    if object_hypothesis.roi.mask is None:
+        mask_full[y:y2, x:x2] = 255
+        return mask_full
+
+    roi_mask = object_hypothesis.roi.mask
+    if roi_mask.shape[0] < roi_h or roi_mask.shape[1] < roi_w:
+        mask_full[y:y2, x:x2] = 255
+        return mask_full
+    mask_full[y:y2, x:x2] = np.where(roi_mask[:roi_h, :roi_w] > 0, 255, 0)
+    return mask_full
+
+
+def largest_contour(mask: npt.NDArray):
+    """Return largest external contour in mask, or None when no contour exists."""
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if len(contours) == 0:
+        return None
+    return max(contours, key=cv2.contourArea)
+
+
+def mask_centroid(mask: npt.NDArray) -> npt.NDArray | None:
+    """Compute contour centroid in pixels for the largest mask component."""
+    contour = largest_contour(mask)
+    if contour is None:
+        return None
+    moments = cv2.moments(contour)
+    if moments["m00"] <= 1e-6:
+        return None
+    cx = moments["m10"] / moments["m00"]
+    cy = moments["m01"] / moments["m00"]
+    return np.array([cx, cy], dtype=np.float64)
+
+
+def centroid_shift_px(
+    expected_mask: npt.NDArray, detected_mask: npt.NDArray
+) -> npt.NDArray | None:
+    """Return detected-minus-expected centroid shift in pixel coordinates."""
+    expected_centroid = mask_centroid(expected_mask)
+    detected_centroid = mask_centroid(detected_mask)
+    if expected_centroid is None or detected_centroid is None:
+        return None
+    return detected_centroid - expected_centroid
+
+
+def contour_outline_match_scores(
+    expected_mask: npt.NDArray,
+    detected_mask: npt.NDArray,
+    contour_thickness: int = 1,
+) -> dict[str, float]:
+    """Compute contour-shape and outline-overlap scores for two binary masks."""
+    expected_contour = largest_contour(expected_mask)
+    detected_contour = largest_contour(detected_mask)
+    if expected_contour is None or detected_contour is None:
+        return {
+            "shape_distance": 1.0,
+            "shape_score": 0.0,
+            "outline_iou": 0.0,
+            "outline_dice": 0.0,
+            "combined_score": 0.0,
+        }
+
+    shape_distance = float(
+        cv2.matchShapes(expected_contour, detected_contour, cv2.CONTOURS_MATCH_I1, 0.0)
+    )
+    shape_score = 1.0 / (1.0 + shape_distance)
+
+    thickness = max(int(contour_thickness), 1)
+    expected_outline = np.zeros_like(expected_mask, dtype=np.uint8)
+    detected_outline = np.zeros_like(detected_mask, dtype=np.uint8)
+    cv2.drawContours(expected_outline, [expected_contour], -1, 255, thickness)
+    cv2.drawContours(detected_outline, [detected_contour], -1, 255, thickness)
+
+    expected_bool = expected_outline > 0
+    detected_bool = detected_outline > 0
+    intersection = int(np.count_nonzero(expected_bool & detected_bool))
+    union = int(np.count_nonzero(expected_bool | detected_bool))
+    expected_count = int(np.count_nonzero(expected_bool))
+    detected_count = int(np.count_nonzero(detected_bool))
+
+    outline_iou = float(intersection / union) if union > 0 else 0.0
+    denom = expected_count + detected_count
+    outline_dice = float((2.0 * intersection) / denom) if denom > 0 else 0.0
+    combined_score = float(
+        np.clip((shape_score + outline_iou + outline_dice) / 3.0, 0.0, 1.0)
+    )
+    return {
+        "shape_distance": shape_distance,
+        "shape_score": float(np.clip(shape_score, 0.0, 1.0)),
+        "outline_iou": float(np.clip(outline_iou, 0.0, 1.0)),
+        "outline_dice": float(np.clip(outline_dice, 0.0, 1.0)),
+        "combined_score": combined_score,
+    }
+
+
+def fov_deg_from_image_width_and_fx(width_px: float, fx_px: float) -> float:
+    """Estimate horizontal FOV in degrees from image width and focal length fx."""
+    width = float(width_px)
+    fx = float(fx_px)
+    if fx <= 0.0 or width <= 0.0:
+        return 90.0
+    return float(np.rad2deg(2.0 * np.arctan(width / (2.0 * fx))))
