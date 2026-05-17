@@ -72,9 +72,8 @@ class Add(Conclusion):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent=None,
     ) -> Iterable[OperationResult]:
 
-        v = next(self.value._evaluate_(sources, parent=self)).value
+        v = next(self.value._evaluate_(sources)).value
         new_bindings = sources.bindings | {self.variable._id_: v}
         yield OperationResult(new_bindings, False, self, sources)

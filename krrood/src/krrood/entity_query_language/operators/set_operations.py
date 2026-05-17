@@ -10,10 +10,7 @@ import itertools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import Iterable, Optional, Tuple, Iterator, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from typing_extensions import Iterable, Optional, Tuple, Iterator
 
 from krrood.entity_query_language.core.base_expressions import (
     MultiArityExpression,
@@ -33,12 +30,11 @@ class Union(MultiArityExpression):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         yield from (
             self.get_result_and_update_truth_value(child_result)
             for child_result in itertools.chain(
-                *(var._evaluate_(sources, self) for var in self._operation_children_)
+                *(var._evaluate_(sources) for var in self._operation_children_)
             )
         )
 
@@ -83,7 +79,7 @@ class PerformsCartesianProduct(SymbolicExpression, ABC):
         """
         ordered_operands = self._optimize_operands_order_(sources)
         return cartesian_product_while_passing_the_bindings_around(
-            ordered_operands, sources, parent=self
+            ordered_operands, sources
         )
 
     def _optimize_operands_order_(

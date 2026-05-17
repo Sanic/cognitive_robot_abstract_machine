@@ -145,7 +145,6 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
     def _evaluate__(
             self,
             sources: OperationResult,
-            parent=None,
     ) -> Iterable[OperationResult]:
         """
         Apply the mapping to the child's values.
@@ -153,9 +152,9 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
         yield from (
             self._build_operation_result_and_update_truth_value_(
-                child_result.bindings | {self._id_: mapped_value}, child_result, parent
+                child_result.bindings | {self._id_: mapped_value}, child_result
             )
-            for child_result in self._child_._evaluate_(sources, parent=self)
+            for child_result in self._child_._evaluate_(sources)
             for mapped_value in self._apply_mapping_(child_result.value, sources=sources)
         )
 
@@ -263,7 +262,7 @@ class Index(MappedVariable):
             # Need to verify that this solution is general and not a hack.
             if isinstance(self._key_, SymbolicExpression) and not (
                     isinstance(value, UnificationDict) and self._key_ in value):
-                for key in self._key_._evaluate_(sources, parent=self):
+                for key in self._key_._evaluate_(sources):
                     yield value[key.value]
             else:
                 yield value[self._key_]

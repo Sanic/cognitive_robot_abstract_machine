@@ -912,9 +912,9 @@ def test_multiple_dependent_selectables(handles_and_containers_world):
     cabinet_drawers = flat_variable(cabinet.drawers)
     old_evaluate = cabinet_drawers._evaluate__
 
-    def _cabinet_drawers_evaluate__(bindings, parent=None):
+    def _cabinet_drawers_evaluate__(bindings):
         assert cabinet._id_ in bindings
-        yield from old_evaluate(bindings, parent)
+        yield from old_evaluate(bindings)
 
     cabinet_drawers._evaluate__ = _cabinet_drawers_evaluate__
 

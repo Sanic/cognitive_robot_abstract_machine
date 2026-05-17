@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import Optional, Iterable, TYPE_CHECKING, Self
+from typing_extensions import Iterable, TYPE_CHECKING, Self, Optional
 
 from krrood.entity_query_language.rules.conclusion import Conclusion
 from krrood.entity_query_language.operators.set_operations import Union as EQLUnion
@@ -109,12 +109,11 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
     def _evaluate__(
         self,
         sources: Optional[OperationResult] = None,
-        parent=None,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the ExceptIf condition and yield the results.
         """
-        for left_value in self.left._evaluate_(sources, self):
+        for left_value in self._evaluate_child_as_condition_(self.left, sources):
             if left_value.is_false:
                 yield from self.get_operation_result_and_clear_conclusion(left_value)
                 continue
@@ -132,7 +131,7 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
         :return: The results of evaluating the right branch.
         """
         self.right_yielded = False
-        for right_value in self.right._evaluate_(left_value, parent=self):
+        for right_value in self._evaluate_child_as_condition_(self.right, left_value):
             if right_value.is_true:
                 self.right_yielded = True
             yield from self.get_operation_result_and_clear_conclusion(right_value)
@@ -178,9 +177,8 @@ class Alternative(OR, ConclusionSelector):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent=None,
     ) -> Iterable[OperationResult]:
-        for output in OR._evaluate__(self, sources, parent):
+        for output in OR._evaluate__(self, sources):
             if output.is_true:
                 self._conclusions_.update(
                     output.previous_operation_result.operand._conclusions_
@@ -219,15 +217,14 @@ class Next(EQLUnion, ConclusionSelector):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent=None,
     ) -> Iterable[OperationResult]:
-        for output in EQLUnion._evaluate__(self, sources, parent):
-            if output.is_true:
-                self._conclusions_.update(
-                    output.previous_operation_result.operand._conclusions_
-                )
-            yield output
-            self._conclusions_.clear()
+        for child in self._operation_children_:
+            for child_result in self._evaluate_child_as_condition_(child, sources):
+                output = OperationResult(child_result.bindings, child_result.is_false, self, child_result)
+                if output.is_true:
+                    self._conclusions_.update(child_result.operand._conclusions_)
+                yield output
+                self._conclusions_.clear()
 
     @classmethod
     def _get_current_context_condition(

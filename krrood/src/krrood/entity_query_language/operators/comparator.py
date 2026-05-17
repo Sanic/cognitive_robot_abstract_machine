@@ -23,7 +23,6 @@ from typing_extensions import (
 )
 
 from krrood.entity_query_language.core.base_expressions import (
-    Bindings,
     OperationResult,
     SymbolicExpression,
     BinaryExpression,
@@ -66,7 +65,6 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         """
         Compares the left and right symbolic variables using the "operation".

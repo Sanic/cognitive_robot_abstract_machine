@@ -110,7 +110,6 @@ def make_set(value: Any) -> Set:
 def cartesian_product_while_passing_the_bindings_around(
     expressions: Iterable[SymbolicExpression],
     sources: Optional[OperationResult],
-    parent: Optional[SymbolicExpression] = None,
 ) -> Iterator[OperationResult]:
     """
     Evaluate the symbolic expressions by generating combinations of values from their evaluation generators while
@@ -118,12 +117,11 @@ def cartesian_product_while_passing_the_bindings_around(
 
     :param expressions: The symbolic expressions to evaluate.
     :param sources: The current OperationResult carrying bindings, or None.
-    :param parent: The parent expression.
     :return: An Iterable of Bindings for each combination of values.
     """
     def _make_stage(inner_expression):
         def stage(prev: Optional[OperationResult]):
-            for result in inner_expression._evaluate_(prev, parent=parent):
+            for result in inner_expression._evaluate_(prev):
                 if prev is not None:
                     result.update(prev)
                 yield result

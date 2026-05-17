@@ -11,9 +11,9 @@ import uuid
 from abc import ABC
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Iterable, Optional
+from typing import List, Iterable
 
-from krrood.entity_query_language.core.base_expressions import Bindings, OperationResult, SymbolicExpression
+from krrood.entity_query_language.core.base_expressions import OperationResult
 from krrood.entity_query_language.operators.core_logical_operators import (
     LogicalBinaryOperator,
 )
@@ -54,11 +54,10 @@ class ForAll(QuantifiedConditional):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         solution_set = None
 
-        for var_val in self.variable._evaluate_(sources, parent=self):
+        for var_val in self.variable._evaluate_(sources):
             if solution_set is None:
                 solution_set = self.get_all_candidate_solutions(var_val)
             else:
@@ -79,7 +78,7 @@ class ForAll(QuantifiedConditional):
     def get_all_candidate_solutions(self, var_val: OperationResult):
         values_that_satisfy_condition = []
         # Evaluate the condition under this particular universal value
-        for condition_val in self.condition._evaluate_(var_val, parent=self):
+        for condition_val in self._evaluate_child_as_condition_(self.condition, var_val):
             if condition_val.is_false:
                 continue
             condition_val_bindings = {
@@ -91,7 +90,7 @@ class ForAll(QuantifiedConditional):
         return values_that_satisfy_condition
 
     def evaluate_condition(self, sources: OperationResult) -> bool:
-        for condition_val in self.condition._evaluate_(sources, parent=self):
+        for condition_val in self._evaluate_child_as_condition_(self.condition, sources):
             return condition_val.is_true
         return False
 
@@ -110,9 +109,8 @@ class Exists(QuantifiedConditional):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
-        for val in self.condition._evaluate_(sources, parent=self):
+        for val in self._evaluate_child_as_condition_(self.condition, sources):
             if val.is_true and self.variable._id_ in val:
                 yield OperationResult(val.bindings, is_false=False, operand=self)
                 return

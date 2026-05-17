@@ -125,23 +125,6 @@ class SymbolicExpression(ABC):
         except StopIteration:
             raise NoExpressionFoundForGivenID(self, id_)
 
-    def _compute_is_false_(self, current_value: Any, parent: Optional[SymbolicExpression] = None) -> bool:
-        """
-        Compute the truth value for this expression given the current binding value.
-        Only meaningful when the parent is a TruthValueOperator; returns False otherwise.
-
-        :param current_value: The current value of the binding.
-        :param parent: The expression that requested this evaluation.
-        :return: True if the expression evaluates to False, False otherwise.
-        """
-        if not isinstance(parent, TruthValueOperator):
-            return False
-        is_true = (
-            len(current_value) > 0
-            if is_iterable(current_value)
-            else bool(current_value)
-        )
-        return not is_true
 
     def tolist(self):
         """
@@ -250,14 +233,11 @@ class SymbolicExpression(ABC):
     def _evaluate_(
         self,
         sources: Optional[OperationResult] = None,
-        parent: Optional[SymbolicExpression] = None,
     ):
         """
-        Wrapper for ``SymbolicExpression._evaluate__`` that manages evaluation context lifecycle
-        and forwards ``parent`` into the implementation.
+        Wrapper for ``SymbolicExpression._evaluate__`` that manages evaluation context lifecycle.
 
         :param sources: The current OperationResult carrying bindings of variables, or None.
-        :param parent: The expression that is requesting this evaluation.
         :return: An iterator of OperationResult instances.
         """
         evaluation_context = get_evaluation_context()
@@ -277,13 +257,13 @@ class SymbolicExpression(ABC):
                 bindings = {}
                 sources = OperationResult({})  # empty sentinel for _evaluate__()
             if self._id_ in bindings:
-                result = OperationResult(bindings, self._compute_is_false_(bindings[self._id_], parent), self, previous_result)
+                result = OperationResult(bindings, False, self, previous_result)
                 evaluation_context.on_result_yielded(expression=self, result=result)
                 yield result
             else:
                 for result in map(
                     self._evaluate_conclusions_and_update_bindings_,
-                    self._evaluate__(sources, parent),
+                    self._evaluate__(sources),
                 ):
                     evaluation_context.on_result_yielded(expression=self, result=result)
                     yield result
@@ -306,7 +286,7 @@ class SymbolicExpression(ABC):
             return current_result
         for conclusion in self._conclusions_:
             current_result.bindings = next(
-                conclusion._evaluate_(current_result, parent=self)
+                conclusion._evaluate_(current_result)
             ).bindings
 
         ctx = get_evaluation_context()
@@ -321,14 +301,12 @@ class SymbolicExpression(ABC):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent: Optional[SymbolicExpression] = None,
     ) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expression and set the operands bindings in the result according to the evaluation logic
         of this expression.
 
         :param sources: The current OperationResult carrying bindings of variables.
-        :param parent: The expression that requested this evaluation.
         :return: An Iterator of OperationResult instances containing the bindings resulting from the evaluation of this
         expression.
         """
@@ -577,6 +555,33 @@ class TruthValueOperator(SymbolicExpression, ABC):
      expressions to update their truth value when yielding results.
     """
 
+    def _evaluate_child_as_condition_(
+        self, child: SymbolicExpression, sources: Optional[OperationResult]
+    ) -> Iterator[OperationResult]:
+        """
+        Evaluate ``child`` and apply truth-value semantics to each result.
+
+        Expressions that carry their own binding (Selectable: Variable, MappedVariable, Comparator, …)
+        have their truth value computed from the binding's boolean value.  Expressions that do not
+        self-bind (LogicalOperators: AND, OR, NOT, …) already carry the correct ``is_false`` flag and
+        are yielded unchanged.
+
+        :param child: The child expression to evaluate in a truth-value context.
+        :param sources: The current OperationResult carrying bindings, or None.
+        :return: An iterator of OperationResult instances with correct truth values.
+        """
+        for result in child._evaluate_(sources):
+            if result.has_value:
+                value = result.value
+                is_false = not (
+                    len(value) > 0 if is_iterable(value) else bool(value)
+                )
+                yield OperationResult(
+                    result.bindings, is_false, result.operand, result.previous_operation_result
+                )
+            else:
+                yield result
+
 
 @dataclass(eq=False, repr=False)
 class DerivedExpression(SymbolicExpression, ABC):
@@ -763,18 +768,15 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
         self,
         bindings: Bindings,
         child_result: Optional[OperationResult] = None,
-        parent: Optional[SymbolicExpression] = None,
     ) -> OperationResult:
         """
-        Build an OperationResult instance with the correct truth value for this binding.
+        Build an OperationResult instance for this binding.
 
         :param bindings: The bindings of the result.
         :param child_result: The result of the child operation, if any.
-        :param parent: The expression that requested this evaluation.
-        :return: The OperationResult instance with the computed truth value.
+        :return: The OperationResult instance.
         """
-        is_false = self._compute_is_false_(bindings[self._id_], parent)
-        return OperationResult(bindings, is_false, self, child_result)
+        return OperationResult(bindings, False, self, child_result)
 
     @cached_property
     def _type__(self):

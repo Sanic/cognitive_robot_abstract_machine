@@ -14,7 +14,6 @@ from typing_extensions import Iterable, Optional, TYPE_CHECKING, Type
 from krrood.entity_query_language.core.base_expressions import (
     TruthValueOperator,
     UnaryExpression,
-    Bindings,
     OperationResult,
     BinaryExpression,
     SymbolicExpression,
@@ -47,10 +46,9 @@ class Not(LogicalOperator, UnaryExpression):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
 
-        for v in self._child_._evaluate_(sources, parent=self):
+        for v in self._evaluate_child_as_condition_(self._child_, sources):
             is_false = v.is_true
             yield OperationResult(v.bindings, is_false, self)
 
@@ -68,7 +66,7 @@ class LogicalBinaryOperator(LogicalOperator, BinaryExpression, ABC):
         :param sources: The current OperationResult to use during evaluation.
         :return: The new bindings after evaluating the right operand.
         """
-        for right_value in self.right._evaluate_(sources, parent=self):
+        for right_value in self._evaluate_child_as_condition_(self.right, sources):
             is_false = right_value.is_false
             yield OperationResult(
                 right_value.bindings, is_false, self, right_value
@@ -84,10 +82,9 @@ class AND(LogicalBinaryOperator):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
 
-        for left_value in self.left._evaluate_(sources, parent=self):
+        for left_value in self._evaluate_child_as_condition_(self.left, sources):
             is_false = left_value.is_false
             if is_false:
                 yield OperationResult(
@@ -106,7 +103,6 @@ class OR(LogicalBinaryOperator):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent: Optional[SymbolicExpression] = None,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the left operand, if it is False, then evaluate the right operand.
@@ -114,7 +110,7 @@ class OR(LogicalBinaryOperator):
         :param sources: The current OperationResult to use for evaluation.
         :return: The new bindings after evaluating the left operand (and possibly right operand).
         """
-        for left_value in self.left._evaluate_(sources, parent=self):
+        for left_value in self._evaluate_child_as_condition_(self.left, sources):
             if left_value.is_false:
                 yield from self.evaluate_right(left_value)
             else:

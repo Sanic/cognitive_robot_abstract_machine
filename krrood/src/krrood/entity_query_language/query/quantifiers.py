@@ -190,11 +190,10 @@ class ResultQuantifier(
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent=None,
     ) -> Iterable[T]:
 
         result_count = 0
-        values = self._child_._evaluate_(parent=self)
+        values = self._child_._evaluate_()
         for value in values:
             result_count += 1
             self._assert_satisfaction_of_quantification_constraints_(
@@ -252,7 +251,6 @@ class The(ResultQuantifier):
     def _evaluate__(
         self,
         sources: OperationResult,
-        parent=None,
     ) -> Iterable[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
         """
         Evaluates the query object descriptor with the given bindings and yields the results.
@@ -261,7 +259,7 @@ class The(ResultQuantifier):
         :raises NoSolutionFound: If no result is found.
         """
         try:
-            yield from super()._evaluate__(sources, parent)
+            yield from super()._evaluate__(sources)
         except LessThanExpectedNumberOfSolutions:
             raise NoSolutionFound(self)
         except GreaterThanExpectedNumberOfSolutions:
