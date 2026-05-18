@@ -1,6 +1,7 @@
 import copy
 
 import clip
+from transformers import CLIPProcessor, CLIPModel
 import faiss
 import torch
 from PIL import Image
@@ -29,9 +30,11 @@ class ClipAnnotator(BaseAnnotator):
         self.clip_preprocess = clip_preprocess
         """CLIP preprocessor used for feature extraction."""
 
+        self.vocabulary_template: str = "A photo of a {}"
+
         self.vocabulary: List[str] = [
             "Milk Container",
-            "Conflakes",
+            "Box of Cornflakes",
             "Pancake Batter",
             "Instant Coffee",
             "Crepe Pan",
@@ -43,17 +46,14 @@ class ClipAnnotator(BaseAnnotator):
         """A faiss index for text features used in similarity search."""
 
         with torch.no_grad():
-            tokenized_vocabulary = [
-                clip.tokenize([name]).to(self.device) for name in self.vocabulary
+            templated_texts = [
+                self.vocabulary_template.format(name) for name in self.vocabulary
             ]
-            text_features = torch.stack(
-                [self.clip_model.encode_text(t) for t in tokenized_vocabulary]
-            )
+            tokenized_vocabulary = clip.tokenize(templated_texts).to(self.device)
+            text_features = self.clip_model.encode_text(tokenized_vocabulary)
             text_features /= torch.norm(text_features, p=2, dim=-1, keepdim=True)
             text_features = text_features.cpu().numpy()
-
-        for feat in text_features:
-            self.vocabulary_index.add(feat)
+        self.vocabulary_index.add(text_features)
 
     def update(self) -> Status:
         ohs: List[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(
@@ -94,7 +94,7 @@ class ClipAnnotator(BaseAnnotator):
                 )
             )
 
-            self.rk_logger.debug(
+            self.rk_logger.info(
                 f"Classified oh {oh.id} as {best_class} ({best_similarity:.2f})"
             )
 
