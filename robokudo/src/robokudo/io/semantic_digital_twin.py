@@ -492,6 +492,7 @@ class SemanticDigitalTwinAdapter:
             "semantic_color": SemanticColorComparator(weight=0.2),
             "roi": RoiComparator(weight=0.2),
             "oh_roi": RoiComparator(weight=0.4),
+            "sift": SIFTComparator(weight=0.6),
         }
         """Mapping of data keys to comparators that are used to compare objects."""
 

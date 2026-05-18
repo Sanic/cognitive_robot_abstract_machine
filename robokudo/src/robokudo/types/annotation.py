@@ -10,6 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import cv2
+import open3d as o3d
+from numpy import typing as npt
+
 from semantic_digital_twin.world_description.geometry import (
     Box as SemDTBox,
 )
@@ -25,7 +28,7 @@ from semantic_digital_twin.world_description.geometry import (
 from typing_extensions import TYPE_CHECKING, Any, List, Optional, Sequence
 
 from robokudo.types.core import Annotation
-from robokudo.types.cv import BoundingBox3D, Points3D
+from robokudo.types.cv import BoundingBox3D, KeyPoint, Points3D
 from robokudo.types.tf import (
     Pose,
     Position,
@@ -314,10 +317,23 @@ class TextAnnotation(Annotation):
 
 @dataclass
 class SIFTAnnotation(Annotation):
-    """SIF feature annotation."""
+    """SIFT feature annotation."""
 
-    keypoints: Sequence[cv2.KeyPoint] = field(default_factory=list)
+    keypoints: List[KeyPoint] = field(default_factory=list)
     """The SIFT keypoints."""
 
     descriptors: Sequence[npt.NDArray[np.float32]] = field(default_factory=list)
     """The SIFT descriptors."""
+
+    @classmethod
+    def from_cv2(
+        cls,
+        keypoints: Sequence[cv2.KeyPoint],
+        descriptors: Sequence[npt.NDArray[np.float32]],
+    ) -> SIFTAnnotation:
+        return cls(
+            keypoints=[KeyPoint.from_cv(k) for k in keypoints], descriptors=descriptors
+        )
+
+    def cv2_keypoints(self) -> List[cv2.KeyPoint]:
+        return [KeyPoint.to_cv(k) for k in self.keypoints]

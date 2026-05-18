@@ -13,6 +13,7 @@ from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     SemanticColor,
     ColorHistogram,
+    SIFTAnnotation,
 )
 from robokudo.types.cv import TSDFAnnotation
 from robokudo.types.scene import ObjectHypothesis
@@ -88,6 +89,10 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
         tsdfs = cas.filter_by_type(TSDFAnnotation, oh.annotations)
         if len(tsdfs) > 0:
             data["tsdf"] = tsdfs[0]
+
+        sift = cas.filter_by_type(SIFTAnnotation, oh.annotations)
+        if len(sift) > 0:
+            data["sift"] = sift[0]
 
         return data
 

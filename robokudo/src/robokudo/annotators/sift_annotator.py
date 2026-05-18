@@ -36,18 +36,21 @@ class SIFTAnnotator(ThreadedAnnotator):
         :return: The status of the computation.
         """
         cas = self.get_cas()
-        if cas is None:
-            return Status.FAILURE
 
         ohs: List[ObjectHypothesis] = cas.filter_annotations_by_type(ObjectHypothesis)
         if len(ohs) == 0:
             return Status.FAILURE
 
-        intrinsic: o3d.camera.PinholeCameraIntrinsic = cas.get(CASViews.CAM_INTRINSIC)
-        depth_ratio = cas.get(CASViews.COLOR2DEPTH_RATIO)
+        intrinsic = cas.cam_intrinsic
+        if intrinsic is None:
+            return Status.FAILURE
 
-        color_image = copy.deepcopy(self.get_cas().get(CASViews.COLOR_IMAGE))
-        depth_image = copy.deepcopy(self.get_cas().get(CASViews.DEPTH_IMAGE))
+        depth_ratio = cas.color2depth_ratio
+        if depth_ratio is None:
+            return Status.FAILURE
+
+        color_image = cas.get_copy(CASViews.COLOR_IMAGE)
+        depth_image = cas.get_copy(CASViews.DEPTH_IMAGE)
         grey_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
 
         vis_image = color_image.copy()
@@ -70,7 +73,7 @@ class SIFTAnnotator(ThreadedAnnotator):
                 k.pt = (k.pt[0] + roi[0], k.pt[1] + roi[1])
 
             oh.annotations.append(
-                SIFTAnnotation(
+                SIFTAnnotation.from_cv2(
                     keypoints=keypoints,
                     descriptors=descriptors,
                 )
