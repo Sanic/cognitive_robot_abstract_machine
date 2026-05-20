@@ -38,7 +38,7 @@ To run the tests or use CRAM with a real robot you need to setup a ROS workspace
 The monorepo provides a shell script to setup the workspace for you. 
 ```bash
 export OVERLAY_WS=$HOME
-./.github/docker/setup_ros_workspace.sh
+./scripts/setup_ros_workspace.sh
 ```
 This will create a ROS workspace in the folder specified in OVERLAY_WS
 
