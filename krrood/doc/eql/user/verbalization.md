@@ -193,6 +193,20 @@ are available; pick the one that matches your editor and environment:
 ### Terminal (ANSI) — JetBrains
 
 ```{code-cell} ipython3
+:tags: [remove-cell]
+
+import sys
+from pathlib import Path
+# _demo_domain.py lives next to this notebook (doc/eql/user/).
+# Add its directory to sys.path so the import works regardless of where
+# jupyter-book launches the kernel (book root vs. notebook directory).
+for _candidate in [Path("doc/eql/user"), Path("eql/user"), Path(".")]:
+    if (_candidate / "_demo_domain.py").exists():
+        sys.path.insert(0, str(_candidate.resolve()))
+        break
+```
+
+```{code-cell} ipython3
 from _demo_domain import Robot as LinkedRobot
 from krrood.entity_query_language.factories import variable, entity, an
 from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline

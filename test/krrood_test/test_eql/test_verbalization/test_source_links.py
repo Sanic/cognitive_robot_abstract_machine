@@ -347,6 +347,41 @@ def test_autoapi_resolver_module_path_uses_slashes():
     assert "." not in path_part
 
 
+def test_autoapi_resolver_no_warning_when_html_root_not_set(caplog):
+    """Without html_root, resolve() never logs a warning."""
+    import logging
+    r = AutoAPIResolver(base_url="https://docs.example.com")
+    with caplog.at_level(logging.WARNING):
+        r.resolve(SourceRef(cls=_Sensor))
+    assert not caplog.records
+
+
+def test_autoapi_resolver_warns_when_local_page_missing(tmp_path):
+    """When html_root is set and the AutoAPI page is absent, a WARNING is logged."""
+    from unittest.mock import patch as _patch
+    import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
+    r = AutoAPIResolver(base_url="https://docs.example.com", html_root=tmp_path)
+    with _patch.object(_slr._log, "warning") as mock_warn:
+        url = r.resolve(SourceRef(cls=_Sensor))
+    assert url is not None, "resolve() must still return the URL"
+    mock_warn.assert_called_once()
+    assert "_Sensor" in str(mock_warn.call_args)
+
+
+def test_autoapi_resolver_no_warning_when_page_exists(tmp_path):
+    """When the AutoAPI page exists on disk, no WARNING is logged."""
+    from unittest.mock import patch as _patch
+    import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
+    module_path = _Sensor.__module__.replace(".", "/")
+    page = tmp_path / "autoapi" / module_path / "index.html"
+    page.parent.mkdir(parents=True)
+    page.write_text("")
+    r = AutoAPIResolver(base_url="https://docs.example.com", html_root=tmp_path)
+    with _patch.object(_slr._log, "warning") as mock_warn:
+        r.resolve(SourceRef(cls=_Sensor))
+    mock_warn.assert_not_called()
+
+
 # ── AutoAPIResolver.for_package ───────────────────────────────────────────────
 
 # Detect at module load whether the krrood docs are built so dependent tests
@@ -379,6 +414,12 @@ def test_autoapi_resolver_for_package_base_url_has_krrood_docs():
 def test_autoapi_resolver_for_package_custom_port():
     resolver = AutoAPIResolver.for_package("krrood", port=8080)
     assert "localhost:8080" in resolver.base_url
+
+
+def test_autoapi_resolver_for_package_sets_html_root():
+    resolver = AutoAPIResolver.for_package("krrood")
+    assert resolver.html_root is not None
+    assert resolver.html_root.is_dir()
 
 
 def test_autoapi_resolver_for_package_unknown_package_raises():
@@ -677,6 +718,13 @@ def test_jetbrains_resolver_end_to_end_ansi():
     with patch.dict("os.environ", {"VTE_VERSION": "6800"}, clear=False):
         text = VerbalizationPipeline.ansi(link_resolver=JetBrainsResolver()).verbalize(an(entity(x)))
     assert "\033]8;;jetbrains://python/navigate/reference?" in text
+    assert "_Sensor" in text
+
+
+def test_jetbrains_resolver_end_to_end_html():
+    x = variable(_Sensor, [])
+    text = VerbalizationPipeline.html(link_resolver=JetBrainsResolver()).verbalize(an(entity(x)))
+    assert 'href="jetbrains://python/navigate/reference?' in text
     assert "_Sensor" in text
 
 

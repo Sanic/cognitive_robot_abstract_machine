@@ -145,9 +145,15 @@ class AutoAPIResolver:
 
     Use :meth:`for_package` to auto-detect the base URL for a locally installed
     package whose docs are served via the JetBrains IDE built-in HTTP server.
+
+    When *html_root* is set (automatically populated by :meth:`for_package`),
+    :meth:`resolve` checks that the generated AutoAPI page exists on disk and
+    logs a ``WARNING`` if it does not — the class may be missing from the docs
+    because they have not been built yet or because AutoAPI excluded it.
     """
 
     base_url: str
+    html_root: Optional[Path] = None
 
     def resolve(self, ref: SourceRef) -> Optional[str]:
         try:
@@ -160,7 +166,19 @@ class AutoAPIResolver:
         if ref.attribute is not None:
             anchor = f"{anchor}.{ref.attribute}"
         base = self.base_url.rstrip("/")
-        return f"{base}/autoapi/{module_path}/index.html#{anchor}"
+        url = f"{base}/autoapi/{module_path}/index.html#{anchor}"
+        if self.html_root is not None:
+            page = self.html_root / "autoapi" / module_path / "index.html"
+            if not page.exists():
+                _log.warning(
+                    "AutoAPI page for %s.%s does not exist at %s — "
+                    "the class may be missing from the docs; "
+                    "try rebuilding: sphinx-build doc doc/_build/html",
+                    module,
+                    qualname,
+                    page,
+                )
+        return url
 
     @classmethod
     def for_package(cls, package_name: str, port: int = 63342) -> "AutoAPIResolver":
@@ -209,4 +227,7 @@ class AutoAPIResolver:
             git_root = package_root.parent
 
         rel_html = html_root.relative_to(git_root)
-        return cls(base_url=f"http://localhost:{port}/{git_root.name}/{rel_html}")
+        return cls(
+            base_url=f"http://localhost:{port}/{git_root.name}/{rel_html}",
+            html_root=html_root,
+        )
