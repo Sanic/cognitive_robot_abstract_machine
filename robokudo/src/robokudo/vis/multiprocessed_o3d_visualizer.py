@@ -146,6 +146,147 @@ class MemoryMap(object):
 class ObjectMemoryMap(MemoryMap):
     """A memory map for an object in shared memory."""
 
+    mapped_attributes = []  # Class attribute (no type hint)
+    """A list of (attribute name, attribute type) for the attributes mapped by the memory map."""
+
+    @classmethod
+    def get_memory_map(cls, obj: Any) -> MemoryMap:
+        """Get the memory map for the given object.
+
+        :param obj: The object to get the memory map for.
+        :return: The object or array memory map.
+        """
+        if isinstance(obj, set):
+            return ArrayMemoryMap.from_numpy_array(np.asarray(list(obj)))
+        elif isinstance(obj, np.ndarray):
+            return ArrayMemoryMap.from_numpy_array(obj)
+        elif ObjectMemoryMapFactory.has_proxy(obj):
+            return ObjectMemoryMapFactory.from_object(obj)
+        else:
+            return ArrayMemoryMap.from_numpy_array(np.asarray(obj))
+
+    @classmethod
+    def create_mapped_attributes_memory_maps(
+        cls, obj: Any
+    ) -> Tuple[Dict[str, Union[MemoryMap, List[MemoryMap], None]], int]:
+        size = 0
+        attribute_dict: Dict[
+            str,
+            Union[MemoryMap, List[MemoryMap], None],
+        ] = {}
+
+        for attribute, _ in cls.mapped_attributes:
+            attribute_value = getattr(obj, attribute)
+            if attribute_value is None:
+                attribute_dict[attribute] = None
+            elif isinstance(attribute_value, list):
+                attribute_dict[attribute] = [
+                    cls.get_memory_map(v) for v in attribute_value
+                ]
+                size += sum(attr.byte_size for attr in attribute_dict[attribute])
+            else:
+                attribute_dict[attribute] = cls.get_memory_map(getattr(obj, attribute))
+                size += attribute_dict[attribute].byte_size
+
+        return attribute_dict, size
+
+    @staticmethod
+    def _write_attribute(
+        write_buf: memoryview,
+        write_idx: int,
+        attribute_map: Any,
+        geometry_attribute: Any,
+    ) -> int:
+        """Write the given geometry attribute to the given buffer using the attribute memory map.
+
+        :param write_buf: The buffer to write to.
+        :param write_idx: The byte index to start writing at.
+        :param attribute_map: The memory map of the attribute.
+        :param geometry_attribute: The attribute to write.
+        :return: The byte index after writing.
+        """
+        if isinstance(attribute_map, ObjectMemoryMap):
+            return attribute_map.write_object(write_buf, write_idx, geometry_attribute)
+        else:
+            buf = np.ndarray(
+                attribute_map.shape,
+                dtype=attribute_map.dtype,
+                buffer=write_buf[write_idx : write_idx + attribute_map.byte_size],
+            )
+
+            if isinstance(geometry_attribute, set):
+                buf[:] = np.asarray(list(geometry_attribute))[:]
+            else:
+                buf[:] = np.asarray(geometry_attribute)[:]
+
+            return write_idx + attribute_map.byte_size
+
+    def write_mapped_attributes(
+        self, input_obj: Any, write_buf: memoryview, write_idx: int
+    ) -> int:
+        for attribute, _ in self.mapped_attributes:
+            attribute_map = getattr(self, attribute)
+            if attribute_map is None:
+                continue
+            elif isinstance(attribute_map, list):
+                if len(attribute_map) == 0:
+                    continue
+
+                geometry_attrs = getattr(input_obj, attribute)
+                for i, attr in enumerate(attribute_map):
+                    write_idx = self._write_attribute(
+                        write_buf, write_idx, attr, geometry_attrs[i]
+                    )
+            else:
+                if attribute_map.byte_size == 0:
+                    continue
+                write_idx = self._write_attribute(
+                    write_buf, write_idx, attribute_map, getattr(input_obj, attribute)
+                )
+        return write_idx
+
+    def read_mapped_attributes_to_object(
+        self, output_obj: Any, read_buf: memoryview, read_idx: int
+    ) -> int:
+        for attribute, attribute_type in self.mapped_attributes:
+            attribute_map = getattr(self, attribute)
+            if attribute_map is None:
+                setattr(output_obj, attribute, None)
+            elif isinstance(attribute_map, list):
+                if len(attribute_map) == 0:
+                    continue
+                attrs = []
+                for i, attr in enumerate(attribute_map):
+                    if isinstance(attr, ObjectMemoryMap):
+                        obj, read_idx = attr.read_object(read_buf, read_idx)
+                        attrs.append(obj)
+                    else:
+                        buf = np.ndarray(
+                            attr.shape,
+                            dtype=attr.dtype,
+                            buffer=read_buf[read_idx : read_idx + attr.byte_size],
+                        )
+                        if attribute_type == np.ndarray:
+                            attrs.append(buf)
+                        else:
+                            attrs.append(attribute_type(buf))
+                        read_idx += attr.byte_size
+                setattr(output_obj, attribute, attrs)
+            else:
+                if attribute_map.byte_size == 0:
+                    continue
+                buf = np.ndarray(
+                    attribute_map.shape,
+                    dtype=attribute_map.dtype,
+                    buffer=read_buf[read_idx : read_idx + attribute_map.byte_size],
+                )
+                if attribute_type == np.ndarray:
+                    setattr(output_obj, attribute, buf)
+                else:
+                    setattr(output_obj, attribute, attribute_type(buf))
+                read_idx += attribute_map.byte_size
+        return read_idx
+
     @classmethod
     def from_object(cls, obj: Any) -> "ObjectMemoryMap":
         """Create a new memory map for the given object."""
@@ -204,7 +345,7 @@ class ArrayMemoryMap(MemoryMap):
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class Geometry3DMemoryMap(MemoryMap):
+class Geometry3DMemoryMap(ObjectMemoryMap):
     """A memory map for a geometry in shared memory."""
 
     name: str
@@ -225,9 +366,6 @@ class Geometry3DMemoryMap(MemoryMap):
     is_visible: Optional[bool] = None
     """IsVisible property of the o3d geometry."""
 
-    mapped_attributes = []  # Class attribute (no type hint)
-    """A list of (attribute name, attribute type) for the open3d attributes mapped by the memory map."""
-
     @classmethod
     def from_geometry(
         cls,
@@ -247,34 +385,7 @@ class Geometry3DMemoryMap(MemoryMap):
         :param time: The o3d time property of the geometry.
         :param is_visible: The o3d is_visible property of the geometry.
         """
-        size = 0
-        attribute_dict: Dict[
-            str, Union[ArrayMemoryMap, List[ArrayMemoryMap], List[ObjectMemoryMap]]
-        ] = {}
-
-        def get_memory_map(obj: Any) -> Union[ArrayMemoryMap, ObjectMemoryMap]:
-            """Get the memory map for the given object.
-
-            :param obj: The object to get the memory map for.
-            :return: The object or array memory map.
-            """
-            if isinstance(obj, set):
-                return ArrayMemoryMap.from_numpy_array(np.asarray(list(obj)))
-            elif isinstance(obj, np.ndarray):
-                return ArrayMemoryMap.from_numpy_array(obj)
-            elif ObjectMemoryMapFactory.has_proxy(obj):
-                return ObjectMemoryMapFactory.from_object(obj)
-            else:
-                return ArrayMemoryMap.from_numpy_array(np.asarray(obj))
-
-        for attribute, _ in cls.mapped_attributes:
-            attribute_value = getattr(geometry, attribute)
-            if isinstance(attribute_value, list):
-                attribute_dict[attribute] = [get_memory_map(v) for v in attribute_value]
-                size += sum(attr.byte_size for attr in attribute_dict[attribute])
-            else:
-                attribute_dict[attribute] = get_memory_map(getattr(geometry, attribute))
-                size += attribute_dict[attribute].byte_size
+        attribute_dict, size = cls.create_mapped_attributes_memory_maps(geometry)
 
         if material is not None:
             material_map = ObjectMemoryMapFactory.from_object(material)
@@ -332,37 +443,6 @@ class Geometry3DMemoryMap(MemoryMap):
 
         return geometry_dict, read_idx
 
-    @staticmethod
-    def _write_attribute(
-        write_buf: memoryview,
-        write_idx: int,
-        attribute_map: Any,
-        geometry_attribute: Any,
-    ) -> int:
-        """Write the given geometry attribute to the given buffer using the attribute memory map.
-
-        :param write_buf: The buffer to write to.
-        :param write_idx: The byte index to start writing at.
-        :param attribute_map: The memory map of the attribute.
-        :param geometry_attribute: The attribute to write.
-        :return: The byte index after writing.
-        """
-        if isinstance(attribute_map, ObjectMemoryMap):
-            return attribute_map.write_object(write_buf, write_idx, geometry_attribute)
-        else:
-            buf = np.ndarray(
-                attribute_map.shape,
-                dtype=attribute_map.dtype,
-                buffer=write_buf[write_idx : write_idx + attribute_map.byte_size],
-            )
-
-            if isinstance(geometry_attribute, set):
-                buf[:] = np.asarray(list(geometry_attribute))[:]
-            else:
-                buf[:] = np.asarray(geometry_attribute)[:]
-
-            return write_idx + attribute_map.byte_size
-
     def write_geometry(
         self,
         shm: shared_memory.SharedMemory,
@@ -379,25 +459,7 @@ class Geometry3DMemoryMap(MemoryMap):
         write_buf = shm.buf
         if write_buf is None:
             raise RuntimeError("Shared memory buffer is None")
-
-        for attribute, _ in self.mapped_attributes:
-            attribute_map = getattr(self, attribute)
-            if isinstance(attribute_map, list):
-                if len(attribute_map) == 0:
-                    continue
-
-                geometry_attrs = getattr(geometry, attribute)
-                for i, attr in enumerate(attribute_map):
-                    write_idx = self._write_attribute(
-                        write_buf, write_idx, attr, geometry_attrs[i]
-                    )
-            else:
-                if attribute_map.byte_size == 0:
-                    continue
-                write_idx = self._write_attribute(
-                    write_buf, write_idx, attribute_map, getattr(geometry, attribute)
-                )
-        return write_idx
+        return self.write_mapped_attributes(geometry, write_buf, write_idx)
 
     def read_geometry(
         self, shm: shared_memory.SharedMemory, read_idx: int
@@ -413,41 +475,7 @@ class Geometry3DMemoryMap(MemoryMap):
             raise RuntimeError("Shared memory buffer is None")
 
         geometry = self.type()
-        for attribute, attribute_type in self.mapped_attributes:
-            attribute_map = getattr(self, attribute)
-            if isinstance(attribute_map, list):
-                if len(attribute_map) == 0:
-                    continue
-                attrs = []
-                for i, attr in enumerate(attribute_map):
-                    if isinstance(attr, ObjectMemoryMap):
-                        obj, read_idx = attr.read_object(read_buf, read_idx)
-                        attrs.append(obj)
-                    else:
-                        buf = np.ndarray(
-                            attr.shape,
-                            dtype=attr.dtype,
-                            buffer=read_buf[read_idx : read_idx + attr.byte_size],
-                        )
-                        if attribute_type == np.ndarray:
-                            attrs.append(buf)
-                        else:
-                            attrs.append(attribute_type(buf))
-                        read_idx += attr.byte_size
-                setattr(geometry, attribute, attrs)
-            else:
-                if attribute_map.byte_size == 0:
-                    continue
-                buf = np.ndarray(
-                    attribute_map.shape,
-                    dtype=attribute_map.dtype,
-                    buffer=read_buf[read_idx : read_idx + attribute_map.byte_size],
-                )
-                if attribute_type == np.ndarray:
-                    setattr(geometry, attribute, buf)
-                else:
-                    setattr(geometry, attribute, attribute_type(buf))
-                read_idx += attribute_map.byte_size
+        read_idx = self.read_mapped_attributes_to_object(geometry, read_buf, read_idx)
         return geometry, read_idx
 
 
@@ -687,38 +715,7 @@ class MaterialRecordMemoryMap(ObjectMemoryMap):
     def from_object(
         cls, obj: o3d.visualization.rendering.MaterialRecord
     ) -> "MaterialRecordMemoryMap":
-        size = 0
-        attribute_dict: Dict[
-            str,
-            Union[ArrayMemoryMap, List[ArrayMemoryMap], List[ObjectMemoryMap], None],
-        ] = {}
-
-        def get_memory_map(obj: Any) -> Union[ArrayMemoryMap, ObjectMemoryMap]:
-            """Get the memory map for the given object.
-
-            :param obj: The object to get the memory map for.
-            :return: The object or array memory map.
-            """
-            if isinstance(obj, set):
-                return ArrayMemoryMap.from_numpy_array(np.asarray(list(obj)))
-            elif isinstance(obj, np.ndarray):
-                return ArrayMemoryMap.from_numpy_array(obj)
-            elif ObjectMemoryMapFactory.has_proxy(obj):
-                return ObjectMemoryMapFactory.from_object(obj)
-            else:
-                return ArrayMemoryMap.from_numpy_array(np.asarray(obj))
-
-        for attribute, _ in cls.mapped_attributes:
-            attribute_value = getattr(obj, attribute)
-            if attribute_value is None:
-                attribute_dict[attribute] = None
-            elif isinstance(attribute_value, list):
-                attribute_dict[attribute] = [get_memory_map(v) for v in attribute_value]
-                size += sum(attr.byte_size for attr in attribute_dict[attribute])
-            else:
-                attribute_dict[attribute] = get_memory_map(getattr(obj, attribute))
-                size += attribute_dict[attribute].byte_size
-
+        attribute_dict, size = cls.create_mapped_attributes_memory_maps(obj)
         return cls(
             byte_size=size,
             absorption_distance=obj.absorption_distance,
@@ -741,40 +738,6 @@ class MaterialRecordMemoryMap(ObjectMemoryMap):
             **attribute_dict,
         )
 
-    @staticmethod
-    def _write_attribute(
-        write_buf: memoryview,
-        write_idx: int,
-        attribute_map: Any,
-        geometry_attribute: Any,
-    ) -> int:
-        """Write the given geometry attribute to the given buffer using the attribute memory map.
-
-        :param write_buf: The buffer to write to.
-        :param write_idx: The byte index to start writing at.
-        :param attribute_map: The memory map of the attribute.
-        :param geometry_attribute: The attribute to write.
-        :return: The byte index after writing.
-        """
-        if isinstance(attribute_map, ObjectMemoryMap):
-            return attribute_map.write_object(write_buf, write_idx, geometry_attribute)
-        else:
-            buf = np.ndarray(
-                attribute_map.shape,
-                dtype=attribute_map.dtype,
-                buffer=write_buf[write_idx : write_idx + attribute_map.byte_size],
-            )
-
-            if isinstance(geometry_attribute, set):
-                buf[:] = np.asarray(list(geometry_attribute))[:]
-            else:
-                if len(geometry_attribute) == 0:
-                    buf[:] = np.ndarray([])
-                else:
-                    buf[:] = np.asarray(geometry_attribute)[:]
-
-            return write_idx + attribute_map.byte_size
-
     def write_object(
         self,
         write_buf: memoryview,
@@ -788,27 +751,7 @@ class MaterialRecordMemoryMap(ObjectMemoryMap):
         :param geometry: The geometry to write.
         :return: The byte index after writing.
         """
-
-        for attribute, _ in self.mapped_attributes:
-            attribute_map = getattr(self, attribute)
-            if attribute_map is None:
-                continue
-            elif isinstance(attribute_map, list):
-                if len(attribute_map) == 0:
-                    continue
-
-                geometry_attrs = getattr(obj, attribute)
-                for i, attr in enumerate(attribute_map):
-                    write_idx = self._write_attribute(
-                        write_buf, write_idx, attr, geometry_attrs[i]
-                    )
-            else:
-                if attribute_map.byte_size == 0:
-                    continue
-                write_idx = self._write_attribute(
-                    write_buf, write_idx, attribute_map, getattr(obj, attribute)
-                )
-        return write_idx
+        return self.write_mapped_attributes(obj, write_buf, write_idx)
 
     def read_object(
         self,
@@ -822,43 +765,7 @@ class MaterialRecordMemoryMap(ObjectMemoryMap):
         :return: The geometry read from the shared memory and the byte index after reading.
         """
         geometry = o3d.visualization.rendering.MaterialRecord()
-        for attribute, attribute_type in self.mapped_attributes:
-            attribute_map = getattr(self, attribute)
-            if attribute_map is None:
-                setattr(geometry, attribute, None)
-            elif isinstance(attribute_map, list):
-                if len(attribute_map) == 0:
-                    continue
-                attrs = []
-                for i, attr in enumerate(attribute_map):
-                    if isinstance(attr, ObjectMemoryMap):
-                        obj, read_idx = attr.read_object(read_buf, read_idx)
-                        attrs.append(obj)
-                    else:
-                        buf = np.ndarray(
-                            attr.shape,
-                            dtype=attr.dtype,
-                            buffer=read_buf[read_idx : read_idx + attr.byte_size],
-                        )
-                        if attribute_type == np.ndarray:
-                            attrs.append(buf)
-                        else:
-                            attrs.append(attribute_type(buf))
-                        read_idx += attr.byte_size
-                setattr(geometry, attribute, attrs)
-            else:
-                if attribute_map.byte_size == 0:
-                    continue
-                buf = np.ndarray(
-                    attribute_map.shape,
-                    dtype=attribute_map.dtype,
-                    buffer=read_buf[read_idx : read_idx + attribute_map.byte_size],
-                )
-                if attribute_type == np.ndarray:
-                    setattr(geometry, attribute, buf)
-                else:
-                    setattr(geometry, attribute, attribute_type(buf))
-                read_idx += attribute_map.byte_size
+        read_idx = self.read_mapped_attributes_to_object(geometry, read_buf, read_idx)
         return geometry, read_idx
 
 
