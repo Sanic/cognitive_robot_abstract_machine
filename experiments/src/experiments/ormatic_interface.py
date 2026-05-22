@@ -18,6 +18,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 import builtins
 import datetime
 import enum
+import experiments.sage_10k.demos
+import experiments.sage_10k.sage10k_actions
 import giskardpy.executor
 import giskardpy.middleware.ros2.exceptions
 import giskardpy.model.world_config
@@ -9781,6 +9783,45 @@ class RosContextExtensionDAO(
     }
 
 
+class Sage10kAbstractDemoDAO(
+    Base, DataAccessObject[experiments.sage_10k.demos.Sage10kAbstractDemo]
+):
+
+    __tablename__ = "Sage10kAbstractDemoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "Sage10kAbstractDemoDAO",
+    }
+
+
+class Sage10kAmericanBuffetDemoDAO(
+    Sage10kAbstractDemoDAO,
+    DataAccessObject[experiments.sage_10k.demos.Sage10kAmericanBuffetDemo],
+):
+
+    __tablename__ = "Sage10kAmericanBuffetDemoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kAmericanBuffetDemoDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
+    }
+
+
 class Sage10kBaseDAO(
     Base,
     DataAccessObject[
@@ -9827,6 +9868,44 @@ class HasXYZDAO(
     }
 
 
+class Sage10kBrutalistStoreDemoDAO(
+    Sage10kAbstractDemoDAO,
+    DataAccessObject[experiments.sage_10k.demos.Sage10kBrutalistStoreDemo],
+):
+
+    __tablename__ = "Sage10kBrutalistStoreDemoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kBrutalistStoreDemoDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
+    }
+
+
+class Sage10kCraftsmanLobbyDemoDAO(
+    Sage10kAbstractDemoDAO,
+    DataAccessObject[experiments.sage_10k.demos.Sage10kCraftsmanLobbyDemo],
+):
+
+    __tablename__ = "Sage10kCraftsmanLobbyDemoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kCraftsmanLobbyDemoDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
+    }
+
+
 class Sage10kDatasetLoaderDAO(
     Base,
     DataAccessObject[
@@ -9843,6 +9922,72 @@ class Sage10kDatasetLoaderDAO(
     directory: Mapped[pathlib.Path] = mapped_column(
         krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
     )
+
+
+class Sage10kEclecticResidenceDAO(
+    Sage10kAbstractDemoDAO,
+    DataAccessObject[experiments.sage_10k.demos.Sage10kEclecticResidence],
+):
+
+    __tablename__ = "Sage10kEclecticResidenceDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kEclecticResidenceDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
+    }
+
+
+class Sage10kGymDemoDAO(
+    Sage10kAbstractDemoDAO, DataAccessObject[experiments.sage_10k.demos.Sage10kGymDemo]
+):
+
+    __tablename__ = "Sage10kGymDemoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kGymDemoDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
+    }
+
+
+class Sage10kOpenDoorDAO(
+    ActionDescriptionDAO,
+    DataAccessObject[experiments.sage_10k.sage10k_actions.Sage10kOpenDoor],
+):
+
+    __tablename__ = "Sage10kOpenDoorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ActionDescriptionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    door_id: Mapped[int] = mapped_column(
+        ForeignKey("DoorDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    door: Mapped[DoorDAO] = relationship(
+        "DoorDAO", uselist=False, foreign_keys=[door_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kOpenDoorDAO",
+        "inherit_condition": database_id == ActionDescriptionDAO.database_id,
+    }
 
 
 class Sage10kPhysicallyBasedRenderingDAO(
@@ -9922,6 +10067,82 @@ class Sage10kSizeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kSizeDAO",
         "inherit_condition": database_id == Sage10kBaseDAO.database_id,
+    }
+
+
+class Sage10kSouthwesternStoreDemoDAO(
+    Sage10kAbstractDemoDAO,
+    DataAccessObject[experiments.sage_10k.demos.Sage10kSouthwesternStoreDemo],
+):
+
+    __tablename__ = "Sage10kSouthwesternStoreDemoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kSouthwesternStoreDemoDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
+    }
+
+
+class Sage10kTVStudioDemoDAO(
+    Sage10kAbstractDemoDAO,
+    DataAccessObject[experiments.sage_10k.demos.Sage10kTVStudioDemo],
+):
+
+    __tablename__ = "Sage10kTVStudioDemoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kTVStudioDemoDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
+    }
+
+
+class Sage10kTropicalWarehouseDAO(
+    Sage10kAbstractDemoDAO,
+    DataAccessObject[experiments.sage_10k.demos.Sage10kTropicalWarehouse],
+):
+
+    __tablename__ = "Sage10kTropicalWarehouseDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kTropicalWarehouseDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
+    }
+
+
+class Sage10kVaporwaveDAO(
+    Sage10kAbstractDemoDAO,
+    DataAccessObject[experiments.sage_10k.demos.Sage10kVaporwave],
+):
+
+    __tablename__ = "Sage10kVaporwaveDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(Sage10kAbstractDemoDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "Sage10kVaporwaveDAO",
+        "inherit_condition": database_id == Sage10kAbstractDemoDAO.database_id,
     }
 
 
