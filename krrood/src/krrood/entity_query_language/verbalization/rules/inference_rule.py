@@ -40,7 +40,7 @@ from krrood.entity_query_language.verbalization.rule_analysis import (
     RuleAnalyzer,
     RuleStructure,
 )
-from krrood.entity_query_language.verbalization.rules.query import EntityRule
+from krrood.entity_query_language.verbalization.rules.query import TopLevelEntityRule
 from krrood.entity_query_language.verbalization.utils import _ensure_plural, inflect_engine
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 _ANALYZER = RuleAnalyzer()
 
 
-class InferenceRuleRule(EntityRule):
+class InferenceRuleRule(TopLevelEntityRule):
     """
     Verbalizes an inference-rule :class:`~krrood.entity_query_language.query.query.Entity`
     (selected variable is an
@@ -69,7 +69,7 @@ class InferenceRuleRule(EntityRule):
     (:attr:`~krrood.entity_query_language.verbalization.context.VerbalizationContext.query_depth`
     ``== 0``) that
     :meth:`~krrood.entity_query_language.verbalization.rule_analysis.RuleAnalyzer.can_handle`.
-    Takes priority over :class:`~krrood.entity_query_language.verbalization.rules.query.EntityRule`
+    Takes priority over :class:`~krrood.entity_query_language.verbalization.rules.query.TopLevelEntityRule`
     via MRO depth; nested inference entities fall through to the noun-phrase form.
     """
 

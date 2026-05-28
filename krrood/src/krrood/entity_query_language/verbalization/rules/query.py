@@ -65,10 +65,16 @@ _UNSET = object()
 # ── Ordered-by / Grouped-by shared helpers ───────────────────────────────────────
 
 
-def _render_ordered_by(
+def _verbalize_ordered_by(
     ordered_by: OrderedBy, context: VerbalizationContext, verbalizer: EQLVerbalizer
 ) -> VerbFragment:
-    """Render an OrderedBy expression as *"ordered by <var> (ascending|descending)"*."""
+    """Build an OrderedBy expression as *"ordered by <var> (ascending|descending)"*.
+
+    :param ordered_by: The OrderedBy expression to verbalize.
+    :param context: Shared verbalization state.
+    :param verbalizer: Verbalizer for recursive sub-expression rendering.
+    :returns: Phrase fragment for the ORDERED BY clause.
+    """
     direction_frag = (
         SortDirections.DESCENDING.as_fragment()
         if ordered_by.descending
@@ -81,10 +87,16 @@ def _render_ordered_by(
     return phrase(Keywords.ORDERED_BY.as_fragment(), ordered_frag, paren_frag)
 
 
-def _render_group_keys(
+def _verbalize_group_keys(
     variables: list, context: VerbalizationContext, verbalizer: EQLVerbalizer
 ) -> VerbFragment:
-    """Render group-by key expressions as a comma-separated phrase."""
+    """Build group-by key expressions as a comma-separated phrase.
+
+    :param variables: List of group-by key expressions.
+    :param context: Shared verbalization state.
+    :param verbalizer: Verbalizer for recursive sub-expression rendering.
+    :returns: Comma-separated phrase of verbalized group keys.
+    """
     group_frags = [verbalizer.build(variable, context) for variable in variables]
     return PhraseFragment(parts=group_frags, separator=", ")
 
@@ -451,7 +463,7 @@ def _grouped_by_clause(
     if grouped_expression is None or not grouped_expression.variables_to_group_by:
         return None
     group_key_root_ids = _root_var_ids_(grouped_expression.variables_to_group_by)
-    groups_phrase = _render_group_keys(
+    groups_phrase = _verbalize_group_keys(
         grouped_expression.variables_to_group_by, context, verbalizer
     )
     aggregated_frags = _aggregated_noun_frags_(
@@ -492,7 +504,7 @@ def _ordered_by_clause(
     ordered_by = expression._ordered_by_builder_
     if ordered_by is None:
         return None
-    return _render_ordered_by(ordered_by, context, verbalizer)
+    return _verbalize_ordered_by(ordered_by, context, verbalizer)
 
 
 # ── Grouping helpers ────────────────────────────────────────────────────────────
@@ -543,19 +555,19 @@ def _aggregated_noun_frags_(
 # ── Rules ───────────────────────────────────────────────────────────────────────
 
 
-class EntityRule(VerbalizationRule):
+class TopLevelEntityRule(VerbalizationRule):
     """
-    Verbalizes :class:`~krrood.entity_query_language.query.query.Entity` expressions.
+    Verbalizes a top-level :class:`~krrood.entity_query_language.query.query.Entity`
+    as the imperative *"Find …"* form via :func:`verbalize_query`.
 
-    Uses :func:`verbalize_query` at the top level (:attr:`~VerbalizationContext.query_depth`
-    ``== 0``) for the imperative *"Find …"* form, or :func:`verbalize_nested` for a
-    nested sub-query used as a value.
+    Only matches when :attr:`~VerbalizationContext.query_depth` is ``0``
+    (i.e. the entity is not nested inside another query).
     """
 
     @classmethod
     def applies(cls, expression, context: VerbalizationContext) -> bool:
-        """Return ``True`` for Entity expressions."""
-        return isinstance(expression, Entity)
+        """Return ``True`` for a top-level Entity (query_depth == 0)."""
+        return isinstance(expression, Entity) and context.query_depth == 0
 
     @classmethod
     def transform(
@@ -564,10 +576,33 @@ class EntityRule(VerbalizationRule):
         context: VerbalizationContext,
         verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
-        """Render the imperative *"Find …"* form (top level) or noun phrase (nested)."""
-        if context.query_depth > 0:
-            return verbalize_nested(expression, context, verbalizer)
+        """Build the imperative *"Find …"* form."""
         return verbalize_query(expression, context, verbalizer)
+
+
+class NestedEntityRule(VerbalizationRule):
+    """
+    Verbalizes a nested :class:`~krrood.entity_query_language.query.query.Entity`
+    as a noun phrase via :func:`verbalize_nested` (never emits *"Find …"*).
+
+    Only matches when :attr:`~VerbalizationContext.query_depth` is greater than
+    ``0`` (i.e. the entity appears as a sub-query selector or value).
+    """
+
+    @classmethod
+    def applies(cls, expression, context: VerbalizationContext) -> bool:
+        """Return ``True`` for a nested Entity (query_depth > 0)."""
+        return isinstance(expression, Entity) and context.query_depth > 0
+
+    @classmethod
+    def transform(
+        cls,
+        expression: Entity,
+        context: VerbalizationContext,
+        verbalizer: EQLVerbalizer,
+    ) -> VerbFragment:
+        """Build the noun-phrase form (aggregation or *"a Robot where …"*)."""
+        return verbalize_nested(expression, context, verbalizer)
 
 
 class SetOfRule(VerbalizationRule):
@@ -651,7 +686,7 @@ class GroupedByRule(VerbalizationRule):
         if expression.variables_to_group_by:
             return phrase(
                 Keywords.GROUPED_BY.as_fragment(),
-                _render_group_keys(expression.variables_to_group_by, context, verbalizer),
+                _verbalize_group_keys(expression.variables_to_group_by, context, verbalizer),
             )
         return Keywords.GROUPED.as_fragment()
 
