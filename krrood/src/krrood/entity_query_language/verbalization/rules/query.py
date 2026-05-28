@@ -66,11 +66,15 @@ _UNSET = object()
 
 
 def _verbalize_ordered_by(
-    ordered_by: OrderedBy, context: VerbalizationContext, verbalizer: EQLVerbalizer
+    ordered_by, context: VerbalizationContext, verbalizer: EQLVerbalizer
 ) -> VerbFragment:
     """Build an OrderedBy expression as *"ordered by <var> (ascending|descending)"*.
 
-    :param ordered_by: The OrderedBy expression to verbalize.
+    Accepts both :class:`OrderedBy` expressions (from standalone rule dispatch) and
+    :class:`OrderedByBuilder` instances (from query-body assembly); both expose
+    ``.variable`` and ``.descending``.
+
+    :param ordered_by: The OrderedBy expression or builder to verbalize.
     :param context: Shared verbalization state.
     :param verbalizer: Verbalizer for recursive sub-expression rendering.
     :returns: Phrase fragment for the ORDERED BY clause.
@@ -716,4 +720,4 @@ class OrderedByRule(VerbalizationRule):
         verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """Build *"ordered by <variable> (ascending|descending)"*."""
-        return _render_ordered_by(expression, context, verbalizer)
+        return _verbalize_ordered_by(expression, context, verbalizer)

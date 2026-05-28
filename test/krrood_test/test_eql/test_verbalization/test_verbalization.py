@@ -694,6 +694,86 @@ def test_verbalize_order_by_aggregation(handles_and_containers_world):
     assert "descending" in text
 
 
+def test_ordered_by_rule_standalone_ascending(handles_and_containers_world):
+    """OrderedByRule.transform must handle standalone OrderedBy (not part of query body)."""
+    world = handles_and_containers_world
+    cabinet = variable(Cabinet, domain=world.views)
+    drawer = flat_variable(cabinet.drawers)
+    query = an(
+        entity(cabinet)
+        .grouped_by(cabinet)
+        .ordered_by(eql.count(drawer), descending=False)
+    )
+    query.build()
+    ordered_by = query._ordered_by_builder_.build()
+    assert ordered_by is not None
+
+    frag = EQLVerbalizer().build(ordered_by)
+    text = ParagraphRenderer(PlainFormatter()).render(frag)
+
+    assert "ordered by" in text.lower()
+    assert "ascending" in text.lower()
+
+
+def test_ordered_by_rule_standalone_descending(handles_and_containers_world):
+    """OrderedByRule.transform produces (descending) for descending=True."""
+    world = handles_and_containers_world
+    cabinet = variable(Cabinet, domain=world.views)
+    drawer = flat_variable(cabinet.drawers)
+    query = an(
+        entity(cabinet)
+        .grouped_by(cabinet)
+        .ordered_by(eql.count(drawer), descending=True)
+    )
+    query.build()
+    ordered_by = query._ordered_by_builder_.build()
+    assert ordered_by is not None
+
+    frag = EQLVerbalizer().build(ordered_by)
+    text = ParagraphRenderer(PlainFormatter()).render(frag)
+
+    assert "ordered by" in text.lower()
+    assert "descending" in text.lower()
+
+
+def test_grouped_by_rule_standalone(handles_and_containers_world):
+    """GroupedByRule.transform must handle standalone GroupedBy expressions."""
+    world = handles_and_containers_world
+    cabinet = variable(Cabinet, domain=world.views)
+    query = an(
+        entity(cabinet)
+        .grouped_by(cabinet)
+    )
+    query.build()
+    grouped_by = query._grouped_by_expression_
+    assert grouped_by is not None
+    assert grouped_by.variables_to_group_by
+
+    frag = EQLVerbalizer().build(grouped_by)
+    text = ParagraphRenderer(PlainFormatter()).render(frag)
+
+    assert "grouped by" in text.lower()
+
+
+def test_grouped_by_rule_standalone_empty(handles_and_containers_world):
+    """GroupedByRule.transform returns 'grouped' when no group-by keys are specified."""
+    world = handles_and_containers_world
+    cabinet = variable(Cabinet, domain=world.views)
+    query = an(
+        entity(cabinet)
+        .grouped_by()  # no variables
+    )
+    query.build()
+    grouped_by = query._grouped_by_expression_
+    assert grouped_by is not None
+    assert not grouped_by.variables_to_group_by
+
+    frag = EQLVerbalizer().build(grouped_by)
+    text = ParagraphRenderer(PlainFormatter()).render(frag)
+
+    assert "grouped" in text.lower()
+
+
 def test_verbalize_complex_having(departments_and_employees_fixture):
     departments, employees = departments_and_employees_fixture
     employee = variable(Employee, domain=None)

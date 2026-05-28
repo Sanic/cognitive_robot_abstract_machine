@@ -4,7 +4,7 @@ Verbalization of inference-rule queries as ``IF … THEN …`` blocks.
 An :class:`~krrood.entity_query_language.query.query.Entity` whose selected variable
 is an :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable` encodes
 an inference rule.  :class:`InferenceRuleRule` is a more-specific
-:class:`~krrood.entity_query_language.verbalization.rules.query.EntityRule` whose
+:class:`~krrood.entity_query_language.verbalization.rules.query.TopLevelEntityRule` whose
 precondition is exactly that shape (at top level), so the rule engine selects it ahead
 of the generic ``Find …`` form — no buried ``if`` in the query path.
 
