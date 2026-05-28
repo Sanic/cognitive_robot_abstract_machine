@@ -120,7 +120,7 @@ class OR(LogicalBinaryOperator):
                 yield OperationResult(left_value.bindings, False, self, left_value)
         if not yielded:
             # Negation as failure: no variable value satisfied the condition. So the whole condition is False.
-            yield OperationResult(sources.bindings, False, self, sources)
+            yield OperationResult(sources.bindings, True, self, sources)
 
 
 def chained_logic(
