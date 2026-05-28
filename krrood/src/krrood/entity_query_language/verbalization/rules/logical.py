@@ -94,18 +94,18 @@ class AndRule(LogicalRule):
 
     @classmethod
     def transform(
-        cls, expr: AND, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, expr: AND, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """
         Flatten the AND chain and join with Oxford-comma *"and"*.
 
         :param expr: Root AND expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Oxford-comma joined fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        parts = [delegate.build(c, ctx) for c in flatten_operands(expr, AND)]
+        parts = [verbalizer.build(c, ctx) for c in flatten_operands(expr, AND)]
         if len(parts) == 1:
             return parts[0]
         return oxford_and(parts, Conjunctions.AND.as_fragment())
@@ -130,14 +130,14 @@ class RangeConjunctionRule(AndRule):
 
     @classmethod
     def transform(
-        cls, expr: AND, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, expr: AND, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """
         Fold range pairs and join the resulting items Oxford-comma style.
 
         :param expr: Root AND expression containing a range pair.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Conjunction fragment with folded *between* phrase(s).
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
@@ -146,14 +146,14 @@ class RangeConjunctionRule(AndRule):
             if isinstance(item, RangeFold):
                 parts.append(
                     build_between(
-                        delegate.build(item.chain_expr, ctx),
-                        delegate.build(item.lo_expr, ctx),
-                        delegate.build(item.hi_expr, ctx),
+                        verbalizer.build(item.chain_expr, ctx),
+                        verbalizer.build(item.lower_expression, ctx),
+                        verbalizer.build(item.upper_expression, ctx),
                         compact=ctx.compact_predicates,
                     )
                 )
             else:
-                parts.append(delegate.build(item, ctx))
+                parts.append(verbalizer.build(item, ctx))
         if len(parts) == 1:
             return parts[0]
         return oxford_and(parts, Conjunctions.AND.as_fragment())
@@ -173,18 +173,18 @@ class OrRule(LogicalRule):
 
     @classmethod
     def transform(
-        cls, expr: OR, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, expr: OR, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """
         Flatten the OR chain and produce *"either a, b, or c"*.
 
         :param expr: Root OR expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Disjunction phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        parts = [delegate.build(c, ctx) for c in flatten_operands(expr, OR)]
+        parts = [verbalizer.build(c, ctx) for c in flatten_operands(expr, OR)]
         if len(parts) == 1:
             return parts[0]
         head_with_comma = PhraseFragment(
@@ -213,18 +213,18 @@ class NotRule(LogicalRule):
 
     @classmethod
     def transform(
-        cls, expr: Not, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, expr: Not, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """
         Build *"not (<child>)"*.
 
         :param expr: Not expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Negation phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        child_frag = delegate.build(expr._child_, ctx)
+        child_frag = verbalizer.build(expr._child_, ctx)
         return phrase(
             Logicals.NOT.as_fragment(),
             PhraseFragment(parts=[word("("), child_frag, word(")")], separator=""),
@@ -248,18 +248,18 @@ class NotComparatorRule(NotRule):
 
     @classmethod
     def transform(
-        cls, expr: Not, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, expr: Not, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """
         Build *"<left> <negated_op> <right>"*.
 
         :param expr: Not-wrapping-Comparator expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Negated comparator phrase.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        return comparator_phrase(expr._child_, ctx, delegate, negated=True)
+        return comparator_phrase(expr._child_, ctx, verbalizer, negated=True)
 
 
 class NotBoolAttrRule(NotRule):
@@ -281,15 +281,15 @@ class NotBoolAttrRule(NotRule):
 
     @classmethod
     def transform(
-        cls, expr: Not, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, expr: Not, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """
         Render *"<nav> is not <attr>"* for the negated boolean attribute chain.
 
         :param expr: Not-wrapping-bool-Attribute expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Predicative *"is not <attr>"* fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        return verbalize_chain(expr._child_, ctx, delegate, negated=True)
+        return verbalize_chain(expr._child_, ctx, verbalizer, negated=True)

@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import tempfile
 import webbrowser
+from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING
 
 from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
@@ -79,6 +80,7 @@ def _is_ipython() -> bool:
         return False
 
 
+@dataclass
 class VerbalizationPipeline:
     """
     Combines an :class:`~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer`
@@ -103,14 +105,13 @@ class VerbalizationPipeline:
 
     * :class:`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.AutoAPIResolver`
       — Sphinx AutoAPI documentation pages (local build or hosted).
-
-    :param renderer: Renderer used to convert the fragment tree to a string.
-    :type renderer: ~krrood.entity_query_language.verbalization.rendering.renderer.FragmentRenderer
     """
 
-    def __init__(self, renderer: FragmentRenderer = ParagraphRenderer()):
-        self._verbalizer = EQLVerbalizer()
-        self._renderer = renderer
+    renderer: FragmentRenderer = field(default_factory=ParagraphRenderer)
+    """Renderer used to convert the fragment tree to a string."""
+
+    _verbalizer: EQLVerbalizer = field(default_factory=EQLVerbalizer, init=False)
+    """The verbalizer that builds fragment trees from EQL expressions."""
 
     def verbalize(self, expr) -> str:
         """
@@ -127,7 +128,7 @@ class VerbalizationPipeline:
 
     def _is_html_renderer(self) -> bool:
         """Return ``True`` when this pipeline's renderer uses :class:`HTMLFormatter`."""
-        return isinstance(getattr(self._renderer, "_formatter", None), HTMLFormatter)
+        return isinstance(getattr(self.renderer, "_formatter", None), HTMLFormatter)
 
     def verbalize_fragment(self, fragment: VerbFragment) -> str:
         """
@@ -141,7 +142,7 @@ class VerbalizationPipeline:
         :returns: Formatted string.
         :rtype: str
         """
-        result = self._renderer.render(fragment)
+        result = self.renderer.render(fragment)
         if self._is_html_renderer():
             return _HTML_CELL_WRAPPER.format(body=result)
         return result
@@ -169,7 +170,7 @@ class VerbalizationPipeline:
         :param fragment: Root of the fragment tree to display.
         :type fragment: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        raw_html = self._renderer.render(fragment)
+        raw_html = self.renderer.render(fragment)
         if _is_ipython():
             from IPython.display import display as _ipython_display, HTML
             wrapped = _HTML_CELL_WRAPPER.format(body=raw_html) if self._is_html_renderer() else raw_html

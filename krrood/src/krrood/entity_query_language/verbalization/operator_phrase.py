@@ -80,7 +80,7 @@ def comparator_operator(
 def comparator_phrase(
     comparator: Comparator,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
     *,
     negated: bool = False,
 ) -> VerbFragment:
@@ -92,12 +92,12 @@ def comparator_phrase(
 
     :param comparator: The comparator expression.
     :param ctx: Shared verbalization state.
-    :param delegate: Verbalizer used to build the operand sub-expressions.
+    :param verbalizer: Verbalizer used to build the operand sub-expressions.
     :param negated: Outer negation (from a wrapping ``Not``).
     :returns: The comparison phrase fragment.
     :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
     """
-    left = delegate.build(comparator.left, ctx)
-    right = delegate.build(comparator.right, ctx)
+    left = verbalizer.build(comparator.left, ctx)
+    right = verbalizer.build(comparator.right, ctx)
     op = comparator_operator(comparator, ctx, negated=negated)
     return phrase(left, op, right)

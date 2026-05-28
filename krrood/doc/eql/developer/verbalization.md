@@ -148,11 +148,11 @@ block = BlockFragment(header=keyword_frag, items=[item1, item2])
 
 ## Rule Dispatch Mechanism
 
-`EQLVerbalizer.build(expr, ctx)` delegates to `RuleEngine.build(expr, ctx, delegate)`, which:
+`EQLVerbalizer.build(expr, ctx)` delegates to `RuleEngine.build(expr, ctx, verbalizer)`, which:
 
 1. Checks `ctx.binding_overrides` for the expression's `_id_` — if found, returns the override fragment immediately (see [Binding Overrides](#binding-overrides) below).
 2. Iterates the sorted rule list and calls `rule_cls.applies(expr, ctx)`.
-3. Calls `rule_cls.transform(expr, ctx, delegate)` on the first matching rule.
+3. Calls `rule_cls.transform(expr, ctx, verbalizer)` on the first matching rule.
 4. Falls back to `WordFragment(text=expr._name_)` when no rule matches.
 
 ### MRO-Depth Sorting
@@ -208,10 +208,10 @@ class BetweenRule(VerbalizationRule):
         return isinstance(expr, Between)
 
     @classmethod
-    def transform(cls, expr, ctx, delegate):
-        left_frag = delegate.build(expr.left, ctx)
-        lo_frag = delegate.build(expr.lo, ctx)
-        hi_frag = delegate.build(expr.hi, ctx)
+    def transform(cls, expr, ctx, verbalizer):
+        left_frag = verbalizer.build(expr.left, ctx)
+        lo_frag = verbalizer.build(expr.lo, ctx)
+        hi_frag = verbalizer.build(expr.hi, ctx)
         return phrase(
             left_frag,
             RangePhrases.IS_BETWEEN.as_fragment(),
@@ -231,10 +231,10 @@ file, nothing else is needed — the existing import already covers it.
 No hand-maintained list.  No registry update.  Just define the class and import
 its module.
 
-#### Step 4 — Use ``delegate.build(child, ctx)`` for Recursive Sub-Expressions
+#### Step 4 — Use ``verbalizer.build(child, ctx)`` for Recursive Sub-Expressions
 
-``EQLVerbalizer`` is passed as the ``delegate`` parameter to every
-``transform()``.  Always call ``delegate.build(child, ctx)`` to render sub-expressions
+``EQLVerbalizer`` is passed as the ``verbalizer`` parameter to every
+``transform()``.  Always call ``verbalizer.build(child, ctx)`` to render sub-expressions
 — this re-enters the full rule dispatch, so your rule's sub-expressions benefit from
 coreference tracking, binding overrides, pronoun resolution, and any future rules.
 

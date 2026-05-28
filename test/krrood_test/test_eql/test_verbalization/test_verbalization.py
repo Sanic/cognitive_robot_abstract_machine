@@ -1563,8 +1563,8 @@ def test_fold_range_pairs_is_position_independent():
     # Upper bound written first: lo/hi are still assigned by direction, not position.
     folded_rev = fold_range_pairs([upper, lower])
     assert isinstance(folded_rev[0], RangeFold)
-    assert folded_rev[0].lo_expr is lower.right
-    assert folded_rev[0].hi_expr is upper.right
+    assert folded_rev[0].lower_expression is lower.right
+    assert folded_rev[0].upper_expression is upper.right
 
 
 def test_fold_range_pairs_ignores_unrelated_bounds():

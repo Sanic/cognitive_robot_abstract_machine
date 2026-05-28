@@ -99,7 +99,7 @@ class RestrictionRule(ABC):
     @classmethod
     @abstractmethod
     def render(
-        cls, item, subject_var, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, item, subject_var, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """Render *item* as a bare predicate fragment (e.g. *"booking_date is between X and Y"*)."""
 
@@ -116,14 +116,14 @@ class RangeRestrictionRule(RestrictionRule):
 
     @classmethod
     def render(
-        cls, item, subject_var, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, item, subject_var, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         attr = _single_hop_attr(item.chain_expr, subject_var)
         left = RoleFragment.for_attribute(attr._owner_class_, attr._attribute_name_)
         return build_between(
             left,
-            delegate.build(item.lo_expr, ctx),
-            delegate.build(item.hi_expr, ctx),
+            verbalizer.build(item.lower_expression, ctx),
+            verbalizer.build(item.upper_expression, ctx),
             compact=False,
         )
 
@@ -146,7 +146,7 @@ class AttributePredicateRestrictionRule(RestrictionRule):
 
     @classmethod
     def render(
-        cls, item, subject_var, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, item, subject_var, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         attr = _single_hop_attr(item.left, subject_var)
         attr_frag = RoleFragment.for_attribute(
@@ -154,7 +154,7 @@ class AttributePredicateRestrictionRule(RestrictionRule):
         )
         op_frag = comparator_operator(item, ctx, compact=False)
         return PhraseFragment(
-            parts=[attr_frag, op_frag, delegate.build(item.right, ctx)]
+            parts=[attr_frag, op_frag, verbalizer.build(item.right, ctx)]
         )
 
 
@@ -256,10 +256,8 @@ class RestrictionClauseBuilder:
     Partition a subject's ``WHERE`` condition into a *"whose <grouped>"* modifier and a
     residual condition fragment.
     """
-    _delegate: EQLVerbalizer
-    """
-    The parent verbalizer for recursive sub-expression rendering.
-    """
+    _verbalizer: EQLVerbalizer
+    """The parent verbalizer for recursive sub-expression rendering."""
 
     def build(
         self, subject_var: Optional[Variable], condition: SymbolicExpression, ctx: VerbalizationContext
@@ -284,7 +282,7 @@ class RestrictionClauseBuilder:
             if rule is None:
                 residual.append(item)
             else:
-                grouped.append(rule.render(item, subject_var, ctx, self._delegate))
+                grouped.append(rule.render(item, subject_var, ctx, self._verbalizer))
 
         whose_frag = None
         if grouped:
@@ -312,14 +310,14 @@ class RestrictionClauseBuilder:
             if isinstance(item, RangeFold):
                 parts.append(
                     build_between(
-                        self._delegate.build(item.chain_expr, ctx),
-                        self._delegate.build(item.lo_expr, ctx),
-                        self._delegate.build(item.hi_expr, ctx),
+                        self._verbalizer.build(item.chain_expr, ctx),
+                        self._verbalizer.build(item.lower_expression, ctx),
+                        self._verbalizer.build(item.upper_expression, ctx),
                         compact=ctx.compact_predicates,
                     )
                 )
             else:
-                parts.append(self._delegate.build(item, ctx))
+                parts.append(self._verbalizer.build(item, ctx))
         if len(parts) == 1:
             return parts[0]
         return oxford_and(parts, Conjunctions.AND.as_fragment())

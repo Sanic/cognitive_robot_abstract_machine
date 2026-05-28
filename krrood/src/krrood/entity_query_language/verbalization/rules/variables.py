@@ -53,13 +53,13 @@ class VariableRule(VerbalizationRule):
         return isinstance(expr, Variable)
 
     @classmethod
-    def transform(cls, expr: Variable, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: Variable, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Build *"a/an TypeName"*, *"the TypeName"*, or just *"TypeName N"* based on context.
 
         :param expr: Variable expression.
         :param ctx: Shared verbalization state (article selection + coreference).
-        :param delegate: Parent verbalizer (unused directly).
+        :param verbalizer: Parent verbalizer (unused directly).
         :returns: Noun phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
@@ -87,13 +87,13 @@ class LiteralRule(VariableRule):
         return isinstance(expr, Literal)
 
     @classmethod
-    def transform(cls, expr: Literal, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: Literal, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Build a LITERAL-role fragment from the Python value.
 
         :param expr: Literal expression.
         :param ctx: Shared verbalization state (for value rendering).
-        :param delegate: Parent verbalizer (unused).
+        :param verbalizer: Parent verbalizer (unused).
         :returns: Literal value fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
@@ -116,13 +116,13 @@ class ExternallySetVariableRule(VerbalizationRule):
         return isinstance(expr, ExternallySetVariable)
 
     @classmethod
-    def transform(cls, expr: ExternallySetVariable, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: ExternallySetVariable, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Build *"a/an TypeName"* without coreference tracking (external variables are opaque).
 
         :param expr: ExternallySetVariable expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer (unused).
+        :param verbalizer: Parent verbalizer (unused).
         :returns: Noun phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
@@ -145,17 +145,17 @@ class InstantiatedVariableRule(VerbalizationRule):
         return isinstance(expr, InstantiatedVariable)
 
     @classmethod
-    def transform(cls, expr: InstantiatedVariable, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: InstantiatedVariable, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Delegate to :func:`_verbalize_instantiated_natural`.
 
         :param expr: InstantiatedVariable expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer.
+        :param verbalizer: Parent verbalizer.
         :returns: Full natural-language binding phrase.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        return _verbalize_instantiated_natural(expr, ctx, delegate)
+        return _verbalize_instantiated_natural(expr, ctx, verbalizer)
 
 
 class InstantiatedVerbalizableRule(InstantiatedVariableRule):
@@ -178,18 +178,18 @@ class InstantiatedVerbalizableRule(InstantiatedVariableRule):
         return isinstance(expr, InstantiatedVariable) and _has_verbalization_template(expr)
 
     @classmethod
-    def transform(cls, expr: InstantiatedVariable, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: InstantiatedVariable, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Apply the verbalization template, substituting verbalized child values.
 
         :param expr: InstantiatedVariable with a Verbalizable type.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for verbalizing child expressions.
+        :param verbalizer: Parent verbalizer for verbalizing child expressions.
         :returns: Plain word fragment from the formatted template.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
         template = expr._type_._verbalization_template_()
-        kwargs = {name: delegate.verbalize(child, ctx) for name, child in expr._child_vars_.items()}
+        kwargs = {name: verbalizer.verbalize(child, ctx) for name, child in expr._child_vars_.items()}
         return word(template.format(**kwargs))
 
 
@@ -225,18 +225,18 @@ def _copula_and_value(
     field_name: str,
     child_expr,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
 ) -> tuple[VerbFragment, VerbFragment]:
     """Return (copula_frag, value_frag) choosing singular/plural based on field name."""
     if inflect_engine.singular_noun(field_name):
-        return Copulas.ARE.as_fragment(), verbalize_plural(child_expr, ctx, delegate.build)
-    return Copulas.IS.as_fragment(), delegate.build(child_expr, ctx)
+        return Copulas.ARE.as_fragment(), verbalize_plural(child_expr, ctx, verbalizer.build)
+    return Copulas.IS.as_fragment(), verbalizer.build(child_expr, ctx)
 
 
 def _build_bindings(
     expr: InstantiatedVariable,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
 ) -> tuple[list[VerbFragment], dict[uuid.UUID, VerbFragment]]:
     """Build all binding fragments and collect overrides without registering them.
 
@@ -248,7 +248,7 @@ def _build_bindings(
     pending_overrides: dict[uuid.UUID, VerbFragment] = {}
     for field_name, child_expr in expr._child_vars_.items():
         field_ref = _make_field_ref_frag(field_name, type_name, expr._type_)
-        copula, value = _copula_and_value(field_name, child_expr, ctx, delegate)
+        copula, value = _copula_and_value(field_name, child_expr, ctx, verbalizer)
         binding_frags.append(phrase(field_ref, copula, value))
         pending_overrides[child_expr._id_] = field_ref
     return binding_frags, pending_overrides
@@ -279,7 +279,7 @@ def _assemble_instantiated_phrase(
 def _verbalize_instantiated_natural(
     expr: InstantiatedVariable,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
 ) -> VerbFragment:
     type_name = getattr(expr._type_, "__name__", str(expr._type_))
     seen = ctx.seen_reference(expr)
@@ -288,9 +288,9 @@ def _verbalize_instantiated_natural(
     ctx.seen[expr._id_] = type_name
 
     ctx.push_constraint_frame()
-    binding_frags, overrides = _build_bindings(expr, ctx, delegate)
+    binding_frags, overrides = _build_bindings(expr, ctx, verbalizer)
     ctx.binding_overrides.update(overrides)
     deferred = ctx.pop_constraint_frame()
-    constraint_frags = [delegate.build(e, ctx) for e in deferred]
+    constraint_frags = [verbalizer.build(e, ctx) for e in deferred]
 
     return _assemble_instantiated_phrase(type_name, expr, binding_frags, constraint_frags)

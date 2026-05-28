@@ -84,12 +84,12 @@ class InferenceRuleRule(EntityRule):
 
     @classmethod
     def transform(
-        cls, expr: Entity, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, expr: Entity, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """Build the two-block ``IF … THEN …`` fragment."""
         structure = _ANALYZER.analyze(expr)
-        if_frag = _verbalize_rule_if_(structure, ctx, delegate)
-        then_frag = _verbalize_rule_then_(structure, ctx, delegate)
+        if_frag = _verbalize_rule_if_(structure, ctx, verbalizer)
+        then_frag = _verbalize_rule_then_(structure, ctx, verbalizer)
         return BlockFragment(
             header=None,
             items=[
@@ -103,7 +103,7 @@ class InferenceRuleRule(EntityRule):
 
 
 def _verbalize_rule_if_(
-    s: RuleStructure, ctx: VerbalizationContext, delegate: EQLVerbalizer
+    s: RuleStructure, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
 ) -> list[VerbFragment]:
     """Build the fragments for the IF block: one item per primary antecedent, plus unmatched conditions."""
     for ant in s.secondary_antecedents:
@@ -113,13 +113,13 @@ def _verbalize_rule_if_(
     for ant in s.primary_antecedents:
         intro = _antecedent_intro_frag_(ant)
         _register_antecedent_(ant, ctx)
-        cond_frags = _condition_frags_(ant.conditions, ant, ctx, delegate)
+        cond_frags = _condition_frags_(ant.conditions, ant, ctx, verbalizer)
         items.append(
             BlockFragment(header=intro, items=cond_frags) if cond_frags else intro
         )
 
     for cond in s.unmatched_conditions:
-        items.append(delegate.build(cond, ctx))
+        items.append(verbalizer.build(cond, ctx))
 
     return items or [Keywords.TRUE.as_fragment()]
 
@@ -146,11 +146,11 @@ def _condition_frags_(
     conditions: list,
     ant: AntecedentInfo,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
 ) -> list[VerbFragment]:
     """Render each condition, preferring a *"whose …"* fold when possible."""
     return [
-        _try_whose_from_condition_(cond, ant, ctx, delegate) or delegate.build(cond, ctx)
+        _try_whose_from_condition_(cond, ant, ctx, verbalizer) or verbalizer.build(cond, ctx)
         for cond in conditions
     ]
 
@@ -159,7 +159,7 @@ def _try_whose_from_condition_(
     cond,
     ant: AntecedentInfo,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
 ) -> Optional[VerbFragment]:
     """If *cond* is a foldable single-attribute equality, return a *"whose <attr> is …"* fragment."""
     if not isinstance(cond, Comparator) or cond.operation is not operator.eq:
@@ -172,9 +172,9 @@ def _try_whose_from_condition_(
     aggregated = ant.aggregation_status == AggregationStatus.AGGREGATED
     attr_word = _ensure_plural(attr_names[-1]) if aggregated else attr_names[-1]
     right_frag = (
-        verbalize_plural(cond.right, ctx, delegate.build)
+        verbalize_plural(cond.right, ctx, verbalizer.build)
         if aggregated
-        else delegate.build(cond.right, ctx)
+        else verbalizer.build(cond.right, ctx)
     )
     return phrase(
         Keywords.WHOSE.as_fragment(),
@@ -199,13 +199,13 @@ def _extract_attr_names_(left: Attribute) -> list[str]:
 
 
 def _verbalize_rule_then_(
-    s: RuleStructure, ctx: VerbalizationContext, delegate: EQLVerbalizer
+    s: RuleStructure, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
 ) -> list[VerbFragment]:
     """Build the fragment for the THEN block: an intro phrase plus whose-binding items."""
     type_name = s.consequent_type
     intro: VerbFragment = ExistentialPhrase.THERE_IS_A.build_phrase(type_name)
     binding_frags = [
-        _verbalize_binding_frag_(b, ctx, delegate) for b in s.consequent_bindings
+        _verbalize_binding_frag_(b, ctx, verbalizer) for b in s.consequent_bindings
     ]
     if not binding_frags:
         return [intro]
@@ -215,7 +215,7 @@ def _verbalize_rule_then_(
 def _verbalize_binding_frag_(
     binding: ConsequentBinding,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
 ) -> VerbFragment:
     """Render a single consequent binding as *"whose <field> is <value>"*."""
     field_text = (
@@ -227,14 +227,14 @@ def _verbalize_binding_frag_(
         Keywords.WHOSE.as_fragment(),
         role(field_text, SemanticRole.ATTRIBUTE),
         Copulas.ARE.as_fragment() if binding.is_plural_field else Copulas.IS.as_fragment(),
-        _binding_value_frag_(binding, ctx, delegate),
+        _binding_value_frag_(binding, ctx, verbalizer),
     )
 
 
 def _binding_value_frag_(
     binding: ConsequentBinding,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
 ) -> VerbFragment:
     """Render the value part of a consequent binding, handling plural/group-key special cases."""
     if (
@@ -243,23 +243,23 @@ def _binding_value_frag_(
     ):
         return phrase(
             Articles.THE.as_fragment(),
-            verbalize_plural(binding.value_expr, ctx, delegate.build),
+            verbalize_plural(binding.value_expr, ctx, verbalizer.build),
         )
     if binding.is_plural_field:
-        return verbalize_plural(binding.value_expr, ctx, delegate.build)
+        return verbalize_plural(binding.value_expr, ctx, verbalizer.build)
     if binding.aggregation_status == AggregationStatus.GROUP_KEY:
-        return _verbalize_group_key_value_(binding.value_expr, ctx, delegate)
-    return delegate.build(binding.value_expr, ctx)
+        return _verbalize_group_key_value_(binding.value_expr, ctx, verbalizer)
+    return verbalizer.build(binding.value_expr, ctx)
 
 
 def _verbalize_group_key_value_(
-    expr, ctx: VerbalizationContext, delegate: EQLVerbalizer
+    expr, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
 ) -> VerbFragment:
     """Render a GROUP KEY value as *"the common <field> of <roots>"*."""
     chain, current = walk_chain(expr)
 
     if not chain or not isinstance(current, Variable):
-        return delegate.build(expr, ctx)
+        return verbalizer.build(expr, ctx)
 
     root_type = (
         current._type_.__name__

@@ -53,18 +53,18 @@ class ForAllRule(QuantifierRule):
         return isinstance(expr, ForAll)
 
     @classmethod
-    def transform(cls, expr: ForAll, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: ForAll, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Build *"for all <plural_var>, <condition>"*.
 
         :param expr: ForAll quantifier expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Universal-quantification phrase.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        var_frag = verbalize_plural(expr.variable, ctx, delegate.build)
-        cond_frag = delegate.build(expr.condition, ctx)
+        var_frag = verbalize_plural(expr.variable, ctx, verbalizer.build)
+        cond_frag = verbalizer.build(expr.condition, ctx)
         return phrase(Logicals.FOR_ALL.as_fragment(), var_frag, word(","), cond_frag)
 
 
@@ -79,18 +79,18 @@ class ExistsRule(QuantifierRule):
         return isinstance(expr, Exists)
 
     @classmethod
-    def transform(cls, expr: Exists, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: Exists, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Build *"there exists <variable> such that <condition>"*.
 
         :param expr: Exists quantifier expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Existential-quantification phrase.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        var_frag = delegate.build(expr.variable, ctx)
-        cond_frag = delegate.build(expr.condition, ctx)
+        var_frag = verbalizer.build(expr.variable, ctx)
+        cond_frag = verbalizer.build(expr.condition, ctx)
         return phrase(
             Logicals.THERE_EXISTS.as_fragment(),
             var_frag,

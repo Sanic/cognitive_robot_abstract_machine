@@ -53,7 +53,7 @@ class AggregatorRule(VerbalizationRule):
         return isinstance(expr, Aggregator)
 
     @classmethod
-    def transform(cls, expr: Aggregator, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: Aggregator, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Build *"the <aggregation> <plural_child>"* or *"the <aggregation> of <child>"*.
 
@@ -70,7 +70,7 @@ class AggregatorRule(VerbalizationRule):
 
         :param expr: Aggregator expression.
         :param ctx: Shared verbalization state.
-        :param delegate: Parent verbalizer for recursive calls.
+        :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Aggregation phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
@@ -79,10 +79,10 @@ class AggregatorRule(VerbalizationRule):
         agg_frag = agg_kind.as_fragment()
 
         if agg_word.child_form == ChildForm.SINGULAR_OF:
-            child_frag = delegate.build(expr._child_, ctx)
+            child_frag = verbalizer.build(expr._child_, ctx)
             result = phrase(Articles.THE.as_fragment(), agg_frag, Prepositions.OF.as_fragment(), child_frag)
         else:
-            child_frag = verbalize_plural(expr._child_, ctx, delegate.build)
+            child_frag = verbalize_plural(expr._child_, ctx, verbalizer.build)
             result = phrase(Articles.THE.as_fragment(), agg_frag, child_frag)
 
         if expr._id_ not in ctx.seen:
@@ -104,13 +104,13 @@ class CountAllRule(AggregatorRule):
         return isinstance(expr, CountAll)
 
     @classmethod
-    def transform(cls, expr: CountAll, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expr: CountAll, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Return the *"count of all"* aggregation fragment directly.
 
         :param expr: CountAll expression.
         :param ctx: Shared verbalization state (unused).
-        :param delegate: Parent verbalizer (unused).
+        :param verbalizer: Parent verbalizer (unused).
         :returns: ``Aggregations.COUNT_ALL.as_fragment()``.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """

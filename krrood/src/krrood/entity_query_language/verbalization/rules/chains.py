@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 def verbalize_chain(
     expr: MappedVariable,
     ctx: VerbalizationContext,
-    delegate: EQLVerbalizer,
+    verbalizer: EQLVerbalizer,
     *,
     negated: bool = False,
 ) -> VerbFragment:
@@ -64,15 +64,15 @@ def verbalize_chain(
 
     :param expr: Root node of a MappedVariable chain.
     :param ctx: Shared verbalization state.
-    :param delegate: Verbalizer for recursive sub-expression rendering.
+    :param verbalizer: Verbalizer for recursive sub-expression rendering.
     :param negated: Use the negated copula for a boolean terminal attribute.
     :returns: Fragment for the chain.
     """
     chain, leaf = walk_chain(expr)
     terminal = chain[-1]
     if isinstance(terminal, Attribute) and terminal._type_ is bool:
-        return _bool_attribute_chain(chain, leaf, ctx, delegate, negated)
-    root_frag = _chain_root_frag(leaf, ctx, delegate)
+        return _bool_attribute_chain(chain, leaf, ctx, verbalizer, negated)
+    root_frag = _chain_root_frag(leaf, ctx, verbalizer)
     return _render_path(build_path_parts(chain), root_frag)
 
 
@@ -135,14 +135,14 @@ def _render_possessive_path(
     return PhraseFragment(parts=frag_parts)
 
 
-def _chain_root_frag(leaf, ctx: VerbalizationContext, delegate: EQLVerbalizer) -> VerbFragment:
+def _chain_root_frag(leaf, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
     """Noun phrase for the root of a chain; unwraps ResultQuantifier wrappers."""
     inner = leaf
     while isinstance(inner, ResultQuantifier):
         inner = inner._child_
     if isinstance(inner, Entity):
-        return as_inline_noun(inner, ctx, delegate)
-    return delegate.build(leaf, ctx)
+        return as_inline_noun(inner, ctx, verbalizer)
+    return verbalizer.build(leaf, ctx)
 
 
 def _navigation_chain(nav_chain: list, root_frag: VerbFragment) -> VerbFragment:
@@ -162,10 +162,10 @@ def _navigation_chain(nav_chain: list, root_frag: VerbFragment) -> VerbFragment:
 
 
 def _bool_attribute_chain(
-    chain: list, leaf, ctx: VerbalizationContext, delegate: EQLVerbalizer, negated: bool
+    chain: list, leaf, ctx: VerbalizationContext, verbalizer: EQLVerbalizer, negated: bool
 ) -> VerbFragment:
     """Produces '<nav-path> is [not] <attr>' for boolean terminal attributes."""
-    root_frag = _chain_root_frag(leaf, ctx, delegate)
+    root_frag = _chain_root_frag(leaf, ctx, verbalizer)
     nav_frag = _navigation_chain(chain[:-1], root_frag)
     copula = Copulas.IS_NOT.as_fragment() if negated else Copulas.IS.as_fragment()
     terminal = chain[-1]
@@ -198,10 +198,10 @@ class MappedVariableRule(VerbalizationRule):
         cls,
         expr: MappedVariable,
         ctx: VerbalizationContext,
-        delegate: EQLVerbalizer,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """Render the chain as a possessive or predicative fragment."""
-        return verbalize_chain(expr, ctx, delegate)
+        return verbalize_chain(expr, ctx, verbalizer)
 
 
 class PronominalChainRule(MappedVariableRule):
@@ -234,7 +234,7 @@ class PronominalChainRule(MappedVariableRule):
         cls,
         expr: MappedVariable,
         ctx: VerbalizationContext,
-        delegate: EQLVerbalizer,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """Render the chain with a leading *"its"* possessive pronoun."""
         _chain, root = walk_chain(expr)
@@ -262,7 +262,7 @@ class FlatVariableRule(MappedVariableRule):
         cls,
         expr: FlatVariable,
         ctx: VerbalizationContext,
-        delegate: EQLVerbalizer,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """Unwrap to the child expression."""
-        return delegate.build(expr._child_, ctx)
+        return verbalizer.build(expr._child_, ctx)

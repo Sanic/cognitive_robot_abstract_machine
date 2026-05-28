@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from krrood.entity_query_language.verbalization.fragments.base import WordFragment
@@ -63,7 +64,7 @@ class VerbalizationRule(ABC):
         cls,
         expr: SymbolicExpression,
         ctx: VerbalizationContext,
-        delegate: EQLVerbalizer,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """
         Build and return the :class:`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment`
@@ -73,8 +74,8 @@ class VerbalizationRule(ABC):
         :type expr: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
         :param ctx: Shared verbalization state (coreference, bindings).
         :type ctx: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
-        :param delegate: The top-level verbalizer used for recursive sub-expression verbalization.
-        :type delegate: ~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer
+        :param verbalizer: The top-level verbalizer used for recursive sub-expression verbalization.
+        :type verbalizer: ~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer
         :returns: Fragment tree representing *expr* in natural language.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
@@ -88,6 +89,7 @@ def _inheritance_depth(cls: type) -> int:
         return 0
 
 
+@dataclass
 class RuleEngine:
     """
     Applies the first matching :class:`VerbalizationRule` to an expression,
@@ -96,20 +98,22 @@ class RuleEngine:
     On construction the supplied rule classes are sorted by MRO depth
     (``__mro__.index(VerbalizationRule)``, descending) so that subclasses always
     shadow their parents without the caller having to manage ordering.
-
-    :param rule_classes: Concrete :class:`VerbalizationRule` subclasses to register.
-    :type rule_classes: list[type[VerbalizationRule]]
     """
 
-    def __init__(self, rule_classes: list[type[VerbalizationRule]]) -> None:
-        """Sort *rule_classes* by MRO depth (descending) so subclasses shadow parents."""
-        self._rules = sorted(rule_classes, key=_inheritance_depth, reverse=True)
+    _rule_classes: list[type[VerbalizationRule]] = field(repr=False)
+    """Unsorted rule classes supplied at construction time (stored for repr)."""
+
+    _rules: list[type[VerbalizationRule]] = field(init=False, repr=False)
+    """Rule classes sorted by MRO depth (descending) so subclasses shadow parents."""
+
+    def __post_init__(self) -> None:
+        self._rules = sorted(self._rule_classes, key=_inheritance_depth, reverse=True)
 
     def build(
         self,
         expr: SymbolicExpression,
         ctx: VerbalizationContext,
-        delegate: EQLVerbalizer,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """
         Dispatch *expr* to the first matching rule and return its fragment.
@@ -125,8 +129,8 @@ class RuleEngine:
         :type expr: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
         :param ctx: Shared verbalization state.
         :type ctx: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
-        :param delegate: Top-level verbalizer for recursive calls.
-        :type delegate: ~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer
+        :param verbalizer: Top-level verbalizer for recursive calls.
+        :type verbalizer: ~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer
         :returns: Fragment tree for *expr*.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
@@ -135,5 +139,5 @@ class RuleEngine:
             return ctx.binding_overrides[var_id]
         for rule_cls in self._rules:
             if rule_cls.applies(expr, ctx):
-                return rule_cls.transform(expr, ctx, delegate)
+                return rule_cls.transform(expr, ctx, verbalizer)
         return WordFragment(text=expr._name_)

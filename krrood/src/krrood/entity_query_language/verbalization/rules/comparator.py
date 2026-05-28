@@ -42,7 +42,7 @@ class ComparatorRule(VerbalizationRule):
 
     @classmethod
     def transform(
-        cls, expr: Comparator, ctx: VerbalizationContext, delegate: EQLVerbalizer
+        cls, expr: Comparator, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """Build *"<left> <operator> <right>"*."""
-        return comparator_phrase(expr, ctx, delegate)
+        return comparator_phrase(expr, ctx, verbalizer)

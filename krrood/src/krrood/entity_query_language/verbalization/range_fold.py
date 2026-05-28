@@ -45,10 +45,10 @@ class RangeFold:
     chain_expr: SymbolicExpression
     """The shared attribute chain (e.g. ``t.booking_date``)."""
 
-    lo_expr: SymbolicExpression
+    lower_expression: SymbolicExpression
     """The lower-bound value expression (the ``>=`` / ``>`` right operand)."""
 
-    hi_expr: SymbolicExpression
+    upper_expression: SymbolicExpression
     """The upper-bound value expression (the ``<=`` / ``<`` right operand)."""
 
 
@@ -129,7 +129,7 @@ def fold_range_pairs(conjuncts: List) -> List[Union[SymbolicExpression, RangeFol
             else (conjuncts[partner], conjunct)
         )
         result.append(
-            RangeFold(chain_expr=lower.left, lo_expr=lower.right, hi_expr=upper.right)
+            RangeFold(chain_expr=lower.left, lower_expression=lower.right, upper_expression=upper.right)
         )
     return result
 
