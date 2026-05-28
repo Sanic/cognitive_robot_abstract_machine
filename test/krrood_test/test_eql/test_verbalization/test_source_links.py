@@ -202,11 +202,13 @@ _requires_krrood_docs = pytest.mark.skipif(
 )
 
 
+@_requires_krrood_docs
 def test_autoapi_resolver_for_package_returns_resolver():
     resolver = AutoAPIResolver.for_package("krrood")
     assert isinstance(resolver, AutoAPIResolver)
 
 
+@_requires_krrood_docs
 def test_autoapi_resolver_for_package_base_url_has_krrood_docs():
     resolver = AutoAPIResolver.for_package("krrood")
     assert "localhost" in resolver.base_url
@@ -214,11 +216,13 @@ def test_autoapi_resolver_for_package_base_url_has_krrood_docs():
     assert "doc/_build/html" in resolver.base_url
 
 
+@_requires_krrood_docs
 def test_autoapi_resolver_for_package_custom_port():
     resolver = AutoAPIResolver.for_package("krrood", port=8080)
     assert "localhost:8080" in resolver.base_url
 
 
+@_requires_krrood_docs
 def test_autoapi_resolver_for_package_sets_html_root():
     resolver = AutoAPIResolver.for_package("krrood")
     assert resolver.html_root is not None
