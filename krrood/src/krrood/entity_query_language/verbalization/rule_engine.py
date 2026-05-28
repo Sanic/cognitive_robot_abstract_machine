@@ -3,7 +3,9 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import List, TYPE_CHECKING
+
+from typing_extensions import Type
 
 from krrood.entity_query_language.verbalization.fragments.base import WordFragment
 
@@ -31,7 +33,7 @@ class VerbalizationRule(ABC):
     just define the class and it will be discovered by :class:`RuleEngine`.
     """
 
-    _registry: list[type[VerbalizationRule]] = []
+    _registry: List[Type[VerbalizationRule]] = []
 
     def __init_subclass__(cls, **kwargs):
         """Auto-register every concrete (non-abstract) rule subclass."""
@@ -40,21 +42,21 @@ class VerbalizationRule(ABC):
             VerbalizationRule._registry.append(cls)
 
     @classmethod
-    def registered_rules(cls) -> list[type[VerbalizationRule]]:
+    def registered_rules(cls) -> List[Type[VerbalizationRule]]:
         """Return all auto-registered concrete rule classes in definition order."""
         return list(cls._registry)
 
     @classmethod
     @abstractmethod
-    def applies(cls, expr: SymbolicExpression, ctx: VerbalizationContext) -> bool:
+    def applies(cls, expression: SymbolicExpression, context: VerbalizationContext) -> bool:
         """
-        Return ``True`` if this rule can handle *expr*.
+        Return ``True`` if this rule can handle *expression*.
 
-        :param expr: EQL expression to test.
-        :type expr: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
-        :param ctx: Current verbalization state.
-        :type ctx: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
-        :returns: ``True`` when this rule should be applied to *expr*.
+        :param expression: EQL expression to test.
+        :type expression: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
+        :param context: Current verbalization state.
+        :type context: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
+        :returns: ``True`` when this rule should be applied to *expression*.
         :rtype: bool
         """
 
@@ -62,21 +64,21 @@ class VerbalizationRule(ABC):
     @abstractmethod
     def transform(
         cls,
-        expr: SymbolicExpression,
-        ctx: VerbalizationContext,
+        expression: SymbolicExpression,
+        context: VerbalizationContext,
         verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """
         Build and return the :class:`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment`
-        for *expr*.
+        for *expression*.
 
-        :param expr: EQL expression to verbalize.
-        :type expr: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
-        :param ctx: Shared verbalization state (coreference, bindings).
-        :type ctx: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
+        :param expression: EQL expression to verbalize.
+        :type expression: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
+        :param context: Shared verbalization state (coreference, bindings).
+        :type context: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
         :param verbalizer: The top-level verbalizer used for recursive sub-expression verbalization.
         :type verbalizer: ~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer
-        :returns: Fragment tree representing *expr* in natural language.
+        :returns: Fragment tree representing *expression* in natural language.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
 
@@ -100,10 +102,10 @@ class RuleEngine:
     shadow their parents without the caller having to manage ordering.
     """
 
-    _rule_classes: list[type[VerbalizationRule]] = field(repr=False)
+    _rule_classes: List[Type[VerbalizationRule]] = field(repr=False)
     """Unsorted rule classes supplied at construction time (stored for repr)."""
 
-    _rules: list[type[VerbalizationRule]] = field(init=False, repr=False)
+    _rules: List[Type[VerbalizationRule]] = field(init=False, repr=False)
     """Rule classes sorted by MRO depth (descending) so subclasses shadow parents."""
 
     def __post_init__(self) -> None:
@@ -111,33 +113,33 @@ class RuleEngine:
 
     def build(
         self,
-        expr: SymbolicExpression,
-        ctx: VerbalizationContext,
+        expression: SymbolicExpression,
+        context: VerbalizationContext,
         verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """
-        Dispatch *expr* to the first matching rule and return its fragment.
+        Dispatch *expression* to the first matching rule and return its fragment.
 
-        Before consulting any rule, checks whether *expr*'s ``_id_`` appears in
+        Before consulting any rule, checks whether *expression*'s ``_id_`` appears in
         :attr:`~krrood.entity_query_language.verbalization.context.VerbalizationContext.binding_overrides`;
         if so the override fragment is returned immediately.
 
         Falls back to a plain :class:`~krrood.entity_query_language.verbalization.fragments.base.WordFragment`
-        bearing ``expr._name_`` when no rule matches.
+        bearing ``expression._name_`` when no rule matches.
 
-        :param expr: EQL expression to verbalize.
-        :type expr: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
-        :param ctx: Shared verbalization state.
-        :type ctx: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
+        :param expression: EQL expression to verbalize.
+        :type expression: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
+        :param context: Shared verbalization state.
+        :type context: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
         :param verbalizer: Top-level verbalizer for recursive calls.
         :type verbalizer: ~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer
-        :returns: Fragment tree for *expr*.
+        :returns: Fragment tree for *expression*.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        var_id = getattr(expr, "_id_", None)
-        if var_id is not None and var_id in ctx.binding_overrides:
-            return ctx.binding_overrides[var_id]
+        variable_id = getattr(expression, "_id_", None)
+        if variable_id is not None and variable_id in context.binding_overrides:
+            return context.binding_overrides[variable_id]
         for rule_cls in self._rules:
-            if rule_cls.applies(expr, ctx):
-                return rule_cls.transform(expr, ctx, verbalizer)
-        return WordFragment(text=expr._name_)
+            if rule_cls.applies(expression, context):
+                return rule_cls.transform(expression, context, verbalizer)
+        return WordFragment(text=expression._name_)

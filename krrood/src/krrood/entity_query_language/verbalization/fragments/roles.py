@@ -11,7 +11,9 @@ output is visually consistent with query graph visualizations.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Dict, Optional
+
+from typing_extensions import Type
 
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.core.variable import Variable, Literal
@@ -68,7 +70,7 @@ ROLE_COLORS: dict[SemanticRole, Optional[str]] = {
 }
 
 
-def _build_role_map() -> dict[type, SemanticRole]:
+def _build_role_map() -> Dict[type, SemanticRole]:
     """Return the mapping of EQL expression types to their :class:`SemanticRole`."""
     return {
         LogicalOperator: SemanticRole.LOGICAL,
@@ -82,25 +84,25 @@ def _build_role_map() -> dict[type, SemanticRole]:
     }
 
 
-_role_map: Optional[dict[type, SemanticRole]] = None
+_role_map: Optional[Dict[type, SemanticRole]] = None
 
 
-def role_for(expr) -> SemanticRole:
+def role_for(expression) -> SemanticRole:
     """
     Return the :class:`SemanticRole` for an EQL expression instance using MRO lookup.
 
-    Traverses the MRO of ``type(expr)`` and returns the role of the first ancestor
+    Traverses the MRO of ``type(expression)`` and returns the role of the first ancestor
     found in the role map.  Falls back to :attr:`~SemanticRole.PLAIN` when no
     match is found (e.g. for custom expression types).
 
-    :param expr: Any EQL expression instance.
+    :param expression: Any EQL expression instance.
     :returns: The most-specific matching :class:`SemanticRole`.
     :rtype: SemanticRole
     """
     global _role_map
     if _role_map is None:
         _role_map = _build_role_map()
-    for cls in type(expr).__mro__:
+    for cls in type(expression).__mro__:
         if cls in _role_map:
             return _role_map[cls]
     return SemanticRole.PLAIN

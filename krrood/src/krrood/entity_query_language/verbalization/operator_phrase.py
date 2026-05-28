@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 def comparator_operator(
     comparator: Comparator,
-    ctx: VerbalizationContext,
+    context: VerbalizationContext,
     *,
     negated: bool = False,
     compact: Optional[bool] = None,
@@ -45,15 +45,15 @@ def comparator_operator(
     * **Negation / compactness** — flags forwarded to the vocabulary.
 
     :param comparator: The comparator expression.
-    :param ctx: Shared verbalization state.
+    :param context: Shared verbalization state.
     :param negated: Outer negation (from a wrapping ``Not``).
     :param compact: Copula-less variant (HAVING clauses).  Defaults to
-        ``ctx.compact_predicates`` when ``None``.
+        ``context.compact_predicates`` when ``None``.
     :returns: The operator fragment.
     :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
     """
     if compact is None:
-        compact = ctx.compact_predicates
+        compact = context.compact_predicates
     op = comparator.operation
 
     is_calc = op in (operator.eq, operator.ne) and (
@@ -79,7 +79,7 @@ def comparator_operator(
 
 def comparator_phrase(
     comparator: Comparator,
-    ctx: VerbalizationContext,
+    context: VerbalizationContext,
     verbalizer: EQLVerbalizer,
     *,
     negated: bool = False,
@@ -91,13 +91,13 @@ def comparator_phrase(
     selected via :func:`comparator_operator`.
 
     :param comparator: The comparator expression.
-    :param ctx: Shared verbalization state.
+    :param context: Shared verbalization state.
     :param verbalizer: Verbalizer used to build the operand sub-expressions.
     :param negated: Outer negation (from a wrapping ``Not``).
     :returns: The comparison phrase fragment.
     :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
     """
-    left = verbalizer.build(comparator.left, ctx)
-    right = verbalizer.build(comparator.right, ctx)
-    op = comparator_operator(comparator, ctx, negated=negated)
+    left = verbalizer.build(comparator.left, context)
+    right = verbalizer.build(comparator.right, context)
+    op = comparator_operator(comparator, context, negated=negated)
     return phrase(left, op, right)

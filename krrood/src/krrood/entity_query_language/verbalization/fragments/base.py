@@ -68,7 +68,7 @@ class RoleFragment(VerbFragment):
     to build hyperlinks."""
 
     @classmethod
-    def for_variable(cls, label: str, expr) -> RoleFragment:
+    def for_variable(cls, label: str, expression) -> RoleFragment:
         """
         Build a fragment for a
         :class:`~krrood.entity_query_language.core.variable.Variable`,
@@ -77,34 +77,34 @@ class RoleFragment(VerbFragment):
 
         :param label: Display text (type name or disambiguated label).
         :type label: str
-        :param expr: Expression whose ``_type_`` attribute supplies the source reference.
+        :param expression: Expression whose ``_type_`` attribute supplies the source reference.
         :returns: :class:`RoleFragment` with :attr:`~SemanticRole.VARIABLE` role.
         :rtype: RoleFragment
         """
         return cls(
             text=label,
             role=SemanticRole.VARIABLE,
-            source_ref=SourceRef.for_type(getattr(expr, "_type_", None)),
+            source_ref=SourceRef.for_type(getattr(expression, "_type_", None)),
         )
 
     @classmethod
-    def for_attribute(cls, owner, attr_name: str, plural: bool = False) -> RoleFragment:
+    def for_attribute(cls, owner, attribute_name: str, plural: bool = False) -> RoleFragment:
         """
         Build a fragment for an attribute access, linked to its owner class.
 
         :param owner: Owner class of the attribute (used for source linking).
-        :param attr_name: Canonical attribute name on *owner*.
-        :type attr_name: str
+        :param attribute_name: Canonical attribute name on *owner*.
+        :type attribute_name: str
         :param plural: Whether the attribute is pluralized in the display text.
         :type plural: bool
         :returns: :class:`RoleFragment` with :attr:`~SemanticRole.ATTRIBUTE` role.
         :rtype: RoleFragment
         """
-        label = attr_name if not plural else _ensure_plural(attr_name)
+        label = attribute_name if not plural else _ensure_plural(attribute_name)
         return cls(
             text=label,
             role=SemanticRole.ATTRIBUTE,
-            source_ref=SourceRef.for_attribute(owner, attr_name),
+            source_ref=SourceRef.for_attribute(owner, attribute_name),
         )
 
     @classmethod
@@ -152,14 +152,14 @@ class BlockFragment(VerbFragment):
 # ── Fragment joining utilities ─────────────────────────────────────────────────
 
 
-def join_with(parts: list[VerbFragment], sep: VerbFragment) -> VerbFragment:
+def join_with(parts: list[VerbFragment], separator: VerbFragment) -> VerbFragment:
     """
-    Interleave *parts* with *sep* between each adjacent pair.
+    Interleave *parts* with *separator* between each adjacent pair.
 
     :param parts: Fragments to join.
     :type parts: list[VerbFragment]
-    :param sep: Separator fragment inserted between adjacent items.
-    :type sep: VerbFragment
+    :param separator: Separator fragment inserted between adjacent items.
+    :type separator: VerbFragment
     :returns: A single fragment (or the sole item when ``len(parts) == 1``).
     :rtype: VerbFragment
     """
@@ -168,10 +168,10 @@ def join_with(parts: list[VerbFragment], sep: VerbFragment) -> VerbFragment:
     if len(parts) == 1:
         return parts[0]
     result: list[VerbFragment] = []
-    for i, frag in enumerate(parts):
-        result.append(frag)
+    for i, fragment in enumerate(parts):
+        result.append(fragment)
         if i < len(parts) - 1:
-            result.append(sep)
+            result.append(separator)
     return PhraseFragment(parts=result, separator="")
 
 
@@ -193,8 +193,8 @@ def oxford_and(parts: list[VerbFragment], conjunction: VerbFragment) -> VerbFrag
     head = parts[:-1]
     tail = parts[-1]
     result: list[VerbFragment] = []
-    for f in head:
-        result.append(f)
+    for fragment in head:
+        result.append(fragment)
         result.append(WordFragment(text=", "))
     result.append(PhraseFragment(parts=[conjunction, tail]))
     return PhraseFragment(parts=result, separator="")

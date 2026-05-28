@@ -58,7 +58,7 @@ def _article(type_name: str) -> str:
     return _engine.a(type_name).split()[0]
 
 
-def _aggregation_source_ids(expr) -> set:
+def _aggregation_source_ids(expression) -> set:
     """
     Return the ``_id_`` of every variable that serves as the source *population*
     of an aggregation sub-query (e.g. the ``BankTransaction`` behind
@@ -70,12 +70,12 @@ def _aggregation_source_ids(expr) -> set:
     a constrained aggregation scope would read *"among BankTransaction 2"* rather
     than *"among BankTransactions"*.
 
-    :param expr: Root expression to scan.
+    :param expression: Root expression to scan.
     :returns: Set of variable ids to exclude from numbering.
     :rtype: set
     """
     ids: set = set()
-    for node in expr._all_expressions_:
+    for node in expression._all_expressions_:
         if isinstance(node, Entity) and selected_aggregator(node) is not None:
             root = aggregation_source_root(node)
             if root is not None:
@@ -83,24 +83,24 @@ def _aggregation_source_ids(expr) -> set:
     return ids
 
 
-def _build_disambiguation_map(expr) -> Dict[uuid.UUID, str]:
+def _build_disambiguation_map(expression) -> Dict[uuid.UUID, str]:
     """
-    Pre-scan *expr* and return a mapping of variable._id_ → display label.
+    Pre-scan *expression* and return a mapping of variable._id_ → display label.
 
     Types appearing once keep the plain type name; types appearing two or more
     times get "TypeName 1", "TypeName 2", … labels in encounter order.
     Literal nodes are excluded, as are variables that only serve as the source
     population of an aggregation sub-query (see :func:`_aggregation_source_ids`).
     """
-    if isinstance(expr, Query):
-        expr.build()
+    if isinstance(expression, Query):
+        expression.build()
 
-    suppressed = _aggregation_source_ids(expr)
+    suppressed = _aggregation_source_ids(expression)
 
     type_to_ids: Dict[str, List[uuid.UUID]] = defaultdict(list)
     seen_ids: set = set()
 
-    for node in expr._all_expressions_:
+    for node in expression._all_expressions_:
         if isinstance(node, Variable) and not isinstance(node, Literal):
             if node._id_ in suppressed:
                 continue
@@ -181,20 +181,20 @@ class VerbalizationContext:
     verbalizers around the clauses that describe a subject."""
 
     @classmethod
-    def from_expression(cls, expr) -> VerbalizationContext:
+    def from_expression(cls, expression) -> VerbalizationContext:
         """
-        Create a context pre-loaded with a disambiguation map for *expr*.
+        Create a context pre-loaded with a disambiguation map for *expression*.
 
         Scans the full expression tree to determine which variable type names
         appear more than once, then assigns numbered labels (``"TypeName 1"``,
         ``"TypeName 2"``, …) to disambiguate them.
 
-        :param expr: Root EQL expression or
+        :param expression: Root EQL expression or
             :class:`~krrood.entity_query_language.query.query.Query` to scan.
         :returns: A fresh :class:`VerbalizationContext` with :attr:`disambiguation_map` populated.
         :rtype: VerbalizationContext
         """
-        return cls(disambiguation_map=_build_disambiguation_map(expr))
+        return cls(disambiguation_map=_build_disambiguation_map(expression))
 
     def push_constraint_frame(self) -> None:
         """
@@ -218,19 +218,19 @@ class VerbalizationContext:
         """
         return self.constraint_exprs.pop() if self.constraint_exprs else []
 
-    def defer_constraint(self, expr: SymbolicExpression) -> None:
+    def defer_constraint(self, expression: SymbolicExpression) -> None:
         """
-        Defer *expr* into the top constraint frame.
+        Defer *expression* into the top constraint frame.
 
         No-op when no frame is open (i.e. when verbalization is not currently
         inside an :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable`
         rendering pass).
 
-        :param expr: EQL expression to defer.
-        :type expr: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
+        :param expression: EQL expression to defer.
+        :type expression: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
         """
         if self.constraint_exprs:
-            self.constraint_exprs[-1].append(expr)
+            self.constraint_exprs[-1].append(expression)
 
     def push_subject(self, var) -> None:
         """
@@ -256,25 +256,25 @@ class VerbalizationContext:
         """``_id_`` of the current coreference subject, or ``None`` when there is none."""
         return self.coref_subjects[-1] if self.coref_subjects else None
 
-    def seen_reference(self, expr) -> Optional[VerbFragment]:
+    def seen_reference(self, expression) -> Optional[VerbFragment]:
         """
-        Return *"the <label>"* when *expr* has already been verbalized in this pass,
+        Return *"the <label>"* when *expression* has already been verbalized in this pass,
         else ``None``.
 
         Centralises the coreference short-circuit that every Entity / nested-noun /
         InstantiatedVariable rendering path performs on re-encountering a variable.
 
-        :param expr: Any expression carrying an ``_id_``.
-        :returns: The definite-reference phrase, or ``None`` when *expr* is unseen.
+        :param expression: Any expression carrying an ``_id_``.
+        :returns: The definite-reference phrase, or ``None`` when *expression* is unseen.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment or None
         """
-        var_id = getattr(expr, "_id_", None)
-        if var_id is None or var_id not in self.seen:
+        variable_id = getattr(expression, "_id_", None)
+        if variable_id is None or variable_id not in self.seen:
             return None
         return PhraseFragment(
             parts=[
                 Articles.THE.as_fragment(),
-                RoleFragment(text=self.seen[var_id], role=SemanticRole.VARIABLE),
+                RoleFragment(text=self.seen[variable_id], role=SemanticRole.VARIABLE),
             ]
         )
 
@@ -355,8 +355,8 @@ class VerbalizationContext:
         """
         if isinstance(value, type):
             return value.__name__
-        if isinstance(value, tuple) and all(isinstance(v, type) for v in value):
-            return " or ".join(v.__name__ for v in value)
+        if isinstance(value, tuple) and all(isinstance(variable, type) for variable in value):
+            return " or ".join(variable.__name__ for variable in value)
         if isinstance(value, datetime.datetime):
             if value.time() == datetime.time.min:
                 return value.strftime("%B %-d, %Y")

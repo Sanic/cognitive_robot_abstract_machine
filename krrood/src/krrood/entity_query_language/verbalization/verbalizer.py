@@ -48,52 +48,52 @@ class EQLVerbalizer:
 
     def build(
         self,
-        expr: SymbolicExpression,
-        ctx: Optional[VerbalizationContext] = None,
+        expression: SymbolicExpression,
+        context: Optional[VerbalizationContext] = None,
     ) -> VerbFragment:
         """
-        Translate *expr* into a :class:`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment` tree.
+        Translate *expression* into a :class:`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment` tree.
 
         A fresh :class:`~krrood.entity_query_language.verbalization.context.VerbalizationContext`
-        (with a pre-built disambiguation map) is created when *ctx* is ``None``.
+        (with a pre-built disambiguation map) is created when *context* is ``None``.
 
-        :param expr: Any EQL symbolic expression.
-        :type expr: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
-        :param ctx: Shared verbalization state; created automatically when omitted.
-        :type ctx: ~krrood.entity_query_language.verbalization.context.VerbalizationContext or None
-        :returns: Root of the fragment tree representing *expr* in natural language.
+        :param expression: Any EQL symbolic expression.
+        :type expression: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
+        :param context: Shared verbalization state; created automatically when omitted.
+        :type context: ~krrood.entity_query_language.verbalization.context.VerbalizationContext or None
+        :returns: Root of the fragment tree representing *expression* in natural language.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        if ctx is None:
-            ctx = VerbalizationContext.from_expression(expr)
-        return self._engine.build(expr, ctx, self)
+        if context is None:
+            context = VerbalizationContext.from_expression(expression)
+        return self._engine.build(expression, context, self)
 
     def verbalize(
         self,
-        expr: SymbolicExpression,
-        ctx: Optional[VerbalizationContext] = None,
+        expression: SymbolicExpression,
+        context: Optional[VerbalizationContext] = None,
     ) -> str:
         """
-        Translate *expr* into a plain-text English string.
+        Translate *expression* into a plain-text English string.
 
-        Equivalent to ``_str(self.build(expr, ctx))`` — no colour markup.
+        Equivalent to ``_str(self.build(expression, context))`` — no colour markup.
         Prefer :class:`~krrood.entity_query_language.verbalization.pipeline.VerbalizationPipeline`
         when colour or hierarchical layout is needed.
 
-        :param expr: Any EQL symbolic expression.
-        :type expr: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
-        :param ctx: Shared verbalization state; created automatically when omitted.
-        :type ctx: ~krrood.entity_query_language.verbalization.context.VerbalizationContext or None
-        :returns: Plain-text natural-language representation of *expr*.
+        :param expression: Any EQL symbolic expression.
+        :type expression: ~krrood.entity_query_language.core.base_expressions.SymbolicExpression
+        :param context: Shared verbalization state; created automatically when omitted.
+        :type context: ~krrood.entity_query_language.verbalization.context.VerbalizationContext or None
+        :returns: Plain-text natural-language representation of *expression*.
         :rtype: str
         """
-        return _str(self.build(expr, ctx))
+        return _str(self.build(expression, context))
 
 
 _default_verbalizer = EQLVerbalizer()
 
 
-def verbalize_expression(expr) -> str:
+def verbalize_expression(expression) -> str:
     """
     Verbalize any EQL expression into a human-readable English phrase (plain text).
 
@@ -102,10 +102,10 @@ def verbalize_expression(expr) -> str:
     :class:`~krrood.entity_query_language.verbalization.pipeline.VerbalizationPipeline`
     directly for coloured or hierarchical output.
 
-    :param expr: Any EQL expression or :class:`~krrood.entity_query_language.query.query.Query`.
+    :param expression: Any EQL expression or :class:`~krrood.entity_query_language.query.query.Query`.
     :returns: Plain-text natural-language string.
     :rtype: str
     """
-    if isinstance(expr, Query):
-        expr.build()
-    return _default_verbalizer.verbalize(expr)
+    if isinstance(expression, Query):
+        expression.build()
+    return _default_verbalizer.verbalize(expression)

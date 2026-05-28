@@ -27,9 +27,9 @@ def word(text: str) -> WordFragment:
     return WordFragment(text=text)
 
 
-def phrase(*parts: VerbFragment, sep: str = " ") -> PhraseFragment:
-    """Inline sequence of *parts* joined by *sep* (default single space)."""
-    return PhraseFragment(parts=list(parts), separator=sep)
+def phrase(*parts: VerbFragment, separator: str = " ") -> PhraseFragment:
+    """Inline sequence of *parts* joined by *separator* (default single space)."""
+    return PhraseFragment(parts=list(parts), separator=separator)
 
 
 def role(

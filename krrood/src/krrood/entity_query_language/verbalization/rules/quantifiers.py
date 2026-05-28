@@ -35,9 +35,9 @@ class QuantifierRule(VerbalizationRule):
     """
 
     @classmethod
-    def applies(cls, expr, ctx: VerbalizationContext) -> bool:
+    def applies(cls, expression, context: VerbalizationContext) -> bool:
         """Return ``True`` for any :class:`~krrood.entity_query_language.operators.logical_quantifiers.QuantifiedConditional`."""
-        return isinstance(expr, QuantifiedConditional)
+        return isinstance(expression, QuantifiedConditional)
 
 
 class ForAllRule(QuantifierRule):
@@ -48,24 +48,24 @@ class ForAllRule(QuantifierRule):
     """
 
     @classmethod
-    def applies(cls, expr, ctx: VerbalizationContext) -> bool:
+    def applies(cls, expression, context: VerbalizationContext) -> bool:
         """Return ``True`` for :class:`~krrood.entity_query_language.operators.logical_quantifiers.ForAll`."""
-        return isinstance(expr, ForAll)
+        return isinstance(expression, ForAll)
 
     @classmethod
-    def transform(cls, expr: ForAll, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expression: ForAll, context: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Build *"for all <plural_var>, <condition>"*.
 
-        :param expr: ForAll quantifier expression.
-        :param ctx: Shared verbalization state.
+        :param expression: ForAll quantifier expression.
+        :param context: Shared verbalization state.
         :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Universal-quantification phrase.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        var_frag = verbalize_plural(expr.variable, ctx, verbalizer.build)
-        cond_frag = verbalizer.build(expr.condition, ctx)
-        return phrase(Logicals.FOR_ALL.as_fragment(), var_frag, word(","), cond_frag)
+        variable_fragment = verbalize_plural(expression.variable, context, verbalizer.build)
+        condition_fragment = verbalizer.build(expression.condition, context)
+        return phrase(Logicals.FOR_ALL.as_fragment(), variable_fragment, word(","), condition_fragment)
 
 
 class ExistsRule(QuantifierRule):
@@ -74,26 +74,26 @@ class ExistsRule(QuantifierRule):
     """
 
     @classmethod
-    def applies(cls, expr, ctx: VerbalizationContext) -> bool:
+    def applies(cls, expression, context: VerbalizationContext) -> bool:
         """Return ``True`` for :class:`~krrood.entity_query_language.operators.logical_quantifiers.Exists`."""
-        return isinstance(expr, Exists)
+        return isinstance(expression, Exists)
 
     @classmethod
-    def transform(cls, expr: Exists, ctx: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
+    def transform(cls, expression: Exists, context: VerbalizationContext, verbalizer: EQLVerbalizer) -> VerbFragment:
         """
         Build *"there exists <variable> such that <condition>"*.
 
-        :param expr: Exists quantifier expression.
-        :param ctx: Shared verbalization state.
+        :param expression: Exists quantifier expression.
+        :param context: Shared verbalization state.
         :param verbalizer: Parent verbalizer for recursive calls.
         :returns: Existential-quantification phrase.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        var_frag = verbalizer.build(expr.variable, ctx)
-        cond_frag = verbalizer.build(expr.condition, ctx)
+        variable_fragment = verbalizer.build(expression.variable, context)
+        condition_fragment = verbalizer.build(expression.condition, context)
         return phrase(
             Logicals.THERE_EXISTS.as_fragment(),
-            var_frag,
+            variable_fragment,
             Keywords.SUCH_THAT.as_fragment(),
-            cond_frag,
+            condition_fragment,
         )

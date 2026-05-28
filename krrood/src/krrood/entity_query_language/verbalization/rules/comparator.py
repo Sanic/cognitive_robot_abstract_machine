@@ -30,19 +30,19 @@ class ComparatorRule(VerbalizationRule):
     :func:`~krrood.entity_query_language.verbalization.operator_phrase.comparator_phrase`,
     which handles calc-equality, temporality, negation, and compactness declaratively.
 
-    Falls back to ``expr._name_`` as a plain operator fragment when the
+    Falls back to ``expression._name_`` as a plain operator fragment when the
     callable is not registered in
     :class:`~krrood.entity_query_language.verbalization.vocabulary.english.Operators`.
     """
 
     @classmethod
-    def applies(cls, expr, ctx: VerbalizationContext) -> bool:
+    def applies(cls, expression, context: VerbalizationContext) -> bool:
         """Return ``True`` for Comparator expressions."""
-        return isinstance(expr, Comparator)
+        return isinstance(expression, Comparator)
 
     @classmethod
     def transform(
-        cls, expr: Comparator, ctx: VerbalizationContext, verbalizer: EQLVerbalizer
+        cls, expression: Comparator, context: VerbalizationContext, verbalizer: EQLVerbalizer
     ) -> VerbFragment:
         """Build *"<left> <operator> <right>"*."""
-        return comparator_phrase(expr, ctx, verbalizer)
+        return comparator_phrase(expression, context, verbalizer)

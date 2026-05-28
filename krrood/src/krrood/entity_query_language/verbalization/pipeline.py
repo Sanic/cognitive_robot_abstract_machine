@@ -113,17 +113,17 @@ class VerbalizationPipeline:
     _verbalizer: EQLVerbalizer = field(default_factory=EQLVerbalizer, init=False)
     """The verbalizer that builds fragment trees from EQL expressions."""
 
-    def verbalize(self, expr) -> str:
+    def verbalize(self, expression) -> str:
         """
-        Verbalize *expr* to a string using this pipeline's renderer.
+        Verbalize *expression* to a string using this pipeline's renderer.
 
-        :param expr: Any EQL expression or :class:`~krrood.entity_query_language.query.query.Query`.
+        :param expression: Any EQL expression or :class:`~krrood.entity_query_language.query.query.Query`.
         :returns: Formatted natural-language string (plain, ANSI, or HTML depending on renderer).
         :rtype: str
         """
-        if isinstance(expr, Query):
-            expr.build()
-        fragment = self._verbalizer.build(expr)
+        if isinstance(expression, Query):
+            expression.build()
+        fragment = self._verbalizer.build(expression)
         return self.verbalize_fragment(fragment)
 
     def _is_html_renderer(self) -> bool:
@@ -147,9 +147,9 @@ class VerbalizationPipeline:
             return _HTML_CELL_WRAPPER.format(body=result)
         return result
 
-    def display(self, expr) -> None:
+    def display(self, expression) -> None:
         """
-        Render *expr* and display it in the current environment.
+        Render *expression* and display it in the current environment.
 
         * **Jupyter / IPython** — renders inline via ``IPython.display.HTML``.
         * **Elsewhere** — writes a temporary ``.html`` file and opens it in the
@@ -158,9 +158,9 @@ class VerbalizationPipeline:
         Designed for use with :meth:`html` pipelines.  Calling it on a plain-text
         or ANSI pipeline will open a browser tab with raw text.
 
-        :param expr: Any EQL expression or :class:`~krrood.entity_query_language.query.query.Query`.
+        :param expression: Any EQL expression or :class:`~krrood.entity_query_language.query.query.Query`.
         """
-        self.display_fragment(self._verbalizer.build(expr))
+        self.display_fragment(self._verbalizer.build(expression))
 
     def display_fragment(self, fragment: VerbFragment) -> None:
         """

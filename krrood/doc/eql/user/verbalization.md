@@ -543,4 +543,4 @@ VerbalizationPipeline.html(link_resolver=resolver).display(linked_query)
   - `.html()` — HTML `<span>` colors, paragraph prose
   - `.html(hierarchical=True)` — HTML, indented bullet structure
   - `.html(link_resolver=...)` — adds clickable hyperlinks to class and attribute names
-  - `.display(expr)` — renders inline in Jupyter or opens a browser tab elsewhere
+  - `.display(expression)` — renders inline in Jupyter or opens a browser tab elsewhere

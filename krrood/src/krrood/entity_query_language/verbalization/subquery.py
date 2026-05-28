@@ -54,9 +54,9 @@ def is_aggregation_subquery(entity) -> bool:
     return selected_aggregator(entity) is not None
 
 
-def is_calculation_value(expr) -> bool:
+def is_calculation_value(expression) -> bool:
     """
-    Return ``True`` when *expr* denotes a *calculation* — an
+    Return ``True`` when *expression* denotes a *calculation* — an
     :class:`~krrood.entity_query_language.operators.aggregators.Aggregator` or an
     aggregation sub-query (an :class:`~krrood.entity_query_language.query.query.Entity`
     selecting one), possibly wrapped in
@@ -65,10 +65,10 @@ def is_calculation_value(expr) -> bool:
     Used to decide equality wording: ``==`` against a calculation reads
     *"is equal to"*, while ``==`` against a plain object/value reads *"is"*.
 
-    :param expr: Candidate operand expression.
+    :param expression: Candidate operand expression.
     :rtype: bool
     """
-    inner = expr
+    inner = expression
     while isinstance(inner, ResultQuantifier):
         inner = inner._child_
     if isinstance(inner, Aggregator):

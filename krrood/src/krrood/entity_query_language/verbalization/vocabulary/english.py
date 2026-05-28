@@ -450,15 +450,15 @@ class Operators(Enum):
         return self.value.select(negated=negated, compact=compact, temporal=temporal)
 
     @classmethod
-    def from_callable(cls, fn) -> Operators:
+    def from_callable(cls, function) -> Operators:
         """
         Map a Python ``operator`` module callable to the matching :class:`Operators` member.
 
-        :param fn: A callable from the ``operator`` module (e.g. ``operator.gt``,
+        :param function: A callable from the ``operator`` module (e.g. ``operator.gt``,
             ``operator.eq``) or the custom ``not_contains`` comparator.
         :returns: The corresponding :class:`Operators` member.
         :rtype: Operators
-        :raises KeyError: If *fn* has no registered mapping.
+        :raises KeyError: If *function* has no registered mapping.
         """
         _MAP = {
             _operator.eq: cls.EQ,
@@ -470,4 +470,4 @@ class Operators(Enum):
             _operator.contains: cls.CONTAINS,
             _nc: cls.NOT_CONTAINS,
         }
-        return _MAP[fn]
+        return _MAP[function]

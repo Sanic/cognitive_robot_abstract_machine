@@ -71,7 +71,7 @@ class ConsequentBinding:
     field_name: str
     """Python attribute name on the consequent type (e.g. ``"tasks"``)."""
 
-    value_expr: Any
+    value_expression: Any
     """EQL expression providing the value for *field_name*."""
 
     is_plural_field: bool
@@ -114,9 +114,9 @@ class RuleStructure:
 
 # ── Module-level helpers (pure domain-analysis utilities) ─────────────────────
 
-def _antecedent_var_id_(ant: AntecedentInfo) -> Optional[object]:
+def _antecedent_var_id_(antecedent: AntecedentInfo) -> Optional[object]:
     """Return the stable _id_ of the underlying variable for an antecedent."""
-    root = ant.root
+    root = antecedent.root
     if isinstance(root, Entity):
         root.build()
         sel = root.selected_variable
@@ -124,14 +124,14 @@ def _antecedent_var_id_(ant: AntecedentInfo) -> Optional[object]:
     return getattr(root, "_id_", None)
 
 
-def _condition_left_owner_id_(cond) -> Optional[object]:
+def _condition_left_owner_id_(condition) -> Optional[object]:
     """
     Return the _id_ of the root variable on the left-hand side of an equality condition,
     or None if the condition is not a simple attribute equality.
     """
-    if not isinstance(cond, Comparator) or cond.operation is not operator.eq:
+    if not isinstance(condition, Comparator) or condition.operation is not operator.eq:
         return None
-    current = chain_root(cond.left)
+    current = chain_root(condition.left)
     while isinstance(current, ResultQuantifier):
         current = current._child_
     return getattr(current, "_id_", None)
@@ -184,58 +184,58 @@ class RuleAnalyzer:
         type_name = getattr(inferred._type_, "__name__", str(inferred._type_))
 
         # ── Group-key IDs ──────────────────────────────────────────────────────
-        grouped_expr = entity._grouped_by_expression_
+        grouped_expression = entity._grouped_by_expression_
         group_key_ids: FrozenSet[uuid.UUID] = frozenset()
-        if grouped_expr is not None and grouped_expr.variables_to_group_by:
-            group_key_ids = frozenset(v._id_ for v in grouped_expr.variables_to_group_by)
+        if grouped_expression is not None and grouped_expression.variables_to_group_by:
+            group_key_ids = frozenset(variable._id_ for variable in grouped_expression.variables_to_group_by)
         has_grouping = bool(group_key_ids)
 
         # ── Walk consequent bindings ───────────────────────────────────────────
         seen_root_ids: dict = {}          # root_id → AntecedentInfo
         consequent_bindings: List[ConsequentBinding] = []
 
-        for field_name, child_expr in inferred._child_vars_.items():
+        for field_name, child_expression in inferred._child_vars_.items():
             is_plural = bool(_engine.singular_noun(field_name))
 
-            if child_expr._id_ in group_key_ids:
-                binding_agg = AggregationStatus.GROUP_KEY
+            if child_expression._id_ in group_key_ids:
+                binding_aggregation = AggregationStatus.GROUP_KEY
             elif has_grouping:
-                binding_agg = AggregationStatus.AGGREGATED
+                binding_aggregation = AggregationStatus.AGGREGATED
             else:
-                binding_agg = AggregationStatus.NONE
+                binding_aggregation = AggregationStatus.NONE
 
             consequent_bindings.append(ConsequentBinding(
                 field_name=field_name,
-                value_expr=child_expr,
+                value_expression=child_expression,
                 is_plural_field=is_plural,
-                aggregation_status=binding_agg,
+                aggregation_status=binding_aggregation,
             ))
 
-            root = self._find_root(child_expr)
+            root = self._find_root(child_expression)
             if root is None or root._id_ in seen_root_ids:
                 continue
 
             root_type_name, own_conditions = self._extract_root_info(root)
 
             if root._id_ in group_key_ids:
-                var_agg = AggregationStatus.GROUP_KEY
+                variable_aggregation = AggregationStatus.GROUP_KEY
             elif has_grouping:
-                var_agg = AggregationStatus.AGGREGATED
+                variable_aggregation = AggregationStatus.AGGREGATED
             else:
-                var_agg = AggregationStatus.NONE
+                variable_aggregation = AggregationStatus.NONE
 
             seen_root_ids[root._id_] = AntecedentInfo(
                 root=root,
                 type_name=root_type_name,
-                aggregation_status=var_agg,
+                aggregation_status=variable_aggregation,
                 conditions=own_conditions,
             )
 
         # ── Attribute outer WHERE conditions to antecedents ────────────────────
-        where_expr = entity._where_expression_
+        where_expression = entity._where_expression_
         extra: List[Any] = []
-        if where_expr is not None:
-            extra = self._flatten_and(where_expr.condition)
+        if where_expression is not None:
+            extra = self._flatten_and(where_expression.condition)
 
         primary, secondary, unmatched = self._attribute_conditions_(
             list(seen_root_ids.values()), extra
@@ -262,23 +262,23 @@ class RuleAnalyzer:
         then classify antecedents as primary (have conditions) or secondary (none).
         Returns (primary, secondary, unmatched).
         """
-        id_to_ant = {_antecedent_var_id_(a): a for a in antecedents}
+        id_to_antecedent = {_antecedent_var_id_(a): a for a in antecedents}
         unmatched: List[Any] = []
 
-        for cond in extra_conditions:
-            owner_id = _condition_left_owner_id_(cond)
-            if owner_id is not None and owner_id in id_to_ant:
-                id_to_ant[owner_id].conditions.append(cond)
+        for condition in extra_conditions:
+            owner_id = _condition_left_owner_id_(condition)
+            if owner_id is not None and owner_id in id_to_antecedent:
+                id_to_antecedent[owner_id].conditions.append(condition)
             else:
-                unmatched.append(cond)
+                unmatched.append(condition)
 
         primary = [a for a in antecedents if a.conditions]
         secondary = [a for a in antecedents if not a.conditions]
         return primary, secondary, unmatched
 
     @staticmethod
-    def _find_root(expr) -> Optional[Any]:
-        current = chain_root(expr)
+    def _find_root(expression) -> Optional[Any]:
+        current = chain_root(expression)
         while isinstance(current, ResultQuantifier):
             current = current._child_
         if isinstance(current, (Variable, Entity)):
@@ -304,8 +304,8 @@ class RuleAnalyzer:
         return "entity", []
 
     @staticmethod
-    def _flatten_and(expr) -> List[Any]:
+    def _flatten_and(expression) -> List[Any]:
         """Recursively flatten a nested AND tree into a flat list of conjuncts."""
-        if isinstance(expr, AND):
-            return RuleAnalyzer._flatten_and(expr.left) + RuleAnalyzer._flatten_and(expr.right)
-        return [expr]
+        if isinstance(expression, AND):
+            return RuleAnalyzer._flatten_and(expression.left) + RuleAnalyzer._flatten_and(expression.right)
+        return [expression]

@@ -118,9 +118,9 @@ class ParagraphRenderer(FragmentRenderer):
                 return text
             case RoleFragment(text=text, role=role, source_ref=ref):
                 return self._render_role(text, role, ref)
-            case PhraseFragment(parts=parts, separator=sep):
+            case PhraseFragment(parts=parts, separator=separator):
                 rendered = [self.render(p) for p in parts]
-                return sep.join(rendered)
+                return separator.join(rendered)
             case BlockFragment(header=header, items=items):
                 rendered_items = [self.render(i) for i in items]
                 prose = ", ".join(rendered_items)
@@ -202,8 +202,8 @@ class HierarchicalRenderer(FragmentRenderer):
                 return text
             case RoleFragment(text=text, role=role, source_ref=ref):
                 return self._render_role(text, role, ref)
-            case PhraseFragment(parts=parts, separator=sep):
-                return sep.join(self._inline(p) for p in parts)
+            case PhraseFragment(parts=parts, separator=separator):
+                return separator.join(self._inline(p) for p in parts)
             case BlockFragment():
                 return self.render(fragment, 0)
             case _:

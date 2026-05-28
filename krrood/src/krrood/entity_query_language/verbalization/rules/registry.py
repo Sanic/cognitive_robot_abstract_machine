@@ -13,6 +13,9 @@ No manual list maintenance is needed.
 
 from __future__ import annotations
 
+from typing import List
+from typing_extensions import Type
+
 from krrood.entity_query_language.verbalization.rule_engine import VerbalizationRule
 
-ALL_RULES: list[type] = VerbalizationRule.registered_rules()
+ALL_RULES: List[Type[VerbalizationRule]] = VerbalizationRule.registered_rules()

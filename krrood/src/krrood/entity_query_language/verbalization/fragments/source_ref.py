@@ -35,15 +35,15 @@ class SourceRef:
         return cls(cls=t) if isinstance(t, type) else None
 
     @classmethod
-    def for_attribute(cls, owner, attr_name: str) -> Optional[SourceRef]:
+    def for_attribute(cls, owner, attribute_name: str) -> Optional[SourceRef]:
         """
-        Return ``SourceRef(cls=owner, attribute=attr_name)`` when *owner* is a real ``type``,
+        Return ``SourceRef(cls=owner, attribute=attribute_name)`` when *owner* is a real ``type``,
         else ``None``.
 
         :param owner: Candidate owner class (any value; non-types return ``None``).
-        :param attr_name: Canonical attribute name on *owner*.
-        :type attr_name: str
+        :param attribute_name: Canonical attribute name on *owner*.
+        :type attribute_name: str
         :returns: A :class:`SourceRef` for the attribute, or ``None``.
         :rtype: SourceRef or None
         """
-        return cls(cls=owner, attribute=attr_name) if isinstance(owner, type) else None
+        return cls(cls=owner, attribute=attribute_name) if isinstance(owner, type) else None

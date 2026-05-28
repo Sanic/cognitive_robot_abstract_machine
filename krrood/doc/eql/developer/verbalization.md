@@ -52,7 +52,7 @@ graph LR
 {py:class}`~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer` walks the EQL expression tree and produces a parallel tree of
 {py:class}`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment` nodes.
 
-It does not produce strings directly. Every call to `build(expr, ctx)` returns a `VerbFragment` — rendering (plain/ANSI/HTML) is deferred to Layer 2.
+It does not produce strings directly. Every call to `build(expression, context)` returns a `VerbFragment` — rendering (plain/ANSI/HTML) is deferred to Layer 2.
 
 `EQLVerbalizer` delegates to a single {py:class}`~krrood.entity_query_language.verbalization.rule_engine.RuleEngine`,
 which dispatches every expression to the first matching
@@ -148,12 +148,12 @@ block = BlockFragment(header=keyword_frag, items=[item1, item2])
 
 ## Rule Dispatch Mechanism
 
-`EQLVerbalizer.build(expr, ctx)` delegates to `RuleEngine.build(expr, ctx, verbalizer)`, which:
+`EQLVerbalizer.build(expression, context)` delegates to `RuleEngine.build(expression, context, verbalizer)`, which:
 
-1. Checks `ctx.binding_overrides` for the expression's `_id_` — if found, returns the override fragment immediately (see [Binding Overrides](#binding-overrides) below).
-2. Iterates the sorted rule list and calls `rule_cls.applies(expr, ctx)`.
-3. Calls `rule_cls.transform(expr, ctx, verbalizer)` on the first matching rule.
-4. Falls back to `WordFragment(text=expr._name_)` when no rule matches.
+1. Checks `context.binding_overrides` for the expression's `_id_` — if found, returns the override fragment immediately (see [Binding Overrides](#binding-overrides) below).
+2. Iterates the sorted rule list and calls `rule_cls.applies(expression, context)`.
+3. Calls `rule_cls.transform(expression, context, verbalizer)` on the first matching rule.
+4. Falls back to `WordFragment(text=expression._name_)` when no rule matches.
 
 ### MRO-Depth Sorting
 
@@ -204,18 +204,18 @@ class BetweenRule(VerbalizationRule):
     """Verbalizes a Between operator as *"x is between lo and hi"*."""
 
     @classmethod
-    def applies(cls, expr, ctx) -> bool:
-        return isinstance(expr, Between)
+    def applies(cls, expression, context) -> bool:
+        return isinstance(expression, Between)
 
     @classmethod
-    def transform(cls, expr, ctx, verbalizer):
-        left_frag = verbalizer.build(expr.left, ctx)
-        lo_frag = verbalizer.build(expr.lo, ctx)
-        hi_frag = verbalizer.build(expr.hi, ctx)
+    def transform(cls, expression, context, verbalizer):
+        left_fragment = verbalizer.build(expression.left, context)
+        lower_fragment = verbalizer.build(expression.lo, context)
+        upper_fragment = verbalizer.build(expression.hi, context)
         return phrase(
-            left_frag,
+            left_fragment,
             RangePhrases.IS_BETWEEN.as_fragment(),
-            phrase(lo_frag, word("and"), hi_frag),
+            phrase(lower_fragment, word("and"), upper_fragment),
         )
 ```
 
@@ -231,10 +231,10 @@ file, nothing else is needed — the existing import already covers it.
 No hand-maintained list.  No registry update.  Just define the class and import
 its module.
 
-#### Step 4 — Use ``verbalizer.build(child, ctx)`` for Recursive Sub-Expressions
+#### Step 4 — Use ``verbalizer.build(child, context)`` for Recursive Sub-Expressions
 
 ``EQLVerbalizer`` is passed as the ``verbalizer`` parameter to every
-``transform()``.  Always call ``verbalizer.build(child, ctx)`` to render sub-expressions
+``transform()``.  Always call ``verbalizer.build(child, context)`` to render sub-expressions
 — this re-enters the full rule dispatch, so your rule's sub-expressions benefit from
 coreference tracking, binding overrides, pronoun resolution, and any future rules.
 
@@ -341,14 +341,14 @@ instance is threaded through the entire `EQLVerbalizer.build()` call tree.
 ### Coreference Tracking (`seen`)
 
 ```python
-ctx.seen: dict   # maps expr._id_ → display label
+context.seen: dict   # maps expression._id_ → display label
 ```
 
 The first time a `Variable` is encountered, `noun_for_parts()` records it in `seen` and returns `INDEFINITE` (→ "a Robot").  Subsequent encounters return `DEFINITE` (→ "the Robot").
 
 ### Disambiguation Map
 
-Created by `VerbalizationContext.from_expression(expr)`, which pre-scans the full expression tree.  Types with a single variable keep the plain type name; collisions get numbered labels:
+Created by `VerbalizationContext.from_expression(expression)`, which pre-scans the full expression tree.  Types with a single variable keep the plain type name; collisions get numbered labels:
 
 ```
 Robot    (single)  →  "Robot"
@@ -361,9 +361,9 @@ Apple 2  (second)  →  "Apple 2"
 Used by the `InstantiatedVariable` verbalization path:
 
 ```python
-ctx.push_constraint_frame()   # open a frame
-ctx.defer_constraint(expr)    # add expr to the top frame
-deferred = ctx.pop_constraint_frame()  # retrieve and close
+context.push_constraint_frame()   # open a frame
+context.defer_constraint(expression)    # add expression to the top frame
+deferred = context.pop_constraint_frame()  # retrieve and close
 ```
 
 When an `Entity` is used as a chain root inside an `InstantiatedVariable`, its WHERE condition is deferred into the top frame rather than verbalized inline.  After all binding overrides are registered, the deferred expressions are verbalized and emitted as a *"such that …"* clause.
@@ -371,7 +371,7 @@ When an `Entity` is used as a chain root inside an `InstantiatedVariable`, its W
 ### Binding Overrides
 
 ```python
-ctx.binding_overrides: dict   # maps expr._id_ → VerbFragment
+context.binding_overrides: dict   # maps expression._id_ → VerbFragment
 ```
 
 Populated by `_verbalize_instantiated_natural` for each field binding.  Before any rule is consulted, `RuleEngine.build` checks this dict.  This ensures that when a variable appears a second time as a WHERE condition value, the renderer uses the same *"the field of the Type"* fragment rather than re-verbalizing the raw variable.

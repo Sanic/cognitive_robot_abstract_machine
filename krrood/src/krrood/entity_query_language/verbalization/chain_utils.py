@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
 
 
-def walk_chain(expr) -> tuple[list, object]:
+def walk_chain(expression) -> tuple[list, object]:
     """
     Walk a :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
     chain outward-first and return ``(chain, root)``.
@@ -46,54 +46,54 @@ def walk_chain(expr) -> tuple[list, object]:
     Example: for ``robot.arm.joint`` the chain is
     ``[Attribute('joint'), Attribute('arm')]`` and root is the ``robot`` Variable.
 
-    :param expr: Any expression; non-MappedVariable expressions return an
-        empty chain with *expr* as the root.
+    :param expression: Any expression; non-MappedVariable expressions return an
+        empty chain with *expression* as the root.
     :returns: Tuple ``(chain, root)`` where *chain* is the core
         :attr:`~krrood.entity_query_language.core.mapped_variable.MappedVariable._access_path_`
         (root-adjacent first, terminal last) and *root* is the chain base.
     :rtype: tuple[list, object]
     """
-    if isinstance(expr, MappedVariable):
-        return list(expr._access_path_), expr._chain_root_
-    return [], expr
+    if isinstance(expression, MappedVariable):
+        return list(expression._access_path_), expression._chain_root_
+    return [], expression
 
 
-def is_temporal(expr) -> bool:
+def is_temporal(expression) -> bool:
     """
-    Return ``True`` when *expr* denotes a :class:`datetime.datetime` value or variable.
+    Return ``True`` when *expression* denotes a :class:`datetime.datetime` value or variable.
 
     Used by comparator verbalization to select temporal operator phrases
     (*"is before"* / *"is after"*) instead of relational ones.  Inspects the
     expression's ``_type_`` (or a :class:`~krrood.entity_query_language.core.variable.Literal`'s
     value), so it is a pure structural/type check with no verbalization state.
 
-    :param expr: Any EQL expression.
+    :param expression: Any EQL expression.
     :returns: ``True`` when the expression is datetime-typed.
     :rtype: bool
     """
-    if isinstance(expr, Literal):
-        return isinstance(expr._value_, _dt.datetime)
-    if isinstance(expr, Variable):
-        return getattr(expr, "_type_", None) is _dt.datetime
-    if isinstance(expr, MappedVariable):
-        chain, _ = walk_chain(expr)
+    if isinstance(expression, Literal):
+        return isinstance(expression._value_, _dt.datetime)
+    if isinstance(expression, Variable):
+        return getattr(expression, "_type_", None) is _dt.datetime
+    if isinstance(expression, MappedVariable):
+        chain, _ = walk_chain(expression)
         return bool(chain) and getattr(chain[-1], "_type_", None) is _dt.datetime
     return False
 
 
-def chain_root(expr) -> object:
+def chain_root(expression) -> object:
     """
     Return the non-:class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
-    root of *expr* without building the full chain list.
+    root of *expression* without building the full chain list.
 
     Faster than :func:`walk_chain` when only the root is needed.
 
-    :param expr: Any expression.
-    :returns: The deepest non-MappedVariable node in the chain, or *expr* itself
+    :param expression: Any expression.
+    :returns: The deepest non-MappedVariable node in the chain, or *expression* itself
         when it is not a MappedVariable.
     :rtype: object
     """
-    return expr._chain_root_ if isinstance(expr, MappedVariable) else expr
+    return expression._chain_root_ if isinstance(expression, MappedVariable) else expression
 
 
 def build_path_parts(chain: list) -> list[tuple[str, Optional[SourceRef]]]:
@@ -139,10 +139,10 @@ def build_path_parts(chain: list) -> list[tuple[str, Optional[SourceRef]]]:
     return parts
 
 
-def verbalize_plural(expr, ctx: VerbalizationContext, build_fn: Callable) -> VerbFragment:
+def verbalize_plural(expression, context: VerbalizationContext, build_fn: Callable) -> VerbFragment:
     """
     Return a plural :class:`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment`
-    for *expr*.
+    for *expression*.
 
     Handles three special cases with dedicated plural forms:
 
@@ -154,40 +154,40 @@ def verbalize_plural(expr, ctx: VerbalizationContext, build_fn: Callable) -> Ver
 
     Falls back to *build_fn* for all other expression types.
 
-    :param expr: EQL expression to pluralise.
-    :param ctx: Shared verbalization state.
-    :type ctx: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
+    :param expression: EQL expression to pluralise.
+    :param context: Shared verbalization state.
+    :type context: ~krrood.entity_query_language.verbalization.context.VerbalizationContext
     :param build_fn: The top-level dispatcher (``EQLVerbalizer.build``) used as fallback.
     :type build_fn: Callable
-    :returns: Plural fragment for *expr*.
+    :returns: Plural fragment for *expression*.
     :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
     """
-    if isinstance(expr, FlatVariable):
-        return verbalize_plural(expr._child_, ctx, build_fn)
+    if isinstance(expression, FlatVariable):
+        return verbalize_plural(expression._child_, context, build_fn)
 
-    if isinstance(expr, Variable):
-        type_name = expr._type_.__name__
-        label = ctx.disambiguation_map.get(expr._id_, type_name)
-        ctx.seen[expr._id_] = label
+    if isinstance(expression, Variable):
+        type_name = expression._type_.__name__
+        label = context.disambiguation_map.get(expression._id_, type_name)
+        context.seen[expression._id_] = label
         plural = label if label != type_name else inflect_engine.plural(type_name)
-        return RoleFragment.for_variable(plural, expr)
+        return RoleFragment.for_variable(plural, expression)
 
-    if isinstance(expr, Attribute):
-        chain, root = walk_chain(expr)
+    if isinstance(expression, Attribute):
+        chain, root = walk_chain(expression)
         if isinstance(root, Variable) and len(chain) == 1 and isinstance(chain[0], Attribute):
             type_name = root._type_.__name__
-            label = ctx.disambiguation_map.get(root._id_, type_name)
-            ctx.seen[root._id_] = label
+            label = context.disambiguation_map.get(root._id_, type_name)
+            context.seen[root._id_] = label
             root_plural = label if label != type_name else inflect_engine.plural(type_name)
-            attr_name = chain[0]._attribute_name_
+            attribute_name = chain[0]._attribute_name_
             owner = chain[0]._owner_class_
             return PhraseFragment(
                 parts=[
-                    RoleFragment.for_attribute(owner, attr_name, plural=True),
+                    RoleFragment.for_attribute(owner, attribute_name, plural=True),
                     Prepositions.OF.as_fragment(),
                     RoleFragment.for_variable(root_plural, root),
                 ],
                 separator=" ",
             )
 
-    return build_fn(expr, ctx)
+    return build_fn(expression, context)

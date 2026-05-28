@@ -38,8 +38,8 @@ def _str(fragment: VerbFragment) -> str:
             return t
         case RoleFragment(text=t):
             return t
-        case PhraseFragment(parts=parts, separator=sep):
-            return sep.join(_str(p) for p in parts)
+        case PhraseFragment(parts=parts, separator=separator):
+            return separator.join(_str(p) for p in parts)
         case BlockFragment(header=header, items=items):
             parts_text = ", ".join(_str(i) for i in items)
             if header is None:

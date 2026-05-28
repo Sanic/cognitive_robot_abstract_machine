@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 class RangeFold:
     """A folded lower/upper bound pair on one attribute chain."""
 
-    chain_expr: SymbolicExpression
+    chain_expression: SymbolicExpression
     """The shared attribute chain (e.g. ``t.booking_date``)."""
 
     lower_expression: SymbolicExpression
@@ -58,11 +58,11 @@ class _Bound(Enum):
     UPPER = auto()
 
 
-def _chain_key(expr) -> Optional[tuple]:
+def _chain_key(expression) -> Optional[tuple]:
     """Hashable identity of a pure attribute chain: ``(root_id, ((name, owner), …))`` or ``None``."""
-    if not isinstance(expr, MappedVariable):
+    if not isinstance(expression, MappedVariable):
         return None
-    chain, root = walk_chain(expr)
+    chain, root = walk_chain(expression)
     if not isinstance(root, Variable):
         return None
     parts = []
@@ -100,7 +100,7 @@ def fold_range_pairs(conjuncts: List) -> List[Union[SymbolicExpression, RangeFol
         :class:`RangeFold` instances.
     :rtype: list
     """
-    infos = [_classify(c) for c in conjuncts]
+    infos = [_classify(conjunct) for conjunct in conjuncts]
     used: set = set()
     result: List[Union[SymbolicExpression, RangeFold]] = []
     for i, conjunct in enumerate(conjuncts):
@@ -129,7 +129,7 @@ def fold_range_pairs(conjuncts: List) -> List[Union[SymbolicExpression, RangeFol
             else (conjuncts[partner], conjunct)
         )
         result.append(
-            RangeFold(chain_expr=lower.left, lower_expression=lower.right, upper_expression=upper.right)
+            RangeFold(chain_expression=lower.left, lower_expression=lower.right, upper_expression=upper.right)
         )
     return result
 
@@ -140,9 +140,9 @@ def has_pair(conjuncts: List) -> bool:
 
 
 def build_between(
-    left_frag: VerbFragment,
-    lo_frag: VerbFragment,
-    hi_frag: VerbFragment,
+    left_fragment: VerbFragment,
+    lower_fragment: VerbFragment,
+    upper_fragment: VerbFragment,
     *,
     compact: bool,
 ) -> VerbFragment:
@@ -152,13 +152,13 @@ def build_between(
     Bounds are joined with :func:`~krrood.entity_query_language.verbalization.fragments.base.oxford_and`
     to match the codebase's Oxford-comma style (e.g. *"between May 15, 2026, and May 30, 2026"*).
 
-    :param left_frag: The already-rendered left side (a full chain, or a bare attribute).
-    :param lo_frag: Rendered lower-bound value.
-    :param hi_frag: Rendered upper-bound value.
+    :param left_fragment: The already-rendered left side (a full chain, or a bare attribute).
+    :param lower_fragment: Rendered lower-bound value.
+    :param upper_fragment: Rendered upper-bound value.
     :param compact: Drop the copula (for HAVING / post-nominal contexts).
     :returns: The range phrase fragment.
     :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
     """
     op = (RangePhrases.BETWEEN if compact else RangePhrases.IS_BETWEEN).as_fragment()
-    bounds = oxford_and([lo_frag, hi_frag], Conjunctions.AND.as_fragment())
-    return PhraseFragment(parts=[left_frag, op, bounds])
+    bounds = oxford_and([lower_fragment, upper_fragment], Conjunctions.AND.as_fragment())
+    return PhraseFragment(parts=[left_fragment, op, bounds])
