@@ -14,9 +14,12 @@ from typing_extensions import Callable, get_args, get_origin
 from typing_extensions import List, Type, Any, Dict, Tuple, Generic
 from typing_extensions import TypeVar
 
+from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
-from krrood.entity_query_language.utils import ensure_hashable
-from krrood.utils import get_scope_from_imports
+from krrood.utils import (
+    ensure_hashable,
+    get_scope_from_imports,
+)
 
 
 def classes_of_module(module) -> List[Type]:

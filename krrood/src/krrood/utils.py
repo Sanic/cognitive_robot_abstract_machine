@@ -18,7 +18,7 @@ from inspect import isclass
 from os import PathLike
 from os.path import dirname
 from pathlib import Path
-from typing import Tuple, Generic
+from typing import Tuple, Generic, Hashable
 from typing import Union, Any
 
 from typing_extensions import TypeVar, Type, List, Optional, Callable
@@ -645,19 +645,27 @@ def get_generic_type_params(
     return params
 
 
-def resolve_union_type(union_type, substitution):
-    resolved_types = []
-    for arg in get_args(union_type):
-        if get_origin(arg) is Union:
-            resolved_types.append(resolve_union_type(arg, substitution))
-        elif arg in substitution:
-            resolved_types.append(substitution[arg])
-        else:
-            resolved_types.append(arg)
+def is_hashable(obj) -> bool:
+    """
+    Checks if an object is hashable by attempting to compute its hash.
 
-    # PyCharm flags this as `Invalid type argument`, but this works at runtime
-    new_union = Union[*resolved_types]
-    return new_union
+    :param obj: The object to check.
+    :return: True if the object is hashable, False otherwise.
+    """
+    try:
+        hash(obj)
+        return True
+    except TypeError:
+        return False
+
+
+def ensure_hashable(obj) -> Hashable:
+    """
+    :return: The object itself if it is hashable, otherwise its id.
+    """
+    if not is_hashable(obj):
+        return id(obj)
+    return obj
 
 
 def get_scope_from_imports(
@@ -867,16 +875,16 @@ def _handle_import_from_node(
     return package_name
 
 
-T = TypeVar("T", bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
 
 
-def memoize(function: T) -> T:
+def memoize(function: F) -> F:
     """
     Caches the return value of a function call at the instance level.
     """
 
     @wraps(function)
-    def wrapper(self, *args: Any, **kwargs: Any) -> T:
+    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
         if not hasattr(self, "__memo__"):
             self.__memo__ = {}
         memo = self.__memo__
@@ -892,7 +900,7 @@ def memoize(function: T) -> T:
     return wrapper  # type: ignore
 
 
-def copy_memoize(function: T) -> T:
+def copy_memoize(function: F) -> F:
     """
     Caches the return value of a function call at the instance level but returns a deepcopy of the value.
     """

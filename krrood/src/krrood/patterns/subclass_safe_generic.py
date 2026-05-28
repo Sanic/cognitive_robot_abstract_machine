@@ -24,10 +24,10 @@ from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
     resolve_type,
 )
-from krrood.entity_query_language.utils import ensure_hashable
 from krrood.utils import (
     get_generic_type_params,
     T,
+    ensure_hashable,
 )
 
 if TYPE_CHECKING:
@@ -143,7 +143,22 @@ class AbstractSubClassSafeGeneric(ABC):
         if "_subclass_safe_substitutions" in cls.__dict__:
             return cls._subclass_safe_substitutions
 
-        substitutions = cls.get_superclass_generic_type_substitution()
+        substitutions = {}
+        for base in getattr(cls, "__orig_bases__", []):
+            base_origin, resolved_types = cls._resolve_base_origin_and_arguments(base)
+            if base_origin is None:
+                continue
+
+            # Map the root TypeVars of the base to the concrete arguments provided here
+            root_parameters = base_origin.get_generic_types()
+            for old_type, new_type in zip(root_parameters, resolved_types):
+                if old_type is not new_type and new_type is not None:
+                    substitutions[ensure_hashable(old_type)] = new_type
+
+            # Recursively pull substitutions already defined by the parent
+            if base_origin is not cls:
+                substitutions.update(base_origin._get_generic_type_substitutions())
+
         if substitutions:
             substitutions = cls._resolve_substitutions_transitively(substitutions)
 
@@ -175,36 +190,6 @@ class AbstractSubClassSafeGeneric(ABC):
         return resolved_substitutions
 
     @classmethod
-    def get_superclass_generic_type_substitution(cls) -> Dict[Type, Type]:
-        """
-        Retrieve generic type substitutions from superclasses.
-
-        :return: A mapping from each superclass generic type to the resolved type in this class.
-        """
-        substitutions = {}
-        if not hasattr(cls, "__orig_bases__"):
-            return substitutions
-
-        for base in cls.__orig_bases__:
-            base_origin, resolved_types = cls._resolve_base_origin_and_arguments(base)
-            if base_origin is None:
-                continue
-
-            # Map the root TypeVars of the base to the concrete arguments provided here
-            root_parameters = base_origin.get_generic_types(True, False)
-            if not root_parameters:
-                root_parameters = base_origin.get_generic_types(False, True)
-
-            for old_type, new_type in zip(root_parameters, resolved_types):
-                if old_type is not new_type and new_type is not None:
-                    substitutions[ensure_hashable(old_type)] = new_type
-
-            # Recursively pull substitutions already defined by the parent
-            if base_origin is not cls:
-                substitutions.update(base_origin._get_generic_type_substitutions())
-        return substitutions
-
-    @classmethod
     def _resolve_base_origin_and_arguments(
         cls, base: Any
     ) -> Tuple[Optional[Type], Tuple[Type, ...]]:
@@ -227,6 +212,7 @@ class AbstractSubClassSafeGeneric(ABC):
         return None, ()
 
     @classmethod
+    @lru_cache
     def get_generic_types(
         cls,
         from_root_generic_base: bool = True,

@@ -153,6 +153,7 @@ def test_ComplexCombinedThreeGenericSubClassSafeWithThirdTypes():
     assert resolved_hints["combined_three_generic_second_argument"] == CombinedClass
     assert resolved_hints["one_generic_first_argument"] == int
 
+
 T = TypeVar("T")
 T2 = TypeVar("T2")
 U = TypeVar("U")
@@ -236,7 +237,7 @@ def test_multiple_generic_bases_map_failure():
     Test that multiple generic bases are correctly reconstructed in the substitution map.
     The current zip-based implementation is expected to fail.
     """
-    from krrood.entity_query_language.utils import ensure_hashable
+    from krrood.utils import ensure_hashable
 
     @dataclass
     class Base1(Generic[T, T2], AbstractSubClassSafeGeneric):
