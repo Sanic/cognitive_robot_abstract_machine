@@ -503,7 +503,7 @@ class MotionNode(DesignatorNode):
     executed.
     """
 
-    designator: BaseMotion
+    designator: BaseMotion = field(kw_only=True)
 
     @property
     def motion(self) -> BaseMotion:
