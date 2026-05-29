@@ -1,20 +1,18 @@
 import os
-import trimesh
-import numpy as np
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional, Union
-from CGAL.CGAL_Kernel import Point_3, Triangle_3
-from CGAL.CGAL_AABB_tree import AABB_tree_Triangle_3_soup
+from typing import List, Union
 
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Quaternion
+import numpy as np
+import trimesh
+from CGAL.CGAL_AABB_tree import AABB_tree_Triangle_3_soup
+from CGAL.CGAL_Kernel import Point_3, Triangle_3
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from krrood.ormatic.utils import create_engine
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 
-from pycram.orm.ormatic_interface import GrasPoseMappingDAO
-from semantic_digital_twin.orm.ormatic_interface import BodyDAO
 
 @dataclass
 class ScoredGrasp:
@@ -187,6 +185,9 @@ def load_successful_grasps_from_dataset(dataset_path: str, gripper_name: str, ob
     :param object_uuid: The unique identifier for the target object (string or UUID).
     :return: A list of Pose objects representing successful grasp poses. Returns an empty list if no grasps are found.
     """
+    from pycram.orm.ormatic_interface import GrasPoseMappingDAO
+    from semantic_digital_twin.orm.ormatic_interface import BodyDAO
+
 
     if not dataset_path.startswith("sqlite"):
         if os.path.isdir(dataset_path):
