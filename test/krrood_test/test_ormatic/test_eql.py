@@ -46,14 +46,13 @@ from krrood.entity_query_language.factories import (
     sum,
     average,
     set_of,
-    case_when,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 from pycram.robot_plans.actions.core.pick_up import PickUpAction
 from pycram.orm.ormatic_interface import PickUpActionDAO, GraspDescriptionDAO
 from krrood.entity_query_language.query.query import UnificationDict
-
+from krrood.entity_query_language.operators.conditionals import CaseWhen, case_when
 
 def test_translate_simple_greater(session, database):
     session.add(KRROODPositionDAO(x=1, y=2, z=3))
