@@ -2,25 +2,27 @@ from __future__ import annotations
 
 import ast
 import linecache
-import os
 import textwrap
 import weakref
 from dataclasses import dataclass, field
-from functools import cached_property
+from pathlib import Path
 from types import ModuleType
-from typing_extensions import Any, Callable, List, Optional, Type
-from uuid import UUID
+from typing_extensions import Any, Callable, List, Optional, Type, TYPE_CHECKING
 
 from ordered_set import OrderedSet
-from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language._monitoring import monitored
 from krrood.entity_query_language._stack import CallStack, StackFrame
+
+# Resolved once at import time: krrood/src/krrood/ — used as the path-based
+# fallback in _is_krrood_internal_frame for frames where module_name is absent.
+_KRROOD_SRC_ROOT: Path = Path(__file__).parents[2].resolve()
 from krrood.entity_query_language.core.base_expressions import Selectable, Bindings
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
     FlatVariable,
 )
+from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.factories import (
     and_,
     attribute_owner_class,
@@ -42,6 +44,7 @@ from krrood.entity_query_language.operators.core_logical_operators import (
     LogicalOperator,
 )
 from krrood.entity_query_language.predicate import HasType
+from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.symbol_graph.symbol_graph import Symbol
 
 if TYPE_CHECKING:
@@ -49,11 +52,8 @@ if TYPE_CHECKING:
         OperationResult,
         SymbolicExpression,
     )
-    from krrood.entity_query_language.core.variable import (
-        InstantiatedVariable,
-        Variable,
-    )
     from krrood.entity_query_language.query.query import Entity, Query
+    from uuid import UUID
 
 
 def _build_type_existence_condition(
@@ -83,6 +83,11 @@ def _is_krrood_internal_frame(frame: StackFrame) -> bool:
     """
     Check whether *frame* belongs to the krrood package internals.
 
+    Uses ``frame.module_name`` as the primary signal.  Falls back to a
+    :mod:`pathlib`-based path check (relative to :data:`_KRROOD_SRC_ROOT`)
+    for frames where ``module_name`` is absent — e.g. notebook cells or
+    frames captured inside ``eval()``.
+
     :param frame: The stack frame to test.
     :return: ``True`` when the frame originates from within the krrood package.
     """
@@ -90,10 +95,13 @@ def _is_krrood_internal_frame(frame: StackFrame) -> bool:
         frame.module_name == "krrood" or frame.module_name.startswith("krrood.")
     ):
         return True
-    return (
-        "/krrood/src/krrood/" in frame.filename
-        or "\\krrood\\src\\krrood\\" in frame.filename
-    )
+    if frame.filename:
+        try:
+            Path(frame.filename).resolve().relative_to(_KRROOD_SRC_ROOT)
+            return True
+        except ValueError:
+            pass
+    return False
 
 
 def _get_query_source(frame: StackFrame) -> Optional[str]:
@@ -108,26 +116,104 @@ def _get_query_source(frame: StackFrame) -> Optional[str]:
     lines = linecache.getlines(frame.filename)
     if not lines:
         return frame.code_snippet
-    try:
-        source = "".join(lines)
-        tree = ast.parse(source)
-        candidates: list = list(tree.body)
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                candidates.extend(node.body)
-        best = None
-        for node in candidates:
-            start = getattr(node, "lineno", None)
-            end = getattr(node, "end_lineno", None)
-            if start is not None and end is not None and start <= frame.lineno <= end:
-                if best is None or (end - start) < (best.end_lineno - best.lineno):
-                    best = node
-        if best is not None:
-            stmt_lines = lines[best.lineno - 1 : best.end_lineno]
-            return textwrap.dedent("".join(stmt_lines)).rstrip()
-    except (SyntaxError, ValueError, UnicodeDecodeError):
-        pass
+
+    # Find the candidate statement that contains the line number.
+    source = "".join(lines)
+    tree = ast.parse(source)
+    candidates: list = list(tree.body)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            candidates.extend(node.body)
+
+    # Among candidates, find the one that contains the line number and has the smallest span.
+    best = None
+    for node in candidates:
+        start = getattr(node, "lineno", None)
+        end = getattr(node, "end_lineno", None)
+        if (start is None) or (end is None) or not (start <= frame.lineno <= end):
+            continue
+        if (best is None) or (end - start) < (best.end_lineno - best.lineno):
+            best = node
+
+    if best is not None:
+        stmt_lines = lines[best.lineno - 1 : best.end_lineno]
+        return textwrap.dedent("".join(stmt_lines)).rstrip()
+
+    # Fallback to the entire source snippet if no candidate statement was found.
     return frame.code_snippet
+
+
+def _select_source_frame(
+    filtered_frames: List[StackFrame],
+) -> Optional[StackFrame]:
+    """
+    Select the best user-facing frame from *filtered_frames*.
+
+    Prefers frames from real source files over synthetic ones (``<string>``, ``<frozen …>``),
+    and excludes krrood-internal frames.  Falls back to the innermost non-krrood frame when
+    all real-file frames are internal, and finally to the very first frame if nothing else
+    qualifies.
+
+    :param filtered_frames: Frames already filtered by :meth:`~krrood.entity_query_language._stack.CallStack.filter`.
+    :return: The selected :class:`~krrood.entity_query_language._stack.StackFrame`, or ``None``
+        if *filtered_frames* is empty.
+    """
+    real_user_frames = [
+        frame
+        for frame in filtered_frames
+        if not frame.filename.startswith("<") and not _is_krrood_internal_frame(frame)
+    ]
+    if real_user_frames:
+        return real_user_frames[0]
+    fallback = [
+        frame for frame in filtered_frames if not _is_krrood_internal_frame(frame)
+    ]
+    if fallback:
+        return fallback[0]
+    return filtered_frames[0] if filtered_frames else None
+
+
+def _format_source_context(source_frame: StackFrame) -> str:
+    """
+    Render the ``(function, file:line)`` context string for *source_frame*.
+
+    :param source_frame: The frame to describe.
+    :return: A parenthesised string of the form ``(func_name, basename:lineno)``.
+    """
+    basename = Path(source_frame.filename).name
+    return f"({source_frame.function_name}, {basename}:{source_frame.lineno})"
+
+
+def _format_indented_source(source_frame: Optional[StackFrame]) -> str:
+    """
+    Return the source statement at *source_frame*, indented by two spaces per line.
+
+    :param source_frame: The frame whose source to render, or ``None``.
+    :return: The indented source string, or ``"  (unavailable)"`` when no source is found.
+    """
+    query_source = _get_query_source(source_frame) if source_frame else None
+    if query_source:
+        return "\n".join(f"  {line}" for line in query_source.splitlines())
+    return "  (unavailable)"
+
+
+def _format_stack_trace(stack: CallStack, focus_package: Optional[str]) -> str:
+    """
+    Render up to ten frames of *stack* as a formatted call-stack string.
+
+    :param stack: The call stack to render.
+    :param focus_package: When given, only frames whose module name contains this
+        string are included; ``None`` includes all frames.
+    :return: A multi-line string with one frame per entry.
+    """
+    display_stack = stack.filter(package=focus_package)
+    formatted = []
+    for frame in display_stack:
+        formatted.append(
+            f'  File "{frame.filename}", line {frame.lineno}, in {frame.function_name}\n'
+            f"    {frame.code_snippet if frame.code_snippet else '???'}\n"
+        )
+    return "".join(formatted[:10])
 
 
 @dataclass
@@ -144,9 +230,6 @@ class ConditionAndBindings:
     """
     A dictionary mapping UUIDs of condition children to their corresponding bindings.
     """
-
-    def __str__(self):
-        return self.__repr__()
 
     def __repr__(self):
         if isinstance(self.condition, Comparator):
@@ -244,7 +327,7 @@ class InferenceExplanation(Symbol):
             )
         return satisfied_conditions
 
-    def condition_graph(self):
+    def condition_graph(self) -> Optional[QueryGraph]:
         """
         Build a QueryGraph of the full query tree with satisfaction data overlaid.
 
@@ -257,8 +340,6 @@ class InferenceExplanation(Symbol):
         """
         if self.query_root is None or not self.satisfied_condition_ids:
             return None
-        from krrood.entity_query_language.query_graph import QueryGraph
-
         return QueryGraph(
             self.query_root,
             satisfied_condition_ids=self.satisfied_condition_ids,
@@ -274,45 +355,9 @@ class InferenceExplanation(Symbol):
         :param show_trace: When ``True``, append the call stack recorded at query-definition time.
         :return: A formatted string explaining the inference.
         """
-        filtered_frames = self.stack.filter().frames
-
-        # Prefer frames from real source files (skip synthetic "<string>", "<frozen ...>", and similar)
-        real_user_frames = [
-            frame
-            for frame in filtered_frames
-            if not frame.filename.startswith("<")
-            and not _is_krrood_internal_frame(frame)
-        ]
-        if real_user_frames:
-            source_frame = real_user_frames[0]
-        else:
-            # Notebook / eval context: fall back to innermost non-krrood frame
-            fallback = [
-                frame
-                for frame in filtered_frames
-                if not _is_krrood_internal_frame(frame)
-            ]
-            source_frame = (
-                fallback[0]
-                if fallback
-                else (filtered_frames[0] if filtered_frames else None)
-            )
-
-        query_source = _get_query_source(source_frame) if source_frame else None
-        if source_frame:
-            basename = os.path.basename(source_frame.filename)
-            source_context = (
-                f"({source_frame.function_name}, {basename}:{source_frame.lineno})"
-            )
-        else:
-            source_context = ""
-
-        if query_source:
-            indented_source = "\n".join(
-                f"  {line}" for line in query_source.splitlines()
-            )
-        else:
-            indented_source = "  (unavailable)"
+        source_frame = _select_source_frame(self.stack.filter().frames)
+        source_context = _format_source_context(source_frame) if source_frame else ""
+        indented_source = _format_indented_source(source_frame)
 
         conditions = self.get_satisfied_conditions_and_their_bindings()
         conds_str = (
@@ -329,14 +374,7 @@ class InferenceExplanation(Symbol):
         if show_trace:
             if isinstance(focus_package, ModuleType):
                 focus_package = focus_package.__name__
-            display_stack = self.stack.filter(package=focus_package)
-            formatted_stack = []
-            for frame in display_stack:
-                formatted_stack.append(
-                    f'  File "{frame.filename}", line {frame.lineno}, in {frame.function_name}\n'
-                    f"    {frame.code_snippet if frame.code_snippet else '???'}\n"
-                )
-            result += f"\nCall stack at definition:\n{''.join(formatted_stack[:10])}"
+            result += f"\nCall stack at definition:\n{_format_stack_trace(self.stack, focus_package)}"
 
         return result
 
@@ -485,8 +523,6 @@ class InferenceExplanation(Symbol):
         """
         :return: An entity containing condition expressions that relate the participating instances in the inference of this instance.
         """
-        from krrood.entity_query_language.core.variable import InstantiatedVariable
-
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
         child1 = flat_variable(node_children(condition_node))
         child2 = flat_variable(node_children(condition_node))
@@ -529,8 +565,6 @@ class InferenceExplanation(Symbol):
         :param type_b: Second participant type.
         :return: An entity containing the matching condition expressions.
         """
-        from krrood.entity_query_language.core.variable import InstantiatedVariable
-
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
         desc_a = flat_variable(node_descendants(condition_node))
         desc_b = flat_variable(node_descendants(condition_node))

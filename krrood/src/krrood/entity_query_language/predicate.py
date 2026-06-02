@@ -97,10 +97,6 @@ class Predicate(Symbol, ABC):
         ``object.__new__`` directly (skipping ``__new__`` entirely) and then ``__init__``, so the
         caller always receives a fully initialised concrete predicate regardless of what the kwargs
         contain.
-
-        This method is inherited by all :class:`Predicate` subclasses and is used by
-        :meth:`~krrood.entity_query_language.core.variable.InstantiatedVariable.\
-_instantiate_using_child_vars_and_yield_results_` when ``_type_`` is a :class:`Predicate` subclass.
         """
         instance = object.__new__(cls)
         instance.__init__(**kwargs)
@@ -172,6 +168,6 @@ def length(iterable: Sized) -> int:
 def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
     """
     :param bindings: A kwarg like dict mapping strings to objects
-    :return: Rather any of the objects is a variable or not.
+    :return: ``True`` if any value in ``bindings`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`, ``False`` otherwise.
     """
     return any(isinstance(binding, SymbolicExpression) for binding in bindings.values())

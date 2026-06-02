@@ -36,9 +36,8 @@ from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
 from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.utils import memoize
-from krrood.entity_query_language.evaluation import (
+from krrood.entity_query_language.evaluation_context import (
     EvaluationContext,
-    create_default_evaluation_context,
     get_evaluation_context,
     set_evaluation_context,
     _evaluation_context_var,
@@ -268,6 +267,10 @@ class SymbolicExpression(ABC):
         evaluation_context = get_evaluation_context()
         owns_an_evaluation_context = evaluation_context is None
         if owns_an_evaluation_context:
+            from krrood.entity_query_language.evaluation import (
+                create_default_evaluation_context,
+            )
+
             evaluation_context = create_default_evaluation_context()
             context_token = set_evaluation_context(evaluation_context)
         try:
