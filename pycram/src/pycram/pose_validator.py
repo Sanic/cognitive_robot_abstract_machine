@@ -5,6 +5,7 @@ from typing_extensions import List, Union
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
@@ -177,10 +178,20 @@ def pose_sequence_reachability_validator(
 
     try:
         executor.tick_until_end()
-    except TimeoutError:
-        failed_nodes = []
-
-        logger.debug(f"Timeout while executing pose sequence: {target_sequence}")
+    except TimeoutError as e:
+        failed_nodes = [
+            (
+                node
+                if node.life_cycle_state
+                not in [LifeCycleValues.DONE, LifeCycleValues.NOT_STARTED]
+                else None
+            )
+            for node in msc.nodes
+        ]
+        failed_nodes = list(filter(None, failed_nodes))
+        logger.debug(
+            f"Timeout while executing pose sequence: {target_sequence}. Failed Nodes: {failed_nodes}"
+        )
         return False
     finally:
         world.state._data[:] = old_state

@@ -121,13 +121,13 @@ class HSRBGripper(EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger]):
 
         gripper_open = JointState.from_mapping(
             name=PrefixedName("gripper_open", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [0.6, 0.6, 1.2])),
+            mapping=dict(zip(gripper_joints, [0.3, 0.3, 0.3])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
             name=PrefixedName("gripper_close", prefix=self.name.name),
-            mapping=dict(zip(gripper_joints, [-0.1, -0.1, -0.2])),
+            mapping=dict(zip(gripper_joints, [0.0, 0.0, 0.0])),
             state_type=GripperState.CLOSE,
         )
 
@@ -369,13 +369,13 @@ class HSRBTorso(Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck]):
 
         torso_mid = JointState.from_mapping(
             name=PrefixedName("torso_mid", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.345 / 2])),
+            mapping=dict(zip(torso_joint, [0.32 / 2])),
             state_type=TorsoState.MID,
         )
 
         torso_high = JointState.from_mapping(
             name=PrefixedName("torso_high", prefix=self.name.name),
-            mapping=dict(zip(torso_joint, [0.345])),
+            mapping=dict(zip(torso_joint, [0.32])),
             state_type=TorsoState.HIGH,
         )
 
@@ -432,46 +432,47 @@ class HSRB(AbstractRobot, HasMobileBase[HSRBMobileBase]):
         self._world.collision_manager.add_ignore_collision_rule(
             SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
         )
-        self._world.collision_manager.extend_default_rules(
-            [
-                AvoidExternalCollisions(
-                    buffer_zone_distance=0.05, violated_distance=0.0, robot=self
-                ),
-                AvoidExternalCollisions(
-                    buffer_zone_distance=0.1,
-                    violated_distance=0.03,
-                    robot=self,
-                    body_subset={
-                        self._world.get_body_in_branch_by_name(self.root, "base_link")
-                    },
-                ),
-                AvoidSelfCollisions(
-                    buffer_zone_distance=0.03,
-                    violated_distance=0.0,
-                    robot=self,
-                ),
-            ]
+        self._world.collision_manager.add_default_rule(
+            AvoidExternalCollisions(
+                buffer_zone_distance=0.05, violated_distance=0.0, robot=self
+            )
         )
 
-        self._world.collision_manager.extend_max_avoided_bodies_rules(
-            [
-                MaxAvoidedCollisionsOverride(
-                    2,
-                    bodies={
-                        self._world.get_body_in_branch_by_name(self.root, "base_link")
-                    },
-                ),
-                MaxAvoidedCollisionsOverride(
-                    4,
-                    bodies=set(
-                        self._world.get_direct_child_bodies_with_collision(
-                            self._world.get_body_in_branch_by_name(
-                                self.root, "wrist_roll_link"
-                            )
+        self._world.collision_manager.add_default_rule(
+            AvoidExternalCollisions(
+                buffer_zone_distance=0.1,
+                violated_distance=0.03,
+                robot=self,
+                body_subset={
+                    self._world.get_body_in_branch_by_name(self.root, "base_link")
+                },
+            )
+        )
+        self._world.collision_manager.add_default_rule(
+            AvoidSelfCollisions(
+                buffer_zone_distance=0.03,
+                violated_distance=0.0,
+                robot=self,
+            )
+        )
+
+        self._world.collision_manager.max_avoided_bodies_rules.append(
+            MaxAvoidedCollisionsOverride(
+                2,
+                bodies={self._world.get_body_in_branch_by_name(self.root, "base_link")},
+            )
+        )
+        self._world.collision_manager.max_avoided_bodies_rules.append(
+            MaxAvoidedCollisionsOverride(
+                4,
+                bodies=set(
+                    self._world.get_direct_child_bodies_with_collision(
+                        self._world.get_body_in_branch_by_name(
+                            self.root, "wrist_roll_link"
                         )
-                    ),
+                    )
                 ),
-            ]
+            )
         )
 
     def _setup_velocity_limits(self):
