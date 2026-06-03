@@ -36,31 +36,25 @@ class CaseWhen(Selectable):
     else_value: Optional[SymbolicExpression] = None
     """The value returned if the condition is false. Defaults to None."""
 
-    @property
-    def _children_(self) -> List[SymbolicExpression]:
-        """Return child expressions for tree traversal."""
-        children = [self.condition, self.then_value]
-        if self.else_value is not None:
-            children.append(self.else_value)
-        return children
-
-    @_children_.setter
-    def _children_(self, value: Any) -> None:
-        """
-        The base dataclass automatically attempts to assign a default value
-        to inherited fields during __init__. This setter catches that
-        assignment to prevent an AttributeError.
-        """
-        pass
+    def __post_init__(self):
+        # Inherit type from then_value for EQL type validation
+        self._type_ = getattr(self.then_value, '_type_', None)
+        # Framework initialization — registers children for tree traversal
+        super().__post_init__()
 
     def _replace_child_field_(self, old: Any, new: Any) -> None:
         """Replace a child expression node during EQL tree manipulation."""
         if self.condition is old:
             self.condition = new
-        if self.then_value is old:
+        elif self.then_value is old:
             self.then_value = new
-        if self.else_value is old:
+        elif self.else_value is old:
             self.else_value = new
+        else:
+            raise ValueError(
+                f"Child {old} not found in CaseWhen — "
+                f"expected one of: condition, then_value, else_value"
+            )
 
     def _name_(self) -> str:
         """Return the symbolic name of this expression node."""
@@ -81,15 +75,10 @@ class CaseWhen(Selectable):
         )
 
         if is_true:
-            if hasattr(self.then_value, "_evaluate__"):
-                return self.then_value._evaluate__(sources)
-            return self.then_value
-        else:
-            if self.else_value is not None:
-                if hasattr(self.else_value, "_evaluate__"):
-                    return self.else_value._evaluate__(sources)
-                return self.else_value
-            return None
+            return self.then_value._evaluate__(sources)
+        if self.else_value is not None:
+            return self.else_value._evaluate__(sources)
+        return None
 
 
 
