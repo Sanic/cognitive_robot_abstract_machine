@@ -46,9 +46,9 @@ class MinimalRobot(AbstractRobot):
                 self.root
             )
             world.add_semantic_annotation_recursively(self)
-            for robot_part in self._robot_parts:
-                robot_part.setup_hardware_interfaces()
-                robot_part.add_joint_states(robot_part.setup_joint_states())
+            self._setup_hardware_interfaces()
+            self._setup_joint_states()
+            self._setup_velocity_limits()
             return self
 
     def _setup_collision_rules(self):
