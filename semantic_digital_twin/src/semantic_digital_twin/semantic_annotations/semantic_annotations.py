@@ -399,6 +399,12 @@ class Cabinet(Furniture, HasCaseAsRootBody):
 class Fridge(Cabinet, HasDoors, HasDrawers): ...
 
 @dataclass(eq=False)
+class Cooktop(HasRootBody):
+    """
+    A cooktop.
+    """
+
+@dataclass(eq=False)
 class Oven(HasRootBody): ...
 
 @dataclass(eq=False)
