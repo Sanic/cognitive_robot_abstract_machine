@@ -208,10 +208,10 @@ def main():
             "Universal_Robots_ROS2_Description",
         ),
         Repository(
-            "https://github.com/code-iai/iai_stretch.git",
-            "ros2-jazzy",
-            "iai_stretch",
-            ["iai_stretch_bringup"],
+            "https://github.com/code-iai/stretch_ros2.git",
+            "joint_velocity_interface",
+            "stretch_ros2",
+            ["stretch_funmap"],
         ),
         Repository(
             "https://github.com/realsenseai/realsense-ros.git",
