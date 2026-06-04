@@ -44,10 +44,6 @@ from semantic_digital_twin.world_description.world_entity import (
 @dataclass(eq=False)
 class TracyLeftGripperLeftFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return True
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -70,10 +66,6 @@ class TracyLeftGripperLeftFinger(Finger):
 
 @dataclass(eq=False)
 class TracyLeftGripperRightFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -98,10 +90,6 @@ class TracyLeftGripperRightFinger(Finger):
 @dataclass(eq=False)
 class TracyRightGripperLeftFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return True
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -124,10 +112,6 @@ class TracyRightGripperLeftFinger(Finger):
 
 @dataclass(eq=False)
 class TracyRightGripperRightFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass

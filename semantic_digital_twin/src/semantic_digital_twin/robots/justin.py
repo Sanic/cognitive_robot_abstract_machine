@@ -17,7 +17,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasTorso,
     HasMobileBase,
     HasFingers,
-    GenericFinger,
+    GenericFingerOtherThanThumb,
 )
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
@@ -38,10 +38,6 @@ from semantic_digital_twin.world_description.world_entity import (
 
 @dataclass(eq=False)
 class JustinLeftThumb(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return True
 
     def setup_hardware_interfaces(self):
         pass
@@ -66,10 +62,6 @@ class JustinLeftThumb(Finger):
 @dataclass(eq=False)
 class JustinLeftIndexFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -90,10 +82,6 @@ class JustinLeftIndexFinger(Finger):
 
 @dataclass(eq=False)
 class JustinLeftMiddleFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -118,10 +106,6 @@ class JustinLeftMiddleFinger(Finger):
 @dataclass(eq=False)
 class JustinLeftRingFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -142,10 +126,6 @@ class JustinLeftRingFinger(Finger):
 
 @dataclass(eq=False)
 class JustinRightThumb(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return True
 
     def setup_hardware_interfaces(self):
         pass
@@ -170,10 +150,6 @@ class JustinRightThumb(Finger):
 @dataclass(eq=False)
 class JustinRightIndexFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -194,10 +170,6 @@ class JustinRightIndexFinger(Finger):
 
 @dataclass(eq=False)
 class JustinRightMiddleFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -221,10 +193,6 @@ class JustinRightMiddleFinger(Finger):
 
 @dataclass(eq=False)
 class JustinRightRingFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -250,12 +218,12 @@ class JustinRightRingFinger(Finger):
 class JustinLeftHand(
     EndEffector,
     HasFingers[
+        JustinLeftThumb,
         Union[
-            JustinLeftThumb,
             JustinLeftIndexFinger,
             JustinLeftMiddleFinger,
             JustinLeftRingFinger,
-        ]
+        ],
     ],
 ):
 
@@ -296,12 +264,12 @@ class JustinLeftHand(
 class JustinRightHand(
     EndEffector,
     HasFingers[
+        JustinRightThumb,
         Union[
-            JustinRightThumb,
             JustinRightRingFinger,
             JustinRightIndexFinger,
             JustinRightMiddleFinger,
-        ]
+        ],
     ],
 ):
 

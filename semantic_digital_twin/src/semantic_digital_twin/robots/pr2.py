@@ -34,7 +34,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     GenericLeftFinger,
     GenericRightFinger,
     HasFingers,
-    GenericFinger,
+    GenericFingerOtherThanThumb,
 )
 from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
@@ -82,10 +82,6 @@ class PR2KinectV1(Camera):
 @dataclass(eq=False)
 class PR2RightGripperLeftFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return True
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -108,10 +104,6 @@ class PR2RightGripperLeftFinger(Finger):
 
 @dataclass(eq=False)
 class PR2RightGripperRightFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -136,10 +128,6 @@ class PR2RightGripperRightFinger(Finger):
 @dataclass(eq=False)
 class PR2LeftGripperLeftFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return True
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -162,10 +150,6 @@ class PR2LeftGripperLeftFinger(Finger):
 
 @dataclass(eq=False)
 class PR2LeftGripperRightFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         return
@@ -191,13 +175,6 @@ class PR2LeftGripperRightFinger(Finger):
 class PR2RightGripper(
     EndEffector, HasTwoFingers[PR2RightGripperLeftFinger, PR2RightGripperRightFinger]
 ):
-
-    @classmethod
-    def _thumb_class(cls):
-        """
-        Returns the class of the thumb type for this HasFingers mixin.
-        """
-        return PR2RightGripperLeftFinger
 
     def setup_joint_states(self) -> List[JointState]:
         right_gripper_joints = self.active_connections
@@ -238,10 +215,6 @@ class PR2RightGripper(
 class PR2LeftGripper(
     EndEffector, HasTwoFingers[PR2LeftGripperLeftFinger, PR2LeftGripperRightFinger]
 ):
-
-    @classmethod
-    def _thumb_class(cls):
-        return PR2LeftGripperLeftFinger
 
     def setup_joint_states(self) -> List[JointState]:
         left_gripper_joints = self.active_connections

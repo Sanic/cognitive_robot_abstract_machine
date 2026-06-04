@@ -28,7 +28,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasTorso,
     HasMobileBase,
     HasFingers,
-    GenericFinger,
+    GenericFingerOtherThanThumb,
     HasEndEffector,
     HasSensors,
 )
@@ -51,10 +51,6 @@ from semantic_digital_twin.world_description.world_entity import (
 
 @dataclass(eq=False)
 class UnitreeG1LeftThumb(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return True
 
     def setup_hardware_interfaces(self):
         pass
@@ -79,10 +75,6 @@ class UnitreeG1LeftThumb(Finger):
 @dataclass(eq=False)
 class UnitreeG1LeftIndexFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -105,10 +97,6 @@ class UnitreeG1LeftIndexFinger(Finger):
 
 @dataclass(eq=False)
 class UnitreeG1LeftMiddleFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -133,10 +121,6 @@ class UnitreeG1LeftMiddleFinger(Finger):
 @dataclass(eq=False)
 class UnitreeG1RightThumb(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return True
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -160,10 +144,6 @@ class UnitreeG1RightThumb(Finger):
 @dataclass(eq=False)
 class UnitreeG1RightIndexFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -186,10 +166,6 @@ class UnitreeG1RightIndexFinger(Finger):
 
 @dataclass(eq=False)
 class UnitreeG1RightMiddleFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -215,7 +191,8 @@ class UnitreeG1RightMiddleFinger(Finger):
 class UnitreeG1LeftHand(
     EndEffector,
     HasFingers[
-        Union[UnitreeG1LeftThumb, UnitreeG1LeftIndexFinger, UnitreeG1LeftMiddleFinger]
+        UnitreeG1LeftThumb,
+        Union[UnitreeG1LeftIndexFinger, UnitreeG1LeftMiddleFinger],
     ],
 ):
 
@@ -258,9 +235,8 @@ class UnitreeG1LeftHand(
 class UnitreeG1RightHand(
     EndEffector,
     HasFingers[
-        Union[
-            UnitreeG1RightThumb, UnitreeG1RightIndexFinger, UnitreeG1RightMiddleFinger
-        ]
+        UnitreeG1RightThumb,
+        Union[UnitreeG1RightIndexFinger, UnitreeG1RightMiddleFinger],
     ],
 ):
 

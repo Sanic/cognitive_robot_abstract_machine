@@ -12,6 +12,7 @@ from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.patterns.subclass_safe_generic import (
     AbstractSubClassSafeGeneric,
 )
+from krrood.utils import get_generic_type_params
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.world_description.world_modification import (
@@ -20,7 +21,8 @@ from semantic_digital_twin.world_description.world_modification import (
 
 logger = logging.getLogger("semantic_digital_twin")
 
-GenericFinger = TypeVar("GenericFinger")
+GenericFingerOtherThanThumb = TypeVar("GenericFingerOtherThanThumb")
+GenericThumb = TypeVar("GenericThumb")
 GenericSensor = TypeVar("GenericSensor")
 GenericCamera = TypeVar("GenericCamera")
 GenericEndEffector = TypeVar("GenericEndEffector")
@@ -35,28 +37,27 @@ GenericRightFinger = TypeVar("GenericRightFinger")
 
 
 @dataclass(eq=False)
-class HasFingers(Generic[GenericFinger], AbstractSubClassSafeGeneric, ABC):
+class HasFingers(
+    Generic[GenericThumb, GenericFingerOtherThanThumb], AbstractSubClassSafeGeneric, ABC
+):
     """
     Mixin class for robots or robot parts that have fingers as their direct children.
     """
 
-    fingers: list[GenericFinger] = field(default_factory=list, kw_only=True)
+    fingers: list[Union[GenericThumb, GenericFingerOtherThanThumb]] = field(
+        default_factory=list, kw_only=True
+    )
     """
     The list of fingers attached to the robot.
     """
 
-    @classmethod
-    @abstractmethod
-    def _thumb_class(cls) -> Type[GenericFinger]:
-        """
-        Returns the class that should act as a thumb. A thumb is a finger that always needs to be involved when
-        interacting with an object.
-        """
-
     @property
-    def thumb(self) -> GenericFinger:
+    def thumb(self) -> GenericThumb:
+        concrete_thumb_class = get_generic_type_params(self, HasFingers)[0]
         [thumb] = [
-            finger for finger in self.fingers if isinstance(finger, self._thumb_class())
+            finger
+            for finger in self.fingers
+            if isinstance(finger, concrete_thumb_class)
         ]
         return thumb
 
@@ -64,7 +65,7 @@ class HasFingers(Generic[GenericFinger], AbstractSubClassSafeGeneric, ABC):
 @dataclass(eq=False)
 class HasTwoFingers(
     Generic[GenericLeftFinger, GenericRightFinger],
-    HasFingers[Union[GenericLeftFinger, GenericRightFinger]],
+    HasFingers[GenericLeftFinger, GenericRightFinger],
     AbstractSubClassSafeGeneric,
     ABC,
 ):
@@ -74,10 +75,12 @@ class HasTwoFingers(
 
     @property
     def finger(self) -> Union[GenericLeftFinger, GenericRightFinger]:
+        concrete_thumb_class = get_generic_type_params(self, HasFingers)[0]
+
         [finger] = [
             finger
             for finger in self.fingers
-            if not isinstance(finger, self._thumb_class())
+            if not isinstance(finger, concrete_thumb_class)
         ]
         return finger
 

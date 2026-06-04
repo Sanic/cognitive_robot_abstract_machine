@@ -19,7 +19,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasMobileBase,
     HasFingers,
     HasSensors,
-    GenericFinger,
+    GenericFingerOtherThanThumb,
 )
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
@@ -40,10 +40,6 @@ from semantic_digital_twin.world_description.world_entity import (
 
 @dataclass(eq=False)
 class ICub3LeftThumb(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return True
 
     def setup_hardware_interfaces(self):
         pass
@@ -68,10 +64,6 @@ class ICub3LeftThumb(Finger):
 @dataclass(eq=False)
 class ICub3LeftIndexFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -94,10 +86,6 @@ class ICub3LeftIndexFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3LeftMiddleFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -122,10 +110,6 @@ class ICub3LeftMiddleFinger(Finger):
 @dataclass(eq=False)
 class ICub3LeftRingFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -148,10 +132,6 @@ class ICub3LeftRingFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3LeftLittleFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -176,10 +156,6 @@ class ICub3LeftLittleFinger(Finger):
 @dataclass(eq=False)
 class ICub3RightThumb(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return True
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -202,10 +178,6 @@ class ICub3RightThumb(Finger):
 
 @dataclass(eq=False)
 class ICub3RightIndexFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -230,10 +202,6 @@ class ICub3RightIndexFinger(Finger):
 @dataclass(eq=False)
 class ICub3RightMiddleFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -257,10 +225,6 @@ class ICub3RightMiddleFinger(Finger):
 @dataclass(eq=False)
 class ICub3RightRingFinger(Finger):
 
-    @property
-    def is_thumb(self) -> bool:
-        return False
-
     def setup_hardware_interfaces(self):
         pass
 
@@ -283,10 +247,6 @@ class ICub3RightRingFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3RightLittleFinger(Finger):
-
-    @property
-    def is_thumb(self) -> bool:
-        return False
 
     def setup_hardware_interfaces(self):
         pass
@@ -312,13 +272,13 @@ class ICub3RightLittleFinger(Finger):
 class ICub3LeftHand(
     EndEffector,
     HasFingers[
+        ICub3LeftThumb,
         Union[
-            ICub3LeftThumb,
             ICub3LeftIndexFinger,
             ICub3LeftMiddleFinger,
             ICub3LeftRingFinger,
             ICub3LeftLittleFinger,
-        ]
+        ],
     ],
 ):
 
@@ -382,13 +342,13 @@ class ICub3LeftHand(
 class ICub3RightHand(
     EndEffector,
     HasFingers[
+        ICub3RightThumb,
         Union[
-            ICub3RightThumb,
             ICub3RightIndexFinger,
             ICub3RightMiddleFinger,
             ICub3RightRingFinger,
             ICub3RightLittleFinger,
-        ]
+        ],
     ],
 ):
 

@@ -411,6 +411,7 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
 
 def test_pr2_semantic_annotation(pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2.torso.left_arm.end_effector.thumb
     pr2.validate()
     # Ensure there are no loose bodies
     pr2_world_state_reset._notify_model_change()
