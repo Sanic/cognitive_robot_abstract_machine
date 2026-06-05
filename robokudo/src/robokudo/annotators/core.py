@@ -25,17 +25,26 @@ from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from sensor_msgs.msg import JointState
-from typing_extensions import Union, List, Dict, Callable, Tuple, Type, Optional, Any
+from typing_extensions import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
+import robokudo.pipeline  # Work around circular import
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.outputs import (
-    AnnotatorOutputs,
     AnnotatorOutputPerPipelineMap,
+    AnnotatorOutputs,
     AnnotatorOutputStruct,
 )
 from robokudo.cas import CAS, CASViews
 from robokudo.defs import PACKAGE_NAME
-import robokudo.pipeline  # Work around circular import
 from robokudo.types.core import Annotation
 from robokudo.utils.tree import find_parent_of_type
 
@@ -113,7 +122,7 @@ class BaseAnnotator(Behaviour):
     def __init__(
         self,
         name: str = "Annotator",
-        descriptor: "BaseAnnotator.Descriptor" = Descriptor(),
+        descriptor=Descriptor(),
         ros_pkg_name: str = PACKAGE_NAME,
     ) -> None:
         """Initialize the BaseAnnotator.

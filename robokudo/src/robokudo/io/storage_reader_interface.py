@@ -23,7 +23,7 @@ import json
 import open3d as o3d
 from typing_extensions import Any
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
-from robokudo.cas import CASViews, CAS
+from robokudo.cas import CAS, CASViews
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.io.storage import Storage
 from robokudo import world
@@ -80,6 +80,10 @@ class StorageReaderInterface(CameraInterface):
         :param cas: Common Analysis Structure to update
         """
         cas_frame = self.reader.get_next_frame()
+        if cas_frame is None:
+            self.rk_logger.debug(f"Reader has no next frame cas_frame:={cas_frame}")
+            return
+
         # Restore the world first to get back references to KinematicStructureEntities
         tracker = world.init_world_with_entity_tracker()
         kwargs = tracker.create_kwargs()
@@ -98,7 +102,7 @@ class StorageReaderInterface(CameraInterface):
         # Restore annotations
         self.storage.load_annotations_from_mongo_in_cas(cas_frame, cas)
 
-        if cas.get(CASViews.DEPTH_IMAGE) is None:
+        if cas.depth_image is None:
             # no depth image available
             AnnotatorPredefinedParameters.global_with_depth = False
 

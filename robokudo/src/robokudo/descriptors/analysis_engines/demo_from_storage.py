@@ -1,8 +1,5 @@
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
-from robokudo.descriptors import CrDescriptorFactory
-
 from robokudo.analysis_engine import AnalysisEngineInterface
-
+from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.outlier_removal_objecthypothesis import (
@@ -11,8 +8,9 @@ from robokudo.annotators.outlier_removal_objecthypothesis import (
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.pipeline import Pipeline
+from robokudo.descriptors import CrDescriptorFactory
 from robokudo.idioms import pipeline_init
+from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
