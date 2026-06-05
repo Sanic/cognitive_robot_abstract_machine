@@ -555,14 +555,14 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         """
         The number of degrees of freedom of the robot, which is the sum of the degrees of freedom of all its end_effectors.
         """
-        dofs = []
+        dofs_with_hardware_interfaces = []
         for connection in self.connections:
             dofs = connection.controlled_dofs
             for dof in dofs:
                 if dof in dofs:
                     continue
-                dofs.append(dof)
-        return dofs
+                dofs_with_hardware_interfaces.append(dof)
+        return dofs_with_hardware_interfaces
 
     def validate(self) -> bool:
         """
