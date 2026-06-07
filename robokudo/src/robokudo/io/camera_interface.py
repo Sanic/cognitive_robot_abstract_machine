@@ -135,22 +135,21 @@ class ROSCameraInterface(CameraInterface):
             self.transform_listener: Buffer = tf_listener_proxy.instance(self.node)
             """ROS transform listener"""
 
-    def lookup_transform(self) -> bool:
+    def lookup_transform(self, timestamp: Time = Time()) -> bool:
         """Look up the camera transform from TF.
 
         :return: True if transform lookup succeeded, False otherwise
         """
         if self.lookup_viewpoint:
-            time = Time()
             try:
-                tf = self.transform_listener.lookup_transform(
+                world_T_camera = self.transform_listener.lookup_transform(
                     target_frame=self.tf_to,
                     source_frame=self.tf_from,
-                    time=time,
+                    time=timestamp,
                     timeout=Duration(seconds=0.1),
                 )
-                translation = tf.transform.translation
-                rotation = tf.transform.rotation
+                translation = world_T_camera.transform.translation
+                rotation = world_T_camera.transform.rotation
                 self.cam_translation = [
                     float(translation.x),
                     float(translation.y),
@@ -164,7 +163,7 @@ class ROSCameraInterface(CameraInterface):
                 ]
             except Exception as err:
                 self.rk_logger.warning(
-                    f"cannot transform from {self.tf_from} to {self.tf_to} at ts {time}: {err}"
+                    f"cannot transform from {self.tf_from} to {self.tf_to} at ts {timestamp}: {err}"
                 )
                 return False
         return True
