@@ -21,6 +21,7 @@ The module handles:
 """
 
 from __future__ import annotations
+from robokudo.world import update_connection_transform
 
 import logging
 import struct
@@ -143,7 +144,10 @@ class ROSCameraInterface(CameraInterface):
             time = Time()
             try:
                 tf = self.transform_listener.lookup_transform(
-                    self.tf_to, self.tf_from, time, timeout=Duration(seconds=0.1)
+                    target_frame=self.tf_to,
+                    source_frame=self.tf_from,
+                    time=time,
+                    timeout=Duration(seconds=0.1),
                 )
                 translation = tf.transform.translation
                 rotation = tf.transform.rotation
@@ -183,11 +187,16 @@ class ROSCameraInterface(CameraInterface):
             # st.timestamp = timestamp
             # cas.set(CASViews.VIEWPOINT_CAM_TO_WORLD, st)
 
-            # TODO Update *Connection* between the corresponding Body's in the world with proper transform?
             setup_world_for_camera_frame(
                 world_frame=self.tf_to, camera_frame=self.tf_from
             )
-            transformation_matrix = HomogeneousTransformationMatrix.from_xyz_quaternion(
+
+            world = world_instance()
+
+            camera_body = world.get_body_by_name(name=self.tf_from)
+            world_body = world.get_body_by_name(name=self.tf_to)
+
+            cam_T_world = HomogeneousTransformationMatrix.from_xyz_quaternion(
                 pos_x=self.cam_translation[0],
                 pos_y=self.cam_translation[1],
                 pos_z=self.cam_translation[2],
@@ -195,13 +204,19 @@ class ROSCameraInterface(CameraInterface):
                 quat_y=self.cam_quaternion[1],
                 quat_z=self.cam_quaternion[2],
                 quat_w=self.cam_quaternion[3],
-                child_frame=world_instance().get_body_by_name(self.tf_from),
-                reference_frame=world_instance().get_body_by_name(self.tf_to),
+                reference_frame=world_body,
+                child_frame=camera_body,
             )
-            cas.cam_to_world_transform = transformation_matrix
+            cas.cam_to_world_transform = cam_T_world
             cas.data_timestamp = timestamp.sec * 1_000_000_000 + timestamp.nanosec
 
-            ROSCameraInterface.store_legacy_cam_to_world_transform_from_cas(cas)
+            update_connection_transform(
+                to_name=world_body.name,
+                from_name=camera_body.name,
+                transform=cam_T_world,
+            )
+
+            ROSCameraInterface.store_legacy_cam_to_world_transform_from_cas(cas=cas)
 
     @staticmethod
     def store_legacy_cam_to_world_transform_from_cas(cas: CAS) -> None:

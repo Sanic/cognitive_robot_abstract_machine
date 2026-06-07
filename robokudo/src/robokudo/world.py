@@ -161,3 +161,18 @@ def setup_world_for_camera_frame(world_frame: str, camera_frame: str) -> None:
         f"This method can currently only be called when neither the world or camera frame exist. "
         f"Existence of camera frame: {camera_exists}, world frame: {world_exists}."
     )
+
+
+def update_connection_transform(
+    to_name: PrefixedName,
+    from_name: PrefixedName,
+    transform: HomogeneousTransformationMatrix,
+) -> None:
+    world = world_instance()
+
+    connection = world.get_connection_by_name(
+        PrefixedName(name=f"{from_name.name}_T_{to_name.name}")
+    )
+
+    with world.modify_world():
+        connection.parent_T_connection_expression = transform
