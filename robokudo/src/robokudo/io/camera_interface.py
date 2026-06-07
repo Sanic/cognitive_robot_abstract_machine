@@ -397,7 +397,7 @@ class KinectCameraInterface(ROSCameraInterface):
         self.color2depth_ratio: Optional[Tuple[float, float]] = None
         """Ratio between color and depth image sizes"""
 
-        self.timestamp: Optional[float] = None
+        self.timestamp: Optional[builtin_interfaces.msg.Time] = None
         """Latest message timestamp"""
 
         self.lock: Lock = Lock()

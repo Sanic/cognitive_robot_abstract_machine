@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from threading import Lock
 
+import builtin_interfaces.msg
 import cv2
 import message_filters
 import numpy as np
@@ -93,7 +94,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.cam_quaternion: Optional[List[float]] = None
         """Camera rotation as quaternion from TF"""
 
-        self.timestamp: Optional[float] = None
+        self.timestamp: Optional[builtin_interfaces.msg.Time] = None
         """Timestamp of latest data"""
 
         self.lock: Lock = Lock()
