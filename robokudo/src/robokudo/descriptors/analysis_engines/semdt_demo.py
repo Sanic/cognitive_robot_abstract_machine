@@ -28,13 +28,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         using a YOLO annotator.
         """
 
-        sw_connector = SemanticDigitalTwinConnector()
-
-        viz = VizMarkerPublisher(
-            world=sw_connector.semdt_adapter.world, node=get_node()
-        )
-
-        kinect_config = CrDescriptorFactory.create_descriptor("kinect_wo_tf")
+        kinect_config = CrDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline("RWPipeline")
         seq.add_children(
@@ -48,8 +42,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterColorAnnotator(),
                 ClusterColorHistogramAnnotator(),
                 ClusterPoseBBAnnotator(),
-                SimpleYoloAnnotator(),
-                sw_connector,
+                SemanticDigitalTwinConnector(),
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
             ]
         )

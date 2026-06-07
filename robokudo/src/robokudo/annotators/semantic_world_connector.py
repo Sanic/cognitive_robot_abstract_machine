@@ -1,36 +1,42 @@
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from robokudo.utils.transform import get_translation_from_transform_matrix
+from robokudo.utils.transform import get_quaternion_from_transform_matrix
+from robokudo.utils.annotator_helper import get_cam_to_world_transform_matrix
+from robokudo.utils.transform import get_transform_matrix_from_q
+from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from robokudo.world import world_instance
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from robokudo.types.belief_state import ObjectBeliefState
+from scipy.optimize import linear_sum_assignment
+from robokudo.types.cv import ImageROI
+from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 from timeit import default_timer
 
 import numpy as np
 from py_trees.common import Status
-from typing_extensions import Optional, Dict, Any
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.io.semantic_digital_twin import SemanticDigitalTwinAdapter, Object
 from robokudo.types.annotation import (
-    PositionAnnotation,
     PoseAnnotation,
-    Classification,
     BoundingBox3DAnnotation,
-    SemanticColor,
-    ColorHistogram,
-    SIFTAnnotation,
-    TSDFAnnotation,
 )
-from robokudo.types.cv import TSDFAnnotation
 from robokudo.types.scene import ObjectHypothesis
+from robokudo import world
+from semantic_digital_twin.world_description.geometry import Box
 
 
 class SemanticDigitalTwinConnector(BaseAnnotator):
     """An annotator that synchronizes the current state of the world with the semdt."""
 
     class Descriptor(BaseAnnotator.Descriptor):
-
         class Parameters:
             def __init__(self) -> None:
                 """Initialize a new set of parameters for the descriptor."""
 
-                self.urdf_path: Optional[str] = None
-                """Optional Path to the URDF file of the world"""
+                self.confidence_threshold = 0.05
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -39,99 +45,62 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
         self,
         name: str = "WorldValidator",
         descriptor: "SemanticDigitalTwinConnector.Descriptor" = Descriptor(),
-    ):
+    ) -> None:
         """Default construction. Minimal one-time init!"""
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.semdt_adapter = SemanticDigitalTwinAdapter(
-            self.get_cas, urdf_path=descriptor.parameters.urdf_path
+        self.object_comparator = (
+            ObjectHypothesisComparator(self.get_cas)
+            .with_comparator_for(ImageROI, weight=0.2)
+            .with_comparator_for(PoseAnnotation, weight=0.4)
+            .with_comparator_for(BoundingBox3DAnnotation, weight=0.4)
         )
-        """An instance of SemanticDigitalTwinConnector used to connect to the semdt."""
-
-    def extract_data(self, oh: ObjectHypothesis) -> Dict[str, Any]:
-        """Extracts data from an object hypothesis to a simple dictionary.
-
-        :param oh: Object hypothesis to extract data from.
-        :return: A dictionary containing the object hypothesis data in form of a dictionary.
-        """
-        data: Dict[str, Any] = {}
-        cas = self.get_cas()
-
-        if hasattr(oh, "roi"):
-            data["oh_roi"] = oh.roi.roi
-
-        positions = cas.filter_by_type(PositionAnnotation, oh.annotations)
-        if len(positions) > 0:
-            translation_vector = np.array(positions[0].translation)
-            data["translation_vector"] = translation_vector
-
-        poses = cas.filter_by_type(PoseAnnotation, oh.annotations)
-        if len(poses) > 0:
-            translation_vector = np.array(poses[0].translation)
-            data["translation_vector"] = translation_vector
-
-        classes = cas.filter_by_type(Classification, oh.annotations)
-        if len(classes) > 0:
-            data["class"] = classes[0]
-
-        bboxs = cas.filter_by_type(BoundingBox3DAnnotation, oh.annotations)
-        if len(bboxs) > 0:
-            data["bbox"] = bboxs[0]
-
-        semantic_colors = cas.filter_by_type(SemanticColor, oh.annotations)
-        if len(semantic_colors) > 0:
-            data["semantic_color"] = semantic_colors[0]
-
-        color_histograms = cas.filter_by_type(ColorHistogram, oh.annotations)
-        if len(color_histograms) > 0:
-            data["color_histogram"] = color_histograms[0]
-
-        tsdfs = cas.filter_by_type(TSDFAnnotation, oh.annotations)
-        if len(tsdfs) > 0:
-            data["tsdf"] = tsdfs[0]
-
-        sift = cas.filter_by_type(SIFTAnnotation, oh.annotations)
-        if len(sift) > 0:
-            data["sift"] = sift[0]
-
-        return data
 
     def update(self) -> Status:
         """Synchronise the current RoboKudo state with the current semdt state."""
         start_timer = default_timer()
 
+        cas = self.get_cas()
+        rk_world = world_instance()
+
+        threshold = self.descriptor.parameters.confidence_threshold
+
         ohs: list[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(
             ObjectHypothesis
         )
 
-        # Get the best data from oh
-        new_objects = [Object(data=self.extract_data(oh)) for oh in ohs]
+        obs = list(world.get_object_belief_states().values())
+        if len(obs) == 0:
+            for oh in ohs:
+                world.add_object_hypothesis_as_belief_state(oh, cas)
+            self.rk_logger.info(
+                f"SemDT \nKS Entities: {len(rk_world.kinematic_structure_entities)}\nViews: {len(rk_world.semantic_annotations)}\nConnections: {len(rk_world.connections)}"
+            )
+            return Status.SUCCESS
 
-        diffs = self.semdt_adapter.compute_diffs(new_objects)
+        cost_matrix = np.full((len(ohs), len(obs)), 1e9)
+        for i, oh in enumerate(ohs):
+            for j, ob in enumerate(obs):
+                similarity = self.object_comparator.compute_similarity(
+                    oh, ob.latest_hypothesis
+                )
+                cost_matrix[i][j] = -similarity
 
-        self.semdt_adapter.apply_diffs(diffs)
+        hypothesis_indices, instance_indices = linear_sum_assignment(cost_matrix)
 
-        # def string_to_type(type_string):
-        #     try:
-        #         module_path, class_name = type_string.rsplit('.', 1)
-        #         module = importlib.import_module(module_path)
-        #         return getattr(module, class_name)
-        #     except (ImportError, AttributeError, ValueError) as e:
-        #         raise ValueError(f"Cannot import type '{type_string}': {e}")
-
-        # for diff in diffs:
-        #     for test_dict in diff.test:
-        #         self.rk_logger.info(json.dumps(test_dict))
-
-        #         test_type = string_to_type(test_dict['type'])
-        #         test_instance = test_type.from_json(test_dict)
-        #         self.rk_logger.info(f"{test_instance}")
+        for h_idx, i_idx in zip(hypothesis_indices, instance_indices):
+            similarity = -cost_matrix[h_idx, i_idx]
+            if similarity > threshold:
+                world.update_belief_state_with_object_hypothesis(
+                    obs[i_idx], ohs[h_idx], cas
+                )
+            else:
+                world.add_object_hypothesis_as_belief_state(oh, cas)
 
         self.rk_logger.info(
-            f"SemDT \nKS Entities: {len(self.semdt_adapter.world.kinematic_structure_entities)}\nViews: {len(self.semdt_adapter.world.semantic_annotations)}\nConnections: {len(self.semdt_adapter.world.connections)}"
+            f"SemDT \nKS Entities: {len(rk_world.kinematic_structure_entities)}\nViews: {len(rk_world.semantic_annotations)}\nConnections: {len(rk_world.connections)}"
         )
-
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         return Status.SUCCESS

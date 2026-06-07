@@ -2,8 +2,27 @@
 Annotators.
 """
 
+import numpy as np
+
+from robokudo.cas import CAS
+from robokudo.types.scene import ObjectHypothesis
+from robokudo.utils.annotator_helper import get_cam_to_world_transform_matrix
+from robokudo.utils.transform import (
+    get_transform_matrix_from_q,
+    get_quaternion_from_transform_matrix,
+    get_translation_from_transform_matrix,
+)
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
+import trimesh.creation
+from semantic_digital_twin.world_description.geometry import Mesh, Scale, Box
 import sys
+from uuid import UUID
 from threading import Lock
+from typing_extensions import Dict
+
+from robokudo.types.belief_state import ObjectBeliefState
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -22,6 +41,8 @@ this.world_entity_tracker = WorldEntityWithIDKwargsTracker.from_world(this.world
 
 _rk_world_lock = Lock()
 """Lock for safe creation of the central SemDT World and entity tracker."""
+
+_tracked_objects: Dict[UUID, ObjectBeliefState] = {}
 
 
 def get_world_entity_tracker() -> WorldEntityWithIDKwargsTracker:
@@ -187,6 +208,12 @@ def update_connection_transform(
     from_name: PrefixedName,
     transform: HomogeneousTransformationMatrix,
 ) -> None:
+    """Update the connection connecting from_name to to_name with the given transformation.
+
+    :param to_name: The connection target name.
+    :param from_name: The connection source name.
+    :param transform: The transformation matrix.
+    """
     world = world_instance()
 
     connection = world.get_connection_by_name(
@@ -198,23 +225,144 @@ def update_connection_transform(
 
 
 def get_object_belief_states() -> Dict[UUID, ObjectBeliefState]:
+    """Get all object belief states as a map of UUID to belief state.
+
+    :return: A map of all UUIDs to their object belief states.
+    """
     return _tracked_objects
 
 
-def add_object_belief_state(object_belief_state: ObjectBeliefState) -> None:
+def add_object_hypothesis_as_belief_state(
+    object_hypothesis: ObjectHypothesis, cas: CAS
+) -> ObjectBeliefState:
+    """Create a new object belief from the given hypothesis and add it to the world.
+
+    .. note::
+        This currently assumes that all object hypotheses are rooted in the camera space.
+
+    :param object_hypothesis: The object hypothesis to create a belief from.
+    :param cas: The CAS to use for transform lookups.
+    :return: The new object belief.
+    """
     world = world_instance()
 
-    _tracked_objects[object_belief_state.uuid] = object_belief_state
+    object_belief = ObjectBeliefState.create_with_new_body().add_hypothesis(
+        object_hypothesis
+    )
 
-    # with world.modify_world():
-    #     world_T_object_belief = Connection6DoF.create_with_dofs(
-    #         world=world,
-    #         parent=world_frame,
-    #         child=object_belief.body,
-    #     )
+    world_frame = cas.world_frame
+    if world_frame is None:
+        return object_belief
+    world_body = world.get_body_by_name(PrefixedName(name=world_frame))
 
-    #     world.add_connection(world_T_object_belief)
+    with world.modify_world():
+        world_T_object_belief = Connection6DoF.create_with_dofs(
+            world=world,
+            parent=world_body,
+            child=object_belief.body,
+        )
+        world.add_connection(world_T_object_belief)
+
+    latest_pose = object_belief.latest_pose
+    if latest_pose is None:
+        return object_belief
+
+    bb = object_belief.latest_bbox_3d
+    if bb is None:
+        return object_belief
+
+    pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
+
+    cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
+    pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
+
+    rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
+    translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
+
+    origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=translation[0],
+        pos_y=translation[1],
+        pos_z=translation[2],
+        quat_x=rotation[0],
+        quat_y=rotation[1],
+        quat_z=rotation[2],
+        quat_w=rotation[3],
+        reference_frame=world_body,
+        child_frame=object_belief.body,
+    )
+
+    scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
+
+    with world.modify_world():
+        object_belief.body.collision.append(Box(scale=scale))
+        world_T_object_belief.origin = origin
+
+    return object_belief
+
+
+def update_belief_state_with_object_hypothesis(
+    object_belief: ObjectBeliefState, object_hypothesis: ObjectHypothesis, cas: CAS
+) -> None:
+    """Update the given object belief state with the object hypothesis.
+
+    .. note::
+        This currently assumes that all object hypotheses are rooted in the camera space.
+
+    :param object_belief: Object belief state to update.
+    :param object_hypothesis: Object hypothesis state to update the belief state with.
+    :param cas: The CAS to use for transform lookups.
+    """
+    world = world_instance()
+
+    object_belief.add_hypothesis(object_hypothesis)
+
+    latest_pose = object_belief.latest_pose
+    if latest_pose is None:
+        return
+
+    bb = object_belief.latest_bbox_3d
+    if bb is None:
+        return
+
+    world_frame = cas.world_frame
+    if world_frame is None:
+        return
+    world_body = world.get_body_by_name(PrefixedName(name=world_frame))
+
+    pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
+
+    cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
+    pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
+
+    rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
+    translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
+
+    origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=translation[0],
+        pos_y=translation[1],
+        pos_z=translation[2],
+        quat_x=rotation[0],
+        quat_y=rotation[1],
+        quat_z=rotation[2],
+        quat_w=rotation[3],
+        reference_frame=world_body,
+        child_frame=object_belief.body,
+    )
+
+    scale = Scale(x=bb.x_length, y=bb.y_length, z=bb.z_length)
+
+    with world.modify_world():
+        object_belief.body.get_first_parent_connection_of_type(
+            Connection6DoF
+        ).origin = origin
+        object_belief.body.collision.shapes.clear()
+        object_belief.body.collision.append(Box(scale=scale))
 
 
 def get_object_belief_state(uuid: UUID) -> ObjectBeliefState:
+    """Get an object belief state by UUID.
+
+    :param uuid: The UUID of the object.
+    :return: The object belief state corresponding to the given UUID.
+    """
     return _tracked_objects[uuid]
