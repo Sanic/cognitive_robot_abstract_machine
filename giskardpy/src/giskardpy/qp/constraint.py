@@ -40,11 +40,6 @@ if TYPE_CHECKING:
 LargeNumber = 1e4
 
 
-class NormalizationFactors(FloatEnum):
-    meter_per_second = 0.2
-    radian_per_second = 0.2
-
-
 def max_velocity_from_horizon_and_jerk_qp(
     prediction_horizon: int,
     vel_limit: float,
@@ -78,7 +73,13 @@ def max_velocity_from_horizon_and_jerk_qp(
 
 
 @dataclass
-class DirectLimits:
+class DirectLimits(ABC):
+    """
+    Represents weights and limits of decision variables in a QP.
+    All fields must have the same length.
+    Subclasses must implement the `create` factory method, which should be used for creating it.
+    """
+
     lower_bounds: sm.Vector = field(init=False)
     upper_bounds: sm.Vector = field(init=False)
     quadratic_weights: sm.Vector = field(init=False)
@@ -86,6 +87,7 @@ class DirectLimits:
     names: list[str] = field(init=False)
 
     @classmethod
+    @abstractmethod
     def create(
         cls,
         degrees_of_freedom: List[DegreeOfFreedom],
@@ -96,6 +98,9 @@ class DirectLimits:
 
 @dataclass
 class SlackLimits(DirectLimits):
+    """
+    Implements
+    """
 
     @classmethod
     def from_constraints(
@@ -926,7 +931,7 @@ class GiskardConstraint(ABC):
 
     linear_weight: sm.ScalarData = field(default=0)
 
-    normalization_factor: NormalizationFactors
+    normalization_factor: float
     """
     This value is important to make constraints with different units comparable.
     The meaning depends on derivative.
@@ -940,6 +945,9 @@ class GiskardConstraint(ABC):
     """
 
     enforcement_strategy: type[EnforcementStrategy]
+    """
+    The strategy used to enforce this constraint within the QP.
+    """
 
     lower_slack_limit: sm.ScalarData = field(default=-LargeNumber)
     upper_slack_limit: sm.ScalarData = field(default=LargeNumber)
