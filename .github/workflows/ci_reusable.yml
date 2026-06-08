@@ -45,21 +45,12 @@ jobs:
             ${{ runner.os }}-cache-
 
       - name: Build ORM
-        if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
+        if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'experiments'}}
         run: |
           cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
           source /opt/ros/cram-env/bin/activate
           source /opt/ros/overlay_ws/install/setup.bash
           python generate_orm.py
-
-      - name: Build ROS2 packages
-        run: |
-          source /opt/ros/cram-env/bin/activate
-          source /opt/ros/overlay_ws/install/setup.bash
-          cd /opt/ros/overlay_ws/src
-          ln -s "${GITHUB_WORKSPACE}/cognitive_robot_abstract_machine/cram_ros2_packages" cram_ros2_packages
-          cd ..
-          colcon build --merge-install
 
       - name: Run CPP tests
         if: ${{inputs.lib == 'random_events'}}

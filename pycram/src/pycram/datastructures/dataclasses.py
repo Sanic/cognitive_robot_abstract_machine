@@ -5,20 +5,25 @@ from dataclasses import dataclass, field
 
 from typing_extensions import (
     Optional,
-    Any, TYPE_CHECKING,
+    Any, TYPE_CHECKING, ClassVar,
 )
 
 from krrood.entity_query_language.backends import QueryBackend, EntityQueryLanguageBackend
+from krrood.class_diagrams.mocking import MockedClass, MockedModule
 from pycram.plans.plan import Plan
 from pycram.plans.plan_entity import PlanEntity
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
-from semantic_digital_twin.world import World
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
+if TYPE_CHECKING:
+    from pycram.plans.plan import Plan
+    from semantic_digital_twin.world import World
 
 try:
     import rclpy
-except ImportError:
-    rclpy = None
+except ImportError as e:
+    from semantic_digital_twin.utils import mocked_rclpy
+    logging.warning("Could not import rclpy. This is expected if you are not using ROS. Mocking rclpy.")
+    rclpy = mocked_rclpy
 
 @dataclass
 class Context(PlanEntity):

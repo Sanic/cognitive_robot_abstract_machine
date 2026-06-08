@@ -5,12 +5,14 @@ from typing_extensions import List, Union
 
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.data_types import LifeCycleValues
 from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.entity_query_language.predicate import symbolic_function
+from pycram.datastructures.grasp import GraspDescription
 from pycram.plans.plan import Plan
 from pycram.plans.plan_node import PlanNode
 from pycram.robot_plans import MoveToolCenterPointMotion
@@ -21,7 +23,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowSelfCollisions,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -69,7 +71,7 @@ def visibility_validator(
     else:
         gen_body = object_or_pose
     r_t = world.ray_tracer
-    camera = list(robot.neck.sensors)[0]
+    camera = robot.get_default_camera()
     ray = r_t.ray_test(
         camera.bodies[0].global_transform.to_position().to_np()[:3],
         gen_body.global_transform.to_position().to_np()[:3],
@@ -93,6 +95,7 @@ def reachability_validator(
     robot_view: AbstractRobot,
     world: World,
     use_fullbody_ik: bool = False,
+    grasp_description: GraspDescription = None,
 ) -> bool:
     """
     Evaluates if a pose can be reached with the tip_link in the given world. This uses giskard motion state charts
@@ -103,7 +106,10 @@ def reachability_validator(
     :param robot_view: The semantic annotation of the robot which should be evaluated for reachability
     :param world: The world in which the visibility should be validated.
     :param use_fullbody_ik: If true the base will be used in trying to reach the poses
+    :param grasp_description: The description of the grasp.
     """
+    if grasp_description:
+        _, target_pose, _ = grasp_description._pose_sequence(target_pose)
     return pose_sequence_reachability_validator(
         [target_pose], tip_link, robot_view, world, use_fullbody_ik
     )
@@ -177,10 +183,20 @@ def pose_sequence_reachability_validator(
 
     try:
         executor.tick_until_end()
-    except TimeoutError:
-        failed_nodes = []
-
-        logger.debug(f"Timeout while executing pose sequence: {target_sequence}")
+    except TimeoutError as e:
+        failed_nodes = [
+            (
+                node
+                if node.life_cycle_state
+                not in [LifeCycleValues.DONE, LifeCycleValues.NOT_STARTED]
+                else None
+            )
+            for node in msc.nodes
+        ]
+        failed_nodes = list(filter(None, failed_nodes))
+        logger.debug(
+            f"Timeout while executing pose sequence: {target_sequence}. Failed Nodes: {failed_nodes}"
+        )
         return False
     finally:
         world.state._data[:] = old_state

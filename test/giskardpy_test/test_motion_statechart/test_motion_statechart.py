@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-
 from giskardpy.data_types.exceptions import DuplicateNameException
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
@@ -42,7 +41,6 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ChangeStateOnEvents,
@@ -56,10 +54,8 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     TestUnpauseUnknownFromParentPause,
 )
 from giskardpy.qp.constraint import (
-    GiskardConstraint,
     IntegralStrategy,
     GiskardEqualityConstraint,
-    GiskardInequalityConstraint,
 )
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from krrood.symbolic_math.symbolic_math import (
@@ -67,28 +63,9 @@ from krrood.symbolic_math.symbolic_math import (
     trinary_logic_not,
     trinary_logic_or,
     FloatVariable,
-    shortest_angular_distance,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
-)
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
-)
-from semantic_digital_twin.collision_checking.collision_rules import (
-    AvoidCollisionBetweenGroups,
-    AvoidExternalCollisions,
-    AvoidAllCollisions,
-    AllowAllCollisions,
-)
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import Manipulator, AbstractRobot
-from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Handle,
-    Door,
-    Hinge,
 )
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,

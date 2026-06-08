@@ -87,7 +87,6 @@ class DirectLimits(ABC):
     names: list[str] = field(init=False)
 
     @classmethod
-    @abstractmethod
     def create(
         cls,
         degrees_of_freedom: List[DegreeOfFreedom],
