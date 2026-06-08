@@ -42,8 +42,7 @@ from krrood.entity_query_language.verbalization.rule_analysis import (
     RuleStructure,
 )
 from krrood.entity_query_language.verbalization.rules.query import TopLevelEntityRule
-from krrood.entity_query_language.verbalization._inflect import _engine as _inflect_engine
-from krrood.entity_query_language.verbalization.utils import _ensure_plural
+from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
     Copulas,
@@ -86,7 +85,10 @@ class InferenceRuleRule(TopLevelEntityRule):
 
     @classmethod
     def transform(
-        cls, expression: Entity, context: VerbalizationContext, verbalizer: EQLVerbalizer
+        cls,
+        expression: Entity,
+        context: VerbalizationContext,
+        verbalizer: EQLVerbalizer,
     ) -> VerbFragment:
         """Build the two-block ``IF … THEN …`` fragment."""
         structure = _ANALYZER.analyze(expression)
@@ -115,7 +117,9 @@ def _verbalize_rule_if_(
     for antecedent in s.primary_antecedents:
         intro = _antecedent_intro_frag_(antecedent)
         _register_antecedent_(antecedent, context)
-        cond_frags = _condition_frags_(antecedent.conditions, antecedent, context, verbalizer)
+        cond_frags = _condition_frags_(
+            antecedent.conditions, antecedent, context, verbalizer
+        )
         items.append(
             BlockFragment(header=intro, items=cond_frags) if cond_frags else intro
         )
@@ -133,7 +137,9 @@ def _antecedent_intro_frag_(antecedent: AntecedentInfo) -> VerbFragment:
     return ExistentialPhrase.THERE_IS_A.build_phrase(antecedent.type_name)
 
 
-def _register_antecedent_(antecedent: AntecedentInfo, context: VerbalizationContext) -> None:
+def _register_antecedent_(
+    antecedent: AntecedentInfo, context: VerbalizationContext
+) -> None:
     """Mark an antecedent's root and selected variable as seen for coreference tracking."""
     root = antecedent.root
     context.seen[root._id_] = antecedent.type_name
@@ -152,7 +158,8 @@ def _condition_frags_(
 ) -> list[VerbFragment]:
     """Render each condition, preferring a *"whose …"* fold when possible."""
     return [
-        _try_whose_from_condition_(condition, antecedent, context, verbalizer) or verbalizer.build(condition, context)
+        _try_whose_from_condition_(condition, antecedent, context, verbalizer)
+        or verbalizer.build(condition, context)
         for condition in conditions
     ]
 
@@ -172,7 +179,9 @@ def _try_whose_from_condition_(
     if not attr_names:
         return None
     aggregated = antecedent.aggregation_status == AggregationStatus.AGGREGATED
-    attr_word = _ensure_plural(attr_names[-1]) if aggregated else attr_names[-1]
+    attr_word = (
+        morphology.ensure_plural(attr_names[-1]) if aggregated else attr_names[-1]
+    )
     right_frag = (
         verbalize_plural(condition.right, context, verbalizer.build)
         if aggregated
@@ -221,14 +230,18 @@ def _verbalize_binding_frag_(
 ) -> VerbFragment:
     """Render a single consequent binding as *"whose <field> is <value>"*."""
     field_text = (
-        _ensure_plural(binding.field_name)
+        morphology.ensure_plural(binding.field_name)
         if binding.is_plural_field
         else binding.field_name
     )
     return phrase(
         Keywords.WHOSE.as_fragment(),
         role(field_text, SemanticRole.ATTRIBUTE),
-        Copulas.ARE.as_fragment() if binding.is_plural_field else Copulas.IS.as_fragment(),
+        (
+            Copulas.ARE.as_fragment()
+            if binding.is_plural_field
+            else Copulas.IS.as_fragment()
+        ),
         _binding_value_frag_(binding, context, verbalizer),
     )
 
@@ -250,7 +263,9 @@ def _binding_value_frag_(
     if binding.is_plural_field:
         return verbalize_plural(binding.value_expression, context, verbalizer.build)
     if binding.aggregation_status == AggregationStatus.GROUP_KEY:
-        return _verbalize_group_key_value_(binding.value_expression, context, verbalizer)
+        return _verbalize_group_key_value_(
+            binding.value_expression, context, verbalizer
+        )
     return verbalizer.build(binding.value_expression, context)
 
 
@@ -268,7 +283,7 @@ def _verbalize_group_key_value_(
         if getattr(current, "_type_", None)
         else FallbackNouns.ENTITY.text
     )
-    root_plural = _inflect_engine.plural(root_type)
+    root_plural = morphology.plural(root_type)
     context.seen[current._id_] = root_type
 
     parts = build_path_parts(chain)

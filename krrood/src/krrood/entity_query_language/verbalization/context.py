@@ -19,8 +19,6 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING
 from typing_extensions import Any, Dict, List, Optional
 
-from krrood.entity_query_language.verbalization._inflect import _engine as _inflect_engine
-
 from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -33,11 +31,13 @@ from krrood.entity_query_language.verbalization.subquery import (
     aggregation_source_root,
     selected_aggregator,
 )
-from krrood.entity_query_language.verbalization.vocabulary.english import Articles, Pronouns
+from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Articles,
+    Pronouns,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-
 
 
 class ArticleSelection(Enum):
@@ -52,11 +52,6 @@ class ArticleSelection(Enum):
     NONE = auto()  # numbered variable — no article
     DEFINITE = auto()  # subsequent mention → "the"
     INDEFINITE = auto()  # first mention → "a" / "an"
-
-
-def _article(type_name: str) -> str:
-    """Return ``"a"`` or ``"an"`` for *type_name* using the inflect engine."""
-    return _inflect_engine.a(type_name).split()[0]
 
 
 def _aggregation_source_ids(expression) -> set:
@@ -391,7 +386,9 @@ class VerbalizationContext:
         """
         if isinstance(value, type):
             return value.__name__
-        if isinstance(value, tuple) and all(isinstance(variable, type) for variable in value):
+        if isinstance(value, tuple) and all(
+            isinstance(variable, type) for variable in value
+        ):
             return " or ".join(variable.__name__ for variable in value)
         if isinstance(value, datetime.datetime):
             if value.time() == datetime.time.min:

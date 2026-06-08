@@ -4,6 +4,7 @@ Rule structure analysis for EQL verbalization.
 Classifies the parts of an Entity-over-inference query into antecedents (IF) and
 a consequent (THEN) so the verbalizer can produce the "If ..., then ..." form.
 """
+
 from __future__ import annotations
 
 import operator
@@ -12,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing_extensions import Any, FrozenSet, List, Optional, Tuple
 
-from krrood.entity_query_language.verbalization._inflect import _engine as _inflect_engine
+from krrood.entity_query_language.verbalization import morphology
 
 from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
 from krrood.entity_query_language.operators.comparator import Comparator
@@ -20,7 +21,6 @@ from krrood.entity_query_language.operators.core_logical_operators import AND
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier
 from krrood.entity_query_language.query.query import Entity
 from krrood.entity_query_language.verbalization.chain_utils import chain_root
-
 
 
 class AggregationStatus(Enum):
@@ -32,9 +32,9 @@ class AggregationStatus(Enum):
     :cvar NONE: No grouping context in this query.
     """
 
-    GROUP_KEY = auto()   # this expression is one of the grouped_by keys
+    GROUP_KEY = auto()  # this expression is one of the grouped_by keys
     AGGREGATED = auto()  # present but not a group key → plural in output
-    NONE = auto()        # no grouping context
+    NONE = auto()  # no grouping context
 
 
 @dataclass
@@ -113,6 +113,7 @@ class RuleStructure:
 
 # ── Module-level helpers (pure domain-analysis utilities) ─────────────────────
 
+
 def _antecedent_var_id_(antecedent: AntecedentInfo) -> Optional[object]:
     """Return the stable _id_ of the underlying variable for an antecedent."""
     root = antecedent.root
@@ -186,15 +187,17 @@ class RuleAnalyzer:
         grouped_expression = entity._grouped_by_expression_
         group_key_ids: FrozenSet[uuid.UUID] = frozenset()
         if grouped_expression is not None and grouped_expression.variables_to_group_by:
-            group_key_ids = frozenset(variable._id_ for variable in grouped_expression.variables_to_group_by)
+            group_key_ids = frozenset(
+                variable._id_ for variable in grouped_expression.variables_to_group_by
+            )
         has_grouping = bool(group_key_ids)
 
         # ── Walk consequent bindings ───────────────────────────────────────────
-        seen_root_ids: dict = {}          # root_id → AntecedentInfo
+        seen_root_ids: dict = {}  # root_id → AntecedentInfo
         consequent_bindings: List[ConsequentBinding] = []
 
         for field_name, child_expression in inferred._child_vars_.items():
-            is_plural = bool(_inflect_engine.singular_noun(field_name))
+            is_plural = morphology.is_plural(field_name)
 
             if child_expression._id_ in group_key_ids:
                 binding_aggregation = AggregationStatus.GROUP_KEY
@@ -203,12 +206,14 @@ class RuleAnalyzer:
             else:
                 binding_aggregation = AggregationStatus.NONE
 
-            consequent_bindings.append(ConsequentBinding(
-                field_name=field_name,
-                value_expression=child_expression,
-                is_plural_field=is_plural,
-                aggregation_status=binding_aggregation,
-            ))
+            consequent_bindings.append(
+                ConsequentBinding(
+                    field_name=field_name,
+                    value_expression=child_expression,
+                    is_plural_field=is_plural,
+                    aggregation_status=binding_aggregation,
+                )
+            )
 
             root = self._find_root(child_expression)
             if root is None or root._id_ in seen_root_ids:
@@ -290,14 +295,22 @@ class RuleAnalyzer:
         if isinstance(root, Entity):
             root.build()
             var = root.selected_variable
-            type_name = var._type_.__name__ if var and getattr(var, "_type_", None) else "entity"
+            type_name = (
+                var._type_.__name__
+                if var and getattr(var, "_type_", None)
+                else "entity"
+            )
             conditions = []
             if root._where_expression_ is not None:
-                conditions = RuleAnalyzer._flatten_and(root._where_expression_.condition)
+                conditions = RuleAnalyzer._flatten_and(
+                    root._where_expression_.condition
+                )
             return type_name, conditions
 
         if isinstance(root, Variable):
-            type_name = root._type_.__name__ if getattr(root, "_type_", None) else "variable"
+            type_name = (
+                root._type_.__name__ if getattr(root, "_type_", None) else "variable"
+            )
             return type_name, []
 
         return "entity", []
@@ -306,5 +319,7 @@ class RuleAnalyzer:
     def _flatten_and(expression) -> List[Any]:
         """Recursively flatten a nested AND tree into a flat list of conjuncts."""
         if isinstance(expression, AND):
-            return RuleAnalyzer._flatten_and(expression.left) + RuleAnalyzer._flatten_and(expression.right)
+            return RuleAnalyzer._flatten_and(
+                expression.left
+            ) + RuleAnalyzer._flatten_and(expression.right)
         return [expression]

@@ -37,7 +37,7 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
 from krrood.entity_query_language.verbalization.rule_engine import VerbalizationRule
 from krrood.entity_query_language.verbalization.rules.query import as_inline_noun
-from krrood.entity_query_language.verbalization.utils import _ordinal
+from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
     Copulas,
@@ -79,7 +79,9 @@ def verbalize_chain(
 
 
 def verbalize_possessive_chain(
-    expression: MappedVariable, context: VerbalizationContext, pronoun_fragment: VerbFragment
+    expression: MappedVariable,
+    context: VerbalizationContext,
+    pronoun_fragment: VerbFragment,
 ) -> VerbFragment:
     """
     Render a chain rooted at the current coreference subject, replacing the trailing
@@ -149,10 +151,16 @@ def _verbalize_pronominal_path(
             fragment_parts.extend([Articles.THE.as_fragment(), attribute_fragment])
         elif index == 0:  # single attribute → "its booking_date"
             fragment_parts.extend([pronoun_fragment, attribute_fragment])
-        elif index == last:  # attribute adjacent to the (elided) root → "of its amount_details"
-            fragment_parts.extend([Prepositions.OF.as_fragment(), pronoun_fragment, attribute_fragment])
+        elif (
+            index == last
+        ):  # attribute adjacent to the (elided) root → "of its amount_details"
+            fragment_parts.extend(
+                [Prepositions.OF.as_fragment(), pronoun_fragment, attribute_fragment]
+            )
         else:
-            fragment_parts.extend([Prepositions.OF_THE.as_fragment(), attribute_fragment])
+            fragment_parts.extend(
+                [Prepositions.OF_THE.as_fragment(), attribute_fragment]
+            )
     return PhraseFragment(parts=fragment_parts)
 
 
@@ -214,8 +222,10 @@ def _verbalize_bool_predicative(
     if not nav_chain:
         nav_fragment = root_fragment
     elif isinstance(nav_chain[-1], Index) and isinstance(nav_chain[-1]._key_, int):
-        ordinal = _ordinal(nav_chain[-1]._key_)
-        pre_frag = _verbalize_possessive_path(build_path_parts(nav_chain[:-1]), root_fragment)
+        ordinal = morphology.ordinal(nav_chain[-1]._key_)
+        pre_frag = _verbalize_possessive_path(
+            build_path_parts(nav_chain[:-1]), root_fragment
+        )
         nav_fragment = phrase(
             Articles.THE.as_fragment(),
             word(ordinal),
@@ -223,7 +233,9 @@ def _verbalize_bool_predicative(
             pre_frag,
         )
     else:
-        nav_fragment = _verbalize_possessive_path(build_path_parts(nav_chain), root_fragment)
+        nav_fragment = _verbalize_possessive_path(
+            build_path_parts(nav_chain), root_fragment
+        )
 
     copula = Copulas.IS_NOT.as_fragment() if negated else Copulas.IS.as_fragment()
     terminal = chain[-1]
@@ -277,7 +289,9 @@ class PronominalChainRule(MappedVariableRule):
     @classmethod
     def applies(cls, expression, context: VerbalizationContext) -> bool:
         """Return ``True`` for a non-bool chain rooted at the current pronoun-eligible subject."""
-        if not isinstance(expression, MappedVariable) or isinstance(expression, FlatVariable):
+        if not isinstance(expression, MappedVariable) or isinstance(
+            expression, FlatVariable
+        ):
             return False
         chain, root = walk_chain(expression)
         if not chain:
@@ -296,7 +310,9 @@ class PronominalChainRule(MappedVariableRule):
     ) -> VerbFragment:
         """Render the chain with a leading *"its"* possessive pronoun."""
         root = chain_root(expression)
-        return verbalize_possessive_chain(expression, context, context.pronoun_for(root))
+        return verbalize_possessive_chain(
+            expression, context, context.pronoun_for(root)
+        )
 
 
 class FlatVariableRule(MappedVariableRule):

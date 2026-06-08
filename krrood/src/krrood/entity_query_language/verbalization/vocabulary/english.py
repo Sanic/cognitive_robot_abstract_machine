@@ -24,7 +24,7 @@ from enum import Enum
 
 from krrood.entity_query_language.operators.comparator import not_contains as _nc
 
-from krrood.entity_query_language.verbalization._inflect import _engine as _inflect_engine
+from krrood.entity_query_language.verbalization import morphology
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
@@ -33,7 +33,6 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-from krrood.entity_query_language.verbalization.utils import _ensure_plural
 from krrood.entity_query_language.verbalization.vocabulary.words import (
     AggregationWord,
     ChildForm,
@@ -45,8 +44,6 @@ from krrood.entity_query_language.verbalization.vocabulary.words import (
     PronounWord,
     VocabEnum,
 )
-
-
 
 # ── English-specific word subtypes ─────────────────────────────────────────────
 # These add behaviour for phrases that depend on a runtime type_name argument.
@@ -71,7 +68,7 @@ class SingularExistential(PlainWord):
         :return: Phrase fragment with the correct indefinite article.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
-        article = _inflect_engine.a(type_name).split()[0]
+        article = morphology.indefinite_article(type_name)
         return PhraseFragment(
             parts=[
                 WordFragment(text=f"{self.text} {article}"),
@@ -100,7 +97,7 @@ class PluralExistential(PlainWord):
             parts=[
                 self.as_fragment(),
                 RoleFragment(
-                    text=_ensure_plural(type_name), role=SemanticRole.VARIABLE
+                    text=morphology.ensure_plural(type_name), role=SemanticRole.VARIABLE
                 ),
             ],
         )
@@ -122,7 +119,7 @@ class FallbackNounWord(PlainWord):
         :return: Pluralised noun fragment (e.g. ``"entities"``).
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.WordFragment
         """
-        return WordFragment(text=_inflect_engine.plural(self.text))
+        return WordFragment(text=morphology.plural(self.text))
 
 
 @dataclass(frozen=True)
@@ -264,7 +261,7 @@ class Articles(VocabEnum):
         :return: ``WordFragment("a")`` or ``WordFragment("an")``.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.WordFragment
         """
-        text = _inflect_engine.a(following_word).split()[0] if following_word else "a"
+        text = morphology.indefinite_article(following_word) if following_word else "a"
         return WordFragment(text=text)
 
 

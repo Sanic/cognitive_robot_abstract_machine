@@ -18,9 +18,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from typing_extensions import Callable, List, Optional, TypeVar
 
+from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
-from krrood.entity_query_language.verbalization.utils import _ensure_plural
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -105,7 +105,9 @@ class RoleFragment(VerbFragment):
         :return: :class:`RoleFragment` with :attr:`~SemanticRole.ATTRIBUTE` role.
         :rtype: RoleFragment
         """
-        label = attribute_name if not plural else _ensure_plural(attribute_name)
+        label = (
+            attribute_name if not plural else morphology.ensure_plural(attribute_name)
+        )
         return cls(
             text=label,
             role=SemanticRole.ATTRIBUTE,

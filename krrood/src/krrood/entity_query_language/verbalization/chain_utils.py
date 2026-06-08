@@ -8,6 +8,7 @@ not import from the subsystem files (``verbalizer.py``, ``context.py``,
 from the ``fragments/``, ``vocabulary/`` layers are safe because those are
 lower in the dependency graph.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
@@ -28,8 +29,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
-from krrood.entity_query_language.verbalization._inflect import _engine as _inflect_engine
-from krrood.entity_query_language.verbalization.utils import _ensure_plural
+from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
 
 if TYPE_CHECKING:
@@ -95,7 +95,11 @@ def chain_root(expression) -> object:
         when it is not a MappedVariable.
     :rtype: object
     """
-    return expression._chain_root_ if isinstance(expression, MappedVariable) else expression
+    return (
+        expression._chain_root_
+        if isinstance(expression, MappedVariable)
+        else expression
+    )
 
 
 def build_path_parts(chain: list) -> list[tuple[str, Optional[SourceRef]]]:
@@ -141,7 +145,9 @@ def build_path_parts(chain: list) -> list[tuple[str, Optional[SourceRef]]]:
     return parts
 
 
-def verbalize_plural(expression, context: VerbalizationContext, build_fn: Callable) -> VerbFragment:
+def verbalize_plural(
+    expression, context: VerbalizationContext, build_fn: Callable
+) -> VerbFragment:
     """
     Return a plural :class:`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment`
     for *expression*.
@@ -171,16 +177,20 @@ def verbalize_plural(expression, context: VerbalizationContext, build_fn: Callab
         type_name = expression._type_.__name__
         label = context.disambiguation_map.get(expression._id_, type_name)
         context.seen[expression._id_] = label
-        plural = label if label != type_name else _inflect_engine.plural(type_name)
+        plural = label if label != type_name else morphology.plural(type_name)
         return RoleFragment.for_variable(plural, expression)
 
     if isinstance(expression, Attribute):
         chain, root = walk_chain(expression)
-        if isinstance(root, Variable) and len(chain) == 1 and isinstance(chain[0], Attribute):
+        if (
+            isinstance(root, Variable)
+            and len(chain) == 1
+            and isinstance(chain[0], Attribute)
+        ):
             type_name = root._type_.__name__
             label = context.disambiguation_map.get(root._id_, type_name)
             context.seen[root._id_] = label
-            root_plural = label if label != type_name else _inflect_engine.plural(type_name)
+            root_plural = label if label != type_name else morphology.plural(type_name)
             attribute_name = chain[0]._attribute_name_
             owner = chain[0]._owner_class_
             return PhraseFragment(
