@@ -12,7 +12,7 @@ and must be preserved.
 
 These predicates are the single source of truth for this concept, shared by the
 disambiguation pre-scan
-(:func:`~krrood.entity_query_language.verbalization.context._build_disambiguation_map`)
+(:func:`~krrood.entity_query_language.verbalization.microplanning.referring._build_disambiguation_map`)
 and the nested-entity renderer
 (:func:`~krrood.entity_query_language.verbalization.rules.query.verbalize_nested`).
 """
