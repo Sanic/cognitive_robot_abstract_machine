@@ -36,7 +36,6 @@ from semantic_digital_twin.exceptions import (
     ApplyMissedMessagesWhileWorldIsBeingModifiedError,
     StateUpdateContainsUnknownDegreesOfFreedomError,
 )
-from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithClassBasedID,
@@ -320,7 +319,7 @@ class ModelReloadSynchronizer(Synchronizer):
         Save the current world model to the database and publish the primary key to the ROS topic such that other
         processes can subscribe to the model changes and update their worlds.
         """
-        dao: WorldMappingDAO = to_dao(self._world)
+        dao = to_dao(self._world)
         self.session.add(dao)
         self.session.commit()
         message = LoadModel(primary_key=dao.database_id, meta_data=self.meta_data)
