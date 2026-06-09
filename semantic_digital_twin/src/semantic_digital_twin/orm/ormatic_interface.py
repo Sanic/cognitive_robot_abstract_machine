@@ -5092,6 +5092,27 @@ class AlreadyBelongsToAWorldErrorDAO(
     }
 
 
+class ApplyMissedMessagesWhileWorldIsBeingModifiedErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.ApplyMissedMessagesWhileWorldIsBeingModifiedError
+    ],
+):
+
+    __tablename__ = "ApplyMissedMessagesWhileWorldIsBeingModifiedErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "ApplyMissedMessagesWhileWorldIsBeingModifiedErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+    }
+
+
 class DoesNotBelongToAWorldErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.DoesNotBelongToAWorldError],
@@ -5657,6 +5678,31 @@ class ReferenceFrameMismatchErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ReferenceFrameMismatchErrorDAO",
         "inherit_condition": database_id == SpatialTypesErrorDAO.database_id,
+    }
+
+
+class StateUpdateContainsUnknownDegreesOfFreedomErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.exceptions.StateUpdateContainsUnknownDegreesOfFreedomError
+    ],
+):
+
+    __tablename__ = "StateUpdateContainsUnknownDegreesOfFreedomErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    unknown_identifiers: Mapped[typing.List[uuid.UUID]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "StateUpdateContainsUnknownDegreesOfFreedomErrorDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
     }
 
 

@@ -2390,7 +2390,7 @@ class _MultiSimStateCallback(StateChangeCallback):
 
     synchronizer: MultiSimSynchronizer = field(kw_only=True)
 
-    def _notify(self, **kwargs):
+    def on_state_change(self, **kwargs):
         self.synchronizer._on_state_change()
 
 
@@ -2436,7 +2436,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
             synchronizer=self,
         )
 
-    def _notify(self, **kwargs):
+    def on_model_change(self, **kwargs):
         for modification in self._world._model_manager.model_modification_blocks[-1]:
             if isinstance(modification, AddKinematicStructureEntityModification):
                 entity = modification.kinematic_structure_entity
@@ -2452,7 +2452,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
         if self._state_callback is not None:
             self._state_callback.stop()
             self._state_callback = None
-        self._world._model_manager.model_change_callbacks.remove(self)
+        super().stop()
 
     @abstractmethod
     def _on_state_change(self) -> None:

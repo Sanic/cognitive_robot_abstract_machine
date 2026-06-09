@@ -1,3 +1,4 @@
+import gc
 import os
 import threading
 import time
@@ -135,6 +136,7 @@ def cleanup_after_test():
 @pytest.fixture(autouse=True, scope="module")
 def count_worlds():
     yield
+    gc.collect()
     world_in_mem = objgraph.count("World")
     if world_in_mem > 30:
         raise MemoryError(
@@ -521,6 +523,12 @@ def apartment_world_setup():
         apartment_world.add_semantic_annotation(milk_view)
 
     return apartment_world
+
+
+@pytest.fixture(scope="function")
+def apartment_world_copy(apartment_world_setup):
+    result = deepcopy(apartment_world_setup)
+    return result
 
 
 @pytest.fixture(scope="session")
