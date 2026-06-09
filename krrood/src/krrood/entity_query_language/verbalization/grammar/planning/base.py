@@ -20,6 +20,7 @@ Systems", CUP — microplanning vs. surface realisation.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from typing_extensions import Generic, TypeVar
 
@@ -30,6 +31,7 @@ P = TypeVar("P")
 """The plan (data record) the planner produces."""
 
 
+@dataclass
 class Planner(ABC, Generic[N, P]):
     """
     Pure analysis of a single EQL *node* into a plan of type ``P``.
@@ -39,8 +41,8 @@ class Planner(ABC, Generic[N, P]):
     family's analysis is one cohesive class.
     """
 
-    def __init__(self, node: N) -> None:
-        self.node = node
+    node: N
+    """The EQL expression being analysed."""
 
     @abstractmethod
     def plan(self) -> P:

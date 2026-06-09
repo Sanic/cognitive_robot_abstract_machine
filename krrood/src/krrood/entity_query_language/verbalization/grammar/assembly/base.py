@@ -21,19 +21,19 @@ practical applications", ENLG — surface realisation as a dedicated stage.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from typing_extensions import Generic, TypeVar
 
 from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
-
-if TYPE_CHECKING:
-    from krrood.entity_query_language.verbalization.grammar.phrase_rule import Ctx
+from krrood.entity_query_language.verbalization.grammar.phrase_rule import Ctx
 
 P = TypeVar("P")
 """The plan (data record) the assembler realises."""
 
 
+@dataclass
 class Assembler(ABC, Generic[P]):
     """
     Realise a plan of type ``P`` into a
@@ -43,8 +43,8 @@ class Assembler(ABC, Generic[P]):
     so realisation sub-steps (methods) share ``self.ctx`` rather than threading it.
     """
 
-    def __init__(self, ctx: "Ctx") -> None:
-        self.ctx = ctx
+    ctx: Ctx
+    """The per-node context (recursion entry + microplanning services)."""
 
     @abstractmethod
     def assemble(self, node, plan: P) -> VerbFragment:

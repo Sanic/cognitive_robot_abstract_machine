@@ -56,7 +56,6 @@ from krrood.entity_query_language.verbalization.chain_utils import (
     walk_chain,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
-    BlockFragment,
     flatten_fragment_to_plain_text,
     join_with,
     oxford_and,
@@ -114,10 +113,11 @@ from krrood.entity_query_language.verbalization.rules.query import (
     verbalize_query,
     verbalize_set_of,
 )
-from krrood.entity_query_language.verbalization.rules.inference_rule import (
-    _ANALYZER,
-    _verbalize_rule_if_,
-    _verbalize_rule_then_,
+from krrood.entity_query_language.verbalization.grammar.assembly.inference import (
+    InferenceAssembler,
+)
+from krrood.entity_query_language.verbalization.grammar.planning.inference import (
+    InferencePlanner,
 )
 from krrood.entity_query_language.verbalization.rules.variables import (
     _has_verbalization_template,
@@ -504,20 +504,10 @@ class InferenceRuleRule(PhraseRule):
     tiebreak = 1  # beats TopLevelEntityRule when both match (same construct + depth 0)
 
     def when(self, node, ctx: Ctx):
-        return ctx.config.query_depth == 0 and _ANALYZER.can_handle(node)
+        return ctx.config.query_depth == 0 and InferencePlanner.can_handle(node)
 
     def build(self, node, ctx: Ctx):
-        verbalizer = _FoldVerbalizer(ctx)
-        structure = _ANALYZER.analyze(node)
-        if_frag = _verbalize_rule_if_(structure, ctx.context, verbalizer)
-        then_frag = _verbalize_rule_then_(structure, ctx.context, verbalizer)
-        return BlockFragment(
-            header=None,
-            items=[
-                BlockFragment(header=Keywords.IF.as_fragment(), items=if_frag),
-                BlockFragment(header=Keywords.THEN.as_fragment(), items=then_frag),
-            ],
-        )
+        return InferenceAssembler(ctx).assemble(node, InferencePlanner(node).plan())
 
 
 class SetOfRule(PhraseRule):
