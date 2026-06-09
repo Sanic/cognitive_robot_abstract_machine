@@ -21,9 +21,19 @@ from __future__ import annotations
 
 from typing_extensions import Any
 
-from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
+from krrood.entity_query_language.verbalization.fragments.base import (
+    PhraseFragment,
+    RoleFragment,
+    VerbFragment,
+)
 from krrood.entity_query_language.verbalization.fragments.factory import phrase
 from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
+from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
+    single_hop_attr,
+)
+from krrood.entity_query_language.verbalization.microplanning.coordination import (
+    build_between,
+)
 from krrood.entity_query_language.verbalization.operator_phrase import (
     comparator_operator,
 )
@@ -42,4 +52,27 @@ class ConditionVerbalizer(Assembler[Any, None]):
             self.ctx.child(comparator.left),
             comparator_operator(comparator, self.ctx.context, negated=negated),
             self.ctx.child(comparator.right),
+        )
+
+    def attribute_modifier(self, comparator, subject) -> VerbFragment:
+        """Bare *"<attr> <operator> <value>"* on *subject*'s single-hop attribute — the
+        grouped predicate a *"whose …"* envelope wraps."""
+        attr = single_hop_attr(comparator.left, subject)
+        return PhraseFragment(
+            parts=[
+                RoleFragment.for_attribute(attr._owner_class_, attr._attribute_name_),
+                comparator_operator(comparator, self.ctx.context, compact=False),
+                self.ctx.child(comparator.right),
+            ]
+        )
+
+    def range_modifier(self, rangefold, subject) -> VerbFragment:
+        """*"<attr> is between lo and hi"* on *subject*'s single-hop attribute."""
+        attr = single_hop_attr(rangefold.chain_expression, subject)
+        left = RoleFragment.for_attribute(attr._owner_class_, attr._attribute_name_)
+        return build_between(
+            left,
+            self.ctx.child(rangefold.lower_expression),
+            self.ctx.child(rangefold.upper_expression),
+            compact=False,
         )

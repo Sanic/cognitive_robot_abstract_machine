@@ -24,23 +24,18 @@ from typing_extensions import Optional, Type
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.operators.comparator import Comparator
-from krrood.entity_query_language.verbalization.fragments.base import (
-    PhraseFragment,
-    RoleFragment,
-    VerbFragment,
-)
+from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     references,
     single_hop_attr,
 )
+from krrood.entity_query_language.verbalization.grammar.conditions.verbalizer import (
+    ConditionVerbalizer,
+)
 from krrood.entity_query_language.verbalization.grammar.phrase_rule import Ctx
 from krrood.entity_query_language.verbalization.grammar.selection import SpecificityRule
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
-    build_between,
     RangeFold,
-)
-from krrood.entity_query_language.verbalization.operator_phrase import (
-    comparator_operator,
 )
 from krrood.entity_query_language.verbalization.subquery import aggregation_source_root
 
@@ -83,14 +78,7 @@ class RangeRestrictionRule(RestrictionRule):
 
     @classmethod
     def render(cls, item, subject_variable, ctx: Ctx) -> VerbFragment:
-        attr = single_hop_attr(item.chain_expression, subject_variable)
-        left = RoleFragment.for_attribute(attr._owner_class_, attr._attribute_name_)
-        return build_between(
-            left,
-            ctx.child(item.lower_expression),
-            ctx.child(item.upper_expression),
-            compact=False,
-        )
+        return ConditionVerbalizer(ctx).range_modifier(item, subject_variable)
 
 
 class AttributePredicateRestrictionRule(RestrictionRule):
@@ -110,14 +98,7 @@ class AttributePredicateRestrictionRule(RestrictionRule):
 
     @classmethod
     def render(cls, item, subject_variable, ctx: Ctx) -> VerbFragment:
-        attr = single_hop_attr(item.left, subject_variable)
-        attribute_fragment = RoleFragment.for_attribute(
-            attr._owner_class_, attr._attribute_name_
-        )
-        operator_fragment = comparator_operator(item, ctx.context, compact=False)
-        return PhraseFragment(
-            parts=[attribute_fragment, operator_fragment, ctx.child(item.right)]
-        )
+        return ConditionVerbalizer(ctx).attribute_modifier(item, subject_variable)
 
 
 def match_restriction(
