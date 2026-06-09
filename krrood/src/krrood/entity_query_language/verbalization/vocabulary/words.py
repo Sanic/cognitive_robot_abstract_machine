@@ -18,23 +18,13 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     VerbFragment,
     WordFragment,
 )
+from krrood.entity_query_language.verbalization.fragments.features import (  # noqa: F401  (re-export)
+    Number,
+)
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 
-
-class Number(Enum):
-    """
-    Grammatical **number** — the morphological feature a planner decides and the lexicon
-    inflects on (see ``for_number`` on the inflecting enums).  Replaces the bespoke
-    number ``Choice`` systems: agreement is plain morphology, not a dispatch.
-    """
-
-    SINGULAR = "singular"
-    PLURAL = "plural"
-
-    @classmethod
-    def of(cls, is_plural: bool) -> "Number":
-        """``PLURAL`` when *is_plural* else ``SINGULAR`` (bridges boolean plan features)."""
-        return cls.PLURAL if is_plural else cls.SINGULAR
+# ``Number`` is defined in ``fragments.features`` (below both this lexicon and the fragment
+# IR, to avoid a cycle) and re-exported here for the ``for_number`` selectors and importers.
 
 
 @dataclass(frozen=True)

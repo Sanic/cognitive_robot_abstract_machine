@@ -16,6 +16,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     VerbFragment,
     WordFragment,
 )
+from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
 
@@ -31,7 +32,12 @@ def phrase(*parts: VerbFragment, separator: str = " ") -> PhraseFragment:
 
 
 def role(
-    text: str, semantic_role: SemanticRole, source_ref: Optional[SourceRef] = None
+    text: str,
+    semantic_role: SemanticRole,
+    source_ref: Optional[SourceRef] = None,
+    number: Number = Number.SINGULAR,
 ) -> RoleFragment:
-    """Role-tagged (coloured / linkable) text fragment."""
-    return RoleFragment(text=text, role=semantic_role, source_ref=source_ref)
+    """Role-tagged (coloured / linkable) text fragment, optionally number-tagged."""
+    return RoleFragment(
+        text=text, role=semantic_role, source_ref=source_ref, number=number
+    )

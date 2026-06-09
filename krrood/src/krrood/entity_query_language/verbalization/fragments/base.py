@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import Callable, List, Optional, TypeVar
 
 from krrood.entity_query_language.verbalization import morphology
+from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
 
@@ -70,8 +71,15 @@ class RoleFragment(VerbFragment):
     :class:`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.SourceLinkResolver`
     to build hyperlinks."""
 
+    number: Number = Number.SINGULAR
+    """Grammatical number *feature* (not yet applied to :attr:`text`).  The
+    :class:`~krrood.entity_query_language.verbalization.rendering.morphology_processor.MorphologyProcessor`
+    pass pluralises the text of leaves tagged :attr:`Number.PLURAL`."""
+
     @classmethod
-    def for_variable(cls, label: str, expression) -> RoleFragment:
+    def for_variable(
+        cls, label: str, expression, number: Number = Number.SINGULAR
+    ) -> RoleFragment:
         """
         Build a fragment for a
         :class:`~krrood.entity_query_language.core.variable.Variable`,
@@ -88,6 +96,7 @@ class RoleFragment(VerbFragment):
             text=label,
             role=SemanticRole.VARIABLE,
             source_ref=SourceRef.for_type(getattr(expression, "_type_", None)),
+            number=number,
         )
 
     @classmethod
@@ -215,6 +224,42 @@ def fold_fragment(
             return block(fragment)
         case _:
             return word("")
+
+
+# ── Fragment transform (tree → tree) ────────────────────────────────────────────
+
+
+def map_fragment(
+    fragment: VerbFragment, leaf: Callable[[VerbFragment], VerbFragment]
+) -> VerbFragment:
+    """
+    Rebuild a :class:`VerbFragment` tree, replacing each **leaf** (``WordFragment`` /
+    ``RoleFragment``) by ``leaf(node)`` and reconstructing ``PhraseFragment`` /
+    ``BlockFragment`` structure around the transformed children.
+
+    The structural dual of :func:`fold_fragment` (which folds *to a value*): this maps a
+    tree *to a tree*, the recursion scheme a realisation pass (e.g. the
+    :class:`~krrood.entity_query_language.verbalization.rendering.morphology_processor.MorphologyProcessor`)
+    needs.  Fragments are immutable in spirit here — new nodes are returned, the input is
+    left untouched, so shared sub-trees (e.g. a reused coreference label) are safe.
+
+    :param fragment: Root of the tree to transform.
+    :param leaf: Transform applied to each leaf fragment (identity for unaffected leaves).
+    :return: The rebuilt tree.
+    :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
+    """
+    match fragment:
+        case PhraseFragment(parts=parts, separator=separator):
+            return PhraseFragment(
+                parts=[map_fragment(p, leaf) for p in parts], separator=separator
+            )
+        case BlockFragment(header=header, items=items):
+            return BlockFragment(
+                header=None if header is None else map_fragment(header, leaf),
+                items=[map_fragment(i, leaf) for i in items],
+            )
+        case _:
+            return leaf(fragment)
 
 
 # ── Fragment flattening ────────────────────────────────────────────────────────
