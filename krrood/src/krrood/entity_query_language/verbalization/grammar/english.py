@@ -63,6 +63,9 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     is_bool_attr_chain,
 )
+from krrood.entity_query_language.verbalization.grammar.conditions.verbalizer import (
+    ConditionVerbalizer,
+)
 from krrood.entity_query_language.verbalization.grammar.phrase_rule import (
     Ctx,
     PhraseRule,
@@ -75,10 +78,6 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 )
 from krrood.entity_query_language.verbalization.microplanning.referring import (
     ArticleSelection,
-)
-from krrood.entity_query_language.verbalization.operator_phrase import (
-    comparator_operator,
-    comparator_phrase,
 )
 from krrood.entity_query_language.verbalization.grammar.assembly.chains import (
     ChainAssembler,
@@ -132,11 +131,7 @@ class ComparatorRule(PhraseRule):
     name = "comparator"
 
     def build(self, node, ctx: Ctx):
-        return phrase(
-            ctx.child(node.left),
-            comparator_operator(node, ctx.context),
-            ctx.child(node.right),
-        )
+        return ConditionVerbalizer(ctx).predicate(node)
 
 
 # ── variables ──────────────────────────────────────────────────────────────────
@@ -272,7 +267,7 @@ class NotComparatorRule(PhraseRule):
         return isinstance(node._child_, Comparator)
 
     def build(self, node, ctx: Ctx):
-        return comparator_phrase(node._child_, ctx.context, ctx.child, negated=True)
+        return ConditionVerbalizer(ctx).predicate(node._child_, negated=True)
 
 
 class NotBoolAttrRule(PhraseRule):

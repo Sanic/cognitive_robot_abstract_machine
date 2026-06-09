@@ -1,23 +1,22 @@
 """
-Comparator operator/phrase rendering — the single source of truth for turning a
-:class:`~krrood.entity_query_language.operators.comparator.Comparator` into English.
-
-:func:`comparator_operator` returns the operator fragment only (e.g. *"is greater than"*);
-:func:`comparator_phrase` renders the full *"<left> <operator> <right>"* phrase.
+Comparator **operator** selection — the single source of truth for the operator phrase of
+a :class:`~krrood.entity_query_language.operators.comparator.Comparator` (e.g. *"is greater
+than"*, *"is not equal to"*, *"is before"*).  The full *"<left> <operator> <right>"* phrase
+is assembled by
+:meth:`~krrood.entity_query_language.verbalization.grammar.conditions.verbalizer.ConditionVerbalizer.predicate`.
 """
 
 from __future__ import annotations
 
 import operator
 from typing import TYPE_CHECKING
-from typing_extensions import Callable, Optional
+from typing_extensions import Optional
 
 from krrood.entity_query_language.verbalization.chain_utils import is_temporal
 from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     VerbFragment,
 )
-from krrood.entity_query_language.verbalization.fragments.factory import phrase
 from krrood.entity_query_language.verbalization.subquery import is_calculation_value
 from krrood.entity_query_language.verbalization.vocabulary.english import Operators
 
@@ -75,30 +74,3 @@ def comparator_operator(
     except KeyError:
         name = comparator._name_
         return RoleFragment.for_operator(f"not {name}" if negated else name)
-
-
-def comparator_phrase(
-    comparator: Comparator,
-    context: VerbalizationContext,
-    build_fn: Callable,
-    *,
-    negated: bool = False,
-) -> VerbFragment:
-    """
-    Render *comparator* as the full *"<left> <operator> <right>"* phrase.
-
-    Operands are built first (preserving coreference order), then the operator is
-    selected via :func:`comparator_operator`.
-
-    :param comparator: The comparator expression.
-    :param context: Shared verbalization state.
-    :param build_fn: The single-argument recursion continuation (``ctx.child``) used to
-        build the operand sub-expressions.
-    :param negated: Outer negation (from a wrapping ``Not``).
-    :return: The comparison phrase fragment.
-    :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
-    """
-    left = build_fn(comparator.left)
-    right = build_fn(comparator.right)
-    op = comparator_operator(comparator, context, negated=negated)
-    return phrase(left, op, right)
