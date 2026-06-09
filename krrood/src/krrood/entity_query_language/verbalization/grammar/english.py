@@ -27,6 +27,7 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.core.variable import (
     ExternallySetVariable,
+    InstantiatedVariable,
     Literal,
     Variable,
 )
@@ -118,6 +119,10 @@ from krrood.entity_query_language.verbalization.rules.inference_rule import (
     _verbalize_rule_if_,
     _verbalize_rule_then_,
 )
+from krrood.entity_query_language.verbalization.rules.variables import (
+    _has_verbalization_template,
+    _verbalize_instantiated_natural,
+)
 
 #: Maps each standard aggregator subtype to its lexicon phrase.
 _AGGREGATION_KIND = {
@@ -144,6 +149,9 @@ class _FoldVerbalizer:
 
     def build(self, expression, context=None) -> VerbFragment:
         return self.ctx.child(expression)
+
+    def verbalize(self, expression, context=None) -> str:
+        return flatten_fragment_to_plain_text(self.ctx.child(expression))
 
 
 def _is_bool_attr_chain(expression) -> bool:
@@ -569,6 +577,38 @@ class OrderedByRule(PhraseRule):
         return _verbalize_ordered_by(node, ctx.context, _FoldVerbalizer(ctx))
 
 
+# ── instantiated variable ────────────────────────────────────────────────────
+
+
+class InstantiatedVariableRule(PhraseRule):
+    """*"a TypeName where the field of the TypeName is … such that …"*."""
+
+    construct = InstantiatedVariable
+    name = "instantiated-variable"
+
+    def build(self, node, ctx: Ctx):
+        return _verbalize_instantiated_natural(node, ctx.context, _FoldVerbalizer(ctx))
+
+
+class InstantiatedVerbalizableRule(PhraseRule):
+    """An InstantiatedVariable whose type supplies a verbalization template string."""
+
+    construct = InstantiatedVariable
+    name = "instantiated-verbalizable"
+
+    def when(self, node, ctx: Ctx):
+        return _has_verbalization_template(node)
+
+    def build(self, node, ctx: Ctx):
+        verbalizer = _FoldVerbalizer(ctx)
+        template = node._type_._verbalization_template_()
+        kwargs = {
+            name: verbalizer.verbalize(child)
+            for name, child in node._child_vars_.items()
+        }
+        return word(template.format(**kwargs))
+
+
 # ── the full grammar (one instance per rule) ─────────────────────────────────────
 
 RULES: List[PhraseRule] = [
@@ -597,4 +637,6 @@ RULES: List[PhraseRule] = [
     FilterRule(),
     GroupedByRule(),
     OrderedByRule(),
+    InstantiatedVariableRule(),
+    InstantiatedVerbalizableRule(),
 ]
