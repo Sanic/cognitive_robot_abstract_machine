@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing_extensions import Dict, List, Tuple
 
 from krrood.entity_query_language.core.variable import InstantiatedVariable
-from krrood.entity_query_language.verbalization.chain_utils import verbalize_plural
+from krrood.entity_query_language.verbalization.grammar.agreement import noun_phrase
 from krrood.entity_query_language.verbalization.fragments.base import (
     oxford_and,
     PhraseFragment,
@@ -103,9 +103,12 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         return Copulas.for_number(Number.of(binding.is_plural)).as_fragment()
 
     def _value(self, binding: BindingPlan) -> VerbFragment:
-        if binding.is_plural:
-            return verbalize_plural(binding.value, self.ctx.context, self.ctx.child)
-        return self.ctx.child(binding.value)
+        return noun_phrase(
+            binding.value,
+            Number.of(binding.is_plural),
+            self.ctx.context,
+            self.ctx.child,
+        )
 
     # ── phrase assembly ──────────────────────────────────────────────────────────
 

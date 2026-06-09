@@ -18,13 +18,14 @@ from __future__ import annotations
 from typing_extensions import Any, Optional
 
 from krrood.entity_query_language.query.query import SetOf
-from krrood.entity_query_language.verbalization.chain_utils import verbalize_plural
 from krrood.entity_query_language.verbalization.fragments.base import (
     oxford_and,
     PhraseFragment,
     VerbFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.factory import phrase, word
+from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.grammar.agreement import noun_phrase
 from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
 from krrood.entity_query_language.verbalization.grammar.planning.clauses import (
     GroupedByPlanner,
@@ -49,7 +50,7 @@ class GroupedByAssembler(Assembler[Any, GroupPlan]):
             return Keywords.GROUPED.as_fragment()
         groups_phrase = self._keys_phrase(plan.keys)
         aggregated_frags = [
-            verbalize_plural(expr, self.ctx.context, self.ctx.child)
+            noun_phrase(expr, Number.PLURAL, self.ctx.context, self.ctx.child)
             for expr in plan.aggregated
         ]
         if aggregated_frags and not isinstance(node, SetOf):

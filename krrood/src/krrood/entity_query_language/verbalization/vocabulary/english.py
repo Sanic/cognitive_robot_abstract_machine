@@ -131,14 +131,17 @@ class CommonGroupKeyWord(PlainWord):
     Used in the THEN clause when a consequent binding refers to a GROUP BY key.
     """
 
-    def build_phrase(self, field_name: str, plural_root: str) -> VerbFragment:
+    def build_phrase(self, field_name: str, root: str) -> VerbFragment:
         """
-        Build *"the common <field_name> of the <plural_root>"*.
+        Build *"the common <field_name> of the <plural root>"*.
+
+        The root type name is pluralised here (this fixed lexicon frame owns its own
+        inflection, like the existential frames).
 
         :param field_name: Name of the grouped field (e.g. ``"location"``).
         :type field_name: str
-        :param plural_root: Plural root type name (e.g. ``"Robots"``).
-        :type plural_root: str
+        :param root: Singular root type name (e.g. ``"Robot"``); pluralised internally.
+        :type root: str
         :return: Phrase fragment.
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
         """
@@ -147,7 +150,7 @@ class CommonGroupKeyWord(PlainWord):
                 self.as_fragment(),
                 WordFragment(text=field_name),
                 Prepositions.OF_THE.as_fragment(),
-                WordFragment(text=plural_root),
+                WordFragment(text=morphology.ensure_plural(root)),
             ],
         )
 

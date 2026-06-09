@@ -19,10 +19,8 @@ from typing_extensions import List
 
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.query.query import Entity
-from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.chain_utils import (
     build_path_parts,
-    verbalize_plural,
     walk_chain,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -30,6 +28,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     VerbFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.factory import phrase
+from krrood.entity_query_language.verbalization.grammar.agreement import noun_phrase
 from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
 from krrood.entity_query_language.verbalization.grammar.conditions.verbalizer import (
     ConditionVerbalizer,
@@ -127,10 +126,8 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         )
 
     def _value(self, expression, number: Number) -> VerbFragment:
-        """Render a value expression in the given number (plural folds the chain)."""
-        if number is Number.PLURAL:
-            return verbalize_plural(expression, self.ctx.context, self.ctx.child)
-        return self.ctx.child(expression)
+        """Render a value expression agreeing with *number*."""
+        return noun_phrase(expression, number, self.ctx.context, self.ctx.child)
 
     # ── THEN clause ───────────────────────────────────────────────────────────
 
@@ -156,13 +153,19 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         ):
             return phrase(
                 Articles.THE.as_fragment(),
-                verbalize_plural(
-                    binding.value_expression, self.ctx.context, self.ctx.child
+                noun_phrase(
+                    binding.value_expression,
+                    Number.PLURAL,
+                    self.ctx.context,
+                    self.ctx.child,
                 ),
             )
         if binding.is_plural_field:
-            return verbalize_plural(
-                binding.value_expression, self.ctx.context, self.ctx.child
+            return noun_phrase(
+                binding.value_expression,
+                Number.PLURAL,
+                self.ctx.context,
+                self.ctx.child,
             )
         if binding.aggregation_status == AggregationStatus.GROUP_KEY:
             return self._group_key_value(binding.value_expression)
@@ -177,8 +180,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
             if getattr(current, "_type_", None)
             else FallbackNouns.ENTITY.text
         )
-        root_plural = morphology.plural(root_type)
         self.ctx.refer.register_label(current, root_type)
         parts = build_path_parts(chain)
         field = list(reversed(parts))[0][0] if parts else root_type
-        return GroupKeyPhrases.COMMON_OF.build_phrase(field, root_plural)
+        return GroupKeyPhrases.COMMON_OF.build_phrase(field, root_type)

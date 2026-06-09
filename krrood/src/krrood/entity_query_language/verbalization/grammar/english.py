@@ -43,7 +43,6 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
 from krrood.entity_query_language.verbalization.chain_utils import (
     chain_root,
-    verbalize_plural,
     walk_chain,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -58,6 +57,8 @@ from krrood.entity_query_language.verbalization.fragments.factory import (
     role,
     word,
 )
+from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.grammar.agreement import noun_phrase
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     is_bool_attr_chain,
@@ -353,7 +354,9 @@ class AggregatorRule(PhraseRule):
                 child_fragment,
             )
         else:
-            child_fragment = verbalize_plural(node._child_, ctx.context, ctx.child)
+            child_fragment = noun_phrase(
+                node._child_, Number.PLURAL, ctx.context, ctx.child
+            )
             result = phrase(
                 Articles.THE.as_fragment(), aggregation_fragment, child_fragment
             )
@@ -383,7 +386,9 @@ class ForAllRule(PhraseRule):
     name = "for-all"
 
     def build(self, node, ctx: Ctx):
-        variable_fragment = verbalize_plural(node.variable, ctx.context, ctx.child)
+        variable_fragment = noun_phrase(
+            node.variable, Number.PLURAL, ctx.context, ctx.child
+        )
         condition_fragment = ctx.child(node.condition)
         return phrase(
             Logicals.FOR_ALL.as_fragment(),
