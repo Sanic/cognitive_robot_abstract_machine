@@ -1,4 +1,8 @@
 from typing import List, Optional
+
+#from probabilistic_model.scripts.gmm import result
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Fruit, Apple, Food, Carrot, Banana
+
 from krrood.entity_query_language.factories import variable_from, entity, contains, variable, \
     an, and_, exists, not_, set_of, type_
 from krrood.entity_query_language.query.query import Entity
@@ -17,6 +21,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     SemanticAnnotation,
 )
+from test.conftest import kitchen_environment_fixture
 
 
 def semantic_annotations_on_surfaces(
@@ -171,3 +176,24 @@ def sort_annotations_by_volume(annotations: List[HasRootBody], order: Optional[b
             return 0.0
 
     return entity(annotaion_var).ordered_by(get_volume(annotaion_var), descending=not order)
+
+# world1 = kitchen_environment_fixture()
+# table1 = world1.get_semantic_annotation_by_name("fruit_table")
+# table2 = world1.get_semantic_annotation_by_name("vegetable_table")
+# table3 = world1.get_semantic_annotation_by_name("empty_table")
+#
+# banana = world1.get_semantic_annotation_by_name("banana")
+#
+# print(goal_surface_of_object(banana, [table1, table2, table3]))
+
+
+# a = True
+# b = True
+# c = True
+#
+# if not (a and b and c):
+#     print("test")
+# else:
+#     print("test2")
+#
+# print(issubclass(Banana, Apple))
