@@ -62,10 +62,19 @@ class DeterminerProcessor:
 
     def _lower(self, np: NounPhrase) -> VerbFragment:
         head = self._agree_head(self.process(np.head), np.number)
-        modifiers = [self.process(m) for m in np.modifiers]
         determiner = self._determiner(np.definiteness, np.number, head)
-        parts = [*([determiner] if determiner is not None else []), head, *modifiers]
-        return parts[0] if len(parts) == 1 else PhraseFragment(parts=parts)
+        head_group_parts = [*([determiner] if determiner is not None else []), head]
+        head_group = (
+            head_group_parts[0]
+            if len(head_group_parts) == 1
+            else PhraseFragment(parts=head_group_parts)
+        )
+        if not np.modifiers:
+            return head_group
+        modifiers = [self.process(m) for m in np.modifiers]
+        return PhraseFragment(
+            parts=[head_group, *modifiers], separator=np.modifier_separator
+        )
 
     @staticmethod
     def _agree_head(head: VerbFragment, number: Number) -> VerbFragment:

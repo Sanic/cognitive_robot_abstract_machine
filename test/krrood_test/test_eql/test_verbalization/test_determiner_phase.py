@@ -96,6 +96,16 @@ def test_modifiers_follow_the_head():
     assert _realised(np) == "drawers of Cabinets"
 
 
+def test_modifier_separator_empty_attaches_appositive_clause():
+    # a clause-bearing referring NP: "a Robot" + ", where ..." with no spurious space
+    np = NounPhrase(
+        head=_noun("Robot"),
+        modifiers=[WordFragment(text=", where it works")],
+        modifier_separator="",
+    )
+    assert _realised(np) == "a Robot, where it works"
+
+
 def test_pass_lowers_nested_noun_phrases_inside_a_phrase():
     tree = PhraseFragment(
         parts=[

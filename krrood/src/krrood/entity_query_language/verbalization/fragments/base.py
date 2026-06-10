@@ -186,6 +186,11 @@ class NounPhrase(VerbFragment):
     modifiers: List[VerbFragment] = field(default_factory=list)
     """Post-modifiers following the head (e.g. *"of the Root"*, *"where … such that …"*)."""
 
+    modifier_separator: str = " "
+    """Separator between the determiner+head group and the :attr:`modifiers`.  Default ``" "``
+    (*"drawers of Cabinets"*); ``""`` lets an appositive clause attach without a spurious space
+    (*"a Robot"* + *", where …"* → *"a Robot, where …"*)."""
+
     referent_id: Optional[uuid.UUID] = None
     """When set, this NP is a **referring expression** for that entity.  :attr:`definiteness`
     then holds the *first-mention* form; the
