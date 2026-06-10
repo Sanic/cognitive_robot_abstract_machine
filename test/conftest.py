@@ -116,6 +116,14 @@ The structure of fixtures in this conftest:
 """
 
 
+def pytest_configure(config):
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+
+    if worker:
+        worker_num = int(worker.removeprefix("gw"))
+        os.environ["ROS_DOMAIN_ID"] = str(100 + worker_num)
+
+
 @pytest.fixture(autouse=True, scope="function")
 def cleanup_after_test():
     # We need to pass the class diagram, since otherwise some names are not found anymore after clearing the symbol graph
