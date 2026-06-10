@@ -108,7 +108,10 @@ def fold_range_pairs(conjuncts: List) -> List[Union[SymbolicExpression, RangeFol
     :class:`RangeFold` items, preserving the order of everything else.
 
     Direction (not position) decides which operand is the lower vs upper bound, so
-    ``t.x <= hi`` written before ``t.x >= lo`` still yields ``between lo and hi``.
+    ``t.x <= hi`` written before ``t.x >= lo`` still yields ``between lo and hi``.  A single
+    forward pass keeps, per chain, a queue of bounds still awaiting their complement (always
+    one direction at a time — an opposite bound folds rather than enqueues).  The fold replaces
+    the *earlier* member's slot and drops the later one, so output order is the input order.
 
     :param conjuncts: A flat list of conjuncts (e.g. the operands of an ``AND``).
     :return: A list whose items are either the original expressions or
@@ -116,41 +119,32 @@ def fold_range_pairs(conjuncts: List) -> List[Union[SymbolicExpression, RangeFol
     :rtype: list
     """
     infos = [_classify(conjunct) for conjunct in conjuncts]
-    used: set = set()
-    result: List[Union[SymbolicExpression, RangeFold]] = []
-    for i, conjunct in enumerate(conjuncts):
-        if i in used:
-            continue
-        info = infos[i]
+    slots: List[Union[SymbolicExpression, RangeFold]] = list(conjuncts)
+    dropped = [False] * len(conjuncts)
+    # chain_key -> indices of bounds awaiting a complement (always one direction at a time).
+    awaiting: dict = {}
+    for i, info in enumerate(infos):
         if info is None:
-            result.append(conjunct)
             continue
-        key_i, bound_i = info
-        partner = None
-        for j in range(i + 1, len(conjuncts)):
-            if j in used or infos[j] is None:
-                continue
-            key_j, bound_j = infos[j]
-            if key_j == key_i and bound_j is not bound_i:
-                partner = j
-                break
-        if partner is None:
-            result.append(conjunct)
-            continue
-        used.add(partner)
-        lower, upper = (
-            (conjunct, conjuncts[partner])
-            if bound_i is _Bound.LOWER
-            else (conjuncts[partner], conjunct)
-        )
-        result.append(
-            RangeFold(
+        key, bound = info
+        queue = awaiting.setdefault(key, [])
+        # A waiting bound of the opposite direction → fold the pair; else enqueue and wait.
+        if queue and infos[queue[0]][1] is not bound:
+            j = queue.pop(0)
+            lower, upper = (
+                (conjuncts[j], conjuncts[i])
+                if bound is _Bound.UPPER
+                else (conjuncts[i], conjuncts[j])
+            )
+            slots[min(i, j)] = RangeFold(
                 chain_expression=lower.left,
                 lower_expression=lower.right,
                 upper_expression=upper.right,
             )
-        )
-    return result
+            dropped[max(i, j)] = True
+        else:
+            queue.append(i)
+    return [slot for index, slot in enumerate(slots) if not dropped[index]]
 
 
 def has_pair(conjuncts: List) -> bool:
