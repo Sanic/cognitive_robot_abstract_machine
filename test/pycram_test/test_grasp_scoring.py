@@ -35,10 +35,10 @@ def object_tree(object_mesh):
 def gripper_mesh():
     """Creates a simple parallel-jaw gripper out of two box-shaped fingers."""
     finger1 = trimesh.creation.box(extents=[0.02, 0.02, 0.1])
-    finger1.apply_translation([0, 0.06, 0])
+    finger1.apply_translation([0, 0.065, 0])
     
     finger2 = trimesh.creation.box(extents=[0.02, 0.02, 0.1])
-    finger2.apply_translation([0, -0.06, 0])
+    finger2.apply_translation([0, -0.065, 0])
     
     return trimesh.util.concatenate([finger1, finger2])
 
@@ -72,11 +72,11 @@ def test_calculate_grasp_score_clearance(gripper_mesh, object_mesh, object_tree)
 def test_calculate_grasp_score_good_grasp(gripper_mesh, object_mesh, object_tree):
     """Tests the stability analysis on a completely valid grasp without collisions."""
     # Position the gripper perfectly around the object. 
-    # Fingers are at y=+-0.06, which clears the object (y ends at +-0.05).
+    # Fingers are at y=+-0.065, which clears the object (y ends at +-0.05).
     grasp_pose = Pose(Point3(0.0, 0.0, 0.05), Quaternion())
     
     score = scorer.calculate_grasp_score(grasp_pose, gripper_mesh, object_mesh, object_tree)
-    # Since the internal rays from y=+-0.06 pointing inwards will intersect the 
+    # Since the internal rays from local y=+-0.06 pointing inwards will intersect the 
     # object and give normal and distance scores, the score should be positive.
     assert score > 0.0
 

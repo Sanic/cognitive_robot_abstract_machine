@@ -121,12 +121,24 @@ class GraspScorer:
             ray_origins=ray_origins_world, ray_directions=ray_directions_world
         )
 
+        contact_points = []
+        contact_normals = []
+        
+        for i in range(len(ray_origins_world)):
+            mask = (index_ray == i)
+            if np.any(mask):
+                locs = locations[mask]
+                tris = index_triangle[mask]
+                dists = np.linalg.norm(locs - ray_origins_world[i], axis=1)
+                closest_idx = np.argmin(dists)
+                contact_points.append(locs[closest_idx])
+                contact_normals.append(object_mesh.face_normals[tris[closest_idx]])
+
         # Grade the contact instead of pass/fail
-        if len(locations) == 2:
+        if len(contact_points) == 2:
             # IDEAL CASE: Two contacts found, calculate a full, detailed score.
-            contact_p1, contact_p2 = locations
-            normal_p1 = object_mesh.face_normals[index_triangle[0]]
-            normal_p2 = object_mesh.face_normals[index_triangle[1]]
+            contact_p1, contact_p2 = contact_points
+            normal_p1, normal_p2 = contact_normals
 
             normal_score = max(0.0, -np.dot(normal_p1, normal_p2))
             distance_score = np.linalg.norm(contact_p1 - contact_p2)
@@ -135,7 +147,7 @@ class GraspScorer:
             positive_score = (self.weight_normal * normal_score) + (self.weight_distance * distance_score) + (self.weight_clearance * clearance_score)
             total_score += positive_score
 
-        elif len(locations) == 1:
+        elif len(contact_points) == 1:
             # GOOD ENOUGH CASE: One contact found. Give a small, fixed bonus.
             total_score += self.score_partial_contact
         else:
