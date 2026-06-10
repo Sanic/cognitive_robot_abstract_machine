@@ -14,7 +14,7 @@ jupyter:
 ---
 
 # Motion Planning with Graphs of Convex Sets
-This notebook shows how CoraPlexs Graph of Convex Sets (GCS) functionality can be used to plan an end effector path in a complex environment and how to execute that path.
+This notebook shows how CoraPlex's Graph of Convex Sets (GCS) functionality can be used to plan an end effector path in a complex environment and how to execute that path.
 Paths will be represented as sequences of waypoints. To execute a sequence of waypoints as one motion the MoveTCPWaypointsMotion Designator is introduced which leverages [Giskard](https://github.com/SemRoCo/giskardpy) to calculate the motion of the robot. To follow the below examples Giskard should be started with this command `roslaunch giskardpy giskardpy_pr2_standalone.launch`.
 The following three cells initilaize the CoraPlex world with a kitchen environment and the PR2 robot, and sync it with the world of Giskard. Then a large drawer is opened, the robot is teleported close to that drawer and it's arms are parked.
 
