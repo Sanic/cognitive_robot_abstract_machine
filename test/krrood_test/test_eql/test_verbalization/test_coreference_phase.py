@@ -17,9 +17,16 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     SubjectScope,
     WordFragment,
 )
+from krrood.entity_query_language.verbalization.fragments.features import (
+    Definiteness,
+    Number,
+)
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.rendering.coreference_processor import (
     CoreferenceProcessor,
+)
+from krrood.entity_query_language.verbalization.rendering.determiner_processor import (
+    DeterminerProcessor,
 )
 
 
@@ -62,3 +69,64 @@ def test_recurses_into_noun_phrase_modifiers():
     out = CoreferenceProcessor().process(np)
     assert isinstance(out, NounPhrase)
     assert isinstance(out.modifiers[1], NounPhrase)  # nested NP preserved, recursed
+
+
+# ── referring resolution (first / repeat / numbered) ─────────────────────────────
+
+
+def _realise(fragment) -> str:
+    """Coreference then determiner phase → plain text (the pipeline's first two stages)."""
+    resolved = CoreferenceProcessor().process(fragment)
+    return flatten_fragment_to_plain_text(DeterminerProcessor().process(resolved))
+
+
+def test_repeat_mention_is_downgraded_to_definite():
+    rid = uuid.uuid4()
+    tree = PhraseFragment(
+        parts=[
+            NounPhrase(head=_noun("Robot"), referent_id=rid),  # first → "a Robot"
+            WordFragment(text="and"),
+            NounPhrase(head=_noun("Robot"), referent_id=rid),  # repeat → "the Robot"
+        ]
+    )
+    assert _realise(tree) == "a Robot and the Robot"
+
+
+def test_first_mention_modifiers_dropped_on_repeat():
+    rid = uuid.uuid4()
+    full = NounPhrase(
+        head=_noun("Robot"),
+        referent_id=rid,
+        modifiers=[WordFragment(text="of"), _noun("Cabinet")],  # "a Robot of Cabinet"
+    )
+    repeat = NounPhrase(head=_noun("Robot"), referent_id=rid)
+    tree = PhraseFragment(parts=[full, WordFragment(text="and"), repeat])
+    assert _realise(tree) == "a Robot of Cabinet and the Robot"
+
+
+def test_numbered_referent_never_downgrades():
+    rid = uuid.uuid4()
+    tree = PhraseFragment(
+        parts=[
+            NounPhrase(
+                head=_noun("Robot 2"), definiteness=Definiteness.BARE, referent_id=rid
+            ),
+            WordFragment(text="and"),
+            NounPhrase(
+                head=_noun("Robot 2"), definiteness=Definiteness.BARE, referent_id=rid
+            ),
+        ]
+    )
+    assert _realise(tree) == "Robot 2 and Robot 2"
+
+
+def test_distinct_referents_do_not_interfere():
+    a, b = uuid.uuid4(), uuid.uuid4()
+    tree = PhraseFragment(
+        parts=[
+            NounPhrase(head=_noun("Robot"), referent_id=a),
+            WordFragment(text="and"),
+            NounPhrase(head=_noun("Cabinet"), referent_id=b),
+        ]
+    )
+    assert _realise(tree) == "a Robot and a Cabinet"

@@ -152,6 +152,7 @@ class VariableRule(PhraseRule):
         return NounPhrase(
             head=RoleFragment.for_variable(label, node),
             definiteness=definiteness,
+            referent_id=node._id_,
         )
 
     @staticmethod
@@ -170,6 +171,7 @@ class VariableRule(PhraseRule):
             head=RoleFragment.for_variable(label, node),
             number=Number.SINGULAR if numbered else Number.PLURAL,
             definiteness=Definiteness.BARE if numbered else Definiteness.INDEFINITE,
+            referent_id=node._id_,
         )
 
 

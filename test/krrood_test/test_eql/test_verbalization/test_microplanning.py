@@ -40,16 +40,18 @@ class Robot:
 # ── ReferringExpressions ─────────────────────────────────────────────────────
 
 
-def test_noun_for_parts_first_then_subsequent_mention():
+def test_noun_for_parts_returns_first_mention_form_and_records():
     refer = ReferringExpressions()
     var = variable(Robot, domain=[])
 
     definiteness, label = refer.noun_for_parts(var)
     assert (definiteness, label) == (Definiteness.INDEFINITE, "Robot")
+    assert var._id_ in refer.seen  # mention recorded for the build-time services
 
-    # Second mention of the same variable becomes definite.
+    # The subsequent-mention downgrade now lives in the CoreferenceProcessor, so
+    # noun_for_parts keeps returning the first-mention (indefinite) form.
     definiteness, label = refer.noun_for_parts(var)
-    assert (definiteness, label) == (Definiteness.DEFINITE, "Robot")
+    assert (definiteness, label) == (Definiteness.INDEFINITE, "Robot")
 
 
 def test_noun_for_parts_numbered_variable_takes_no_article():

@@ -13,6 +13,9 @@ Reference: Gatt & Reiter (2009), SimpleNLG — the ordered realisation stages.
 
 from __future__ import annotations
 
+import uuid
+from typing import Iterable, Optional
+
 from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
     VerbFragment,
@@ -32,10 +35,15 @@ _DETERMINER = DeterminerProcessor()
 _MORPHOLOGY = MorphologyProcessor()
 
 
-def realize_tree(fragment: VerbFragment) -> VerbFragment:
+def realize_tree(
+    fragment: VerbFragment,
+    already_seen: Optional[Iterable[uuid.UUID]] = None,
+) -> VerbFragment:
     """Run the ordered realisation passes over *fragment*: coreference resolution → DP lowering
-    → morphology."""
-    return _MORPHOLOGY.process(_DETERMINER.process(_COREFERENCE.process(fragment)))
+    → morphology.  *already_seen* carries referents introduced by prior builds on a shared
+    context (see :meth:`CoreferenceProcessor.process`)."""
+    resolved = _COREFERENCE.process(fragment, already_seen=already_seen)
+    return _MORPHOLOGY.process(_DETERMINER.process(resolved))
 
 
 def realize_subtree(fragment: VerbFragment) -> str:

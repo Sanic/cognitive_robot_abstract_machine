@@ -109,6 +109,7 @@ class ChainAssembler(Assembler[MappedVariable, None]):
             head=RoleFragment.for_variable(label, root),
             number=Number.SINGULAR if numbered else Number.PLURAL,
             definiteness=Definiteness.BARE if numbered else Definiteness.INDEFINITE,
+            referent_id=root._id_,
         )
         return NounPhrase(
             head=RoleFragment.for_attribute(

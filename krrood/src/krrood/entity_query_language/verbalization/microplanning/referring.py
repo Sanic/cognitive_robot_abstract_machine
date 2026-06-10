@@ -225,16 +225,20 @@ class ReferringExpressions:
 
     def noun_for_parts(self, var) -> tuple[Definiteness, str]:
         """
-        Return ``(Definiteness, label)`` for *var* — the coreference decision, expressed
-        directly as the realisation feature the determiner phase consumes.
+        Return the **first-mention** ``(Definiteness, label)`` for *var* — a numbered variable
+        (*"Robot 2"*) is ``BARE``, any other is ``INDEFINITE`` (*"a Robot"*).
 
-        Consults :attr:`disambiguation_map` for the display label, then :attr:`seen`
-        for first vs. subsequent mention, recording the mention as a side effect: a
-        numbered variable (*"Robot 2"*) is ``BARE``, a first mention ``INDEFINITE``
-        (*"a Robot"*), a subsequent mention ``DEFINITE`` (*"the Robot"*).
+        The *subsequent*-mention downgrade to definite is no longer decided here: the caller
+        stamps the resulting :class:`~krrood.entity_query_language.verbalization.fragments.base.NounPhrase`
+        with a ``referent_id`` and the
+        :class:`~krrood.entity_query_language.verbalization.rendering.coreference_processor.CoreferenceProcessor`
+        downgrades repeats in document order (the discourse decision, in one place).  The mention
+        is still recorded in :attr:`seen` because the build-time pronoun / definite-reference
+        services (``pronoun_for``, ``seen_reference`` for not-yet-deferred constructs) still
+        consult it.
 
         :param var: A :class:`~krrood.entity_query_language.core.variable.Variable` instance.
-        :return: Tuple of ``(Definiteness, display_label)``.
+        :return: Tuple of ``(first-mention Definiteness, display_label)``.
         :rtype: tuple
         """
         type_name = (
@@ -244,7 +248,6 @@ class ReferringExpressions:
         )
         label = self.disambiguation_map.get(var._id_, type_name)
         is_numbered = label != type_name
-        if var._id_ in self.seen:
-            return (Definiteness.BARE if is_numbered else Definiteness.DEFINITE), label
-        self.seen[var._id_] = RoleFragment(text=label, role=SemanticRole.VARIABLE)
+        if var._id_ not in self.seen:
+            self.seen[var._id_] = RoleFragment(text=label, role=SemanticRole.VARIABLE)
         return (Definiteness.BARE if is_numbered else Definiteness.INDEFINITE), label

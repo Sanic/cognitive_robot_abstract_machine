@@ -65,7 +65,12 @@ class EQLVerbalizer:
         """
         if context is None:
             context = VerbalizationContext.from_expression(expression)
-        return realize_tree(fold(expression, context, ALL_PHRASE_RULES))
+        # Referents already introduced by prior builds on this (shared) context, so the same
+        # expression verbalized twice reads "a Robot" then "the Robot".  Snapshot BEFORE the
+        # fold, which records this build's own mentions in the same set.
+        already_seen = set(context.seen.keys())
+        fragment = fold(expression, context, ALL_PHRASE_RULES)
+        return realize_tree(fragment, already_seen=already_seen)
 
     def verbalize(
         self,

@@ -22,7 +22,7 @@ Gatt & Reiter (2009), SimpleNLG — ordered realisation stages.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import List, Optional
+from typing import Iterable, List, Optional
 import uuid
 
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -32,14 +32,28 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     SubjectScope,
     VerbFragment,
 )
+from krrood.entity_query_language.verbalization.fragments.features import (
+    Definiteness,
+    Number,
+)
 
 
 class CoreferenceProcessor:
     """Resolve every referring :class:`NounPhrase` in document order (first / repeat / pronoun)."""
 
-    def process(self, fragment: VerbFragment) -> VerbFragment:
-        """Return a new tree with referring NPs resolved and ``SubjectScope`` markers stripped."""
-        self._seen: set[uuid.UUID] = set()
+    def process(
+        self,
+        fragment: VerbFragment,
+        already_seen: Optional[Iterable[uuid.UUID]] = None,
+    ) -> VerbFragment:
+        """
+        Return a new tree with referring NPs resolved and ``SubjectScope`` markers stripped.
+
+        :param already_seen: Referents introduced by *prior* builds sharing the same context
+            (so the same expression verbalized twice against one context reads *"a Robot"* then
+            *"the Robot"*).  These are treated as already-mentioned before the walk begins.
+        """
+        self._seen: set[uuid.UUID] = set(already_seen or ())
         self._subject_stack: List[Optional[uuid.UUID]] = []
         return self._walk(fragment)
 
@@ -67,9 +81,37 @@ class CoreferenceProcessor:
                 return fragment
 
     def _noun_phrase(self, np: NounPhrase) -> VerbFragment:
-        """Recurse structurally through an NP's head and modifiers (discourse resolution is
-        layered on in later steps; a non-referring NP is just rebuilt around its children).
+        """Resolve a referring NP (first / repeat) in document order; recurse otherwise.
+
+        Every mention (singular or plural) marks its referent introduced.  Only a **repeat
+        singular** mention is downgraded to a definite reference — dropping the first-mention
+        modifiers and keeping the head label (*"a Robot, where …"* → *"the Robot"*).  A plural
+        mention (*"Robots"*) only introduces the referent (it never carries an article), and a
+        ``BARE`` numbered label (*"Robot 2"*) never downgrades.  A non-referring NP is just
+        rebuilt around its (recursed) children.
         """
-        head = self._walk(np.head)
-        modifiers = [self._walk(m) for m in np.modifiers]
-        return replace(np, head=head, modifiers=modifiers)
+        if np.referent_id is None:
+            return self._rebuilt(np)
+        repeat = np.referent_id in self._seen
+        self._seen.add(np.referent_id)
+        downgrade = (
+            repeat
+            and np.number is Number.SINGULAR
+            and np.definiteness is not Definiteness.BARE
+        )
+        if downgrade:
+            return NounPhrase(
+                head=self._walk(np.head),
+                number=np.number,
+                definiteness=Definiteness.DEFINITE,
+                referent_id=np.referent_id,
+            )
+        return self._rebuilt(np)
+
+    def _rebuilt(self, np: NounPhrase) -> NounPhrase:
+        """Rebuild *np* with its head and modifiers recursed (document order preserved)."""
+        return replace(
+            np,
+            head=self._walk(np.head),
+            modifiers=[self._walk(m) for m in np.modifiers],
+        )
