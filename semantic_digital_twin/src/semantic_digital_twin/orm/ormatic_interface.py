@@ -15067,6 +15067,11 @@ class CabinetDAO(
         nullable=True,
         use_existing_column=True,
     )
+    handle_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("HandleDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
     supporting_surface_id: Mapped[int] = mapped_column(
         ForeignKey("RegionDAO.database_id", use_alter=True),
         nullable=True,
@@ -15075,6 +15080,9 @@ class CabinetDAO(
 
     root: Mapped[BodyDAO] = relationship(
         "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+    )
+    handle: Mapped[HandleDAO] = relationship(
+        "HandleDAO", uselist=False, foreign_keys=[handle_id], post_update=True
     )
     objects: Mapped[builtins.list[CabinetDAO_objects_association]] = relationship(
         "CabinetDAO_objects_association",

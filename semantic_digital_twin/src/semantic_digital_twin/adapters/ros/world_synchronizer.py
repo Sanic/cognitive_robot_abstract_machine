@@ -322,6 +322,8 @@ class ModelReloadSynchronizer(Synchronizer):
         Save the current world model to the database and publish the primary key to the ROS topic such that other
         processes can subscribe to the model changes and update their worlds.
         """
+        from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
         dao = to_dao(self._world)
         self.session.add(dao)
         self.session.commit()

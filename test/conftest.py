@@ -420,30 +420,30 @@ def world_with_urdf_factory(
 
 
 @pytest.fixture(scope="session")
-def pr2_world_setup():
+def _pr2_world_setup():
     return world_with_urdf_factory(PR2, OmniDrive)
 
 
 @pytest.fixture(scope="function")
-def pr2_world_copy(pr2_world_setup):
-    result = deepcopy(pr2_world_setup)
+def pr2_world_copy(_pr2_world_setup):
+    result = deepcopy(_pr2_world_setup)
     return result
 
 
 @pytest.fixture(scope="session")
-def hsr_world_setup():
+def _hsr_world_setup():
     return world_with_urdf_factory(HSRB, OmniDrive)
 
 
 @pytest.fixture(scope="function")
-def hsr_world_copy(hsr_world_setup):
-    result = deepcopy(hsr_world_setup)
+def hsr_world_copy(_hsr_world_setup):
+    result = deepcopy(_hsr_world_setup)
     HSRB.from_world(result)
     return result
 
 
 @pytest.fixture(scope="session")
-def garmi_world_setup():
+def _garmi_world_setup():
     if Garmi is None:
         pytest.skip("GARMI semantic annotation not installed")
     urdf_dir = "package://garmi_description/urdf/garmi.urdf"
@@ -464,24 +464,17 @@ def tracy_world():
 
 
 @pytest.fixture(scope="session")
-def stretch_world():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "pycram",
-        "resources",
-        "robots",
-    )
+def _stretch_world_setup():
     return world_with_urdf_factory(Stretch, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")
-def tiago_world():
+def _tiago_world_setup():
     return world_with_urdf_factory(Tiago, DifferentialDrive)
 
 
 @pytest.fixture(scope="session")
-def apartment_world_setup():
+def _apartment_world_setup():
     apartment_world = URDFParser.from_file(
         os.path.join(
             os.path.dirname(__file__),
@@ -534,13 +527,28 @@ def apartment_world_setup():
 
 
 @pytest.fixture(scope="function")
-def apartment_world_copy(apartment_world_setup):
-    result = deepcopy(apartment_world_setup)
+def apartment_world_copy(_apartment_world_setup):
+    result = deepcopy(_apartment_world_setup)
     return result
 
 
+@pytest.fixture(scope="function")
+def apartment_world_pr2_copy_with_context(_apartment_world_setup, _pr2_world_setup):
+    result = deepcopy(_apartment_world_setup)
+    pr2_copy = deepcopy(_pr2_world_setup)
+    result.merge_world(pr2_copy)
+    return (
+        result,
+        result.get_semantic_annotations_by_type(AbstractRobot)[0],
+        Context(
+            result,
+            result.get_semantic_annotations_by_type(AbstractRobot)[0],
+        ),
+    )
+
+
 @pytest.fixture(scope="session")
-def simple_apartment_setup():
+def _simple_apartment_setup():
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -548,28 +556,28 @@ def simple_apartment_setup():
 
         box = Body(
             name=PrefixedName("box"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            collision=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
+            visual=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
         )
 
         box_2 = Body(
             name=PrefixedName("box_2"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            collision=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
+            visual=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
         )
 
         box_1_connection = FixedConnection(
             parent=world.root,
             child=box,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                2, 0, 0.5, reference_frame=world.root
+                2, 0, 0.375, reference_frame=world.root
             ),
         )
         box_2_connection = FixedConnection(
             parent=root,
             child=box_2,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                -2, 0, 0.5
+                -2, 0, 0.375
             ),
         )
 
@@ -642,7 +650,7 @@ def simple_apartment_setup():
     ).parse()
     world.merge_world_at_pose(
         milk_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi),
+        HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
     )
     return world
 
@@ -664,14 +672,14 @@ def kitchen_world():
 
 
 @pytest.fixture(scope="session")
-def pr2_apartment_world(pr2_world_setup, apartment_world_setup):
+def pr2_apartment_world(_pr2_world_setup, _apartment_world_setup):
     """
     Builds this tree:
     map -> odom_combined -> pr2 urdf tree
         -> apartment urdf
     """
-    pr2_copy = deepcopy(pr2_world_setup)
-    apartment_copy = deepcopy(apartment_world_setup)
+    pr2_copy = deepcopy(_pr2_world_setup)
+    apartment_copy = deepcopy(_apartment_world_setup)
 
     pr2_copy.merge_world(apartment_copy)
     pr2_copy.get_body_by_name("base_footprint").parent_connection.origin = (
@@ -681,18 +689,18 @@ def pr2_apartment_world(pr2_world_setup, apartment_world_setup):
 
 
 @pytest.fixture(scope="session")
-def simple_pr2_world_setup(pr2_world_setup, simple_apartment_setup):
-    apartment_world = deepcopy(simple_apartment_setup)
-    pr2_copy = deepcopy(pr2_world_setup)
+def simple_pr2_world_setup(_pr2_world_setup, _simple_apartment_setup):
+    apartment_world = deepcopy(_simple_apartment_setup)
+    pr2_copy = deepcopy(_pr2_world_setup)
     pr2_copy.merge_world(apartment_world)
     robot_view = pr2_copy.get_semantic_annotations_by_type(PR2)[0]
     return pr2_copy, robot_view, Context(pr2_copy, robot_view)
 
 
 @pytest.fixture(scope="session")
-def hsr_apartment_world(hsr_world_setup, apartment_world_setup):
-    apartment_copy = deepcopy(apartment_world_setup)
-    hsr_copy = deepcopy(hsr_world_setup)
+def hsr_apartment_world(_hsr_world_setup, _apartment_world_setup):
+    apartment_copy = deepcopy(_apartment_world_setup)
+    hsr_copy = deepcopy(_hsr_world_setup)
     robot_view = hsr_copy.get_semantic_annotations_by_type(HSRB)[0]
 
     apartment_copy.merge_world_at_pose(
@@ -703,9 +711,9 @@ def hsr_apartment_world(hsr_world_setup, apartment_world_setup):
 
 
 @pytest.fixture(scope="session")
-def stretch_apartment_world(stretch_world_setup, apartment_world_setup):
-    apartment_copy = deepcopy(apartment_world_setup)
-    stretch_copy = deepcopy(stretch_world_setup)
+def stretch_apartment_world(_stretch_world_setup, _apartment_world_setup):
+    apartment_copy = deepcopy(_apartment_world_setup)
+    stretch_copy = deepcopy(_stretch_world_setup)
 
     apartment_copy.merge_world_at_pose(
         stretch_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
@@ -715,9 +723,9 @@ def stretch_apartment_world(stretch_world_setup, apartment_world_setup):
 
 
 @pytest.fixture(scope="session")
-def tiago_apartment_world(tiago_world, apartment_world_setup):
-    apartment_copy = deepcopy(apartment_world_setup)
-    tiago_copy = deepcopy(tiago_world)
+def tiago_apartment_world(_tiago_world_setup, _apartment_world_setup):
+    apartment_copy = deepcopy(_apartment_world_setup)
+    tiago_copy = deepcopy(_tiago_world_setup)
     apartment_copy.merge_world(tiago_copy)
 
     return apartment_copy, Tiago.from_world(apartment_copy)
@@ -729,8 +737,8 @@ def tiago_apartment_world(tiago_world, apartment_world_setup):
 
 
 @pytest.fixture
-def pr2_world_state_reset(pr2_world_setup):
-    world = deepcopy(pr2_world_setup)
+def pr2_world_state_reset(_pr2_world_setup):
+    world = deepcopy(_pr2_world_setup)
     state = world.state._data.copy()
     yield world
     world.state._data[:] = state

@@ -16,10 +16,10 @@ from pycram.datastructures.enums import (
     VerticalAlignment,
 )
 from pycram.datastructures.grasp import GraspDescription
+from pycram.locations.pose_validator import IsReachableBy
 from pycram.plans.factories import sequential
-from pycram.pose_validator import reachability_validator
 from pycram.querying.predicates import GripperIsFree
-from pycram.robot_plans.actions.base import ActionDescription, DescriptionType
+from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.pick_up import GraspingAction
 from pycram.robot_plans.motions.container import OpeningMotion, ClosingMotion
 from pycram.robot_plans.motions.gripper import MoveGripperMotion
@@ -88,20 +88,17 @@ class OpenAction(ActionDescription):
 
         return and_(
             GripperIsFree(end_effector),
-            reachability_validator(
-                kwargs["object_designator"].global_pose,
-                end_effector.tool_frame,
-                test_world.get_semantic_annotations_by_type(type(context.robot))[0],
-                test_world,
-                (
-                    context.robot.mobile_base.full_body_controlled
-                    if isinstance(context.robot, HasMobileBase)
-                    else False
-                ),
-                GraspDescription(
+            IsReachableBy(
+                world=test_world,
+                robot=test_world.get_semantic_annotations_by_type(type(context.robot))[
+                    0
+                ],
+                pose=kwargs["object_designator"].global_pose,
+                tip_link=end_effector.tool_frame,
+                grasp_description=GraspDescription(
                     ApproachDirection.FRONT,
                     VerticalAlignment.NoAlignment,
-                    ViewManager.get_end_effector_view(kwargs["arm"], test_robot),
+                    next(end_effector.evaluate()),
                 ),
             ),
         )

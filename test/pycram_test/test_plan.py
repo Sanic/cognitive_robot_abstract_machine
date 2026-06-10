@@ -357,12 +357,12 @@ def test_pause_plan(immutable_model_world):
     ].position == pytest.approx(0.3, abs=0.1)
 
 
-def test_algebra_sequential_plan(mutable_model_world):
+def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     """
     Parameterize a SequentialPlan using krrood parameterizer, create a fully-factorized distribution and
     assert the correctness of sampled values after conditioning and truncation.
     """
-    world, robot_view, context = mutable_model_world
+    world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
     target_location = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
@@ -392,8 +392,8 @@ def test_algebra_sequential_plan(mutable_model_world):
     assert len(plan.root.children[1].children) == 1
 
 
-def test_parameterization_of_pick_up(mutable_model_world):
-    world, robot_view, context = mutable_model_world
+def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
+    world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
     milk = world.get_body_by_name("milk.stl")

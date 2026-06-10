@@ -4,7 +4,8 @@ from copy import deepcopy
 import objgraph
 
 from pycram.datastructures.dataclasses import Context
-from pycram.datastructures.enums import Arms
+from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
+from pycram.datastructures.grasp import GraspDescription
 from pycram.motion_executor import simulated_robot
 from pycram.plans.factories import sequential
 from pycram.robot_plans.actions.composite.transporting import TransportAction
@@ -54,13 +55,18 @@ def test_ref_chain_after_copy_with_execute_complex_plan(mutable_model_world):
     copy_world.name = "copy_world"
 
     copy_context = Context(
-        copy_world, copy_world.get_semantic_annotation_by_id(view.id)
+        copy_world, copy_robot := copy_world.get_semantic_annotation_by_id(view.id)
     )
 
     description = TransportAction(
         copy_world.get_body_by_name("milk.stl"),
         Pose.from_xyz_quaternion(3.4, 2.2, 0.95, 0.0, 0.0, 1.0, 0.0, world.root),
         Arms.RIGHT,
+        GraspDescription(
+            ApproachDirection.RIGHT,
+            VerticalAlignment.NoAlignment,
+            copy_robot.right_arm.end_effector,
+        ),
     )
     plan = sequential([MoveTorsoAction(TorsoState.HIGH), description], copy_context)
     with simulated_robot:

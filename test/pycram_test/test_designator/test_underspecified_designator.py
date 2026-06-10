@@ -20,11 +20,11 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
-def test_underspecified_action(mutable_model_world):
+def test_underspecified_action(apartment_world_pr2_copy_with_context):
     """
     Test that an underspecified action can be executed
     """
-    world, robot, context = mutable_model_world
+    world, robot, context = apartment_world_pr2_copy_with_context
     action = underspecified(NavigateAction)(
         target_location=variable_from(
             [
@@ -43,11 +43,11 @@ def test_underspecified_action(mutable_model_world):
     assert plan.root.children[0].status == TaskStatus.SUCCEEDED
 
 
-def test_underspecified_action_with_ellipsis(mutable_model_world):
+def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_context):
     """
     Test that an underspecified action can be executed when a factory for a spatial type is used with ellipsis
     """
-    world, robot, context = mutable_model_world
+    world, robot, context = apartment_world_pr2_copy_with_context
     context.query_backend = ProbabilisticBackend()
     action = underspecified(NavigateAction)(
         target_location=underspecified(Pose.from_xyz_rpy)(
@@ -70,11 +70,11 @@ def test_underspecified_action_with_ellipsis(mutable_model_world):
     assert plan.root.children[-1].status == TaskStatus.SUCCEEDED
 
 
-def test_underspecified_language(mutable_model_world):
+def test_underspecified_language(apartment_world_pr2_copy_with_context):
     """
     Test that entire plans can be underspecified
     """
-    world, robot, context = mutable_model_world
+    world, robot, context = apartment_world_pr2_copy_with_context
     grasp_description = GraspDescription(
         ApproachDirection.FRONT,
         VerticalAlignment.NoAlignment,
