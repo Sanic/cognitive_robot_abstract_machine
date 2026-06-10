@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -65,7 +66,11 @@ class Sage10kDatasetLoader:
         # unzip the scene
         extraction_directory.mkdir(parents=True, exist_ok=True)
         with ZipFile(zipped_scene, "r") as zip_ref:
-            zip_ref.extractall(extraction_directory)
+            try:
+                zip_ref.extractall(extraction_directory)
+            except FileExistsError:
+                extraction_directory = self.directory / zipped_scene.stem / str(random.randint(0, 100000))
+                zip_ref.extractall(extraction_directory)
 
         os.remove(str(zipped_scene))
         logger.info(f"Downloaded and extracted {scene_url} to {extraction_directory}")
