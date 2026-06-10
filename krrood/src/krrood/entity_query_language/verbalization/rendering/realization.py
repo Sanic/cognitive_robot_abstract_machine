@@ -17,6 +17,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
     VerbFragment,
 )
+from krrood.entity_query_language.verbalization.rendering.coreference_processor import (
+    CoreferenceProcessor,
+)
 from krrood.entity_query_language.verbalization.rendering.determiner_processor import (
     DeterminerProcessor,
 )
@@ -24,13 +27,15 @@ from krrood.entity_query_language.verbalization.rendering.morphology_processor i
     MorphologyProcessor,
 )
 
+_COREFERENCE = CoreferenceProcessor()
 _DETERMINER = DeterminerProcessor()
 _MORPHOLOGY = MorphologyProcessor()
 
 
 def realize_tree(fragment: VerbFragment) -> VerbFragment:
-    """Run the ordered realisation passes (DP lowering → morphology) over *fragment*."""
-    return _MORPHOLOGY.process(_DETERMINER.process(fragment))
+    """Run the ordered realisation passes over *fragment*: coreference resolution → DP lowering
+    → morphology."""
+    return _MORPHOLOGY.process(_DETERMINER.process(_COREFERENCE.process(fragment)))
 
 
 def realize_subtree(fragment: VerbFragment) -> str:

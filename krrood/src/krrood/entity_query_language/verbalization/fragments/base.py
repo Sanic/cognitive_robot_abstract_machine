@@ -14,6 +14,7 @@ Joining utilities (:func:`join_with`, :func:`oxford_and`) produce
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from typing_extensions import Callable, List, Optional, TypeVar
@@ -185,6 +186,34 @@ class NounPhrase(VerbFragment):
     modifiers: List[VerbFragment] = field(default_factory=list)
     """Post-modifiers following the head (e.g. *"of the Root"*, *"where … such that …"*)."""
 
+    referent_id: Optional[uuid.UUID] = None
+    """When set, this NP is a **referring expression** for that entity.  :attr:`definiteness`
+    then holds the *first-mention* form; the
+    :class:`~krrood.entity_query_language.verbalization.rendering.coreference_processor.CoreferenceProcessor`
+    pass downgrades a *repeat* mention to definite (dropping :attr:`modifiers`, keeping only
+    :attr:`head` as the label) or to a pronoun — the discourse decision, made in one place."""
+
+
+@dataclass
+class SubjectScope(VerbFragment):
+    """
+    Marks the region in which :attr:`subject_id` is the pronoun-eligible discourse subject.
+
+    A structural wrapper (the document-order replacement for the build-time
+    ``push_subject``/``pop_subject`` stack): the
+    :class:`~krrood.entity_query_language.verbalization.rendering.coreference_processor.CoreferenceProcessor`
+    pushes :attr:`subject_id` on entry and pops it on exit, so a referring NP whose referent is
+    the current subject can be pronominalised.  After that pass it is replaced by its (resolved)
+    :attr:`child`; all other passes recurse through it transparently.
+    """
+
+    subject_id: Optional[uuid.UUID]
+    """The subject's referent id, or ``None`` for a scope with no single subject (e.g. ``SetOf``),
+    which suppresses pronominalisation."""
+
+    child: VerbFragment
+    """The wrapped fragment the scope applies to."""
+
 
 @dataclass
 class BlockFragment(VerbFragment):
@@ -261,6 +290,10 @@ def fold_fragment(
             return phrase(folded, separator)
         case BlockFragment():
             return block(fragment)
+        case SubjectScope(child=child):
+            return fold_fragment(
+                child, word=word, role=role, phrase=phrase, block=block
+            )
         case _:
             return word("")
 
@@ -297,6 +330,8 @@ def map_fragment(
                 header=None if header is None else map_fragment(header, leaf),
                 items=[map_fragment(i, leaf) for i in items],
             )
+        case SubjectScope(subject_id=subject_id, child=child):
+            return SubjectScope(subject_id=subject_id, child=map_fragment(child, leaf))
         case _:
             return leaf(fragment)
 
