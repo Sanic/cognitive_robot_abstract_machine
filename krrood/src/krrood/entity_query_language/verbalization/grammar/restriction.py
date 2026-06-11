@@ -167,11 +167,11 @@ class AggregationSourceSubjectRule(RestrictionSubjectRule):
         )
 
     @classmethod
-    def subject(cls, expression, selected_variable, context: "VerbalizationContext"):
+    def subject(cls, expression, selected_variable, context: VerbalizationContext):
         return aggregation_source_root(expression)
 
 
-def restriction_subject(expression, selected_variable, context: "VerbalizationContext"):
+def restriction_subject(expression, selected_variable, context: VerbalizationContext) -> Optional[Variable]:
     """The variable a selection's ``WHERE`` restricts (most-specific rule wins), or ``None``."""
     chosen = RestrictionSubjectRule.most_applicable(
         expression, selected_variable, context

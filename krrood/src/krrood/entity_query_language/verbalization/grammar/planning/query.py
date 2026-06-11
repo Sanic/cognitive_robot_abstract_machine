@@ -22,6 +22,10 @@ from enum import Enum, auto
 
 from typing_extensions import Any, List, Optional, Tuple, Type
 
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.mapped_variable import MappedVariable
+from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.operators.core_logical_operators import (
     AND,
     flatten_operands,
@@ -82,15 +86,19 @@ class RestrictionPlan:
 
 
 @dataclass(frozen=True)
-class AggregationValuePlan:
-    """A collapsed aggregation value-subquery (*"the maximum amount among …"*)."""
+class AggregationData:
+    """A collapsed aggregation subquery (*"the maximum amount among …"*)."""
 
-    aggregator: Any
-    leaf: Any
+    aggregator: Optional[Aggregator]
+    """The selected aggregator."""
+
+    leaf: Optional[MappedVariable]
     """The leaf :class:`Attribute` of the aggregator chain, or ``None``."""
 
     is_constrained: bool
-    source: Any
+    """``True`` when the aggregation is constrained by a WHERE/HAVING clause."""
+
+    source: Optional[Variable]
     """The chain-root source variable aggregated over, or ``None``."""
 
 
@@ -101,11 +109,11 @@ class QueryPlan:
     kind: SelectionKind
     is_the: bool
     selected_type: str
-    subject: Optional[Any]
+    subject: Optional[Variable]
     subject_restriction: Optional[RestrictionPlan]
-    where_condition: Optional[Any]
+    where_condition: Optional[SymbolicExpression]
     is_aggregation_subquery: bool
-    aggregation_value: Optional[AggregationValuePlan]
+    aggregation_data: Optional[AggregationData]
 
 
 @dataclass
@@ -122,7 +130,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             subject_restriction=self._subject_restriction(),
             where_condition=self._where_condition(),
             is_aggregation_subquery=is_aggregation_subquery(self.node),
-            aggregation_value=self._aggregation_value(),
+            aggregation_data=self._aggregation_data(),
         )
 
     # ── selection shape ──────────────────────────────────────────────────────
@@ -153,7 +161,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
 
     # ── subject restriction (WHERE partition) ────────────────────────────────
 
-    def _subject(self) -> Optional[Any]:
+    def _subject(self) -> Optional[Variable]:
         if not isinstance(self.node, Entity):
             return None
         return restriction_subject(self.node, self._selected, None)
@@ -179,16 +187,16 @@ class QueryPlanner(Planner[Query, QueryPlan]):
 
     # ── clauses ──────────────────────────────────────────────────────────────
 
-    def _where_condition(self) -> Optional[Any]:
+    def _where_condition(self) -> Optional[SymbolicExpression]:
         where = getattr(self.node, "_where_expression_", None)
         return where.condition if where is not None else None
 
     # ── aggregation value-subquery ───────────────────────────────────────────
 
-    def _aggregation_value(self) -> Optional[AggregationValuePlan]:
+    def _aggregation_data(self) -> Optional[AggregationData]:
         if not is_aggregation_subquery(self.node):
             return None
-        return AggregationValuePlan(
+        return AggregationData(
             aggregator=selected_aggregator(self.node),
             leaf=aggregation_leaf_attribute(self.node),
             is_constrained=is_constrained_query(self.node),

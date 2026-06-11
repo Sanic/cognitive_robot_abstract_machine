@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing_extensions import Optional
 
+from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier
 from krrood.entity_query_language.query.query import Entity

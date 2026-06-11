@@ -53,31 +53,32 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
     planner = QueryPlanner
 
     def realize(self, node, plan: QueryPlan) -> VerbFragment:
-        av = plan.aggregation_value
-        if av.leaf is None:
+        aggregation_data = plan.aggregation_data
+        if aggregation_data.leaf is None:
             with self.ctx.config.query_depth_scope():
-                return self.ctx.child(av.aggregator)
+                return self.ctx.child(aggregation_data.aggregator)
 
-        aggregation_kind = AGGREGATION_KIND[type(av.aggregator)]
+        aggregation_kind = AGGREGATION_KIND[type(aggregation_data.aggregator)]
         plural_leaf = aggregation_kind.value.child_form == ChildForm.PLURAL
         leaf_frag = RoleFragment.for_attribute(
-            av.leaf._owner_class_,
-            av.leaf._attribute_name_,
+            aggregation_data.leaf._owner_class_,
+            aggregation_data.leaf._attribute_name_,
             number=Number.of(plural_leaf),
         )
+
         aggregate = NounPhrase(
             head=aggregation_kind.as_fragment(),
             definiteness=Definiteness.DEFINITE,
             modifiers=[leaf_frag],
         )
 
-        if not av.is_constrained:
+        if not aggregation_data.is_constrained:
             return aggregate
         return self._scope(node, plan, aggregate)
 
     def _scope(self, node, plan: QueryPlan, aggregate) -> VerbFragment:
         """Append *"among <plural source> [whose …] [such that …] [having …]"*."""
-        source = plan.aggregation_value.source
+        source = plan.aggregation_data.source
         source_frag = (
             self.ctx.child(source, number=Number.PLURAL)
             if source is not None
