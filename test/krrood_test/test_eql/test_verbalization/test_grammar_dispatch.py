@@ -6,8 +6,13 @@ the dispatch mechanics are validated independently of the real grammar.
 
 from __future__ import annotations
 
+import pytest
+
 from krrood.entity_query_language.verbalization.context import VerbalizationContext
-from krrood.entity_query_language.verbalization.engine import fold
+from krrood.entity_query_language.verbalization.engine import (
+    fold,
+    UnverbalizableExpressionError,
+)
 from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
     PhraseFragment,
@@ -136,10 +141,8 @@ def test_fold_binding_override_short_circuits_before_dispatch():
     assert flatten_fragment_to_plain_text(fold(node, context, [])) == "OVERRIDE"
 
 
-def test_fold_falls_back_to_node_name():
+def test_fold_raises_when_no_rule_covers_the_node():
     node = Mid()
-    node._name_ = "fallback-name"
-    assert (
-        flatten_fragment_to_plain_text(fold(node, VerbalizationContext(), []))
-        == "fallback-name"
-    )
+    node._name_ = "uncovered"
+    with pytest.raises(UnverbalizableExpressionError):
+        fold(node, VerbalizationContext(), [])

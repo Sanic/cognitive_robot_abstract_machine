@@ -17,12 +17,9 @@ Programming").  Compare the fold over the *output* tree,
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from typing_extensions import Callable, Optional, Sequence
+from typing_extensions import Optional, Sequence
 
-from krrood.entity_query_language.verbalization.fragments.base import (
-    VerbFragment,
-    WordFragment,
-)
+from krrood.entity_query_language.verbalization.fragments.base import VerbFragment
 from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.grammar.phrase_rule import (
     Ctx,
@@ -35,34 +32,41 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import VerbalizationContext
 
 
+class UnverbalizableExpressionError(TypeError):
+    """No grammar rule covers an EQL construct.
+
+    Raised by :func:`fold` instead of silently degrading the node to its class name — a coverage
+    gap is a bug, not bad English.  Add a
+    :class:`~krrood.entity_query_language.verbalization.grammar.phrase_rule.PhraseRule` for the
+    construct (in :mod:`~krrood.entity_query_language.verbalization.grammar.english`).
+    """
+
+
 def fold(
     node,
     context: "VerbalizationContext",
     rules: Optional[Sequence[PhraseRule]] = None,
-    fallback: Optional[Callable[[object, "VerbalizationContext"], VerbFragment]] = None,
     number: Number = Number.SINGULAR,
 ) -> VerbFragment:
     """
     Verbalize *node* by dispatching to the matching grammar rule and recursing.
 
-    Order of resolution (matching the previous engine):
+    Order of resolution:
 
     1. **Binding-override short-circuit** — if ``node._id_`` has a pre-built
        substitute in :attr:`BindingScope.binding_overrides`, return it before any
        dispatch (used for InstantiatedVariable field references).
     2. :func:`select` the most-specific rule and apply its ``build`` with a fresh
        :class:`Ctx` whose ``child`` re-enters :func:`fold`.
-    3. **Fallback** — no rule applies → *fallback(node, context)* when supplied
-       (the strangler hook routing un-ported constructs to the legacy engine
-       during migration), otherwise a plain :class:`WordFragment` of ``node._name_``.
+    3. **No rule** → raise :class:`UnverbalizableExpressionError` (a coverage gap is a bug,
+       not silent degradation to the class name).
 
     :param node: Any EQL expression.
     :param context: The verbalization context (services + render config).
     :param rules: Grammar to dispatch over; defaults to ``RULES``.
-    :param fallback: Optional handler for nodes no grammar rule covers; it should
-        recurse back through :func:`fold` for its children.
     :return: The fragment for *node*.
     :rtype: ~krrood.entity_query_language.verbalization.fragments.base.VerbFragment
+    :raises UnverbalizableExpressionError: when no grammar rule covers *node*.
     """
     rules = RULES if rules is None else rules
 
@@ -74,7 +78,7 @@ def fold(
 
     ctx = Ctx(
         child=lambda child_node, number=Number.SINGULAR: fold(
-            child_node, context, rules, fallback, number
+            child_node, context, rules, number=number
         ),
         context=context,
         number=number,
@@ -82,7 +86,8 @@ def fold(
 
     rule = select(node, rules, ctx)
     if rule is None:
-        if fallback is not None:
-            return fallback(node, context)
-        return WordFragment(text=node._name_)
+        raise UnverbalizableExpressionError(
+            f"No verbalization rule for {type(node).__name__!r} "
+            f"(name={getattr(node, '_name_', None)!r}); add a PhraseRule in grammar/english.py."
+        )
     return rule.build(node, ctx)

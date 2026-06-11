@@ -111,6 +111,19 @@ def test_all_rules_registry_is_populated():
     )
 
 
+def test_uncovered_construct_raises_instead_of_degrading():
+    """A construct with no grammar rule (e.g. Concatenation) must raise, not silently
+    render its bare class name."""
+    from krrood.entity_query_language.factories import concatenation
+    from krrood.entity_query_language.verbalization.engine import (
+        UnverbalizableExpressionError,
+    )
+
+    expr = concatenation(variable(int, []), variable(int, []))
+    with pytest.raises(UnverbalizableExpressionError):
+        verbalize_expression(expr)
+
+
 def test_verbalization_produces_natural_language_not_repr():
     """Smoke test: verbalizing a simple query must produce English prose,
     not fall back to the expression's repr string like '(EntityType)'."""
