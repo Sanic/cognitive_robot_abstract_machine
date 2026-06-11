@@ -553,6 +553,35 @@ def test_nested_constrained_aggregation_preserves_filter():
     assert "before" in text, f"Got: {text!r}"
 
 
+def test_deeply_nested_subqueries_golden():
+    """Nesting has no depth limit: three levels of constrained aggregation sub-queries render
+    with exactly one top-level 'Find', every deeper query as a noun phrase, and coreference
+    tracked across levels (subject → 'its', re-mention → 'the … of the …')."""
+    t1 = variable(BankTransaction, domain=None)
+    t2 = variable(BankTransaction, domain=None)
+    t3 = variable(BankTransaction, domain=None)
+    level3 = an(
+        entity(eql.max(t3.amount_details.amount)).where(
+            t3.booking_date < datetime.datetime(2024, 1, 1)
+        )
+    )
+    level2 = an(
+        entity(eql.max(t2.amount_details.amount)).where(
+            t2.amount_details.amount == level3
+        )
+    )
+    query = eql.the(entity(t1).where(t1.amount_details.amount == level2))
+    text = verbalize_expression(query)
+    assert text == (
+        "Find the unique BankTransaction such that the amount of its amount_details "
+        "is equal to the maximum amount among BankTransactions such that "
+        "the amount of the amount_details of the BankTransaction is equal to "
+        "the maximum amount among BankTransactions whose booking_date is before "
+        "January 1, 2024"
+    )
+    assert text.count("Find") == 1  # only the top level emits the imperative
+
+
 def test_nested_aggregation_collapses_to_compact_amount():
     """An unconstrained max sub-query collapses to 'the maximum amount' (no chain, no variable)."""
     t1 = variable(BankTransaction, domain=None)
@@ -832,6 +861,41 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
     # THEN clause uses "whose" for each binding
     assert "whose container is the parent of the FixedConnection" in text
     assert "whose handle is the child of the FixedConnection" in text
+
+
+def test_verbalize_inference_rule_golden(doors_and_drawers_world):
+    """Exact IF/THEN surface for a sub-query inference rule (pins the whole sentence:
+    antecedent intro, ``whose`` conditions, the ``, then`` join, and consequent bindings —
+    including the FixedConnection reading ``a`` first then ``the`` via coreference)."""
+    world = doors_and_drawers_world
+    handle = variable(Handle, world.bodies)
+    prismatic_connection = variable(PrismaticConnection, world.connections)
+    fixed_connection = match_variable(FixedConnection, world.connections)(
+        parent=prismatic_connection.child, child=handle
+    )
+    drawer_var = inference(Drawer)(
+        container=fixed_connection.parent, handle=fixed_connection.child
+    )
+    assert verbalize_expression(entity(drawer_var)) == (
+        "If there's a FixedConnection whose parent is the child of a PrismaticConnection, "
+        "whose child is a Handle, "
+        "then there's a Drawer whose container is the parent of the FixedConnection, "
+        "whose handle is the child of the FixedConnection"
+    )
+
+
+def test_verbalize_inference_no_sub_query_golden(doors_and_drawers_world):
+    """Exact surface for a plain-binding inference rule (no antecedent sub-query): a noun
+    phrase with appositive ``, where …`` bindings, no IF/THEN block, no ``such that``.
+    """
+    world = doors_and_drawers_world
+    handle_variable = variable(Handle, world.bodies)
+    container_variable = variable(Container, world.bodies)
+    drawer = inference(Drawer)(handle=handle_variable, container=container_variable)
+    assert verbalize_expression(drawer) == (
+        "a Drawer, where the handle of the Drawer is a Handle, "
+        "and the container of the Drawer is a Container"
+    )
 
 
 def test_verbalize_condition_graph_example():
