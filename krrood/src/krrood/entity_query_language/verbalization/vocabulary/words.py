@@ -19,6 +19,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.features import (  # noqa: F401  (re-export)
+    Glue,
     Number,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
@@ -45,6 +46,21 @@ class PlainWord:
         :rtype: ~krrood.entity_query_language.verbalization.fragments.base.WordFragment
         """
         return WordFragment(text=self.text)
+
+
+@dataclass(frozen=True)
+class PunctuationWord(PlainWord):
+    """
+    A punctuation token carrying an orthographic :class:`Glue` — so the orthography pass
+    drops the space adjacent to it and rules emit it as an ordinary, normally-separated token.
+    """
+
+    glue: Glue = Glue.NONE
+    """Which side hugs its neighbour (``LEFT`` for *","* / *")"*; ``RIGHT`` for *"("*)."""
+
+    def as_fragment(self) -> WordFragment:
+        """A role-less :class:`WordFragment` carrying this token's :attr:`glue`."""
+        return WordFragment(text=self.text, glue=self.glue)
 
 
 @dataclass(frozen=True)

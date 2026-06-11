@@ -245,19 +245,14 @@ class OrRule(PhraseRule):
         parts = [ctx.child(conjunct) for conjunct in flatten_operands(node, OR)]
         if len(parts) == 1:
             return parts[0]
-        head_with_comma = PhraseFragment(
-            parts=[
-                PhraseFragment(
-                    parts=parts[:-1], separator=Punctuation.COMMA.text + " "
-                ),
-                Punctuation.COMMA.as_fragment(),
-            ],
-            separator="",
-        )
+        # "either a, b, or c": the head items are comma-joined, then a trailing comma that the
+        # orthography pass hugs to the last head item — no separator="" bookkeeping here.
+        head = PhraseFragment(parts=parts[:-1], separator=Punctuation.COMMA.text + " ")
         return PhraseFragment(
             parts=[
                 Logicals.EITHER.as_fragment(),
-                head_with_comma,
+                head,
+                Punctuation.COMMA.as_fragment(),
                 Conjunctions.OR.as_fragment(),
                 parts[-1],
             ]
@@ -272,17 +267,13 @@ class NotRule(PhraseRule):
 
     def build(self, node, ctx: Ctx):
         child_fragment = ctx.child(node._child_)
+        # The parens glue to the child via the orthography pass → "not (child)".
         return PhraseFragment(
             parts=[
                 Logicals.NOT.as_fragment(),
-                PhraseFragment(
-                    parts=[
-                        Punctuation.OPEN_PAREN.as_fragment(),
-                        child_fragment,
-                        Punctuation.CLOSE_PAREN.as_fragment(),
-                    ],
-                    separator="",
-                ),
+                Punctuation.OPEN_PAREN.as_fragment(),
+                child_fragment,
+                Punctuation.CLOSE_PAREN.as_fragment(),
             ]
         )
 

@@ -34,6 +34,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
+from krrood.entity_query_language.verbalization.fragments.features import Glue
 from krrood.entity_query_language.verbalization.vocabulary.words import (
     AggregationWord,
     ChildForm,
@@ -44,6 +45,7 @@ from krrood.entity_query_language.verbalization.vocabulary.words import (
     OperatorWord,
     PlainWord,
     PronounWord,
+    PunctuationWord,
     VocabEnum,
 )
 
@@ -251,9 +253,9 @@ class Punctuation(VocabEnum):
     so no punctuation literal is hard-coded in the grammar.  :attr:`COMMA`'s ``text`` also seeds
     the *", "* list separator passed to :class:`PhraseFragment`."""
 
-    COMMA = PlainWord(",")
-    OPEN_PAREN = PlainWord("(")
-    CLOSE_PAREN = PlainWord(")")
+    COMMA = PunctuationWord(",", glue=Glue.LEFT)
+    OPEN_PAREN = PunctuationWord("(", glue=Glue.RIGHT)
+    CLOSE_PAREN = PunctuationWord(")", glue=Glue.LEFT)
 
 
 class Pronouns(VocabEnum):

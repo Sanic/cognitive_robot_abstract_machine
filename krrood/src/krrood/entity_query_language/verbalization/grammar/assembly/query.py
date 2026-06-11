@@ -118,13 +118,13 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             vars_phrase = PhraseFragment(
                 parts=variable_fragments, separator=Punctuation.COMMA.text + " "
             )
+            # The parens glue to their content via the orthography pass — no separator="".
             selection = PhraseFragment(
                 parts=[
                     Punctuation.OPEN_PAREN.as_fragment(),
                     vars_phrase,
                     Punctuation.CLOSE_PAREN.as_fragment(),
-                ],
-                separator="",
+                ]
             )
             return self._query_body(
                 node,

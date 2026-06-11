@@ -48,3 +48,21 @@ class Definiteness(Enum):
     INDEFINITE = "indefinite"
     DEFINITE = "definite"
     UNIQUE = "unique"
+
+
+class Glue(Enum):
+    """
+    Orthographic **spacing** of a token relative to its neighbours — the feature the
+    :class:`~krrood.entity_query_language.verbalization.rendering.orthography_processor.OrthographyProcessor`
+    reads so rules emit punctuation as ordinary tokens (with the normal separator) and the
+    pass removes the adjacent space.
+
+    :cvar NONE: Spaced on both sides like a normal word (the default).
+    :cvar LEFT: No space *before* this token — it hugs the preceding token (*","* → *"x,"*;
+        *")"* → *"x)"*).
+    :cvar RIGHT: No space *after* this token — it hugs the following token (*"("* → *"(x"*).
+    """
+
+    NONE = "none"
+    LEFT = "left"
+    RIGHT = "right"

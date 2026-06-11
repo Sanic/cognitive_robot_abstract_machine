@@ -63,7 +63,7 @@ graph LR
 {py:class}`~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer` is the internal fragment builder behind the pipeline (use it directly only when you want the fragment tree itself, e.g. in tests).  `build(expression, context)`:
 
 1. **Folds** the EQL tree into a {py:class}`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment` tree via the grammar (see [Rule dispatch](#rule-dispatch-the-fold)).
-2. Runs the ordered **realisation passes** ({py:func}`~krrood.entity_query_language.verbalization.rendering.realization.realize_tree`): coreference → determiner → morphology (see [Realisation passes](#realisation-passes)).
+2. Runs the ordered **realisation passes** ({py:func}`~krrood.entity_query_language.verbalization.rendering.realization.realize_tree`): coreference → determiner → morphology → orthography (see [Realisation passes](#realisation-passes)).
 
 It never produces strings — formatting is Layer 2/3.
 
@@ -292,11 +292,12 @@ Navigation chains are realisation-only (no plan): {py:class}`~krrood.entity_quer
 
 ## Realisation passes
 
-After the fold, {py:func}`~krrood.entity_query_language.verbalization.rendering.realization.realize_tree` runs three ordered passes over the fragment tree (each a `map_fragment` rebuild):
+After the fold, {py:func}`~krrood.entity_query_language.verbalization.rendering.realization.realize_tree` runs four ordered passes over the fragment tree:
 
 1. **{py:class}`~krrood.entity_query_language.verbalization.rendering.coreference_processor.CoreferenceProcessor`** — resolves referring expressions in document order and strips `SubjectScope` / `PossessiveChain` markers (below).
 2. **{py:class}`~krrood.entity_query_language.verbalization.rendering.determiner_processor.DeterminerProcessor`** — lowers every `NounPhrase` to a determiner-bearing `PhraseFragment` via the concord table (INDEFINITE×SINGULAR → *a/an*; INDEFINITE×PLURAL → bare; DEFINITE → *the*; UNIQUE → *the unique*), and tags the head with its `Number`.
-3. **{py:class}`~krrood.entity_query_language.verbalization.rendering.morphology_processor.MorphologyProcessor`** — inflects every leaf tagged `Number.PLURAL` (pluralise nouns; copula suppletion *is*→*are*).
+3. **{py:class}`~krrood.entity_query_language.verbalization.rendering.morphology_processor.MorphologyProcessor`** — inflects every leaf tagged `Number.PLURAL` (pluralise nouns; copula suppletion *is*→*are*).  Domain exceptions can be registered via `morphology.register_plural` / `register_indefinite_article`.
+4. **{py:class}`~krrood.entity_query_language.verbalization.rendering.orthography_processor.OrthographyProcessor`** — removes the space adjacent to glued punctuation (a `Punctuation` token carries a {py:class}`~krrood.entity_query_language.verbalization.fragments.features.Glue`), so rules emit *","* / *"("* / *")"* as ordinary, normally-separated tokens (no `separator=""`) and still get *"x, y"* / *"(x)"*.
 
 ### Coreference
 
@@ -464,7 +465,7 @@ text = VerbalizationPipeline(ParagraphRenderer(MarkdownFormatter())).verbalize(q
 ### Rendering passes & output
 
 - {py:func}`~krrood.entity_query_language.verbalization.rendering.realization.realize_tree`
-- {py:class}`~krrood.entity_query_language.verbalization.rendering.coreference_processor.CoreferenceProcessor` / {py:class}`~krrood.entity_query_language.verbalization.rendering.determiner_processor.DeterminerProcessor` / {py:class}`~krrood.entity_query_language.verbalization.rendering.morphology_processor.MorphologyProcessor`
+- {py:class}`~krrood.entity_query_language.verbalization.rendering.coreference_processor.CoreferenceProcessor` / {py:class}`~krrood.entity_query_language.verbalization.rendering.determiner_processor.DeterminerProcessor` / {py:class}`~krrood.entity_query_language.verbalization.rendering.morphology_processor.MorphologyProcessor` / {py:class}`~krrood.entity_query_language.verbalization.rendering.orthography_processor.OrthographyProcessor`
 - {py:mod}`~krrood.entity_query_language.verbalization.microplanning.possessive`
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.renderer.ParagraphRenderer` / `HierarchicalRenderer`
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.formatter.PlainFormatter` / `ANSIFormatter` / `HTMLFormatter`

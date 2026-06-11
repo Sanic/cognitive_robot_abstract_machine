@@ -93,8 +93,7 @@ class OrderedByAssembler(Assembler[Any, None]):
                 Punctuation.OPEN_PAREN.as_fragment(),
                 direction.as_fragment(),
                 Punctuation.CLOSE_PAREN.as_fragment(),
-            ],
-            separator="",
+            ]
         )
         return PhraseFragment(
             parts=[

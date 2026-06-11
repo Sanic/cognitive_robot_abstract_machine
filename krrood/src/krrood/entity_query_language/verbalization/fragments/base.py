@@ -21,6 +21,7 @@ from typing_extensions import Callable, List, Optional, Tuple, TypeVar
 
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
+    Glue,
     Number,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
@@ -60,6 +61,10 @@ class WordFragment(VerbFragment):
 
     number: Number = Number.SINGULAR
     """Grammatical number *feature* — the morphology pass pluralises a ``PLURAL`` leaf's text."""
+
+    glue: Glue = Glue.NONE
+    """Orthographic spacing — the orthography pass removes the space adjacent to a ``LEFT`` /
+    ``RIGHT`` token (punctuation), so rules need not manage punctuation spacing themselves."""
 
 
 @dataclass

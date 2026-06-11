@@ -29,10 +29,14 @@ from krrood.entity_query_language.verbalization.rendering.determiner_processor i
 from krrood.entity_query_language.verbalization.rendering.morphology_processor import (
     MorphologyProcessor,
 )
+from krrood.entity_query_language.verbalization.rendering.orthography_processor import (
+    OrthographyProcessor,
+)
 
 _COREFERENCE = CoreferenceProcessor()
 _DETERMINER = DeterminerProcessor()
 _MORPHOLOGY = MorphologyProcessor()
+_ORTHOGRAPHY = OrthographyProcessor()
 
 
 def realize_tree(
@@ -40,10 +44,12 @@ def realize_tree(
     already_seen: Optional[Iterable[uuid.UUID]] = None,
 ) -> VerbFragment:
     """Run the ordered realisation passes over *fragment*: coreference resolution → DP lowering
-    → morphology.  *already_seen* carries referents introduced by prior builds on a shared
-    context (see :meth:`CoreferenceProcessor.process`)."""
+    → morphology → orthography (punctuation spacing).  *already_seen* carries referents
+    introduced by prior builds on a shared context (see :meth:`CoreferenceProcessor.process`).
+    """
     resolved = _COREFERENCE.process(fragment, already_seen=already_seen)
-    return _MORPHOLOGY.process(_DETERMINER.process(resolved))
+    inflected = _MORPHOLOGY.process(_DETERMINER.process(resolved))
+    return _ORTHOGRAPHY.process(inflected)
 
 
 def realize_subtree(fragment: VerbFragment) -> str:
