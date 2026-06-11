@@ -779,7 +779,6 @@ class World(HasSimulatorProperties):
         :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
             the current context.
 
-        :raises AddingAnExistingSemanticAnnotationError: If the semantic annotation already exists
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
         if self.is_semantic_annotation_in_world(semantic_annotation):
@@ -796,8 +795,6 @@ class World(HasSimulatorProperties):
 
         :param semantic_annotation: The semantic annotation instance to be added. Its name must be unique within
             the current context.
-
-        :raises AddingAnExistingSemanticAnnotationError: If the semantic annotation already exists
         """
         self._raise_error_if_belongs_to_other_world(semantic_annotation)
         if self.is_semantic_annotation_in_world(semantic_annotation):

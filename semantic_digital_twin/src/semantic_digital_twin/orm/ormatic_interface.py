@@ -492,25 +492,6 @@ class ShapeCollectionDAO_shapes_association(Base, AssociationDataAccessObject):
     )
 
 
-class DuplicateKinematicStructureEntityErrorDAO_names_association(
-    Base, AssociationDataAccessObject
-):
-
-    __tablename__ = "_10696966761756032922078837984240156951375122326279076008233503"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_duplicatekinematicstructureentityerrordao_id: Mapped[int] = mapped_column(
-        ForeignKey("DuplicateKinematicStructureEntityErrorDAO.database_id")
-    )
-    target_prefixednamedao_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id")
-    )
-
-    target: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", foreign_keys=[target_prefixednamedao_id]
-    )
-
-
 class DuplicateRobotAssignmentsErrorDAO_robots_association(
     Base, AssociationDataAccessObject
 ):
@@ -7968,40 +7949,6 @@ class UsageErrorDAO(
     }
 
 
-class AddingAnExistingSemanticAnnotationErrorDAO(
-    UsageErrorDAO,
-    DataAccessObject[
-        semantic_digital_twin.exceptions.AddingAnExistingSemanticAnnotationError
-    ],
-):
-
-    __tablename__ = "AddingAnExistingSemanticAnnotationErrorDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(UsageErrorDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    semantic_annotation_id: Mapped[int] = mapped_column(
-        ForeignKey("SemanticAnnotationDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    semantic_annotation: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO",
-        uselist=False,
-        foreign_keys=[semantic_annotation_id],
-        post_update=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "AddingAnExistingSemanticAnnotationErrorDAO",
-        "inherit_condition": database_id == UsageErrorDAO.database_id,
-    }
-
-
 class AlreadyBelongsToAWorldErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.AlreadyBelongsToAWorldError],
@@ -8084,36 +8031,6 @@ class DoesNotBelongToAWorldErrorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "DoesNotBelongToAWorldErrorDAO",
-        "inherit_condition": database_id == UsageErrorDAO.database_id,
-    }
-
-
-class DuplicateKinematicStructureEntityErrorDAO(
-    UsageErrorDAO,
-    DataAccessObject[
-        semantic_digital_twin.exceptions.DuplicateKinematicStructureEntityError
-    ],
-):
-
-    __tablename__ = "DuplicateKinematicStructureEntityErrorDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(UsageErrorDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    names: Mapped[
-        builtins.list[DuplicateKinematicStructureEntityErrorDAO_names_association]
-    ] = relationship(
-        "DuplicateKinematicStructureEntityErrorDAO_names_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[DuplicateKinematicStructureEntityErrorDAO_names_association.source_duplicatekinematicstructureentityerrordao_id]",
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "DuplicateKinematicStructureEntityErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
     }
 
@@ -8589,6 +8506,32 @@ class InsufficientVectorsErrorDAO(
         ForeignKey(SpatialTypesErrorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    x_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    y_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    z_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    x: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[x_id], post_update=True
+    )
+    y: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[y_id], post_update=True
+    )
+    z: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[z_id], post_update=True
     )
 
     __mapper_args__ = {

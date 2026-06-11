@@ -979,25 +979,6 @@ class UpdateTemporaryCollisionRulesDAO_temporary_rules_association(
     )
 
 
-class DuplicateKinematicStructureEntityErrorDAO_names_association(
-    Base, AssociationDataAccessObject
-):
-
-    __tablename__ = "_10696966761756032922078837984240156951375122326279076008233503"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_duplicatekinematicstructureentityerrordao_id: Mapped[int] = mapped_column(
-        ForeignKey("DuplicateKinematicStructureEntityErrorDAO.database_id")
-    )
-    target_prefixednamedao_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id")
-    )
-
-    target: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", foreign_keys=[target_prefixednamedao_id]
-    )
-
-
 class DuplicateRobotAssignmentsErrorDAO_robots_association(
     Base, AssociationDataAccessObject
 ):
@@ -2073,10 +2054,6 @@ class AtomicWorldModificationNotAtomicDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     world_id: Mapped[int] = mapped_column(
         ForeignKey("WorldMappingDAO.database_id", use_alter=True),
         nullable=True,
@@ -3130,10 +3107,6 @@ class ContextIsUnavailableDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     instance_id: Mapped[int] = mapped_column(
         ForeignKey("DesignatorDAO.database_id", use_alter=True),
         nullable=True,
@@ -3165,10 +3138,6 @@ class DatabaseNotAvailableErrorDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
 
@@ -3678,10 +3647,6 @@ class DofNotInWorldStateErrorDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     dof_id: Mapped[uuid.UUID] = mapped_column(
@@ -4834,10 +4799,6 @@ class IncorrectWorldStateValueShapeErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     dof_id: Mapped[uuid.UUID] = mapped_column(
         sqlalchemy.sql.sqltypes.UUID, nullable=False, use_existing_column=True
     )
@@ -5509,10 +5470,6 @@ class LogicalErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
     )
@@ -5869,9 +5826,6 @@ class MismatchingCommandLengthErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
     expected_length: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     actual_length: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
@@ -5887,10 +5841,6 @@ class MismatchingIDsInWorldModificationDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     modification_type: Mapped[TypeType] = mapped_column(
@@ -6209,6 +6159,29 @@ class InputNotExpressionErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InputNotExpressionErrorDAO",
         "inherit_condition": database_id == InvalidConditionErrorDAO.database_id,
+    }
+
+
+class InvalidConstraintExpressionShapeErrorDAO(
+    MotionStatechartErrorDAO,
+    DataAccessObject[
+        giskardpy.motion_statechart.exceptions.InvalidConstraintExpressionShapeError
+    ],
+):
+
+    __tablename__ = "InvalidConstraintExpressionShapeErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MotionStatechartErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    actual_shape: Mapped[builtins.tuple] = mapped_column(use_existing_column=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InvalidConstraintExpressionShapeErrorDAO",
+        "inherit_condition": database_id == MotionStatechartErrorDAO.database_id,
     }
 
 
@@ -8187,10 +8160,6 @@ class MultiSimErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
     polymorphic_type: Mapped[str] = mapped_column(
         String(255), nullable=False, use_existing_column=True
     )
@@ -8412,9 +8381,6 @@ class NegativeConnectionVelocityDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
     velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
 
@@ -8426,10 +8392,6 @@ class NoJointStateWithTypeDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     joint_state: Mapped[
@@ -8729,10 +8691,6 @@ class NotJsonSerializableDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     polymorphic_type: Mapped[str] = mapped_column(
@@ -9258,12 +9216,44 @@ class ParsingErrorDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
     file_path: Mapped[typing.Optional[builtins.str]] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
+
+    polymorphic_type: Mapped[str] = mapped_column(
+        String(255), nullable=False, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "ParsingErrorDAO",
+    }
+
+
+class PackageResolutionErrorDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.PackageResolutionError],
+):
+
+    __tablename__ = "PackageResolutionErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    package_name: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    details: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PackageResolutionErrorDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+    }
 
 
 class PartNetLabelClassDescriptionDAO(
@@ -9314,6 +9304,32 @@ class PartNetMobilityDatasetLoaderDAO(
     directory: Mapped[pathlib.Path] = mapped_column(
         krrood.ormatic.custom_types.PathType, nullable=False, use_existing_column=True
     )
+
+
+class PathResolutionErrorDAO(
+    ParsingErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.PathResolutionError],
+):
+
+    __tablename__ = "PathResolutionErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(ParsingErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    uri: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+    details: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PathResolutionErrorDAO",
+        "inherit_condition": database_id == ParsingErrorDAO.database_id,
+    }
 
 
 class PerceptionQueryDAO(Base, DataAccessObject[coraplex.perception.PerceptionQuery]):
@@ -9738,10 +9754,6 @@ class PlanFailureDAO(Base, DataAccessObject[coraplex.plans.failures.PlanFailure]
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     polymorphic_type: Mapped[str] = mapped_column(
@@ -10217,10 +10229,6 @@ class PointOccupiedErrorDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     point_id: Mapped[int] = mapped_column(
@@ -11618,6 +11626,31 @@ class QoSProfileJSONSerializerDAO(
     )
 
 
+class QuaternionConversionErrorDAO(
+    MultiSimErrorDAO,
+    DataAccessObject[
+        semantic_digital_twin.adapters.multi_sim.QuaternionConversionError
+    ],
+):
+
+    __tablename__ = "QuaternionConversionErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MultiSimErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    reason: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "QuaternionConversionErrorDAO",
+        "inherit_condition": database_id == MultiSimErrorDAO.database_id,
+    }
+
+
 class ROS2ConversionErrorDAO(
     Base,
     DataAccessObject[
@@ -12160,10 +12193,6 @@ class RootNodeNotFoundErrorDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     candidates: Mapped[typing.List[builtins.str]] = mapped_column(
@@ -16645,10 +16674,6 @@ class UnknownWorldModificationDAO(
         Integer, primary_key=True, use_existing_column=True
     )
 
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
 
 class UpdateTemporaryCollisionRulesDAO(
     MotionStatechartNodeDAO,
@@ -16695,40 +16720,6 @@ class UsageErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UsageErrorDAO",
         "inherit_condition": database_id == LogicalErrorDAO.database_id,
-    }
-
-
-class AddingAnExistingSemanticAnnotationErrorDAO(
-    UsageErrorDAO,
-    DataAccessObject[
-        semantic_digital_twin.exceptions.AddingAnExistingSemanticAnnotationError
-    ],
-):
-
-    __tablename__ = "AddingAnExistingSemanticAnnotationErrorDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(UsageErrorDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    semantic_annotation_id: Mapped[int] = mapped_column(
-        ForeignKey("SemanticAnnotationDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    semantic_annotation: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO",
-        uselist=False,
-        foreign_keys=[semantic_annotation_id],
-        post_update=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "AddingAnExistingSemanticAnnotationErrorDAO",
-        "inherit_condition": database_id == UsageErrorDAO.database_id,
     }
 
 
@@ -16814,36 +16805,6 @@ class DoesNotBelongToAWorldErrorDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "DoesNotBelongToAWorldErrorDAO",
-        "inherit_condition": database_id == UsageErrorDAO.database_id,
-    }
-
-
-class DuplicateKinematicStructureEntityErrorDAO(
-    UsageErrorDAO,
-    DataAccessObject[
-        semantic_digital_twin.exceptions.DuplicateKinematicStructureEntityError
-    ],
-):
-
-    __tablename__ = "DuplicateKinematicStructureEntityErrorDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(UsageErrorDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    names: Mapped[
-        builtins.list[DuplicateKinematicStructureEntityErrorDAO_names_association]
-    ] = relationship(
-        "DuplicateKinematicStructureEntityErrorDAO_names_association",
-        collection_class=builtins.list,
-        cascade="all, delete-orphan",
-        foreign_keys="[DuplicateKinematicStructureEntityErrorDAO_names_association.source_duplicatekinematicstructureentityerrordao_id]",
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "DuplicateKinematicStructureEntityErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
     }
 
@@ -17014,6 +16975,35 @@ class InvalidPlaneDimensionsDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "InvalidPlaneDimensionsDAO",
+        "inherit_condition": database_id == UsageErrorDAO.database_id,
+    }
+
+
+class MimicDofLimitOverwriteErrorDAO(
+    UsageErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.MimicDofLimitOverwriteError],
+):
+
+    __tablename__ = "MimicDofLimitOverwriteErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(UsageErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    dof_name_id: Mapped[int] = mapped_column(
+        ForeignKey("PrefixedNameDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    dof_name: Mapped[PrefixedNameDAO] = relationship(
+        "PrefixedNameDAO", uselist=False, foreign_keys=[dof_name_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "MimicDofLimitOverwriteErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
     }
 
@@ -17279,6 +17269,51 @@ class SpatialTypesErrorDAO(
     }
 
 
+class InsufficientVectorsErrorDAO(
+    SpatialTypesErrorDAO,
+    DataAccessObject[semantic_digital_twin.exceptions.InsufficientVectorsError],
+):
+
+    __tablename__ = "InsufficientVectorsErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(SpatialTypesErrorDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    x_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    y_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+    z_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
+        ForeignKey("Vector3MappingDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    x: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[x_id], post_update=True
+    )
+    y: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[y_id], post_update=True
+    )
+    z: Mapped[Vector3MappingDAO] = relationship(
+        "Vector3MappingDAO", uselist=False, foreign_keys=[z_id], post_update=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "InsufficientVectorsErrorDAO",
+        "inherit_condition": database_id == SpatialTypesErrorDAO.database_id,
+    }
+
+
 class MissingReferenceFrameErrorDAO(
     SpatialTypesErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingReferenceFrameError],
@@ -17324,27 +17359,31 @@ class ReferenceFrameMismatchErrorDAO(
         use_existing_column=True,
     )
 
-    frame1_id: Mapped[int] = mapped_column(
+    context: Mapped[typing.Optional[builtins.str]] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
+
+    expected_frame_id: Mapped[int] = mapped_column(
         ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
-    frame2_id: Mapped[int] = mapped_column(
+    actual_frame_id: Mapped[int] = mapped_column(
         ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    frame1: Mapped[KinematicStructureEntityDAO] = relationship(
+    expected_frame: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
-        foreign_keys=[frame1_id],
+        foreign_keys=[expected_frame_id],
         post_update=True,
     )
-    frame2: Mapped[KinematicStructureEntityDAO] = relationship(
+    actual_frame: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
-        foreign_keys=[frame2_id],
+        foreign_keys=[actual_frame_id],
         post_update=True,
     )
 
@@ -17390,6 +17429,10 @@ class UselessConceptErrorDAO(
         ForeignKey(UsageErrorDAO.database_id),
         primary_key=True,
         use_existing_column=True,
+    )
+
+    reason: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     __mapper_args__ = {
@@ -18955,10 +18998,6 @@ class WorldEntityWithIDNotInKwargsDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
-    )
-
-    message: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
 
     world_entity_id: Mapped[uuid.UUID] = mapped_column(
