@@ -286,7 +286,7 @@ Queries, inference rules, and instantiated variables are too involved for a one-
 
 The rule's `build` just calls `XAssembler(ctx).assemble(node)`.  The orchestrating {py:class}`~krrood.entity_query_language.verbalization.grammar.assembly.query.QueryAssembler` delegates cohesive sub-forms to their own components: the trailing clauses to {py:mod}`~krrood.entity_query_language.verbalization.grammar.assembly.clauses`, the WHERE partition to {py:class}`~krrood.entity_query_language.verbalization.grammar.assembly.restrictions.RestrictionAssembler`, and the aggregation value-subquery to {py:class}`~krrood.entity_query_language.verbalization.grammar.assembly.aggregation_value.AggregationValueAssembler`.
 
-Navigation chains are realisation-only (no plan): {py:class}`~krrood.entity_query_language.verbalization.grammar.assembly.chains.ChainAssembler` analyses the chain once into a {py:class}`~krrood.entity_query_language.verbalization.chain_utils.ChainAnalysis` and dispatches to the plural / bool-predicative / possessive / pronominal-deferred form, the possessive/pronominal surface built by {py:mod}`~krrood.entity_query_language.verbalization.rendering.possessive`.
+Navigation chains are realisation-only (no plan): {py:class}`~krrood.entity_query_language.verbalization.grammar.assembly.chains.ChainAssembler` analyses the chain once into a {py:class}`~krrood.entity_query_language.verbalization.chain_utils.ChainAnalysis` and dispatches to the plural / bool-predicative / possessive / pronominal-deferred form, the possessive/pronominal surface built by {py:mod}`~krrood.entity_query_language.verbalization.microplanning.possessive`.
 
 ---
 
@@ -465,7 +465,7 @@ text = VerbalizationPipeline(ParagraphRenderer(MarkdownFormatter())).verbalize(q
 
 - {py:func}`~krrood.entity_query_language.verbalization.rendering.realization.realize_tree`
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.coreference_processor.CoreferenceProcessor` / {py:class}`~krrood.entity_query_language.verbalization.rendering.determiner_processor.DeterminerProcessor` / {py:class}`~krrood.entity_query_language.verbalization.rendering.morphology_processor.MorphologyProcessor`
-- {py:mod}`~krrood.entity_query_language.verbalization.rendering.possessive`
+- {py:mod}`~krrood.entity_query_language.verbalization.microplanning.possessive`
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.renderer.ParagraphRenderer` / `HierarchicalRenderer`
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.formatter.PlainFormatter` / `ANSIFormatter` / `HTMLFormatter`
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.source_link_resolver.SourceLinkResolver` / `AutoAPIResolver`

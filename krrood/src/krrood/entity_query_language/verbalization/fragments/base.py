@@ -230,7 +230,7 @@ class PossessiveChain(VerbFragment):
     *"the amount of the amount_details of the BankTransaction"* (otherwise) is a discourse
     decision the :class:`~krrood.entity_query_language.verbalization.rendering.coreference_processor.CoreferenceProcessor`
     makes — it then calls the
-    :mod:`~krrood.entity_query_language.verbalization.rendering.possessive` builders to render
+    :mod:`~krrood.entity_query_language.verbalization.microplanning.possessive` builders to render
     the chosen form.  Bool-predicative chains never pronominalise and so render directly without
     this node.
     """

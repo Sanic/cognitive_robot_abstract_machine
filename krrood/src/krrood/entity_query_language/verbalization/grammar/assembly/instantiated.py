@@ -35,7 +35,7 @@ from krrood.entity_query_language.verbalization.grammar.planning.instantiated im
     InstantiatedPlan,
     InstantiatedPlanner,
 )
-from krrood.entity_query_language.verbalization.rendering.possessive import (
+from krrood.entity_query_language.verbalization.microplanning.possessive import (
     possessive_path,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
@@ -84,7 +84,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
 
     def _field_ref(self, field_name: str, type_name: str, type_cls) -> VerbFragment:
         """*"the <field> of the <Type>"* — a single-hop possessive, built by the shared
-        :func:`~krrood.entity_query_language.verbalization.rendering.possessive.possessive_path`
+        :func:`~krrood.entity_query_language.verbalization.microplanning.possessive.possessive_path`
         so the genitive structure lives in exactly one place."""
         type_root = PhraseFragment(
             parts=[

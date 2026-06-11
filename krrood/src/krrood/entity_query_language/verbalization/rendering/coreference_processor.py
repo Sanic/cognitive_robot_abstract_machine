@@ -36,7 +36,7 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     Number,
 )
-from krrood.entity_query_language.verbalization.rendering.possessive import (
+from krrood.entity_query_language.verbalization.microplanning.possessive import (
     possessive_path,
     pronominal_path,
 )

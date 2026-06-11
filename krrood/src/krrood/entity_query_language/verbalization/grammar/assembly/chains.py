@@ -48,7 +48,7 @@ from krrood.entity_query_language.verbalization.grammar.assembly.base import Ass
 from krrood.entity_query_language.verbalization.grammar.assembly.query import (
     QueryAssembler,
 )
-from krrood.entity_query_language.verbalization.rendering.possessive import (
+from krrood.entity_query_language.verbalization.microplanning.possessive import (
     possessive_path,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
