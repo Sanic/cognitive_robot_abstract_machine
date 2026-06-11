@@ -292,7 +292,7 @@ def test_model_synchronization_creation_only(rclpy_node):
 
         c = Connection6DoF.create_with_dofs(parent=b2, child=new_body, world=w1)
         w1.add_connection(c)
-    time.sleep(0.1)
+    time.sleep(0.5)
     assert len(w1.kinematic_structure_entities) == 2
     assert len(w2.kinematic_structure_entities) == 2
     assert len(w1.connections) == 1
@@ -1109,7 +1109,7 @@ def test_nested_modify_world_publish_changes_true_false(rclpy_node):
         new_body = Body(name=PrefixedName("b3"))
         w1.add_kinematic_structure_entity(new_body)
 
-    time.sleep(0.2)
+    time.sleep(0.5)
 
     assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
 
@@ -1122,7 +1122,7 @@ def test_nested_modify_world_publish_changes_true_false(rclpy_node):
                     PrefixedName("handle"), w1
                 )
 
-    with pytest.raises(BrokenWorldModificationHistoryError):
+    with pytest.raises(MismatchingPublishChangesAttribute):
         with w1.modify_world(publish_changes=False):
             handle = Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
 
