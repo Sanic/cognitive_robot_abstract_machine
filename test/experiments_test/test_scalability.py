@@ -17,23 +17,11 @@ from experiments.ormatic_experiments.scalability import (
 
 
 @pytest.fixture(scope="module")
-def small_class_set(pycram_class_sets):
-    all_classes, alternative_mappings, type_mappings = pycram_class_sets
+def small_class_set():
+    all_classes, alternative_mappings, type_mappings = build_cram_class_sets()
     mandatory = {am.original_class() for am in alternative_mappings}
     extras = set(list(all_classes - mandatory)[:5])
     return mandatory | extras, alternative_mappings, type_mappings
-
-
-@pytest.fixture(scope="module")
-def aggregate_result(pycram_class_sets):
-    all_classes, alternative_mappings, type_mappings = pycram_class_sets
-    return run_scalability_experiment(
-        list(all_classes),
-        alternative_mappings,
-        type_mappings,
-        class_drop_probability=0.8,
-        iterations=2,
-    )
 
 
 def test_experiment_timings_are_non_negative(small_class_set):
