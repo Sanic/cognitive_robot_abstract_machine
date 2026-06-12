@@ -58,16 +58,7 @@ import coraplex.view_manager
 import datetime
 import enum
 import giskardpy.executor
-import giskardpy.middleware.ros2.behavior_tree_config
 import giskardpy.middleware.ros2.exceptions
-import giskardpy.middleware.ros2.giskard
-import giskardpy.middleware.ros2.python_interface
-import giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs
-import giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs
-import giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs
-import giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs
-import giskardpy.middleware.ros2.scripts.tools.interactive_marker
-import giskardpy.middleware.ros2.utils.utils_for_tests
 import giskardpy.model.world_config
 import giskardpy.motion_statechart.binding_policy
 import giskardpy.motion_statechart.context
@@ -444,23 +435,6 @@ class ExecutionDataDAO_added_world_modifications_association(
     target: Mapped[WorldModelModificationBlockDAO] = relationship(
         "WorldModelModificationBlockDAO",
         foreign_keys=[target_worldmodelmodificationblockdao_id],
-    )
-
-
-class GiskardTesterDAO_robot_names_association(Base, AssociationDataAccessObject):
-
-    __tablename__ = "_18552742813313585395849894661168412239528432174761485585780336"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_giskardtesterdao_id: Mapped[int] = mapped_column(
-        ForeignKey("GiskardTesterDAO.database_id")
-    )
-    target_prefixednamedao_id: Mapped[int] = mapped_column(
-        ForeignKey("PrefixedNameDAO.database_id")
-    )
-
-    target: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", foreign_keys=[target_prefixednamedao_id]
     )
 
 
@@ -1428,12 +1402,12 @@ class HSRBNeckDAO_sensors_association(Base, AssociationDataAccessObject):
     source_hsrbneckdao_id: Mapped[int] = mapped_column(
         ForeignKey("HSRBNeckDAO.database_id")
     )
-    target_hsrbheadcentercameradao_id: Mapped[int] = mapped_column(
-        ForeignKey("HSRBHeadCenterCameraDAO.database_id")
+    target_cameradao_id: Mapped[int] = mapped_column(
+        ForeignKey("CameraDAO.database_id")
     )
 
-    target: Mapped[HSRBHeadCenterCameraDAO] = relationship(
-        "HSRBHeadCenterCameraDAO", foreign_keys=[target_hsrbheadcentercameradao_id]
+    target: Mapped[CameraDAO] = relationship(
+        "CameraDAO", foreign_keys=[target_cameradao_id]
     )
 
 
@@ -1999,7 +1973,11 @@ class AccelerationVariableDAO(
     )
 
     dof: Mapped[DegreeOfFreedomDAO] = relationship(
-        "DegreeOfFreedomDAO", uselist=False, foreign_keys=[dof_id], post_update=True
+        "DegreeOfFreedomDAO",
+        uselist=False,
+        foreign_keys=[dof_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -2024,7 +2002,11 @@ class AcknowledgmentDAO(
     )
 
     node_meta_data: Mapped[MetaDataDAO] = relationship(
-        "MetaDataDAO", uselist=False, foreign_keys=[node_meta_data_id], post_update=True
+        "MetaDataDAO",
+        uselist=False,
+        foreign_keys=[node_meta_data_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -2084,7 +2066,11 @@ class AtomicWorldModificationNotAtomicDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -2107,64 +2093,6 @@ class BaseConstraintDAO(Base, DataAccessObject[giskardpy.qp.constraint.BaseConst
     __mapper_args__ = {
         "polymorphic_on": "polymorphic_type",
         "polymorphic_identity": "BaseConstraintDAO",
-    }
-
-
-class BehaviorTreeConfigDAO(
-    Base,
-    DataAccessObject[giskardpy.middleware.ros2.behavior_tree_config.BehaviorTreeConfig],
-):
-
-    __tablename__ = "BehaviorTreeConfigDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    tree_tick_rate: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    debug_mode: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-    add_gantt_chart_plotter: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    add_goal_graph_plotter: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    add_trajectory_plotter: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    add_debug_trajectory_plotter: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    add_debug_marker_publisher: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    add_trajectory_visualizer: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    add_debug_trajectory_visualizer: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
-    add_qp_data_publisher_id: Mapped[int] = mapped_column(
-        ForeignKey("QPDataPublisherConfigDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    add_qp_data_publisher: Mapped[QPDataPublisherConfigDAO] = relationship(
-        "QPDataPublisherConfigDAO",
-        uselist=False,
-        foreign_keys=[add_qp_data_publisher_id],
-        post_update=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "BehaviorTreeConfigDAO",
     }
 
 
@@ -2198,6 +2126,7 @@ class BoundingBoxDAO(
         uselist=False,
         foreign_keys=[origin_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -2214,25 +2143,6 @@ class CaseReasonerDAO(
     model_directory: Mapped[builtins.str] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
-
-
-class ClosedLoopBTConfigDAO(
-    BehaviorTreeConfigDAO,
-    DataAccessObject[giskardpy.middleware.ros2.behavior_tree_config.ClosedLoopBTConfig],
-):
-
-    __tablename__ = "ClosedLoopBTConfigDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(BehaviorTreeConfigDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ClosedLoopBTConfigDAO",
-        "inherit_condition": database_id == BehaviorTreeConfigDAO.database_id,
-    }
 
 
 class ClosestPointsDAO(
@@ -2262,10 +2172,18 @@ class ClosestPointsDAO(
     )
 
     body_a: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_a_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_a_id],
+        post_update=True,
+        lazy="selectin",
     )
     body_b: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_b_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_b_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -2294,10 +2212,18 @@ class CollisionCheckDAO(
     )
 
     body_a: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_a_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_a_id],
+        post_update=True,
+        lazy="selectin",
     )
     body_b: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_b_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_b_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -2340,6 +2266,7 @@ class CollisionCheckingResultDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[CollisionCheckingResultDAO_contacts_association.source_collisioncheckingresultdao_id]",
+            lazy="selectin",
         )
     )
 
@@ -2387,13 +2314,18 @@ class CollisionGroupDAO(
     )
 
     root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
+        lazy="selectin",
     )
     bodies: Mapped[builtins.set[CollisionGroupDAO_bodies_association]] = relationship(
         "CollisionGroupDAO_bodies_association",
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionGroupDAO_bodies_association.source_collisiongroupdao_id]",
+        lazy="selectin",
     )
 
 
@@ -2459,6 +2391,7 @@ class CollisionMatrixDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionMatrixDAO_collision_checks_association.source_collisionmatrixdao_id]",
+        lazy="selectin",
     )
 
 
@@ -2555,7 +2488,11 @@ class AllowAlwaysInCollisionDAO(
     )
 
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
     collision_checks: Mapped[
         builtins.set[AllowAlwaysInCollisionDAO_collision_checks_association]
@@ -2564,6 +2501,7 @@ class AllowAlwaysInCollisionDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[AllowAlwaysInCollisionDAO_collision_checks_association.source_allowalwaysincollisiondao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -2594,6 +2532,7 @@ class AllowCollisionBetweenGroupsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AllowCollisionBetweenGroupsDAO_body_group_a_association.source_allowcollisionbetweengroupsdao_id]",
+        lazy="selectin",
     )
     body_group_b: Mapped[
         builtins.list[AllowCollisionBetweenGroupsDAO_body_group_b_association]
@@ -2602,6 +2541,7 @@ class AllowCollisionBetweenGroupsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AllowCollisionBetweenGroupsDAO_body_group_b_association.source_allowcollisionbetweengroupsdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -2653,6 +2593,7 @@ class AllowCollisionForBodiesDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[AllowCollisionForBodiesDAO_allowed_collision_bodies_association.source_allowcollisionforbodiesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -2687,7 +2628,11 @@ class AllowDefaultInCollisionDAO(
     )
 
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
     bodies: Mapped[builtins.list[AllowDefaultInCollisionDAO_bodies_association]] = (
         relationship(
@@ -2695,6 +2640,7 @@ class AllowDefaultInCollisionDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[AllowDefaultInCollisionDAO_bodies_association.source_allowdefaultincollisiondao_id]",
+            lazy="selectin",
         )
     )
 
@@ -2740,7 +2686,11 @@ class AllowNeverInCollisionDAO(
     )
 
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
     collision_checks: Mapped[
         builtins.set[AllowNeverInCollisionDAO_collision_checks_association]
@@ -2749,6 +2699,7 @@ class AllowNeverInCollisionDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[AllowNeverInCollisionDAO_collision_checks_association.source_allowneverincollisiondao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -2800,7 +2751,11 @@ class AllowSelfCollisionsDAO(
     )
 
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -2878,6 +2833,7 @@ class AvoidCollisionBetweenGroupsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AvoidCollisionBetweenGroupsDAO_body_group_a_association.source_avoidcollisionbetweengroupsdao_id]",
+        lazy="selectin",
     )
     body_group_b: Mapped[
         builtins.list[AvoidCollisionBetweenGroupsDAO_body_group_b_association]
@@ -2886,6 +2842,7 @@ class AvoidCollisionBetweenGroupsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AvoidCollisionBetweenGroupsDAO_body_group_b_association.source_avoidcollisionbetweengroupsdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -2916,7 +2873,11 @@ class AvoidExternalCollisionsDAO(
     )
 
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -2947,7 +2908,11 @@ class AvoidSelfCollisionsDAO(
     )
 
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -2978,6 +2943,7 @@ class CollisionViolatedErrorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionViolatedErrorDAO_violated_collisions_association.source_collisionviolatederrordao_id]",
+        lazy="selectin",
     )
 
 
@@ -3067,25 +3033,32 @@ class ConstraintBuilderDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
     root: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[root_id],
         post_update=True,
+        lazy="selectin",
     )
     tip: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_id],
         post_update=True,
+        lazy="selectin",
     )
     target: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
         "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
         foreign_keys=[target_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -3141,7 +3114,11 @@ class ContextIsUnavailableDAO(
     )
 
     instance: Mapped[DesignatorDAO] = relationship(
-        "DesignatorDAO", uselist=False, foreign_keys=[instance_id], post_update=True
+        "DesignatorDAO",
+        uselist=False,
+        foreign_keys=[instance_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -3193,7 +3170,11 @@ class DebugExpressionDAO(
     )
 
     color: Mapped[ColorDAO] = relationship(
-        "ColorDAO", uselist=False, foreign_keys=[color_id], post_update=True
+        "ColorDAO",
+        uselist=False,
+        foreign_keys=[color_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -3226,12 +3207,14 @@ class DegreeOfFreedomLimitsDAO(
         uselist=False,
         foreign_keys=[lower_id],
         post_update=True,
+        lazy="selectin",
     )
     upper: Mapped[DerivativeMap_floatDAO] = relationship(
         "DerivativeMap_floatDAO",
         uselist=False,
         foreign_keys=[upper_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -3485,7 +3468,11 @@ class CloseActionDAO(
     )
 
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -3532,10 +3519,18 @@ class CuttingActionDAO(
     )
 
     object_: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object__id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object__id],
+        post_update=True,
+        lazy="selectin",
     )
     tool: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO", uselist=False, foreign_keys=[tool_id], post_update=True
+        "SemanticAnnotationDAO",
+        uselist=False,
+        foreign_keys=[tool_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -3588,7 +3583,11 @@ class ClosingMotionDAO(
     )
 
     object_part: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_part_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_part_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -3633,7 +3632,11 @@ class DetectActionDAO(
     )
 
     region: Mapped[RegionDAO] = relationship(
-        "RegionDAO", uselist=False, foreign_keys=[region_id], post_update=True
+        "RegionDAO",
+        uselist=False,
+        foreign_keys=[region_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -3661,7 +3664,11 @@ class DetectingMotionDAO(
     )
 
     query: Mapped[PerceptionQueryDAO] = relationship(
-        "PerceptionQueryDAO", uselist=False, foreign_keys=[query_id], post_update=True
+        "PerceptionQueryDAO",
+        uselist=False,
+        foreign_keys=[query_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -4082,12 +4089,14 @@ class ExecutionDataDAO(
         uselist=False,
         foreign_keys=[execution_start_pose_id],
         post_update=True,
+        lazy="selectin",
     )
     execution_end_pose: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO",
         uselist=False,
         foreign_keys=[execution_end_pose_id],
         post_update=True,
+        lazy="selectin",
     )
     added_world_modifications: Mapped[
         builtins.list[ExecutionDataDAO_added_world_modifications_association]
@@ -4096,6 +4105,7 @@ class ExecutionDataDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ExecutionDataDAO_added_world_modifications_association.source_executiondatadao_id]",
+        lazy="selectin",
     )
 
 
@@ -4148,9 +4158,14 @@ class ExecutorDAO(Base, DataAccessObject[giskardpy.executor.Executor]):
         uselist=False,
         foreign_keys=[context_id],
         post_update=True,
+        lazy="selectin",
     )
     pacer: Mapped[PacerDAO] = relationship(
-        "PacerDAO", uselist=False, foreign_keys=[pacer_id], post_update=True
+        "PacerDAO",
+        uselist=False,
+        foreign_keys=[pacer_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -4213,7 +4228,11 @@ class FaceAtActionDAO(
     )
 
     pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[pose_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -4244,7 +4263,11 @@ class FetchWorldServerDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -4363,6 +4386,7 @@ class FollowToolCenterPointPathActionDAO(
         uselist=False,
         foreign_keys=[target_locations_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -4420,19 +4444,25 @@ class ForwardKinematicsBindingDAO(
     )
 
     name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[name_id],
+        post_update=True,
+        lazy="selectin",
     )
     root: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[root_id],
         post_update=True,
+        lazy="selectin",
     )
     tip: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -4460,7 +4490,11 @@ class FrozenBoxDAO(
     )
 
     scale: Mapped[ScaleDAO] = relationship(
-        "ScaleDAO", uselist=False, foreign_keys=[scale_id], post_update=True
+        "ScaleDAO",
+        uselist=False,
+        foreign_keys=[scale_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -4483,169 +4517,6 @@ class FrozenIndexBoxDAO(
     y1: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     z0: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     z1: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-
-
-class GiskardDAO(Base, DataAccessObject[giskardpy.middleware.ros2.giskard.Giskard]):
-
-    __tablename__ = "GiskardDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    world_config_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldConfigDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    behavior_tree_config_id: Mapped[int] = mapped_column(
-        ForeignKey("BehaviorTreeConfigDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    qp_controller_config_id: Mapped[int] = mapped_column(
-        ForeignKey("QPControllerConfigDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    world_config: Mapped[WorldConfigDAO] = relationship(
-        "WorldConfigDAO",
-        uselist=False,
-        foreign_keys=[world_config_id],
-        post_update=True,
-    )
-    behavior_tree_config: Mapped[BehaviorTreeConfigDAO] = relationship(
-        "BehaviorTreeConfigDAO",
-        uselist=False,
-        foreign_keys=[behavior_tree_config_id],
-        post_update=True,
-    )
-    qp_controller_config: Mapped[QPControllerConfigDAO] = relationship(
-        "QPControllerConfigDAO",
-        uselist=False,
-        foreign_keys=[qp_controller_config_id],
-        post_update=True,
-    )
-
-
-class GiskardTesterDAO(
-    Base,
-    DataAccessObject[giskardpy.middleware.ros2.utils.utils_for_tests.GiskardTester],
-):
-
-    __tablename__ = "GiskardTesterDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    total_time_spend_giskarding: Mapped[builtins.int] = mapped_column(
-        use_existing_column=True
-    )
-    total_time_spend_moving: Mapped[builtins.int] = mapped_column(
-        use_existing_column=True
-    )
-    default_env_name: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    robot_names: Mapped[builtins.list[GiskardTesterDAO_robot_names_association]] = (
-        relationship(
-            "GiskardTesterDAO_robot_names_association",
-            collection_class=builtins.list,
-            cascade="all, delete-orphan",
-            foreign_keys="[GiskardTesterDAO_robot_names_association.source_giskardtesterdao_id]",
-        )
-    )
-
-
-class GiskardWrapperDAO(
-    Base, DataAccessObject[giskardpy.middleware.ros2.python_interface.GiskardWrapper]
-):
-
-    __tablename__ = "GiskardWrapperDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    giskard_node_name: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    polymorphic_type: Mapped[str] = mapped_column(
-        String(255), nullable=False, use_existing_column=True
-    )
-
-    world_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_on": "polymorphic_type",
-        "polymorphic_identity": "GiskardWrapperDAO",
-    }
-
-
-class GiskardWrapperNodeDAO(
-    GiskardWrapperDAO,
-    DataAccessObject[giskardpy.middleware.ros2.python_interface.GiskardWrapperNode],
-):
-
-    __tablename__ = "GiskardWrapperNodeDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(GiskardWrapperDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    is_spinning: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-    node_name: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    avoid_name_conflict: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-    namespace: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    use_global_arguments: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    enable_rosout: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-    start_parameter_services: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    allow_undeclared_parameters: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-    automatically_declare_parameters_from_overrides: Mapped[builtins.bool] = (
-        mapped_column(use_existing_column=True)
-    )
-    enable_logger_service: Mapped[builtins.bool] = mapped_column(
-        use_existing_column=True
-    )
-
-    context_id: Mapped[typing.Optional[builtins.int]] = mapped_column(
-        ForeignKey("ContextDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    context: Mapped[ContextDAO] = relationship(
-        "ContextDAO", uselist=False, foreign_keys=[context_id], post_update=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "GiskardWrapperNodeDAO",
-        "inherit_condition": database_id == GiskardWrapperDAO.database_id,
-    }
 
 
 class GraspDescriptionDAO(
@@ -4689,6 +4560,7 @@ class GraspDescriptionDAO(
         uselist=False,
         foreign_keys=[end_effector_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -4723,13 +4595,18 @@ class GraspingActionDAO(
     )
 
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -4781,6 +4658,7 @@ class HasSimulatorPropertiesDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HasSimulatorPropertiesDAO_simulator_additional_properties_association.source_hassimulatorpropertiesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -4818,6 +4696,7 @@ class HistoryGanttChartPlotterDAO(
         uselist=False,
         foreign_keys=[motion_statechart_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -4874,9 +4753,14 @@ class InertialDAO(
         uselist=False,
         foreign_keys=[center_of_mass_id],
         post_update=True,
+        lazy="selectin",
     )
     inertia: Mapped[InertiaTensorDAO] = relationship(
-        "InertiaTensorDAO", uselist=False, foreign_keys=[inertia_id], post_update=True
+        "InertiaTensorDAO",
+        uselist=False,
+        foreign_keys=[inertia_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -4912,12 +4796,14 @@ class InertialConverterDAO(
         uselist=False,
         foreign_keys=[inertia_pos_id],
         post_update=True,
+        lazy="selectin",
     )
     inertia_quat: Mapped[QuaternionMappingDAO] = relationship(
         "QuaternionMappingDAO",
         uselist=False,
         foreign_keys=[inertia_quat_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -4980,24 +4866,6 @@ class InequalityConstraintDAO(
     }
 
 
-class InteractiveMarkerNodeDAO(
-    Base,
-    DataAccessObject[
-        giskardpy.middleware.ros2.scripts.tools.interactive_marker.InteractiveMarkerNode
-    ],
-):
-
-    __tablename__ = "InteractiveMarkerNodeDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    motion_timeout_seconds: Mapped[builtins.float] = mapped_column(
-        use_existing_column=True
-    )
-
-
 class InvalidCollisionCheckErrorDAO(
     CollisionCheckingErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.InvalidCollisionCheckError],
@@ -5022,6 +4890,7 @@ class InvalidCollisionCheckErrorDAO(
         uselist=False,
         foreign_keys=[collision_check_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -5090,7 +4959,11 @@ class InverseKinematicsSolverDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -5143,7 +5016,11 @@ class JerkVariableDAO(
     )
 
     dof: Mapped[DegreeOfFreedomDAO] = relationship(
-        "DegreeOfFreedomDAO", uselist=False, foreign_keys=[dof_id], post_update=True
+        "DegreeOfFreedomDAO",
+        uselist=False,
+        foreign_keys=[dof_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -5198,59 +5075,15 @@ class JointStateDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[JointStateDAO_connections_association.source_jointstatedao_id]",
+            lazy="selectin",
         )
     )
     name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
-    )
-
-
-class KinematicChainMarkerDAO(
-    Base,
-    DataAccessObject[
-        giskardpy.middleware.ros2.scripts.tools.interactive_marker.KinematicChainMarker
-    ],
-):
-
-    __tablename__ = "KinematicChainMarkerDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    root_link: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    tip_link: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    marker_scale: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    marker_box_size: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    marker_color_value: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    marker_color_alpha: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-    root_body_id: Mapped[int] = mapped_column(
-        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    tip_body_id: Mapped[int] = mapped_column(
-        ForeignKey("KinematicStructureEntityDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    root_body: Mapped[KinematicStructureEntityDAO] = relationship(
-        "KinematicStructureEntityDAO",
+        "PrefixedNameDAO",
         uselist=False,
-        foreign_keys=[root_body_id],
+        foreign_keys=[name_id],
         post_update=True,
-    )
-    tip_body: Mapped[KinematicStructureEntityDAO] = relationship(
-        "KinematicStructureEntityDAO",
-        uselist=False,
-        foreign_keys=[tip_body_id],
-        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -5348,12 +5181,14 @@ class KinematicStructureEntitySpatialRelationDAO(
         uselist=False,
         foreign_keys=[body_id],
         post_update=True,
+        lazy="selectin",
     )
     other: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[other_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -5450,6 +5285,7 @@ class LifeCycleVariableDAO(
         uselist=False,
         foreign_keys=[motion_statechart_node_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -5478,16 +5314,25 @@ class LocationDAO(Base, DataAccessObject[coraplex.locations.base.Location]):
     )
 
     context: Mapped[ContextDAO] = relationship(
-        "ContextDAO", uselist=False, foreign_keys=[context_id], post_update=True
+        "ContextDAO",
+        uselist=False,
+        foreign_keys=[context_id],
+        post_update=True,
+        lazy="selectin",
     )
     target_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
     generator: Mapped[PoseGeneratorBackendDAO] = relationship(
         "PoseGeneratorBackendDAO",
         uselist=False,
         foreign_keys=[generator_id],
         post_update=True,
+        lazy="selectin",
     )
     validators: Mapped[builtins.list[LocationDAO_validators_association]] = (
         relationship(
@@ -5495,6 +5340,7 @@ class LocationDAO(Base, DataAccessObject[coraplex.locations.base.Location]):
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[LocationDAO_validators_association.source_locationdao_id]",
+            lazy="selectin",
         )
     )
 
@@ -5548,10 +5394,18 @@ class LookAtActionDAO(
     )
 
     target: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_id],
+        post_update=True,
+        lazy="selectin",
     )
     camera: Mapped[CameraDAO] = relationship(
-        "CameraDAO", uselist=False, foreign_keys=[camera_id], post_update=True
+        "CameraDAO",
+        uselist=False,
+        foreign_keys=[camera_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -5585,10 +5439,18 @@ class LookingMotionDAO(
     )
 
     target: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_id],
+        post_update=True,
+        lazy="selectin",
     )
     camera: Mapped[CameraDAO] = relationship(
-        "CameraDAO", uselist=False, foreign_keys=[camera_id], post_update=True
+        "CameraDAO",
+        uselist=False,
+        foreign_keys=[camera_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -5700,6 +5562,7 @@ class MaxAvoidedCollisionsOverrideDAO(
             collection_class=builtins.set,
             cascade="all, delete-orphan",
             foreign_keys="[MaxAvoidedCollisionsOverrideDAO_bodies_association.source_maxavoidedcollisionsoverridedao_id]",
+            lazy="selectin",
         )
     )
 
@@ -5811,7 +5674,11 @@ class MessageDAO(
     )
 
     meta_data: Mapped[MetaDataDAO] = relationship(
-        "MetaDataDAO", uselist=False, foreign_keys=[meta_data_id], post_update=True
+        "MetaDataDAO",
+        uselist=False,
+        foreign_keys=[meta_data_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -5939,10 +5806,18 @@ class MixingActionDAO(
     )
 
     object_: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object__id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object__id],
+        post_update=True,
+        lazy="selectin",
     )
     tool: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO", uselist=False, foreign_keys=[tool_id], post_update=True
+        "SemanticAnnotationDAO",
+        uselist=False,
+        foreign_keys=[tool_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6008,6 +5883,7 @@ class ModificationBlockDAO(
         uselist=False,
         foreign_keys=[modifications_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6043,13 +5919,22 @@ class MotionExecutorDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[MotionExecutorDAO_motions_association.source_motionexecutordao_id]",
+            lazy="selectin",
         )
     )
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
     plan_node: Mapped[PlanNodeDAO] = relationship(
-        "PlanNodeDAO", uselist=False, foreign_keys=[plan_node_id], post_update=True
+        "PlanNodeDAO",
+        uselist=False,
+        foreign_keys=[plan_node_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -6087,13 +5972,18 @@ class MotionStatechartContextDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
     qp_controller_config: Mapped[QPControllerConfigDAO] = relationship(
         "QPControllerConfigDAO",
         uselist=False,
         foreign_keys=[qp_controller_config_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -6185,6 +6075,7 @@ class InvalidConditionErrorDAO(
         uselist=False,
         foreign_keys=[condition_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6263,6 +6154,7 @@ class MotionStatechartGraphvizDAO(
         uselist=False,
         foreign_keys=[motion_statechart_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -6508,22 +6400,32 @@ class DistanceToLineDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     center_point: Mapped[Point3MappingDAO] = relationship(
         "Point3MappingDAO",
         uselist=False,
         foreign_keys=[center_point_id],
         post_update=True,
+        lazy="selectin",
     )
     line_axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[line_axis_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6576,7 +6478,11 @@ class ExternalCollisionDistanceMonitorDAO(
     )
 
     body: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6612,10 +6518,18 @@ class FeatureMonitorDAO(
     )
 
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6658,12 +6572,14 @@ class AngleMonitorDAO(
         uselist=False,
         foreign_keys=[reference_vector_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_vector: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[tip_vector_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6706,9 +6622,14 @@ class DistanceMonitorDAO(
         uselist=False,
         foreign_keys=[reference_point_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_point: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[tip_point_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_point_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6751,9 +6672,14 @@ class HeightMonitorDAO(
         uselist=False,
         foreign_keys=[reference_point_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_point: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[tip_point_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_point_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6829,22 +6755,39 @@ class AlignToPushDoorDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     door_object: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[door_object_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[door_object_id],
+        post_update=True,
+        lazy="selectin",
     )
     door_handle: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[door_handle_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[door_handle_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_gripper_axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[tip_gripper_axis_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6876,7 +6819,11 @@ class BaseTrajFollowerDAO(
     )
 
     connection: Mapped[ConnectionDAO] = relationship(
-        "ConnectionDAO", uselist=False, foreign_keys=[connection_id], post_update=True
+        "ConnectionDAO",
+        uselist=False,
+        foreign_keys=[connection_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6912,10 +6859,18 @@ class CuttingDAO(
     )
 
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6949,7 +6904,11 @@ class ExternalCollisionAvoidanceDAO(
     )
 
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -6993,19 +6952,32 @@ class GraspSequenceDAO(
     )
 
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     gripper_joint: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO",
         uselist=False,
         foreign_keys=[gripper_joint_id],
         post_update=True,
+        lazy="selectin",
     )
     goal_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[goal_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[goal_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7048,16 +7020,25 @@ class InsertCylinderDAO(
     )
 
     cylinder_name: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[cylinder_name_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[cylinder_name_id],
+        post_update=True,
+        lazy="selectin",
     )
     hole_point: Mapped[Point3MappingDAO] = relationship(
         "Point3MappingDAO",
         uselist=False,
         foreign_keys=[hole_point_id],
         post_update=True,
+        lazy="selectin",
     )
     up: Mapped[Vector3MappingDAO] = relationship(
-        "Vector3MappingDAO", uselist=False, foreign_keys=[up_id], post_update=True
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[up_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7092,7 +7073,11 @@ class InWorldSpaceDAO(
     )
 
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7130,6 +7115,7 @@ class JointPositionReachedDAO(
         uselist=False,
         foreign_keys=[connection_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7208,15 +7194,21 @@ class MoveAndPickUpActionDAO(
         uselist=False,
         foreign_keys=[standing_position_id],
         post_update=True,
+        lazy="selectin",
     )
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7269,15 +7261,21 @@ class MoveAndPlaceActionDAO(
         uselist=False,
         foreign_keys=[standing_position_id],
         post_update=True,
+        lazy="selectin",
     )
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
     target_location: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO",
         uselist=False,
         foreign_keys=[target_location_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7368,12 +7366,14 @@ class MoveJointsMotionDAO(
         uselist=False,
         foreign_keys=[tip_normal_id],
         post_update=True,
+        lazy="selectin",
     )
     root_normal: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[root_normal_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7413,13 +7413,18 @@ class MoveManipulatorActionDAO(
     )
 
     target_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
     end_effector: Mapped[EndEffectorDAO] = relationship(
         "EndEffectorDAO",
         uselist=False,
         foreign_keys=[end_effector_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7457,13 +7462,18 @@ class MoveManipulatorMotionDAO(
     )
 
     target: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_id],
+        post_update=True,
+        lazy="selectin",
     )
     end_effector: Mapped[EndEffectorDAO] = relationship(
         "EndEffectorDAO",
         uselist=False,
         foreign_keys=[end_effector_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7493,7 +7503,11 @@ class MoveMotionDAO(
     )
 
     target: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7560,6 +7574,7 @@ class MoveTCPWaypointsMotionDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[MoveTCPWaypointsMotionDAO_waypoints_association.source_movetcpwaypointsmotiondao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7604,18 +7619,21 @@ class MoveToReachDAO(
         uselist=False,
         foreign_keys=[target_pose_offset_robot_id],
         post_update=True,
+        lazy="selectin",
     )
     target_pose_end_effector: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO",
         uselist=False,
         foreign_keys=[target_pose_end_effector_id],
         post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -7661,7 +7679,11 @@ class MoveToolCenterPointMotionDAO(
     )
 
     target: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -8334,6 +8356,7 @@ class NavigateActionDAO(
         uselist=False,
         foreign_keys=[target_location_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -8369,10 +8392,18 @@ class NavigateActionServerTaskDAO(
     )
 
     target_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
     base_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[base_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[base_link_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -8480,6 +8511,7 @@ class NodeArtifactsDAO(
         uselist=False,
         foreign_keys=[constraints_id],
         post_update=True,
+        lazy="selectin",
     )
     debug_expressions: Mapped[
         builtins.list[NodeArtifactsDAO_debug_expressions_association]
@@ -8488,6 +8520,7 @@ class NodeArtifactsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[NodeArtifactsDAO_debug_expressions_association.source_nodeartifactsdao_id]",
+        lazy="selectin",
     )
 
 
@@ -8519,6 +8552,7 @@ class NodeInitializationErrorDAO(
         uselist=False,
         foreign_keys=[node_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -8572,6 +8606,7 @@ class NodeAlreadyBelongsToDifferentNodeErrorDAO(
         uselist=False,
         foreign_keys=[new_node_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -8651,7 +8686,11 @@ class NodeProcessingResultDAO(
     )
 
     body: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -8806,6 +8845,7 @@ class ObservationVariableDAO(
         uselist=False,
         foreign_keys=[motion_statechart_node_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -8856,12 +8896,14 @@ class OpenDAO(
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
     environment_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[environment_link_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -8916,31 +8958,16 @@ class OpenActionDAO(
     )
 
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "OpenActionDAO",
         "inherit_condition": database_id == ActionDescriptionDAO.database_id,
-    }
-
-
-class OpenLoopBTConfigDAO(
-    BehaviorTreeConfigDAO,
-    DataAccessObject[giskardpy.middleware.ros2.behavior_tree_config.OpenLoopBTConfig],
-):
-
-    __tablename__ = "OpenLoopBTConfigDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(BehaviorTreeConfigDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "OpenLoopBTConfigDAO",
-        "inherit_condition": database_id == BehaviorTreeConfigDAO.database_id,
     }
 
 
@@ -8970,7 +8997,11 @@ class OpeningMotionDAO(
     )
 
     object_part: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_part_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_part_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9014,16 +9045,25 @@ class OrientationReachedDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     goal_orientation: Mapped[RotationMatrixMappingDAO] = relationship(
         "RotationMatrixMappingDAO",
         uselist=False,
         foreign_keys=[goal_orientation_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9103,6 +9143,7 @@ class ParallelDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ParallelDAO_nodes_association.source_paralleldao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9155,15 +9196,21 @@ class CartesianPoseStraightDAO(
         uselist=False,
         foreign_keys=[root_link_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
     goal_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[goal_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[goal_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9209,12 +9256,14 @@ class CartesianVelocityLimitDAO(
         uselist=False,
         foreign_keys=[root_link_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9345,13 +9394,25 @@ class PerceptionQueryDAO(Base, DataAccessObject[coraplex.perception.PerceptionQu
     )
 
     region: Mapped[BoundingBoxDAO] = relationship(
-        "BoundingBoxDAO", uselist=False, foreign_keys=[region_id], post_update=True
+        "BoundingBoxDAO",
+        uselist=False,
+        foreign_keys=[region_id],
+        post_update=True,
+        lazy="selectin",
     )
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -9388,12 +9449,14 @@ class PerpendicularMonitorDAO(
         uselist=False,
         foreign_keys=[reference_normal_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_normal: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[tip_normal_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9440,19 +9503,25 @@ class PickAndPlaceActionDAO(
     )
 
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
     target_location: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO",
         uselist=False,
         foreign_keys=[target_location_id],
         post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9492,13 +9561,18 @@ class PickUpActionDAO(
     )
 
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9522,6 +9596,7 @@ class PipelineDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PipelineDAO_steps_association.source_pipelinedao_id]",
+        lazy="selectin",
     )
 
 
@@ -9556,13 +9631,18 @@ class PlaceActionDAO(
     )
 
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
     target_location: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO",
         uselist=False,
         foreign_keys=[target_location_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9596,28 +9676,39 @@ class PlanMappingDAO(Base, DataAccessObject[coraplex.orm.model.PlanMapping]):
     )
 
     root: Mapped[PlanNodeDAO] = relationship(
-        "PlanNodeDAO", uselist=False, foreign_keys=[root_id], post_update=True
+        "PlanNodeDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
+        lazy="selectin",
     )
     nodes: Mapped[builtins.list[PlanMappingDAO_nodes_association]] = relationship(
         "PlanMappingDAO_nodes_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PlanMappingDAO_nodes_association.source_planmappingdao_id]",
+        lazy="selectin",
     )
     edges: Mapped[builtins.list[PlanMappingDAO_edges_association]] = relationship(
         "PlanMappingDAO_edges_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PlanMappingDAO_edges_association.source_planmappingdao_id]",
+        lazy="selectin",
     )
     context: Mapped[ContextDAO] = relationship(
-        "ContextDAO", uselist=False, foreign_keys=[context_id], post_update=True
+        "ContextDAO",
+        uselist=False,
+        foreign_keys=[context_id],
+        post_update=True,
+        lazy="selectin",
     )
     initial_world: Mapped[WorldMappingDAO] = relationship(
         "WorldMappingDAO",
         uselist=False,
         foreign_keys=[initial_world_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -9641,10 +9732,18 @@ class PlanEdgeDAO(Base, DataAccessObject[coraplex.orm.model.PlanEdge]):
     )
 
     parent: Mapped[PlanNodeDAO] = relationship(
-        "PlanNodeDAO", uselist=False, foreign_keys=[parent_id], post_update=True
+        "PlanNodeDAO",
+        uselist=False,
+        foreign_keys=[parent_id],
+        post_update=True,
+        lazy="selectin",
     )
     child: Mapped[PlanNodeDAO] = relationship(
-        "PlanNodeDAO", uselist=False, foreign_keys=[child_id], post_update=True
+        "PlanNodeDAO",
+        uselist=False,
+        foreign_keys=[child_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -9667,7 +9766,11 @@ class PlanEntityDAO(Base, DataAccessObject[coraplex.plans.plan_entity.PlanEntity
     )
 
     plan: Mapped[PlanMappingDAO] = relationship(
-        "PlanMappingDAO", uselist=False, foreign_keys=[plan_id], post_update=True
+        "PlanMappingDAO",
+        uselist=False,
+        foreign_keys=[plan_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9702,10 +9805,18 @@ class ContextDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9777,6 +9888,7 @@ class AllChildrenFailedDAO(
         uselist=False,
         foreign_keys=[language_node_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9810,7 +9922,11 @@ class BodyUnfetchableDAO(
     )
 
     body: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9898,9 +10014,14 @@ class EndEffectorDidNotReachTargetDAO(
         uselist=False,
         foreign_keys=[end_effector_id],
         post_update=True,
+        lazy="selectin",
     )
     target: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9928,6 +10049,7 @@ class MotionDidNotFinishDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[MotionDidNotFinishDAO_failed_motions_association.source_motiondidnotfinishdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -9965,9 +10087,14 @@ class NavigationGoalNotReachedErrorDAO(
         uselist=False,
         foreign_keys=[current_pose_id],
         post_update=True,
+        lazy="selectin",
     )
     goal_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[goal_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[goal_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10006,7 +10133,11 @@ class PlanNodeDAO(PlanEntityDAO, DataAccessObject[coraplex.plans.plan_node.PlanN
     )
 
     reason: Mapped[PlanFailureDAO] = relationship(
-        "PlanFailureDAO", uselist=False, foreign_keys=[reason_id], post_update=True
+        "PlanFailureDAO",
+        uselist=False,
+        foreign_keys=[reason_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10032,7 +10163,11 @@ class DesignatorNodeDAO(
     )
 
     designator: Mapped[DesignatorDAO] = relationship(
-        "DesignatorDAO", uselist=False, foreign_keys=[designator_id], post_update=True
+        "DesignatorDAO",
+        uselist=False,
+        foreign_keys=[designator_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10069,12 +10204,14 @@ class ActionNodeDAO(
         uselist=False,
         foreign_keys=[execution_data_id],
         post_update=True,
+        lazy="selectin",
     )
     motion_executor: Mapped[MotionExecutorDAO] = relationship(
         "MotionExecutorDAO",
         uselist=False,
         foreign_keys=[motion_executor_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10230,7 +10367,11 @@ class PointOccupiedErrorDAO(
     )
 
     point: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[point_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[point_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -10261,10 +10402,18 @@ class PointSpatialRelationDAO(
     )
 
     point: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[point_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[point_id],
+        post_update=True,
+        lazy="selectin",
     )
     other: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[other_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[other_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10312,22 +10461,32 @@ class PointingAtDAO(
     )
 
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     goal_point: Mapped[Point3MappingDAO] = relationship(
         "Point3MappingDAO",
         uselist=False,
         foreign_keys=[goal_point_id],
         post_update=True,
+        lazy="selectin",
     )
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     pointing_axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[pointing_axis_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10400,12 +10559,21 @@ class GiskardLocationBackendDAO(
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10449,12 +10617,14 @@ class GraspPoseGeneratorDAO(
         uselist=False,
         foreign_keys=[generator_id],
         post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10503,16 +10673,25 @@ class PoseReachedDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     goal_pose: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
         "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
         foreign_keys=[goal_pose_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10536,6 +10715,7 @@ class PoseTrajectoryDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PoseTrajectoryDAO_poses_association.source_posetrajectorydao_id]",
+        lazy="selectin",
     )
 
 
@@ -10563,10 +10743,18 @@ class PoseValidatorDAO(Base, DataAccessObject[coraplex.locations.base.PoseValida
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10605,18 +10793,21 @@ class AreReachableByDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AreReachableByDAO_pose_sequence_association.source_arereachablebydao_id]",
+        lazy="selectin",
     )
     tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10654,19 +10845,25 @@ class IsReachableByDAO(
     )
 
     pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[pose_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10699,10 +10896,18 @@ class IsVisibleByDAO(
     )
 
     target_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
     target_body: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[target_body_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[target_body_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10746,16 +10951,25 @@ class PositionReachedDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     goal_point: Mapped[Point3MappingDAO] = relationship(
         "Point3MappingDAO",
         uselist=False,
         foreign_keys=[goal_point_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10788,7 +11002,11 @@ class PositionVariableDAO(
     )
 
     dof: Mapped[DegreeOfFreedomDAO] = relationship(
-        "DegreeOfFreedomDAO", uselist=False, foreign_keys=[dof_id], post_update=True
+        "DegreeOfFreedomDAO",
+        uselist=False,
+        foreign_keys=[dof_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -10830,10 +11048,18 @@ class PouringActionDAO(
     )
 
     object_: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object__id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object__id],
+        post_update=True,
+        lazy="selectin",
     )
     tool: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO", uselist=False, foreign_keys=[tool_id], post_update=True
+        "SemanticAnnotationDAO",
+        uselist=False,
+        foreign_keys=[tool_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -10883,16 +11109,32 @@ class PrePushDoorDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     door_object: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[door_object_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[door_object_id],
+        post_update=True,
+        lazy="selectin",
     )
     door_handle: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[door_handle_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[door_handle_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -11041,18 +11283,21 @@ class ProblemDataPartDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ProblemDataPartDAO_degrees_of_freedom_association.source_problemdatapartdao_id]",
+        lazy="selectin",
     )
     constraint_collection: Mapped[ConstraintCollectionDAO] = relationship(
         "ConstraintCollectionDAO",
         uselist=False,
         foreign_keys=[constraint_collection_id],
         post_update=True,
+        lazy="selectin",
     )
     config: Mapped[QPControllerConfigDAO] = relationship(
         "QPControllerConfigDAO",
         uselist=False,
         foreign_keys=[config_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -11210,6 +11455,7 @@ class ProcthorDoorDAO(
             uselist=False,
             foreign_keys=[world_T_parent_wall_id],
             post_update=True,
+            lazy="selectin",
         )
     )
 
@@ -11303,12 +11549,14 @@ class QPControllerDAO(Base, DataAccessObject[giskardpy.qp.qp_controller.QPContro
         uselist=False,
         foreign_keys=[config_id],
         post_update=True,
+        lazy="selectin",
     )
     constraint_collection: Mapped[ConstraintCollectionDAO] = relationship(
         "ConstraintCollectionDAO",
         uselist=False,
         foreign_keys=[constraint_collection_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -11362,6 +11610,7 @@ class QPControllerDebuggerDAO(
         uselist=False,
         foreign_keys=[qp_controller_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -11427,7 +11676,11 @@ class QPDataFactoryDAO(
     )
 
     qp_data: Mapped[QPDataSymbolicDAO] = relationship(
-        "QPDataSymbolicDAO", uselist=False, foreign_keys=[qp_data_id], post_update=True
+        "QPDataSymbolicDAO",
+        uselist=False,
+        foreign_keys=[qp_data_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -11582,25 +11835,32 @@ class QPProblemDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
     root: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[root_id],
         post_update=True,
+        lazy="selectin",
     )
     tip: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_id],
         post_update=True,
+        lazy="selectin",
     )
     target: Mapped[HomogeneousTransformationMatrixMappingDAO] = relationship(
         "HomogeneousTransformationMatrixMappingDAO",
         uselist=False,
         foreign_keys=[target_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -11755,16 +12015,25 @@ class ReachActionDAO(
     )
 
     target_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[target_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[target_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -11812,13 +12081,18 @@ class ReachMotionDAO(
     )
 
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -12698,21 +12972,28 @@ class Sage10kObjectDAO(
         uselist=False,
         foreign_keys=[position_id],
         post_update=True,
+        lazy="selectin",
     )
     rotation: Mapped[Sage10kRotationDAO] = relationship(
         "Sage10kRotationDAO",
         uselist=False,
         foreign_keys=[rotation_id],
         post_update=True,
+        lazy="selectin",
     )
     dimensions: Mapped[Sage10kSizeDAO] = relationship(
-        "Sage10kSizeDAO", uselist=False, foreign_keys=[dimensions_id], post_update=True
+        "Sage10kSizeDAO",
+        uselist=False,
+        foreign_keys=[dimensions_id],
+        post_update=True,
+        lazy="selectin",
     )
     pbr_parameters: Mapped[Sage10kPhysicallyBasedRenderingDAO] = relationship(
         "Sage10kPhysicallyBasedRenderingDAO",
         uselist=False,
         foreign_keys=[pbr_parameters_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -12755,31 +13036,39 @@ class Sage10kRoomDAO(
     )
 
     dimensions: Mapped[Sage10kSizeDAO] = relationship(
-        "Sage10kSizeDAO", uselist=False, foreign_keys=[dimensions_id], post_update=True
+        "Sage10kSizeDAO",
+        uselist=False,
+        foreign_keys=[dimensions_id],
+        post_update=True,
+        lazy="selectin",
     )
     position: Mapped[Sage10kPositionDAO] = relationship(
         "Sage10kPositionDAO",
         uselist=False,
         foreign_keys=[position_id],
         post_update=True,
+        lazy="selectin",
     )
     objects: Mapped[builtins.list[Sage10kRoomDAO_objects_association]] = relationship(
         "Sage10kRoomDAO_objects_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Sage10kRoomDAO_objects_association.source_sage10kroomdao_id]",
+        lazy="selectin",
     )
     walls: Mapped[builtins.list[Sage10kRoomDAO_walls_association]] = relationship(
         "Sage10kRoomDAO_walls_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Sage10kRoomDAO_walls_association.source_sage10kroomdao_id]",
+        lazy="selectin",
     )
     doors: Mapped[builtins.list[Sage10kRoomDAO_doors_association]] = relationship(
         "Sage10kRoomDAO_doors_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Sage10kRoomDAO_doors_association.source_sage10kroomdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -12823,6 +13112,7 @@ class Sage10kSceneDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Sage10kSceneDAO_rooms_association.source_sage10kscenedao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -12868,12 +13158,14 @@ class Sage10kWallDAO(
         uselist=False,
         foreign_keys=[start_point_id],
         post_update=True,
+        lazy="selectin",
     )
     end_point: Mapped[Sage10kPositionDAO] = relationship(
         "Sage10kPositionDAO",
         uselist=False,
         foreign_keys=[end_point_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -12922,7 +13214,11 @@ class SelfCollisionAvoidanceDAO(
     )
 
     robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[robot_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -12960,10 +13256,18 @@ class SelfCollisionDistanceMonitorDAO(
     )
 
     body_a: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_a_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_a_id],
+        post_update=True,
+        lazy="selectin",
     )
     body_b: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[body_b_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[body_b_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -12994,6 +13298,7 @@ class SelfCollisionMatrixRuleDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[SelfCollisionMatrixRuleDAO_allowed_collision_pairs_association.source_selfcollisionmatrixruledao_id]",
+        lazy="selectin",
     )
     allowed_collision_bodies: Mapped[
         builtins.set[SelfCollisionMatrixRuleDAO_allowed_collision_bodies_association]
@@ -13002,6 +13307,7 @@ class SelfCollisionMatrixRuleDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[SelfCollisionMatrixRuleDAO_allowed_collision_bodies_association.source_selfcollisionmatrixruledao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13239,6 +13545,7 @@ class SequenceDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[SequenceDAO_nodes_association.source_sequencedao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13269,7 +13576,11 @@ class DifferentialDriveBaseGoalDAO(
     )
 
     goal_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[goal_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[goal_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13352,6 +13663,7 @@ class SetInitialTemporaryCollisionRulesDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[SetInitialTemporaryCollisionRulesDAO_temporary_rules_association.source_setinitialtemporarycollisionrulesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13393,12 +13705,14 @@ class SetOdometryDAO(
         uselist=False,
         foreign_keys=[base_pose_id],
         post_update=True,
+        lazy="selectin",
     )
     odom_connection: Mapped[OmniDriveDAO] = relationship(
         "OmniDriveDAO",
         uselist=False,
         foreign_keys=[odom_connection_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13433,6 +13747,7 @@ class SetSeedConfigurationDAO(
         uselist=False,
         foreign_keys=[seed_configuration_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13472,9 +13787,14 @@ class ShapeDAO(
         uselist=False,
         foreign_keys=[origin_id],
         post_update=True,
+        lazy="selectin",
     )
     color: Mapped[ColorDAO] = relationship(
-        "ColorDAO", uselist=False, foreign_keys=[color_id], post_update=True
+        "ColorDAO",
+        uselist=False,
+        foreign_keys=[color_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13500,7 +13820,11 @@ class BoxDAO(
     )
 
     scale: Mapped[ScaleDAO] = relationship(
-        "ScaleDAO", uselist=False, foreign_keys=[scale_id], post_update=True
+        "ScaleDAO",
+        uselist=False,
+        foreign_keys=[scale_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13550,7 +13874,11 @@ class MeshDAO(
     )
 
     scale: Mapped[ScaleDAO] = relationship(
-        "ScaleDAO", uselist=False, foreign_keys=[scale_id], post_update=True
+        "ScaleDAO",
+        uselist=False,
+        foreign_keys=[scale_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -13587,12 +13915,14 @@ class ShapeCollectionDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ShapeCollectionDAO_shapes_association.source_shapecollectiondao_id]",
+        lazy="selectin",
     )
     reference_frame: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[reference_frame_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -14120,7 +14450,11 @@ class MujocoTendonDAO(
     )
 
     rgba: Mapped[ColorDAO] = relationship(
-        "ColorDAO", uselist=False, foreign_keys=[rgba_id], post_update=True
+        "ColorDAO",
+        uselist=False,
+        foreign_keys=[rgba_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -14228,6 +14562,7 @@ class SpatialTypeDAO(
         uselist=False,
         foreign_keys=[reference_frame_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -14268,19 +14603,25 @@ class HomogeneousTransformationMatrixMappingDAO(
     )
 
     position: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[position_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[position_id],
+        post_update=True,
+        lazy="selectin",
     )
     rotation: Mapped[QuaternionMappingDAO] = relationship(
         "QuaternionMappingDAO",
         uselist=False,
         foreign_keys=[rotation_id],
         post_update=True,
+        lazy="selectin",
     )
     child_frame: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[child_frame_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -14335,13 +14676,18 @@ class PoseMappingDAO(
     )
 
     position: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[position_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[position_id],
+        post_update=True,
+        lazy="selectin",
     )
     orientation: Mapped[QuaternionMappingDAO] = relationship(
         "QuaternionMappingDAO",
         uselist=False,
         foreign_keys=[orientation_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -14379,6 +14725,7 @@ class GrasPoseMappingDAO(
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -14456,6 +14803,7 @@ class RotationMatrixMappingDAO(
         uselist=False,
         foreign_keys=[rotation_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -14581,27 +14929,6 @@ class SphereToRos2ConverterDAO(
     }
 
 
-class StandAloneBTConfigDAO(
-    BehaviorTreeConfigDAO,
-    DataAccessObject[giskardpy.middleware.ros2.behavior_tree_config.StandAloneBTConfig],
-):
-
-    __tablename__ = "StandAloneBTConfigDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(BehaviorTreeConfigDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    publish_world_state: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "StandAloneBTConfigDAO",
-        "inherit_condition": database_id == BehaviorTreeConfigDAO.database_id,
-    }
-
-
 class StateDAO(
     Base, DataAccessObject[giskardpy.motion_statechart.motion_statechart.State]
 ):
@@ -14627,6 +14954,7 @@ class StateDAO(
         uselist=False,
         foreign_keys=[motion_statechart_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -14684,6 +15012,7 @@ class StateHistoryDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[StateHistoryDAO_history_association.source_statehistorydao_id]",
+        lazy="selectin",
     )
 
 
@@ -15079,24 +15408,28 @@ class AlignPlanesDAO(
         uselist=False,
         foreign_keys=[root_link_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
     goal_normal: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[goal_normal_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_normal: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[tip_normal_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15163,13 +15496,25 @@ class BaseArmWeightScalingDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_goal: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[tip_goal_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_goal_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15232,12 +15577,14 @@ class CartesianPositionVelocityLimitDAO(
         uselist=False,
         foreign_keys=[root_link_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15275,10 +15622,18 @@ class CartesianPositionVelocityTargetDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15320,12 +15675,14 @@ class CartesianRotationVelocityLimitDAO(
         uselist=False,
         foreign_keys=[root_link_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15369,12 +15726,14 @@ class CartesianTaskDAO(
         uselist=False,
         foreign_keys=[root_link_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15412,6 +15771,7 @@ class CartesianOrientationDAO(
         uselist=False,
         foreign_keys=[goal_orientation_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15448,7 +15808,11 @@ class CartesianPoseDAO(
     )
 
     goal_pose: Mapped[PoseMappingDAO] = relationship(
-        "PoseMappingDAO", uselist=False, foreign_keys=[goal_pose_id], post_update=True
+        "PoseMappingDAO",
+        uselist=False,
+        foreign_keys=[goal_pose_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15488,6 +15852,7 @@ class CartesianPositionDAO(
         uselist=False,
         foreign_keys=[goal_point_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15525,6 +15890,7 @@ class CartesianPositionStraightDAO(
         uselist=False,
         foreign_keys=[goal_point_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15564,6 +15930,7 @@ class CartesianPositionTrajectoryDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CartesianPositionTrajectoryDAO_goal_points_association.source_cartesianpositiontrajectorydao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15604,12 +15971,14 @@ class PointingDAO(
         uselist=False,
         foreign_keys=[goal_point_id],
         post_update=True,
+        lazy="selectin",
     )
     pointing_axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[pointing_axis_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15651,12 +16020,14 @@ class PointingConeDAO(
         uselist=False,
         foreign_keys=[goal_point_id],
         post_update=True,
+        lazy="selectin",
     )
     pointing_axis: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[pointing_axis_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15710,12 +16081,14 @@ class FeatureFunctionGoalDAO(
         uselist=False,
         foreign_keys=[tip_link_id],
         post_update=True,
+        lazy="selectin",
     )
     root_link: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[root_link_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15758,12 +16131,14 @@ class AlignPerpendicularDAO(
         uselist=False,
         foreign_keys=[tip_normal_id],
         post_update=True,
+        lazy="selectin",
     )
     reference_normal: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[reference_normal_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15805,12 +16180,14 @@ class AngleGoalDAO(
         uselist=False,
         foreign_keys=[tip_vector_id],
         post_update=True,
+        lazy="selectin",
     )
     reference_vector: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[reference_vector_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15848,13 +16225,18 @@ class DistanceGoalDAO(
     )
 
     tip_point: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[tip_point_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_point_id],
+        post_update=True,
+        lazy="selectin",
     )
     reference_point: Mapped[Point3MappingDAO] = relationship(
         "Point3MappingDAO",
         uselist=False,
         foreign_keys=[reference_point_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15892,13 +16274,18 @@ class HeightGoalDAO(
     )
 
     tip_point: Mapped[Point3MappingDAO] = relationship(
-        "Point3MappingDAO", uselist=False, foreign_keys=[tip_point_id], post_update=True
+        "Point3MappingDAO",
+        uselist=False,
+        foreign_keys=[tip_point_id],
+        post_update=True,
+        lazy="selectin",
     )
     reference_point: Mapped[Point3MappingDAO] = relationship(
         "Point3MappingDAO",
         uselist=False,
         foreign_keys=[reference_point_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15949,7 +16336,11 @@ class JointPositionListDAO(
     )
 
     goal_state: Mapped[JointStateDAO] = relationship(
-        "JointStateDAO", uselist=False, foreign_keys=[goal_state_id], post_update=True
+        "JointStateDAO",
+        uselist=False,
+        foreign_keys=[goal_state_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -15979,6 +16370,7 @@ class JointVelocityDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[JointVelocityDAO_connections_association.source_jointvelocitydao_id]",
+            lazy="selectin",
         )
     )
 
@@ -16008,6 +16400,7 @@ class JointVelocityLimitDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[JointVelocityLimitDAO_joints_association.source_jointvelocitylimitdao_id]",
+            lazy="selectin",
         )
     )
 
@@ -16047,6 +16440,7 @@ class JustinTorsoLimitDAO(
         uselist=False,
         foreign_keys=[connection_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16083,10 +16477,18 @@ class MaxManipulabilityDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16422,6 +16824,7 @@ class TrainingEnvironmentDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[TrainingEnvironmentDAO_executed_plans_association.source_trainingenvironmentdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16514,19 +16917,25 @@ class TransportActionDAO(
     )
 
     object_designator: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[object_designator_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[object_designator_id],
+        post_update=True,
+        lazy="selectin",
     )
     target_location: Mapped[PoseMappingDAO] = relationship(
         "PoseMappingDAO",
         uselist=False,
         foreign_keys=[target_location_id],
         post_update=True,
+        lazy="selectin",
     )
     grasp_description: Mapped[GraspDescriptionDAO] = relationship(
         "GraspDescriptionDAO",
         uselist=False,
         foreign_keys=[grasp_description_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16562,6 +16971,7 @@ class TrinaryConditionDAO(
         uselist=False,
         foreign_keys=[owner_id],
         post_update=True,
+        lazy="selectin",
     )
 
 
@@ -16672,6 +17082,7 @@ class UpdateTemporaryCollisionRulesDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[UpdateTemporaryCollisionRulesDAO_temporary_rules_association.source_updatetemporarycollisionrulesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16724,6 +17135,7 @@ class AddingAnExistingSemanticAnnotationErrorDAO(
         uselist=False,
         foreign_keys=[semantic_annotation_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16756,7 +17168,11 @@ class AlreadyBelongsToAWorldErrorDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16810,6 +17226,7 @@ class DoesNotBelongToAWorldErrorDAO(
         uselist=False,
         foreign_keys=[world_entity_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16840,6 +17257,7 @@ class DuplicateKinematicStructureEntityErrorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DuplicateKinematicStructureEntityErrorDAO_names_association.source_duplicatekinematicstructureentityerrordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16872,6 +17290,7 @@ class DuplicateRobotAssignmentsErrorDAO(
         uselist=False,
         foreign_keys=[robot_part_id],
         post_update=True,
+        lazy="selectin",
     )
     robots: Mapped[
         builtins.list[DuplicateRobotAssignmentsErrorDAO_robots_association]
@@ -16880,6 +17299,7 @@ class DuplicateRobotAssignmentsErrorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DuplicateRobotAssignmentsErrorDAO_robots_association.source_duplicaterobotassignmentserrordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16908,6 +17328,7 @@ class DuplicateWorldEntityErrorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DuplicateWorldEntityErrorDAO_world_entities_association.source_duplicateworldentityerrordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16941,13 +17362,18 @@ class InvalidConnectionLimitsDAO(
     )
 
     name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[name_id],
+        post_update=True,
+        lazy="selectin",
     )
     limits: Mapped[DegreeOfFreedomLimitsDAO] = relationship(
         "DegreeOfFreedomLimitsDAO",
         uselist=False,
         foreign_keys=[limits_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -16976,7 +17402,11 @@ class InvalidHingeActiveAxisDAO(
     )
 
     axis: Mapped[Vector3MappingDAO] = relationship(
-        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[axis_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17009,7 +17439,11 @@ class InvalidPlaneDimensionsDAO(
     )
 
     scale: Mapped[ScaleDAO] = relationship(
-        "ScaleDAO", uselist=False, foreign_keys=[scale_id], post_update=True
+        "ScaleDAO",
+        uselist=False,
+        foreign_keys=[scale_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17074,12 +17508,14 @@ class MismatchingWorldDAO(
         uselist=False,
         foreign_keys=[expected_world_id],
         post_update=True,
+        lazy="selectin",
     )
     given_world: Mapped[WorldMappingDAO] = relationship(
         "WorldMappingDAO",
         uselist=False,
         foreign_keys=[given_world_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17219,6 +17655,7 @@ class SemanticAnnotationCircularDependencyErrorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association.source_semanticannotationcirculardependencyerrordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17253,6 +17690,7 @@ class SemanticAnnotationNotInWorldErrorDAO(
         uselist=False,
         foreign_keys=[semantic_annotation_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17303,6 +17741,7 @@ class MissingReferenceFrameErrorDAO(
         uselist=False,
         foreign_keys=[spatial_type_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17340,12 +17779,14 @@ class ReferenceFrameMismatchErrorDAO(
         uselist=False,
         foreign_keys=[frame1_id],
         post_update=True,
+        lazy="selectin",
     )
     frame2: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[frame2_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17544,22 +17985,32 @@ class VectorsAlignedDAO(
     )
 
     root_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     tip_link: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_link_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_link_id],
+        post_update=True,
+        lazy="selectin",
     )
     goal_normal: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[goal_normal_id],
         post_update=True,
+        lazy="selectin",
     )
     tip_normal: Mapped[Vector3MappingDAO] = relationship(
         "Vector3MappingDAO",
         uselist=False,
         foreign_keys=[tip_normal_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17592,7 +18043,11 @@ class VelocityVariableDAO(
     )
 
     dof: Mapped[DegreeOfFreedomDAO] = relationship(
-        "DegreeOfFreedomDAO", uselist=False, foreign_keys=[dof_id], post_update=True
+        "DegreeOfFreedomDAO",
+        uselist=False,
+        foreign_keys=[dof_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -17629,6 +18084,7 @@ class ViewDependentSpatialRelationDAO(
         uselist=False,
         foreign_keys=[point_of_view_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17831,6 +18287,7 @@ class WorldMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldMappingDAO_kinematic_structure_entities_association.source_worldmappingdao_id]",
+        lazy="selectin",
     )
     connections: Mapped[builtins.list[WorldMappingDAO_connections_association]] = (
         relationship(
@@ -17838,6 +18295,7 @@ class WorldMappingDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[WorldMappingDAO_connections_association.source_worldmappingdao_id]",
+            lazy="selectin",
         )
     )
     semantic_annotations: Mapped[
@@ -17847,6 +18305,7 @@ class WorldMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldMappingDAO_semantic_annotations_association.source_worldmappingdao_id]",
+        lazy="selectin",
     )
     degrees_of_freedom: Mapped[
         builtins.list[WorldMappingDAO_degrees_of_freedom_association]
@@ -17855,9 +18314,14 @@ class WorldMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldMappingDAO_degrees_of_freedom_association.source_worldmappingdao_id]",
+        lazy="selectin",
     )
     state: Mapped[WorldStateMappingDAO] = relationship(
-        "WorldStateMappingDAO", uselist=False, foreign_keys=[state_id], post_update=True
+        "WorldStateMappingDAO",
+        uselist=False,
+        foreign_keys=[state_id],
+        post_update=True,
+        lazy="selectin",
     )
     modification_history: Mapped[
         builtins.list[WorldMappingDAO_modification_history_association]
@@ -17866,6 +18330,7 @@ class WorldMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldMappingDAO_modification_history_association.source_worldmappingdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17893,7 +18358,11 @@ class WorldConfigDAO(Base, DataAccessObject[giskardpy.model.world_config.WorldCo
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17942,7 +18411,11 @@ class WorldEntityDAO(
     )
 
     name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[name_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -17996,18 +18469,21 @@ class ConnectionDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ConnectionDAO_simulator_additional_properties_association.source_connectiondao_id]",
+        lazy="selectin",
     )
     parent: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[parent_id],
         post_update=True,
+        lazy="selectin",
     )
     child: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         uselist=False,
         foreign_keys=[child_id],
         post_update=True,
+        lazy="selectin",
     )
     parent_T_connection_expression: Mapped[
         HomogeneousTransformationMatrixMappingDAO
@@ -18016,6 +18492,7 @@ class ConnectionDAO(
         uselist=False,
         foreign_keys=[parent_T_connection_expression_id],
         post_update=True,
+        lazy="selectin",
     )
     connection_T_child_expression: Mapped[HomogeneousTransformationMatrixMappingDAO] = (
         relationship(
@@ -18023,6 +18500,7 @@ class ConnectionDAO(
             uselist=False,
             foreign_keys=[connection_T_child_expression_id],
             post_update=True,
+            lazy="selectin",
         )
     )
 
@@ -18087,10 +18565,18 @@ class ActiveConnection1DOFDAO(
     )
 
     axis: Mapped[Vector3MappingDAO] = relationship(
-        "Vector3MappingDAO", uselist=False, foreign_keys=[axis_id], post_update=True
+        "Vector3MappingDAO",
+        uselist=False,
+        foreign_keys=[axis_id],
+        post_update=True,
+        lazy="selectin",
     )
     dynamics: Mapped[JointDynamicsDAO] = relationship(
-        "JointDynamicsDAO", uselist=False, foreign_keys=[dynamics_id], post_update=True
+        "JointDynamicsDAO",
+        uselist=False,
+        foreign_keys=[dynamics_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -18379,6 +18865,7 @@ class DegreeOfFreedomDAO(
         uselist=False,
         foreign_keys=[limits_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -18470,6 +18957,7 @@ class CollisionDetectorModelUpdaterDAO(
         uselist=False,
         foreign_keys=[collision_detector_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -18504,6 +18992,7 @@ class CollisionManagerDAO(
         uselist=False,
         foreign_keys=[collision_detector_id],
         post_update=True,
+        lazy="selectin",
     )
     default_rules: Mapped[
         builtins.list[CollisionManagerDAO_default_rules_association]
@@ -18512,6 +19001,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_default_rules_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
     temporary_rules: Mapped[
         builtins.list[CollisionManagerDAO_temporary_rules_association]
@@ -18520,6 +19010,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_temporary_rules_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
     ignore_collision_rules: Mapped[
         builtins.list[CollisionManagerDAO_ignore_collision_rules_association]
@@ -18528,6 +19019,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_ignore_collision_rules_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
     max_avoided_bodies_rules: Mapped[
         builtins.list[CollisionManagerDAO_max_avoided_bodies_rules_association]
@@ -18536,6 +19028,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_max_avoided_bodies_rules_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
     collision_consumers: Mapped[
         builtins.list[CollisionManagerDAO_collision_consumers_association]
@@ -18544,6 +19037,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_collision_consumers_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -18652,6 +19146,7 @@ class TfPublisherModelCallbackDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_association.source_tfpublishermodelcallbackdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -18737,6 +19232,7 @@ class CollisionDetectorStateUpdaterDAO(
         uselist=False,
         foreign_keys=[collision_detector_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -18772,6 +19268,7 @@ class TFPublisherDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[TFPublisherDAO_ignored_kinematic_structure_entities_association.source_tfpublisherdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -18827,6 +19324,7 @@ class BulletCollisionDetectorDAO(
         uselist=False,
         foreign_keys=[mesh_decomposer_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -18990,6 +19488,7 @@ class WorldEntityWithSimulatorPropertiesDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association.source_worldentitywithsimulatorpropertiesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19070,16 +19569,25 @@ class BodyDAO(
     )
 
     visual: Mapped[ShapeCollectionDAO] = relationship(
-        "ShapeCollectionDAO", uselist=False, foreign_keys=[visual_id], post_update=True
+        "ShapeCollectionDAO",
+        uselist=False,
+        foreign_keys=[visual_id],
+        post_update=True,
+        lazy="selectin",
     )
     collision: Mapped[ShapeCollectionDAO] = relationship(
         "ShapeCollectionDAO",
         uselist=False,
         foreign_keys=[collision_id],
         post_update=True,
+        lazy="selectin",
     )
     inertial: Mapped[InertialDAO] = relationship(
-        "InertialDAO", uselist=False, foreign_keys=[inertial_id], post_update=True
+        "InertialDAO",
+        uselist=False,
+        foreign_keys=[inertial_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19108,7 +19616,11 @@ class RegionDAO(
     )
 
     area: Mapped[ShapeCollectionDAO] = relationship(
-        "ShapeCollectionDAO", uselist=False, foreign_keys=[area_id], post_update=True
+        "ShapeCollectionDAO",
+        uselist=False,
+        foreign_keys=[area_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19166,10 +19678,18 @@ class DoubleDoorDAO(
     )
 
     door_0: Mapped[DoorDAO] = relationship(
-        "DoorDAO", uselist=False, foreign_keys=[door_0_id], post_update=True
+        "DoorDAO",
+        uselist=False,
+        foreign_keys=[door_0_id],
+        post_update=True,
+        lazy="selectin",
     )
     door_1: Mapped[DoorDAO] = relationship(
-        "DoorDAO", uselist=False, foreign_keys=[door_1_id], post_update=True
+        "DoorDAO",
+        uselist=False,
+        foreign_keys=[door_1_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19320,6 +19840,7 @@ class HasRootKinematicStructureEntityDAO(
         uselist=False,
         foreign_keys=[root_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19346,6 +19867,7 @@ class HasDoorsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HasDoorsDAO_doors_association.source_hasdoorsdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19373,6 +19895,7 @@ class HasDrawersDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HasDrawersDAO_drawers_association.source_hasdrawersdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19422,6 +19945,7 @@ class AbstractRobotPartDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AbstractRobotPartDAO_joint_states_association.source_abstractrobotpartdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19455,13 +19979,18 @@ class EndEffectorDAO(
     )
 
     tool_frame: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tool_frame_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tool_frame_id],
+        post_update=True,
+        lazy="selectin",
     )
     front_facing_orientation: Mapped[QuaternionMappingDAO] = relationship(
         "QuaternionMappingDAO",
         uselist=False,
         foreign_keys=[front_facing_orientation_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19883,7 +20412,11 @@ class KinematicChainDAO(
     )
 
     tip: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[tip_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[tip_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -19987,6 +20520,7 @@ class HSRBArmDAO(ArmDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRB
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HSRBArmDAO_sensors_association.source_hsrbarmdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -20270,7 +20804,11 @@ class FingerDAO(
     )
 
     finger_tip_frame: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[finger_tip_frame_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[finger_tip_frame_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21317,6 +21855,7 @@ class Armar7NeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Armar7NeckDAO_sensors_association.source_armar7neckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21340,6 +21879,7 @@ class GarmiNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[GarmiNeckDAO_sensors_association.source_garmineckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21363,6 +21903,7 @@ class HSRBNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HSRBNeckDAO_sensors_association.source_hsrbneckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21386,6 +21927,7 @@ class ICub3NeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ICub3NeckDAO_sensors_association.source_icub3neckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21409,6 +21951,7 @@ class JustinNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[JustinNeckDAO_sensors_association.source_justinneckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21430,6 +21973,7 @@ class PR2NeckDAO(NeckDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2N
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PR2NeckDAO_sensors_association.source_pr2neckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21453,6 +21997,7 @@ class StretchNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[StretchNeckDAO_sensors_association.source_stretchneckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21477,6 +22022,7 @@ class TiagoMujocoNeckDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[TiagoMujocoNeckDAO_sensors_association.source_tiagomujoconeckdao_id]",
+            lazy="selectin",
         )
     )
 
@@ -21501,6 +22047,7 @@ class TiagoNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[TiagoNeckDAO_sensors_association.source_tiagoneckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21524,6 +22071,7 @@ class UnitreeG1NeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[UnitreeG1NeckDAO_sensors_association.source_unitreeg1neckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -21646,6 +22194,7 @@ class MMPDresdenTorsoDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[MMPDresdenTorsoDAO_sensors_association.source_mmpdresdentorsodao_id]",
+            lazy="selectin",
         )
     )
 
@@ -21763,6 +22312,7 @@ class MobileBaseDAO(
         uselist=False,
         foreign_keys=[forward_axis_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -22024,12 +22574,14 @@ class CameraDAO(
         uselist=False,
         foreign_keys=[forward_facing_axis_id],
         post_update=True,
+        lazy="selectin",
     )
     field_of_view: Mapped[FieldOfViewDAO] = relationship(
         "FieldOfViewDAO",
         uselist=False,
         foreign_keys=[field_of_view_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -22443,6 +22995,7 @@ class ICub3DAO(
         uselist=False,
         foreign_keys=[mobile_base_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -22508,6 +23061,7 @@ class MinimalRobotDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[MinimalRobotDAO_bodies_of_branch_association.source_minimalrobotdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -22603,6 +23157,7 @@ class TracyDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[TracyDAO_sensors_association.source_tracydao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -22635,6 +23190,7 @@ class UnitreeG1DAO(
         uselist=False,
         foreign_keys=[mobile_base_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -22705,7 +23261,11 @@ class BookDAO(
     )
 
     book_front: Mapped[BookFrontDAO] = relationship(
-        "BookFrontDAO", uselist=False, foreign_keys=[book_front_id], post_update=True
+        "BookFrontDAO",
+        uselist=False,
+        foreign_keys=[book_front_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -23644,6 +24204,7 @@ class HasAperturesDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[HasAperturesDAO_apertures_association.source_hasaperturesdao_id]",
+            lazy="selectin",
         )
     )
 
@@ -23694,7 +24255,11 @@ class HasHandleDAO(
     )
 
     handle: Mapped[HandleDAO] = relationship(
-        "HandleDAO", uselist=False, foreign_keys=[handle_id], post_update=True
+        "HandleDAO",
+        uselist=False,
+        foreign_keys=[handle_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -23723,7 +24288,11 @@ class HasHingeDAO(
     )
 
     hinge: Mapped[HingeDAO] = relationship(
-        "HingeDAO", uselist=False, foreign_keys=[hinge_id], post_update=True
+        "HingeDAO",
+        uselist=False,
+        foreign_keys=[hinge_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -23757,10 +24326,18 @@ class DoorDAO(
     )
 
     hinge: Mapped[HingeDAO] = relationship(
-        "HingeDAO", uselist=False, foreign_keys=[hinge_id], post_update=True
+        "HingeDAO",
+        uselist=False,
+        foreign_keys=[hinge_id],
+        post_update=True,
+        lazy="selectin",
     )
     entry_way: Mapped[EntryWayDAO] = relationship(
-        "EntryWayDAO", uselist=False, foreign_keys=[entry_way_id], post_update=True
+        "EntryWayDAO",
+        uselist=False,
+        foreign_keys=[entry_way_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -23811,6 +24388,7 @@ class HasStorageSpaceDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[HasStorageSpaceDAO_objects_association.source_hasstoragespacedao_id]",
+            lazy="selectin",
         )
     )
 
@@ -23846,6 +24424,7 @@ class HasSupportingSurfaceDAO(
         uselist=False,
         foreign_keys=[supporting_surface_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -23904,19 +24483,25 @@ class CounterTopDAO(
     )
 
     root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
+        lazy="selectin",
     )
     objects: Mapped[builtins.list[CounterTopDAO_objects_association]] = relationship(
         "CounterTopDAO_objects_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CounterTopDAO_objects_association.source_countertopdao_id]",
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
         uselist=False,
         foreign_keys=[supporting_surface_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -23997,22 +24582,32 @@ class CabinetDAO(
     )
 
     root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
+        lazy="selectin",
     )
     handle: Mapped[HandleDAO] = relationship(
-        "HandleDAO", uselist=False, foreign_keys=[handle_id], post_update=True
+        "HandleDAO",
+        uselist=False,
+        foreign_keys=[handle_id],
+        post_update=True,
+        lazy="selectin",
     )
     objects: Mapped[builtins.list[CabinetDAO_objects_association]] = relationship(
         "CabinetDAO_objects_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CabinetDAO_objects_association.source_cabinetdao_id]",
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
         uselist=False,
         foreign_keys=[supporting_surface_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -24039,6 +24634,7 @@ class CupboardDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CupboardDAO_doors_association.source_cupboarddao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -24065,12 +24661,14 @@ class DresserDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DresserDAO_doors_association.source_dresserdao_id]",
+        lazy="selectin",
     )
     drawers: Mapped[builtins.list[DresserDAO_drawers_association]] = relationship(
         "DresserDAO_drawers_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DresserDAO_drawers_association.source_dresserdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -24097,12 +24695,14 @@ class FridgeDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[FridgeDAO_drawers_association.source_fridgedao_id]",
+        lazy="selectin",
     )
     doors: Mapped[builtins.list[FridgeDAO_doors_association]] = relationship(
         "FridgeDAO_doors_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[FridgeDAO_doors_association.source_fridgedao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -24129,12 +24729,14 @@ class WardrobeDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WardrobeDAO_doors_association.source_wardrobedao_id]",
+        lazy="selectin",
     )
     drawers: Mapped[builtins.list[WardrobeDAO_drawers_association]] = relationship(
         "WardrobeDAO_drawers_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WardrobeDAO_drawers_association.source_wardrobedao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -24163,12 +24765,14 @@ class DishwasherDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DishwasherDAO_drawers_association.source_dishwasherdao_id]",
+        lazy="selectin",
     )
     doors: Mapped[builtins.list[DishwasherDAO_doors_association]] = relationship(
         "DishwasherDAO_doors_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DishwasherDAO_doors_association.source_dishwasherdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -24244,19 +24848,25 @@ class SofaDAO(
     )
 
     root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
+        lazy="selectin",
     )
     objects: Mapped[builtins.list[SofaDAO_objects_association]] = relationship(
         "SofaDAO_objects_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[SofaDAO_objects_association.source_sofadao_id]",
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
         uselist=False,
         foreign_keys=[supporting_surface_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -24290,19 +24900,25 @@ class TableDAO(
     )
 
     root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
+        lazy="selectin",
     )
     objects: Mapped[builtins.list[TableDAO_objects_association]] = relationship(
         "TableDAO_objects_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[TableDAO_objects_association.source_tabledao_id]",
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
         uselist=False,
         foreign_keys=[supporting_surface_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -27205,7 +27821,11 @@ class HasSliderDAO(
     )
 
     slider: Mapped[SliderDAO] = relationship(
-        "SliderDAO", uselist=False, foreign_keys=[slider_id], post_update=True
+        "SliderDAO",
+        uselist=False,
+        foreign_keys=[slider_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -27250,25 +27870,39 @@ class DrawerDAO(
     )
 
     root: Mapped[BodyDAO] = relationship(
-        "BodyDAO", uselist=False, foreign_keys=[root_id], post_update=True
+        "BodyDAO",
+        uselist=False,
+        foreign_keys=[root_id],
+        post_update=True,
+        lazy="selectin",
     )
     objects: Mapped[builtins.list[DrawerDAO_objects_association]] = relationship(
         "DrawerDAO_objects_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DrawerDAO_objects_association.source_drawerdao_id]",
+        lazy="selectin",
     )
     slider: Mapped[SliderDAO] = relationship(
-        "SliderDAO", uselist=False, foreign_keys=[slider_id], post_update=True
+        "SliderDAO",
+        uselist=False,
+        foreign_keys=[slider_id],
+        post_update=True,
+        lazy="selectin",
     )
     handle: Mapped[HandleDAO] = relationship(
-        "HandleDAO", uselist=False, foreign_keys=[handle_id], post_update=True
+        "HandleDAO",
+        uselist=False,
+        foreign_keys=[handle_id],
+        post_update=True,
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
         uselist=False,
         foreign_keys=[supporting_surface_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -27299,7 +27933,11 @@ class RoomDAO(
     )
 
     floor: Mapped[FloorDAO] = relationship(
-        "FloorDAO", uselist=False, foreign_keys=[floor_id], post_update=True
+        "FloorDAO",
+        uselist=False,
+        foreign_keys=[floor_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -27407,6 +28045,7 @@ class RoomWithWallsAndDoorsDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[RoomWithWallsAndDoorsDAO_walls_association.source_roomwithwallsanddoorsdao_id]",
+            lazy="selectin",
         )
     )
     doors: Mapped[builtins.list[RoomWithWallsAndDoorsDAO_doors_association]] = (
@@ -27415,6 +28054,7 @@ class RoomWithWallsAndDoorsDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[RoomWithWallsAndDoorsDAO_doors_association.source_roomwithwallsanddoorsdao_id]",
+            lazy="selectin",
         )
     )
 
@@ -27464,6 +28104,7 @@ class WorldModelManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldModelManagerDAO_model_modification_blocks_association.source_worldmodelmanagerdao_id]",
+        lazy="selectin",
     )
 
 
@@ -27487,6 +28128,7 @@ class WorldModelModificationBlockDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldModelModificationBlockDAO_modifications_association.source_worldmodelmodificationblockdao_id]",
+        lazy="selectin",
     )
 
 
@@ -27515,6 +28157,7 @@ class WorldModelSnapshotDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldModelSnapshotDAO_modifications_association.source_worldmodelsnapshotdao_id]",
+        lazy="selectin",
     )
 
 
@@ -27800,7 +28443,11 @@ class AddActuatorModificationDAO(
     )
 
     actuator: Mapped[ActuatorDAO] = relationship(
-        "ActuatorDAO", uselist=False, foreign_keys=[actuator_id], post_update=True
+        "ActuatorDAO",
+        uselist=False,
+        foreign_keys=[actuator_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -27839,7 +28486,11 @@ class AddConnectionModificationDAO(
     )
 
     connection: Mapped[ConnectionDAO] = relationship(
-        "ConnectionDAO", uselist=False, foreign_keys=[connection_id], post_update=True
+        "ConnectionDAO",
+        uselist=False,
+        foreign_keys=[connection_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -27879,6 +28530,7 @@ class AddDegreeOfFreedomModificationDAO(
         uselist=False,
         foreign_keys=[degree_of_freedom_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -27920,6 +28572,7 @@ class AddKinematicStructureEntityModificationDAO(
         uselist=False,
         foreign_keys=[kinematic_structure_entity_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -27946,7 +28599,11 @@ class WorldReasonerDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -28002,7 +28659,11 @@ class WorldStateTrajectoryDAO(
     )
 
     world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
+        "WorldMappingDAO",
+        uselist=False,
+        foreign_keys=[world_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -28124,12 +28785,14 @@ class WorldUpdateDAO(
         uselist=False,
         foreign_keys=[modification_block_id],
         post_update=True,
+        lazy="selectin",
     )
     state_update: Mapped[WorldStateUpdateDAO] = relationship(
         "WorldStateUpdateDAO",
         uselist=False,
         foreign_keys=[state_update_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -28177,19 +28840,32 @@ class WorldWithDiffDriveRobotDAO(
     )
 
     root_name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[root_name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[root_name_id],
+        post_update=True,
+        lazy="selectin",
     )
     robot_name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[robot_name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[robot_name_id],
+        post_update=True,
+        lazy="selectin",
     )
     odom_body_name: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO",
         uselist=False,
         foreign_keys=[odom_body_name_id],
         post_update=True,
+        lazy="selectin",
     )
     urdf_view: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[urdf_view_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[urdf_view_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -28231,13 +28907,25 @@ class WorldWithFixedRobotDAO(
     )
 
     root_name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[root_name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[root_name_id],
+        post_update=True,
+        lazy="selectin",
     )
     robot_name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[robot_name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[robot_name_id],
+        post_update=True,
+        lazy="selectin",
     )
     urdf_view: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[urdf_view_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[urdf_view_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -28285,129 +28973,37 @@ class WorldWithOmniDriveRobotDAO(
     )
 
     root_name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[root_name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[root_name_id],
+        post_update=True,
+        lazy="selectin",
     )
     robot_name: Mapped[PrefixedNameDAO] = relationship(
-        "PrefixedNameDAO", uselist=False, foreign_keys=[robot_name_id], post_update=True
+        "PrefixedNameDAO",
+        uselist=False,
+        foreign_keys=[robot_name_id],
+        post_update=True,
+        lazy="selectin",
     )
     odom_body_name: Mapped[PrefixedNameDAO] = relationship(
         "PrefixedNameDAO",
         uselist=False,
         foreign_keys=[odom_body_name_id],
         post_update=True,
+        lazy="selectin",
     )
     urdf_view: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[urdf_view_id], post_update=True
+        "AbstractRobotDAO",
+        uselist=False,
+        foreign_keys=[urdf_view_id],
+        post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "WorldWithOmniDriveRobotDAO",
         "inherit_condition": database_id == WorldConfigDAO.database_id,
-    }
-
-
-class WorldWithHSRConfigDAO(
-    WorldWithOmniDriveRobotDAO,
-    DataAccessObject[
-        giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs.WorldWithHSRConfig
-    ],
-):
-
-    __tablename__ = "WorldWithHSRConfigDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldWithOmniDriveRobotDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "WorldWithHSRConfigDAO",
-        "inherit_condition": database_id == WorldWithOmniDriveRobotDAO.database_id,
-    }
-
-
-class WorldWithPR2ConfigDAO(
-    WorldWithOmniDriveRobotDAO,
-    DataAccessObject[
-        giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs.WorldWithPR2Config
-    ],
-):
-
-    __tablename__ = "WorldWithPR2ConfigDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldWithOmniDriveRobotDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "WorldWithPR2ConfigDAO",
-        "inherit_condition": database_id == WorldWithOmniDriveRobotDAO.database_id,
-    }
-
-
-class WorldWithStretchConfigDAO(
-    WorldWithOmniDriveRobotDAO,
-    DataAccessObject[
-        giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs.WorldWithStretchConfig
-    ],
-):
-
-    __tablename__ = "WorldWithStretchConfigDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldWithOmniDriveRobotDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "WorldWithStretchConfigDAO",
-        "inherit_condition": database_id == WorldWithOmniDriveRobotDAO.database_id,
-    }
-
-
-class WorldWithStretchConfigDiffDriveDAO(
-    WorldWithDiffDriveRobotDAO,
-    DataAccessObject[
-        giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs.WorldWithStretchConfigDiffDrive
-    ],
-):
-
-    __tablename__ = "WorldWithStretchConfigDiffDriveDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldWithDiffDriveRobotDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "WorldWithStretchConfigDiffDriveDAO",
-        "inherit_condition": database_id == WorldWithDiffDriveRobotDAO.database_id,
-    }
-
-
-class WorldWithTracyConfigDAO(
-    WorldWithFixedRobotDAO,
-    DataAccessObject[
-        giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs.WorldWithTracyConfig
-    ],
-):
-
-    __tablename__ = "WorldWithTracyConfigDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(WorldWithFixedRobotDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "WorldWithTracyConfigDAO",
-        "inherit_condition": database_id == WorldWithFixedRobotDAO.database_id,
     }
 
 
@@ -28429,7 +29025,11 @@ class WrenchProcessorDAO(
     )
 
     config: Mapped[FilterConfigDAO] = relationship(
-        "FilterConfigDAO", uselist=False, foreign_keys=[config_id], post_update=True
+        "FilterConfigDAO",
+        uselist=False,
+        foreign_keys=[config_id],
+        post_update=True,
+        lazy="selectin",
     )
 
 
@@ -28495,6 +29095,7 @@ class _CancelBecauseExternalCollisionViolatedDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[_CancelBecauseExternalCollisionViolatedDAO_tasks_association.source__cancelbecauseexternalcollisionviolateddao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -28525,6 +29126,7 @@ class _CancelBecauseSelfCollisionViolatedDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[_CancelBecauseSelfCollisionViolatedDAO_tasks_association.source__cancelbecauseselfcollisionviolateddao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -28586,6 +29188,7 @@ class _ExternalCollisionAvoidanceNodeDAO(
         uselist=False,
         foreign_keys=[collision_group_id],
         post_update=True,
+        lazy="selectin",
     )
     external_collision_manager: Mapped[ExternalCollisionVariableManagerDAO] = (
         relationship(
@@ -28593,6 +29196,7 @@ class _ExternalCollisionAvoidanceNodeDAO(
             uselist=False,
             foreign_keys=[external_collision_manager_id],
             post_update=True,
+            lazy="selectin",
         )
     )
 
@@ -28670,6 +29274,7 @@ class _MultiSimStateCallbackDAO(
         uselist=False,
         foreign_keys=[synchronizer_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -28716,18 +29321,21 @@ class _SelfCollisionAvoidanceNodeDAO(
         uselist=False,
         foreign_keys=[collision_group_a_id],
         post_update=True,
+        lazy="selectin",
     )
     collision_group_b: Mapped[CollisionGroupDAO] = relationship(
         "CollisionGroupDAO",
         uselist=False,
         foreign_keys=[collision_group_b_id],
         post_update=True,
+        lazy="selectin",
     )
     self_collision_manager: Mapped[SelfCollisionVariableManagerDAO] = relationship(
         "SelfCollisionVariableManagerDAO",
         uselist=False,
         foreign_keys=[self_collision_manager_id],
         post_update=True,
+        lazy="selectin",
     )
 
     __mapper_args__ = {

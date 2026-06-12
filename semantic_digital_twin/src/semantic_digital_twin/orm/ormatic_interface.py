@@ -136,10 +136,10 @@ class Base(DeclarativeBase):
 class CollisionCheckingResultDAO_contacts_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_30943416093470573366535430635148087213656332547341162949685825"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_collisioncheckingresultdao_id: Mapped[int] = mapped_column(
         ForeignKey("CollisionCheckingResultDAO.database_id")
     )
@@ -153,10 +153,10 @@ class CollisionCheckingResultDAO_contacts_association(
 
 
 class CollisionGroupDAO_bodies_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_61428407002132739694257719785249721483169019459943026085884624"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_collisiongroupdao_id: Mapped[int] = mapped_column(
         ForeignKey("CollisionGroupDAO.database_id")
     )
@@ -168,10 +168,10 @@ class CollisionGroupDAO_bodies_association(Base, AssociationDataAccessObject):
 class CollisionMatrixDAO_collision_checks_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_27850612640478721565049186037970387651110481473708464663453347"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_collisionmatrixdao_id: Mapped[int] = mapped_column(
         ForeignKey("CollisionMatrixDAO.database_id")
     )
@@ -187,10 +187,10 @@ class CollisionMatrixDAO_collision_checks_association(
 class AllowAlwaysInCollisionDAO_collision_checks_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_10334328805330685313242953821568395588962970778653334344040686"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_allowalwaysincollisiondao_id: Mapped[int] = mapped_column(
         ForeignKey("AllowAlwaysInCollisionDAO.database_id")
     )
@@ -206,10 +206,10 @@ class AllowAlwaysInCollisionDAO_collision_checks_association(
 class AllowCollisionBetweenGroupsDAO_body_group_a_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_41671465971218617443763055172685315804182524207102570225479429"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_allowcollisionbetweengroupsdao_id: Mapped[int] = mapped_column(
         ForeignKey("AllowCollisionBetweenGroupsDAO.database_id")
     )
@@ -221,10 +221,10 @@ class AllowCollisionBetweenGroupsDAO_body_group_a_association(
 class AllowCollisionBetweenGroupsDAO_body_group_b_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_41936993875283545034946870955138052732830669101194548782288967"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_allowcollisionbetweengroupsdao_id: Mapped[int] = mapped_column(
         ForeignKey("AllowCollisionBetweenGroupsDAO.database_id")
     )
@@ -236,10 +236,10 @@ class AllowCollisionBetweenGroupsDAO_body_group_b_association(
 class AllowCollisionForBodiesDAO_allowed_collision_bodies_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_94678273608311948591648065413734501463904061158173552606270103"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_allowcollisionforbodiesdao_id: Mapped[int] = mapped_column(
         ForeignKey("AllowCollisionForBodiesDAO.database_id")
     )
@@ -249,10 +249,10 @@ class AllowCollisionForBodiesDAO_allowed_collision_bodies_association(
 
 
 class AllowDefaultInCollisionDAO_bodies_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_16745738402595376615490104838810518996026044124080290204487931"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_allowdefaultincollisiondao_id: Mapped[int] = mapped_column(
         ForeignKey("AllowDefaultInCollisionDAO.database_id")
     )
@@ -264,10 +264,10 @@ class AllowDefaultInCollisionDAO_bodies_association(Base, AssociationDataAccessO
 class AllowNeverInCollisionDAO_collision_checks_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_10169822373554314992663236248765875155167553052262804975273014"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_allowneverincollisiondao_id: Mapped[int] = mapped_column(
         ForeignKey("AllowNeverInCollisionDAO.database_id")
     )
@@ -283,10 +283,10 @@ class AllowNeverInCollisionDAO_collision_checks_association(
 class AvoidCollisionBetweenGroupsDAO_body_group_a_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_61180892300204569375191675967263458078025350411925097800913719"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_avoidcollisionbetweengroupsdao_id: Mapped[int] = mapped_column(
         ForeignKey("AvoidCollisionBetweenGroupsDAO.database_id")
     )
@@ -298,10 +298,10 @@ class AvoidCollisionBetweenGroupsDAO_body_group_a_association(
 class AvoidCollisionBetweenGroupsDAO_body_group_b_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_21138284673524856788102514108253064586914313033146521039214843"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_avoidcollisionbetweengroupsdao_id: Mapped[int] = mapped_column(
         ForeignKey("AvoidCollisionBetweenGroupsDAO.database_id")
     )
@@ -313,10 +313,10 @@ class AvoidCollisionBetweenGroupsDAO_body_group_b_association(
 class HasSimulatorPropertiesDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_51210141141437714055138772332299701547761173930543594171244162"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_hassimulatorpropertiesdao_id: Mapped[int] = mapped_column(
         ForeignKey("HasSimulatorPropertiesDAO.database_id")
     )
@@ -331,10 +331,10 @@ class HasSimulatorPropertiesDAO_simulator_additional_properties_association(
 
 
 class JointStateDAO_connections_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_21489142497387605418175767994387298833851019386390203672514962"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_jointstatedao_id: Mapped[int] = mapped_column(
         ForeignKey("JointStateDAO.database_id")
     )
@@ -350,10 +350,10 @@ class JointStateDAO_connections_association(Base, AssociationDataAccessObject):
 class MaxAvoidedCollisionsOverrideDAO_bodies_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_23156111058184471296057929487758249660265487815654308822532550"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_maxavoidedcollisionsoverridedao_id: Mapped[int] = mapped_column(
         ForeignKey("MaxAvoidedCollisionsOverrideDAO.database_id")
     )
@@ -363,10 +363,10 @@ class MaxAvoidedCollisionsOverrideDAO_bodies_association(
 
 
 class PipelineDAO_steps_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_58860945866721041702051595583608401001783989657624804336843220"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_pipelinedao_id: Mapped[int] = mapped_column(
         ForeignKey("PipelineDAO.database_id")
     )
@@ -376,10 +376,10 @@ class PipelineDAO_steps_association(Base, AssociationDataAccessObject):
 
 
 class Sage10kRoomDAO_objects_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_50527165745583492520861687878274343628149206398247113551967909"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_sage10kroomdao_id: Mapped[int] = mapped_column(
         ForeignKey("Sage10kRoomDAO.database_id")
     )
@@ -393,10 +393,10 @@ class Sage10kRoomDAO_objects_association(Base, AssociationDataAccessObject):
 
 
 class Sage10kRoomDAO_walls_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_10826985052592580690785514445342796912599070742047010634223003"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_sage10kroomdao_id: Mapped[int] = mapped_column(
         ForeignKey("Sage10kRoomDAO.database_id")
     )
@@ -410,10 +410,10 @@ class Sage10kRoomDAO_walls_association(Base, AssociationDataAccessObject):
 
 
 class Sage10kRoomDAO_doors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_53617136961376353101647293881034824248448109112438677452145197"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_sage10kroomdao_id: Mapped[int] = mapped_column(
         ForeignKey("Sage10kRoomDAO.database_id")
     )
@@ -427,10 +427,10 @@ class Sage10kRoomDAO_doors_association(Base, AssociationDataAccessObject):
 
 
 class Sage10kSceneDAO_rooms_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_66557502878987976541408562996163696634198954948570112334331586"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_sage10kscenedao_id: Mapped[int] = mapped_column(
         ForeignKey("Sage10kSceneDAO.database_id")
     )
@@ -446,10 +446,10 @@ class Sage10kSceneDAO_rooms_association(Base, AssociationDataAccessObject):
 class SelfCollisionMatrixRuleDAO_allowed_collision_pairs_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_61274754000288052279657223915681004397558962435449167568608251"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_selfcollisionmatrixruledao_id: Mapped[int] = mapped_column(
         ForeignKey("SelfCollisionMatrixRuleDAO.database_id")
     )
@@ -465,10 +465,10 @@ class SelfCollisionMatrixRuleDAO_allowed_collision_pairs_association(
 class SelfCollisionMatrixRuleDAO_allowed_collision_bodies_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_14396452434524994467973541080545578269638262176329214669324005"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_selfcollisionmatrixruledao_id: Mapped[int] = mapped_column(
         ForeignKey("SelfCollisionMatrixRuleDAO.database_id")
     )
@@ -478,10 +478,10 @@ class SelfCollisionMatrixRuleDAO_allowed_collision_bodies_association(
 
 
 class ShapeCollectionDAO_shapes_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_10690769161909727122075553340095638664377970261192207149203117"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_shapecollectiondao_id: Mapped[int] = mapped_column(
         ForeignKey("ShapeCollectionDAO.database_id")
     )
@@ -495,10 +495,10 @@ class ShapeCollectionDAO_shapes_association(Base, AssociationDataAccessObject):
 class DuplicateKinematicStructureEntityErrorDAO_names_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_10696966761756032922078837984240156951375122326279076008233503"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_duplicatekinematicstructureentityerrordao_id: Mapped[int] = mapped_column(
         ForeignKey("DuplicateKinematicStructureEntityErrorDAO.database_id")
     )
@@ -514,10 +514,10 @@ class DuplicateKinematicStructureEntityErrorDAO_names_association(
 class DuplicateRobotAssignmentsErrorDAO_robots_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_68211936433118714298639438955270567124903021105789333075935746"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_duplicaterobotassignmentserrordao_id: Mapped[int] = mapped_column(
         ForeignKey("DuplicateRobotAssignmentsErrorDAO.database_id")
     )
@@ -533,10 +533,10 @@ class DuplicateRobotAssignmentsErrorDAO_robots_association(
 class DuplicateWorldEntityErrorDAO_world_entities_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_53799652587194369816620819022534772975303087340912573203479238"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_duplicateworldentityerrordao_id: Mapped[int] = mapped_column(
         ForeignKey("DuplicateWorldEntityErrorDAO.database_id")
     )
@@ -552,10 +552,10 @@ class DuplicateWorldEntityErrorDAO_world_entities_association(
 class SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_55398879348376960425566483383494381522090766330439258780258698"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_semanticannotationcirculardependencyerrordao_id: Mapped[int] = mapped_column(
         ForeignKey("SemanticAnnotationCircularDependencyErrorDAO.database_id")
     )
@@ -571,10 +571,10 @@ class SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_associat
 class WorldMappingDAO_kinematic_structure_entities_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_98762232059874914470242886446583768008771186152408554194139492"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldmappingdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldMappingDAO.database_id")
     )
@@ -589,10 +589,10 @@ class WorldMappingDAO_kinematic_structure_entities_association(
 
 
 class WorldMappingDAO_connections_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_88234943079532431001352304833525576232513095396710319263627667"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldmappingdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldMappingDAO.database_id")
     )
@@ -608,10 +608,10 @@ class WorldMappingDAO_connections_association(Base, AssociationDataAccessObject)
 class WorldMappingDAO_semantic_annotations_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_25834668279083196045577121485588551640685948987323901258225780"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldmappingdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldMappingDAO.database_id")
     )
@@ -625,10 +625,10 @@ class WorldMappingDAO_semantic_annotations_association(
 
 
 class WorldMappingDAO_degrees_of_freedom_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_63820737491753039802985637704969215539308413921468745291289025"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldmappingdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldMappingDAO.database_id")
     )
@@ -644,10 +644,10 @@ class WorldMappingDAO_degrees_of_freedom_association(Base, AssociationDataAccess
 class WorldMappingDAO_modification_history_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_11294180735054649438971565721084910078136875372585588648441413"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldmappingdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldMappingDAO.database_id")
     )
@@ -664,10 +664,10 @@ class WorldMappingDAO_modification_history_association(
 class ConnectionDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_10065629950849011221246418594379183704541772197845796488908999"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_connectiondao_id: Mapped[int] = mapped_column(
         ForeignKey("ConnectionDAO.database_id")
     )
@@ -682,10 +682,10 @@ class ConnectionDAO_simulator_additional_properties_association(
 
 
 class CollisionManagerDAO_default_rules_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_13703861091435910739902688048702147583387754794677427873193221"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_collisionmanagerdao_id: Mapped[int] = mapped_column(
         ForeignKey("CollisionManagerDAO.database_id")
     )
@@ -701,10 +701,10 @@ class CollisionManagerDAO_default_rules_association(Base, AssociationDataAccessO
 class CollisionManagerDAO_temporary_rules_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_82458614459814869030203285340769947517170837305761222414886699"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_collisionmanagerdao_id: Mapped[int] = mapped_column(
         ForeignKey("CollisionManagerDAO.database_id")
     )
@@ -720,10 +720,10 @@ class CollisionManagerDAO_temporary_rules_association(
 class CollisionManagerDAO_ignore_collision_rules_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_46333174708774040308044301017263424864222097586499136391061428"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_collisionmanagerdao_id: Mapped[int] = mapped_column(
         ForeignKey("CollisionManagerDAO.database_id")
     )
@@ -739,10 +739,10 @@ class CollisionManagerDAO_ignore_collision_rules_association(
 class CollisionManagerDAO_max_avoided_bodies_rules_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_16724485338724009241359604968160680505695204666100837233991288"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_collisionmanagerdao_id: Mapped[int] = mapped_column(
         ForeignKey("CollisionManagerDAO.database_id")
     )
@@ -759,10 +759,10 @@ class CollisionManagerDAO_max_avoided_bodies_rules_association(
 class CollisionManagerDAO_collision_consumers_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_18517485872566537243889877764736548861898657133656657980408730"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_collisionmanagerdao_id: Mapped[int] = mapped_column(
         ForeignKey("CollisionManagerDAO.database_id")
     )
@@ -778,10 +778,10 @@ class CollisionManagerDAO_collision_consumers_association(
 class TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_81194114849190998785115027879032778576443272100015680570805548"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_tfpublishermodelcallbackdao_id: Mapped[int] = mapped_column(
         ForeignKey("TfPublisherModelCallbackDAO.database_id")
     )
@@ -798,10 +798,10 @@ class TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_associati
 class TFPublisherDAO_ignored_kinematic_structure_entities_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_10847423734993281096727992810714124032814938791878717524770991"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_tfpublisherdao_id: Mapped[int] = mapped_column(
         ForeignKey("TFPublisherDAO.database_id")
     )
@@ -818,10 +818,10 @@ class TFPublisherDAO_ignored_kinematic_structure_entities_association(
 class WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_11499645060598489347680316872822067885268947572839939386934347"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldentitywithsimulatorpropertiesdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldEntityWithSimulatorPropertiesDAO.database_id")
     )
@@ -836,10 +836,10 @@ class WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_asso
 
 
 class HasDoorsDAO_doors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_84161163964185576257308772369580715393080523624674823814576220"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_hasdoorsdao_id: Mapped[int] = mapped_column(
         ForeignKey("HasDoorsDAO.database_id")
     )
@@ -849,10 +849,10 @@ class HasDoorsDAO_doors_association(Base, AssociationDataAccessObject):
 
 
 class HasDrawersDAO_drawers_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_88275789406460250200062975824544818056184666258539844979001303"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_hasdrawersdao_id: Mapped[int] = mapped_column(
         ForeignKey("HasDrawersDAO.database_id")
     )
@@ -866,10 +866,10 @@ class HasDrawersDAO_drawers_association(Base, AssociationDataAccessObject):
 
 
 class AbstractRobotPartDAO_joint_states_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_99227046866415165395121362125333388137127466260905116857765701"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_abstractrobotpartdao_id: Mapped[int] = mapped_column(
         ForeignKey("AbstractRobotPartDAO.database_id")
     )
@@ -883,10 +883,10 @@ class AbstractRobotPartDAO_joint_states_association(Base, AssociationDataAccessO
 
 
 class HSRBArmDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_10496932630927257261783792073339671637701412416029376491417600"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_hsrbarmdao_id: Mapped[int] = mapped_column(
         ForeignKey("HSRBArmDAO.database_id")
     )
@@ -900,10 +900,10 @@ class HSRBArmDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class Armar7NeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_10355595014762210227699809619985626063622928107464440078926468"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_armar7neckdao_id: Mapped[int] = mapped_column(
         ForeignKey("Armar7NeckDAO.database_id")
     )
@@ -917,10 +917,10 @@ class Armar7NeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class GarmiNeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_24159828222561644200652040421426352899498118227735590280021402"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_garmineckdao_id: Mapped[int] = mapped_column(
         ForeignKey("GarmiNeckDAO.database_id")
     )
@@ -934,10 +934,10 @@ class GarmiNeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class HSRBNeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_42432767956368764438557522591085922362514103275494162825454206"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_hsrbneckdao_id: Mapped[int] = mapped_column(
         ForeignKey("HSRBNeckDAO.database_id")
     )
@@ -951,10 +951,10 @@ class HSRBNeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class ICub3NeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_10205463936664727742624430915518765570489938866907620040527290"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_icub3neckdao_id: Mapped[int] = mapped_column(
         ForeignKey("ICub3NeckDAO.database_id")
     )
@@ -968,10 +968,10 @@ class ICub3NeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class JustinNeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_10392232295152138680119415385959246444247036309119458017555480"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_justinneckdao_id: Mapped[int] = mapped_column(
         ForeignKey("JustinNeckDAO.database_id")
     )
@@ -985,10 +985,10 @@ class JustinNeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class PR2NeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_86979702492176158898046080868708676794563298691337533399512530"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_pr2neckdao_id: Mapped[int] = mapped_column(
         ForeignKey("PR2NeckDAO.database_id")
     )
@@ -1002,10 +1002,10 @@ class PR2NeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class StretchNeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_11168140387188727304074991337531783684941712189284451432430423"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_stretchneckdao_id: Mapped[int] = mapped_column(
         ForeignKey("StretchNeckDAO.database_id")
     )
@@ -1019,10 +1019,10 @@ class StretchNeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class TiagoMujocoNeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_38524838261481507179973275982693392910427579138789470039700441"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_tiagomujoconeckdao_id: Mapped[int] = mapped_column(
         ForeignKey("TiagoMujocoNeckDAO.database_id")
     )
@@ -1036,10 +1036,10 @@ class TiagoMujocoNeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class TiagoNeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_65438130779050205324634791125768263011820838411077626456191668"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_tiagoneckdao_id: Mapped[int] = mapped_column(
         ForeignKey("TiagoNeckDAO.database_id")
     )
@@ -1053,10 +1053,10 @@ class TiagoNeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class UnitreeG1NeckDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_31864155639682184385855455096735323461910812609770070936241639"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_unitreeg1neckdao_id: Mapped[int] = mapped_column(
         ForeignKey("UnitreeG1NeckDAO.database_id")
     )
@@ -1066,10 +1066,10 @@ class UnitreeG1NeckDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class MMPDresdenTorsoDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_25459292650698024389310320091701675216782234496162389686145481"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_mmpdresdentorsodao_id: Mapped[int] = mapped_column(
         ForeignKey("MMPDresdenTorsoDAO.database_id")
     )
@@ -1083,10 +1083,10 @@ class MMPDresdenTorsoDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class MinimalRobotDAO_bodies_of_branch_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_93313390411884787792845487212249312599933457989172665658987594"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_minimalrobotdao_id: Mapped[int] = mapped_column(
         ForeignKey("MinimalRobotDAO.database_id")
     )
@@ -1101,10 +1101,10 @@ class MinimalRobotDAO_bodies_of_branch_association(Base, AssociationDataAccessOb
 
 
 class TracyDAO_sensors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_53455785527190888444914272868730157618197722139938256344000707"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_tracydao_id: Mapped[int] = mapped_column(ForeignKey("TracyDAO.database_id"))
     target_tracycameradao_id: Mapped[int] = mapped_column(
         ForeignKey("TracyCameraDAO.database_id")
@@ -1116,10 +1116,10 @@ class TracyDAO_sensors_association(Base, AssociationDataAccessObject):
 
 
 class HasAperturesDAO_apertures_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_20807349603043271587286625033281799047722033893758740561822060"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_hasaperturesdao_id: Mapped[int] = mapped_column(
         ForeignKey("HasAperturesDAO.database_id")
     )
@@ -1133,10 +1133,10 @@ class HasAperturesDAO_apertures_association(Base, AssociationDataAccessObject):
 
 
 class HasStorageSpaceDAO_objects_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_25874083443521766617770704172931011793368795308247254903290268"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_hasstoragespacedao_id: Mapped[int] = mapped_column(
         ForeignKey("HasStorageSpaceDAO.database_id")
     )
@@ -1150,10 +1150,10 @@ class HasStorageSpaceDAO_objects_association(Base, AssociationDataAccessObject):
 
 
 class CounterTopDAO_objects_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_96811263818468319328907277137732176623714510442205184055803083"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_countertopdao_id: Mapped[int] = mapped_column(
         ForeignKey("CounterTopDAO.database_id")
     )
@@ -1167,10 +1167,10 @@ class CounterTopDAO_objects_association(Base, AssociationDataAccessObject):
 
 
 class CabinetDAO_objects_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_10336047020298164765592793407188592894195369769859711739454463"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_cabinetdao_id: Mapped[int] = mapped_column(
         ForeignKey("CabinetDAO.database_id")
     )
@@ -1184,10 +1184,10 @@ class CabinetDAO_objects_association(Base, AssociationDataAccessObject):
 
 
 class CupboardDAO_doors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_74616698996037202449113822676674559397511001886440435857180955"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_cupboarddao_id: Mapped[int] = mapped_column(
         ForeignKey("CupboardDAO.database_id")
     )
@@ -1197,10 +1197,10 @@ class CupboardDAO_doors_association(Base, AssociationDataAccessObject):
 
 
 class DresserDAO_doors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_35076679555318315855053218119011274026303055254368822201866811"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_dresserdao_id: Mapped[int] = mapped_column(
         ForeignKey("DresserDAO.database_id")
     )
@@ -1210,10 +1210,10 @@ class DresserDAO_doors_association(Base, AssociationDataAccessObject):
 
 
 class DresserDAO_drawers_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_19432728909890710848229646921765143342041167761747873925730434"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_dresserdao_id: Mapped[int] = mapped_column(
         ForeignKey("DresserDAO.database_id")
     )
@@ -1227,10 +1227,10 @@ class DresserDAO_drawers_association(Base, AssociationDataAccessObject):
 
 
 class FridgeDAO_drawers_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_95454291339249238904623447617862005981647288819823008693016856"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_fridgedao_id: Mapped[int] = mapped_column(
         ForeignKey("FridgeDAO.database_id")
     )
@@ -1244,10 +1244,10 @@ class FridgeDAO_drawers_association(Base, AssociationDataAccessObject):
 
 
 class FridgeDAO_doors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_88751853259437492998445973741639929027503494451645508804486539"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_fridgedao_id: Mapped[int] = mapped_column(
         ForeignKey("FridgeDAO.database_id")
     )
@@ -1257,10 +1257,10 @@ class FridgeDAO_doors_association(Base, AssociationDataAccessObject):
 
 
 class WardrobeDAO_doors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_43115623383042475979198340133386602440199232404437670362926270"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_wardrobedao_id: Mapped[int] = mapped_column(
         ForeignKey("WardrobeDAO.database_id")
     )
@@ -1270,10 +1270,10 @@ class WardrobeDAO_doors_association(Base, AssociationDataAccessObject):
 
 
 class WardrobeDAO_drawers_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_92542331566240419694477258440183114518164932556050025455469310"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_wardrobedao_id: Mapped[int] = mapped_column(
         ForeignKey("WardrobeDAO.database_id")
     )
@@ -1287,10 +1287,10 @@ class WardrobeDAO_drawers_association(Base, AssociationDataAccessObject):
 
 
 class DishwasherDAO_drawers_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_77009511054531257172073748784620283583854564769907603991441130"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_dishwasherdao_id: Mapped[int] = mapped_column(
         ForeignKey("DishwasherDAO.database_id")
     )
@@ -1304,10 +1304,10 @@ class DishwasherDAO_drawers_association(Base, AssociationDataAccessObject):
 
 
 class DishwasherDAO_doors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_72799654902329927565100249975226146805185530810383799467878664"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_dishwasherdao_id: Mapped[int] = mapped_column(
         ForeignKey("DishwasherDAO.database_id")
     )
@@ -1317,10 +1317,10 @@ class DishwasherDAO_doors_association(Base, AssociationDataAccessObject):
 
 
 class SofaDAO_objects_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_94393988479730442605207881991662733321301694888106448637684645"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_sofadao_id: Mapped[int] = mapped_column(ForeignKey("SofaDAO.database_id"))
     target_hasrootbodydao_id: Mapped[int] = mapped_column(
         ForeignKey("HasRootBodyDAO.database_id")
@@ -1332,10 +1332,10 @@ class SofaDAO_objects_association(Base, AssociationDataAccessObject):
 
 
 class TableDAO_objects_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_31838534710353540730159230236956687286764949961489382044173039"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_tabledao_id: Mapped[int] = mapped_column(ForeignKey("TableDAO.database_id"))
     target_hasrootbodydao_id: Mapped[int] = mapped_column(
         ForeignKey("HasRootBodyDAO.database_id")
@@ -1347,10 +1347,10 @@ class TableDAO_objects_association(Base, AssociationDataAccessObject):
 
 
 class DrawerDAO_objects_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_14390906673593893944701256723746792577165710662206346614138882"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_drawerdao_id: Mapped[int] = mapped_column(
         ForeignKey("DrawerDAO.database_id")
     )
@@ -1364,10 +1364,10 @@ class DrawerDAO_objects_association(Base, AssociationDataAccessObject):
 
 
 class RoomWithWallsAndDoorsDAO_walls_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_59279835155553331916320829121624451516437301546125700947447732"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_roomwithwallsanddoorsdao_id: Mapped[int] = mapped_column(
         ForeignKey("RoomWithWallsAndDoorsDAO.database_id")
     )
@@ -1377,10 +1377,10 @@ class RoomWithWallsAndDoorsDAO_walls_association(Base, AssociationDataAccessObje
 
 
 class RoomWithWallsAndDoorsDAO_doors_association(Base, AssociationDataAccessObject):
-
     __tablename__ = "_41651222075607285598093561901844381163868576790321323113299336"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_roomwithwallsanddoorsdao_id: Mapped[int] = mapped_column(
         ForeignKey("RoomWithWallsAndDoorsDAO.database_id")
     )
@@ -1392,10 +1392,10 @@ class RoomWithWallsAndDoorsDAO_doors_association(Base, AssociationDataAccessObje
 class WorldModelManagerDAO_model_modification_blocks_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_48817053789051842980524726351659431200061677772768352314745967"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldmodelmanagerdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldModelManagerDAO.database_id")
     )
@@ -1412,10 +1412,10 @@ class WorldModelManagerDAO_model_modification_blocks_association(
 class WorldModelModificationBlockDAO_modifications_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_73570109423472009398311036254907134191898497721503046786229224"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldmodelmodificationblockdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldModelModificationBlockDAO.database_id")
     )
@@ -1431,10 +1431,10 @@ class WorldModelModificationBlockDAO_modifications_association(
 class WorldModelSnapshotDAO_modifications_association(
     Base, AssociationDataAccessObject
 ):
-
     __tablename__ = "_24698704726108595078964782894919771941347483550905452311408919"
 
     database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     source_worldmodelsnapshotdao_id: Mapped[int] = mapped_column(
         ForeignKey("WorldModelSnapshotDAO.database_id")
     )
@@ -1473,7 +1473,6 @@ class AccelerationVariableDAO(
         semantic_digital_twin.world_description.degree_of_freedom.AccelerationVariable
     ],
 ):
-
     __tablename__ = "AccelerationVariableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1498,7 +1497,6 @@ class AccelerationVariableDAO(
 class AcknowledgmentDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.ros.messages.Acknowledgment]
 ):
-
     __tablename__ = "AcknowledgmentDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1526,7 +1524,6 @@ class AmentPackageLocatorDAO(
         semantic_digital_twin.adapters.package_resolver.AmentPackageLocator
     ],
 ):
-
     __tablename__ = "AmentPackageLocatorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1538,7 +1535,6 @@ class AtomicWorldModificationNotAtomicDAO(
     Base,
     DataAccessObject[semantic_digital_twin.exceptions.AtomicWorldModificationNotAtomic],
 ):
-
     __tablename__ = "AtomicWorldModificationNotAtomicDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1563,7 +1559,6 @@ class AtomicWorldModificationNotAtomicDAO(
 class BoundingBoxDAO(
     Base, DataAccessObject[semantic_digital_twin.world_description.geometry.BoundingBox]
 ):
-
     __tablename__ = "BoundingBoxDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1596,7 +1591,6 @@ class BoundingBoxDAO(
 class CaseReasonerDAO(
     Base, DataAccessObject[semantic_digital_twin.reasoning.reasoner.CaseReasoner]
 ):
-
     __tablename__ = "CaseReasonerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1614,7 +1608,6 @@ class ClosestPointsDAO(
         semantic_digital_twin.collision_checking.collision_detector.ClosestPoints
     ],
 ):
-
     __tablename__ = "ClosestPointsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1648,7 +1641,6 @@ class CollisionCheckDAO(
         semantic_digital_twin.collision_checking.collision_matrix.CollisionCheck
     ],
 ):
-
     __tablename__ = "CollisionCheckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1677,7 +1669,6 @@ class CollisionCheckDAO(
 class CollisionCheckingErrorDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.CollisionCheckingError]
 ):
-
     __tablename__ = "CollisionCheckingErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1700,7 +1691,6 @@ class CollisionCheckingResultDAO(
         semantic_digital_twin.collision_checking.collision_detector.CollisionCheckingResult
     ],
 ):
-
     __tablename__ = "CollisionCheckingResultDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1723,7 +1713,6 @@ class CollisionConsumerDAO(
         semantic_digital_twin.collision_checking.collision_manager.CollisionConsumer
     ],
 ):
-
     __tablename__ = "CollisionConsumerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1746,7 +1735,6 @@ class CollisionGroupDAO(
         semantic_digital_twin.collision_checking.collision_groups.CollisionGroup
     ],
 ):
-
     __tablename__ = "CollisionGroupDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1776,7 +1764,6 @@ class CollisionGroupConsumerDAO(
         semantic_digital_twin.collision_checking.collision_groups.CollisionGroupConsumer
     ],
 ):
-
     __tablename__ = "CollisionGroupConsumerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1797,7 +1784,6 @@ class BaseCollisionVariableManagerDAO(
         semantic_digital_twin.collision_checking.collision_variable_managers.BaseCollisionVariableManager
     ],
 ):
-
     __tablename__ = "BaseCollisionVariableManagerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1818,7 +1804,6 @@ class CollisionMatrixDAO(
         semantic_digital_twin.collision_checking.collision_matrix.CollisionMatrix
     ],
 ):
-
     __tablename__ = "CollisionMatrixDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1841,7 +1826,6 @@ class CollisionRuleDAO(
         semantic_digital_twin.collision_checking.collision_matrix.CollisionRule
     ],
 ):
-
     __tablename__ = "CollisionRuleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1864,7 +1848,6 @@ class AllowCollisionRuleDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowCollisionRule
     ],
 ):
-
     __tablename__ = "AllowCollisionRuleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1885,7 +1868,6 @@ class AllowAllCollisionsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowAllCollisions
     ],
 ):
-
     __tablename__ = "AllowAllCollisionsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1906,7 +1888,6 @@ class AllowAlwaysInCollisionDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowAlwaysInCollision
     ],
 ):
-
     __tablename__ = "AllowAlwaysInCollisionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1951,7 +1932,6 @@ class AllowCollisionBetweenGroupsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowCollisionBetweenGroups
     ],
 ):
-
     __tablename__ = "AllowCollisionBetweenGroupsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -1989,7 +1969,6 @@ class AllowCollisionForAdjacentPairsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowCollisionForAdjacentPairs
     ],
 ):
-
     __tablename__ = "AllowCollisionForAdjacentPairsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2010,7 +1989,6 @@ class AllowCollisionForBodiesDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowCollisionForBodies
     ],
 ):
-
     __tablename__ = "AllowCollisionForBodiesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2040,7 +2018,6 @@ class AllowDefaultInCollisionDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowDefaultInCollision
     ],
 ):
-
     __tablename__ = "AllowDefaultInCollisionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2083,7 +2060,6 @@ class AllowNeverInCollisionDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowNeverInCollision
     ],
 ):
-
     __tablename__ = "AllowNeverInCollisionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2136,7 +2112,6 @@ class AllowNonRobotCollisionsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowNonRobotCollisions
     ],
 ):
-
     __tablename__ = "AllowNonRobotCollisionsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2157,7 +2132,6 @@ class AllowSelfCollisionsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AllowSelfCollisions
     ],
 ):
-
     __tablename__ = "AllowSelfCollisionsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2188,7 +2162,6 @@ class AvoidCollisionRuleDAO(
         semantic_digital_twin.collision_checking.collision_rules.AvoidCollisionRule
     ],
 ):
-
     __tablename__ = "AvoidCollisionRuleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2214,7 +2187,6 @@ class AvoidAllCollisionsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AvoidAllCollisions
     ],
 ):
-
     __tablename__ = "AvoidAllCollisionsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2235,7 +2207,6 @@ class AvoidCollisionBetweenGroupsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AvoidCollisionBetweenGroups
     ],
 ):
-
     __tablename__ = "AvoidCollisionBetweenGroupsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2273,7 +2244,6 @@ class AvoidExternalCollisionsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AvoidExternalCollisions
     ],
 ):
-
     __tablename__ = "AvoidExternalCollisionsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2304,7 +2274,6 @@ class AvoidSelfCollisionsDAO(
         semantic_digital_twin.collision_checking.collision_rules.AvoidSelfCollisions
     ],
 ):
-
     __tablename__ = "AvoidSelfCollisionsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2332,7 +2301,6 @@ class AvoidSelfCollisionsDAO(
 class ColorDAO(
     Base, DataAccessObject[semantic_digital_twin.world_description.geometry.Color]
 ):
-
     __tablename__ = "ColorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2351,7 +2319,6 @@ class CompositePathResolverDAO(
         semantic_digital_twin.adapters.package_resolver.CompositePathResolver
     ],
 ):
-
     __tablename__ = "CompositePathResolverDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2365,7 +2332,6 @@ class ConstraintBuilderDAO(
         semantic_digital_twin.spatial_computations.ik_solver.ConstraintBuilder
     ],
 ):
-
     __tablename__ = "ConstraintBuilderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2429,7 +2395,6 @@ class ConstraintBuilderDAO(
 class CoordinateAxisDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.fbx.CoordinateAxis]
 ):
-
     __tablename__ = "CoordinateAxisDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2441,7 +2406,6 @@ class DatabaseNotAvailableErrorDAO(
     Base,
     DataAccessObject[semantic_digital_twin.orm.exceptions.DatabaseNotAvailableError],
 ):
-
     __tablename__ = "DatabaseNotAvailableErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2459,7 +2423,6 @@ class DegreeOfFreedomLimitsDAO(
         semantic_digital_twin.world_description.degree_of_freedom.DegreeOfFreedomLimits
     ],
 ):
-
     __tablename__ = "DegreeOfFreedomLimitsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2495,7 +2458,6 @@ class DerivativeMapDAO(
     Base,
     DataAccessObject[semantic_digital_twin.spatial_types.derivatives.DerivativeMap],
 ):
-
     __tablename__ = "DerivativeMapDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2518,7 +2480,6 @@ class DerivativeMap_floatDAO(
         semantic_digital_twin.spatial_types.derivatives.DerivativeMap[float]
     ],
 ):
-
     __tablename__ = "DerivativeMap_floatDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2549,7 +2510,6 @@ class DerivativeMap_floatDAO(
 class DofNotInWorldStateErrorDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.DofNotInWorldStateError]
 ):
-
     __tablename__ = "DofNotInWorldStateErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2571,7 +2531,6 @@ class DurationJSONSerializerDAO(
         semantic_digital_twin.adapters.ros.ros_msg_serializer.DurationJSONSerializer
     ],
 ):
-
     __tablename__ = "DurationJSONSerializerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2582,7 +2541,6 @@ class DurationJSONSerializerDAO(
 class EntityConverterDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.multi_sim.EntityConverter]
 ):
-
     __tablename__ = "EntityConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2607,7 +2565,6 @@ class ActuatorConverterDAO(
     EntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.ActuatorConverter],
 ):
-
     __tablename__ = "ActuatorConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2626,7 +2583,6 @@ class CameraConverterDAO(
     EntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.CameraConverter],
 ):
-
     __tablename__ = "CameraConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2645,7 +2601,6 @@ class ConnectionConverterDAO(
     EntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.ConnectionConverter],
 ):
-
     __tablename__ = "ConnectionConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2664,7 +2619,6 @@ class Connection1DOFConverterDAO(
     ConnectionConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.Connection1DOFConverter],
 ):
-
     __tablename__ = "Connection1DOFConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2707,7 +2661,6 @@ class ConnectionPrismaticConverterDAO(
         semantic_digital_twin.adapters.multi_sim.ConnectionPrismaticConverter
     ],
 ):
-
     __tablename__ = "ConnectionPrismaticConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2728,7 +2681,6 @@ class ConnectionRevoluteConverterDAO(
         semantic_digital_twin.adapters.multi_sim.ConnectionRevoluteConverter
     ],
 ):
-
     __tablename__ = "ConnectionRevoluteConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2747,7 +2699,6 @@ class Connection6DOFConverterDAO(
     ConnectionConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.Connection6DOFConverter],
 ):
-
     __tablename__ = "Connection6DOFConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2765,7 +2716,6 @@ class Connection6DOFConverterDAO(
 class EntitySpawnerDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.multi_sim.EntitySpawner]
 ):
-
     __tablename__ = "EntitySpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2786,7 +2736,6 @@ class ActuatorSpawnerDAO(
     EntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.ActuatorSpawner],
 ):
-
     __tablename__ = "ActuatorSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2805,7 +2754,6 @@ class ConnectionSpawnerDAO(
     EntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.ConnectionSpawner],
 ):
-
     __tablename__ = "ConnectionSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2824,7 +2772,6 @@ class Connection1DOFSpawnerDAO(
     ConnectionSpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.Connection1DOFSpawner],
 ):
-
     __tablename__ = "Connection1DOFSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2843,7 +2790,6 @@ class Connection6DOFSpawnerDAO(
     ConnectionSpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.Connection6DOFSpawner],
 ):
-
     __tablename__ = "Connection6DOFSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2864,7 +2810,6 @@ class ConnectionPrismaticSpawnerDAO(
         semantic_digital_twin.adapters.multi_sim.ConnectionPrismaticSpawner
     ],
 ):
-
     __tablename__ = "ConnectionPrismaticSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2885,7 +2830,6 @@ class ConnectionRevoluteSpawnerDAO(
         semantic_digital_twin.adapters.multi_sim.ConnectionRevoluteSpawner
     ],
 ):
-
     __tablename__ = "ConnectionRevoluteSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2906,7 +2850,6 @@ class ExternalCollisionVariableManagerDAO(
         semantic_digital_twin.collision_checking.collision_variable_managers.ExternalCollisionVariableManager
     ],
 ):
-
     __tablename__ = "ExternalCollisionVariableManagerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2924,7 +2867,6 @@ class ExternalCollisionVariableManagerDAO(
 class FBXGlobalSettingsDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.fbx.FBXGlobalSettings]
 ):
-
     __tablename__ = "FBXGlobalSettingsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2936,7 +2878,6 @@ class FetchWorldServerDAO(
     Base,
     DataAccessObject[semantic_digital_twin.adapters.ros.world_fetcher.FetchWorldServer],
 ):
-
     __tablename__ = "FetchWorldServerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2962,7 +2903,6 @@ class FieldOfViewDAO(
     Base,
     DataAccessObject[semantic_digital_twin.datastructures.field_of_view.FieldOfView],
 ):
-
     __tablename__ = "FieldOfViewDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2977,7 +2917,6 @@ class FileUriResolverDAO(
     Base,
     DataAccessObject[semantic_digital_twin.adapters.package_resolver.FileUriResolver],
 ):
-
     __tablename__ = "FileUriResolverDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -2993,7 +2932,6 @@ class FixedConnectionSpawnerDAO(
     ConnectionSpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.FixedConnectionSpawner],
 ):
-
     __tablename__ = "FixedConnectionSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3014,7 +2952,6 @@ class FrozenBoxDAO(
         semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer.FrozenBox
     ],
 ):
-
     __tablename__ = "FrozenBoxDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3042,7 +2979,6 @@ class FrozenIndexBoxDAO(
         semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer.FrozenIndexBox
     ],
 ):
-
     __tablename__ = "FrozenIndexBoxDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3060,7 +2996,6 @@ class FrozenIndexBoxDAO(
 class HasRobotPartsDAO(
     Base, DataAccessObject[semantic_digital_twin.robots.robot_parts.HasRobotParts]
 ):
-
     __tablename__ = "HasRobotPartsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3080,7 +3015,6 @@ class HasRobotPartsDAO(
 class HasSimulatorPropertiesDAO(
     Base, DataAccessObject[semantic_digital_twin.mixin.HasSimulatorProperties]
 ):
-
     __tablename__ = "HasSimulatorPropertiesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3114,7 +3048,6 @@ class IncorrectWorldStateValueShapeErrorDAO(
         semantic_digital_twin.exceptions.IncorrectWorldStateValueShapeError
     ],
 ):
-
     __tablename__ = "IncorrectWorldStateValueShapeErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3136,7 +3069,6 @@ class InertialDAO(
         semantic_digital_twin.world_description.inertial_properties.Inertial
     ],
 ):
-
     __tablename__ = "InertialDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3170,7 +3102,6 @@ class InertialDAO(
 class InertialConverterDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.multi_sim.InertialConverter]
 ):
-
     __tablename__ = "InertialConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3212,7 +3143,6 @@ class InvalidCollisionCheckErrorDAO(
     CollisionCheckingErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.InvalidCollisionCheckError],
 ):
-
     __tablename__ = "InvalidCollisionCheckErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3244,7 +3174,6 @@ class BodyHasNoGeometryErrorDAO(
     InvalidCollisionCheckErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.BodyHasNoGeometryError],
 ):
-
     __tablename__ = "BodyHasNoGeometryErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3265,7 +3194,6 @@ class InvalidBodiesInCollisionCheckErrorDAO(
         semantic_digital_twin.exceptions.InvalidBodiesInCollisionCheckError
     ],
 ):
-
     __tablename__ = "InvalidBodiesInCollisionCheckErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3286,7 +3214,6 @@ class InverseKinematicsSolverDAO(
         semantic_digital_twin.spatial_computations.ik_solver.InverseKinematicsSolver
     ],
 ):
-
     __tablename__ = "InverseKinematicsSolverDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3308,7 +3235,6 @@ class IsPerceivableDAO(
     Base,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.IsPerceivable],
 ):
-
     __tablename__ = "IsPerceivableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3335,7 +3261,6 @@ class JerkVariableDAO(
         semantic_digital_twin.world_description.degree_of_freedom.JerkVariable
     ],
 ):
-
     __tablename__ = "JerkVariableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3363,7 +3288,6 @@ class JointDynamicsDAO(
         semantic_digital_twin.world_description.connection_properties.JointDynamics
     ],
 ):
-
     __tablename__ = "JointDynamicsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3378,7 +3302,6 @@ class JointDynamicsDAO(
 class JointStateDAO(
     Base, DataAccessObject[semantic_digital_twin.datastructures.joint_state.JointState]
 ):
-
     __tablename__ = "JointStateDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3421,7 +3344,6 @@ class KinematicStructureEntityConverterDAO(
         semantic_digital_twin.adapters.multi_sim.KinematicStructureEntityConverter
     ],
 ):
-
     __tablename__ = "KinematicStructureEntityConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3447,7 +3369,6 @@ class BodyConverterDAO(
     KinematicStructureEntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.BodyConverter],
 ):
-
     __tablename__ = "BodyConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3482,7 +3403,6 @@ class KinematicStructureEntitySpatialRelationDAO(
         semantic_digital_twin.reasoning.predicates.KinematicStructureEntitySpatialRelation
     ],
 ):
-
     __tablename__ = "KinematicStructureEntitySpatialRelationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3527,7 +3447,6 @@ class InsideOfDAO(
     KinematicStructureEntitySpatialRelationDAO,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.InsideOf],
 ):
-
     __tablename__ = "InsideOfDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3551,7 +3470,6 @@ class KinematicStructureEntitySpawnerDAO(
         semantic_digital_twin.adapters.multi_sim.KinematicStructureEntitySpawner
     ],
 ):
-
     __tablename__ = "KinematicStructureEntitySpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3570,7 +3488,6 @@ class BodySpawnerDAO(
     KinematicStructureEntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.BodySpawner],
 ):
-
     __tablename__ = "BodySpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3589,7 +3506,6 @@ class BodySpawnerDAO(
 class LogicalErrorDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.LogicalError]
 ):
-
     __tablename__ = "LogicalErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3613,7 +3529,6 @@ class LogicalErrorDAO(
 class MJCFParserDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.mjcf.MJCFParser]
 ):
-
     __tablename__ = "MJCFParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3634,7 +3549,6 @@ class MaxAvoidedCollisionsRuleDAO(
         semantic_digital_twin.collision_checking.collision_matrix.MaxAvoidedCollisionsRule
     ],
 ):
-
     __tablename__ = "MaxAvoidedCollisionsRuleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3657,7 +3571,6 @@ class DefaultMaxAvoidedCollisionsDAO(
         semantic_digital_twin.collision_checking.collision_matrix.DefaultMaxAvoidedCollisions
     ],
 ):
-
     __tablename__ = "DefaultMaxAvoidedCollisionsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3678,7 +3591,6 @@ class MaxAvoidedCollisionsOverrideDAO(
         semantic_digital_twin.collision_checking.collision_matrix.MaxAvoidedCollisionsOverride
     ],
 ):
-
     __tablename__ = "MaxAvoidedCollisionsOverrideDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3707,7 +3619,6 @@ class MaxAvoidedCollisionsOverrideDAO(
 class MeshParserDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.mesh.MeshParser]
 ):
-
     __tablename__ = "MeshParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3731,7 +3642,6 @@ class MeshParserDAO(
 class DAEParserDAO(
     MeshParserDAO, DataAccessObject[semantic_digital_twin.adapters.mesh.DAEParser]
 ):
-
     __tablename__ = "DAEParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3749,7 +3659,6 @@ class DAEParserDAO(
 class FBXParserDAO(
     MeshParserDAO, DataAccessObject[semantic_digital_twin.adapters.fbx.FBXParser]
 ):
-
     __tablename__ = "FBXParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3767,7 +3676,6 @@ class FBXParserDAO(
 class GLBParserDAO(
     MeshParserDAO, DataAccessObject[semantic_digital_twin.adapters.mesh.GLBParser]
 ):
-
     __tablename__ = "GLBParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3785,7 +3693,6 @@ class GLBParserDAO(
 class MessageDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.ros.messages.Message]
 ):
-
     __tablename__ = "MessageDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3818,7 +3725,6 @@ class MessageDAO(
 class LoadModelDAO(
     MessageDAO, DataAccessObject[semantic_digital_twin.adapters.ros.messages.LoadModel]
 ):
-
     __tablename__ = "LoadModelDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3836,7 +3742,6 @@ class LoadModelDAO(
 class MetaDataDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.ros.messages.MetaData]
 ):
-
     __tablename__ = "MetaDataDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3857,7 +3762,6 @@ class MismatchingCommandLengthErrorDAO(
     Base,
     DataAccessObject[semantic_digital_twin.exceptions.MismatchingCommandLengthError],
 ):
-
     __tablename__ = "MismatchingCommandLengthErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3877,7 +3781,6 @@ class MismatchingIDsInWorldModificationDAO(
         semantic_digital_twin.exceptions.MismatchingIDsInWorldModification
     ],
 ):
-
     __tablename__ = "MismatchingIDsInWorldModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3902,7 +3805,6 @@ class MismatchingIDsInWorldModificationDAO(
 class MockedNodeClassDAO(
     Base, DataAccessObject[semantic_digital_twin.utils.MockedNodeClass]
 ):
-
     __tablename__ = "MockedNodeClassDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3913,7 +3815,6 @@ class MockedNodeClassDAO(
 class MockedNodeModuleDAO(
     Base, DataAccessObject[semantic_digital_twin.utils.MockedNodeModule]
 ):
-
     __tablename__ = "MockedNodeModuleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3926,7 +3827,6 @@ class MockedNodeModuleDAO(
 
 
 class MockedRCLPYDAO(Base, DataAccessObject[semantic_digital_twin.utils.MockedRCLPY]):
-
     __tablename__ = "MockedRCLPYDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3938,7 +3838,6 @@ class ModificationBlockDAO(
     MessageDAO,
     DataAccessObject[semantic_digital_twin.adapters.ros.messages.ModificationBlock],
 ):
-
     __tablename__ = "ModificationBlockDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3968,7 +3867,6 @@ class MujocoActuatorConverterDAO(
     ActuatorConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoActuatorConverter],
 ):
-
     __tablename__ = "MujocoActuatorConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -3987,7 +3885,6 @@ class MujocoCameraConverterDAO(
     CameraConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoCameraConverter],
 ):
-
     __tablename__ = "MujocoCameraConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4006,7 +3903,6 @@ class MujocoConverterDAO(
     EntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoConverter],
 ):
-
     __tablename__ = "MujocoConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4025,7 +3921,6 @@ class MujocoEntitySpawnerDAO(
     EntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoEntitySpawner],
 ):
-
     __tablename__ = "MujocoEntitySpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4044,7 +3939,6 @@ class MujocoActuatorSpawnerDAO(
     MujocoEntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoActuatorSpawner],
 ):
-
     __tablename__ = "MujocoActuatorSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4063,7 +3957,6 @@ class MujocoConnectionSpawnerDAO(
     MujocoEntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoConnectionSpawner],
 ):
-
     __tablename__ = "MujocoConnectionSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4084,7 +3977,6 @@ class MujocoFixedConnectionSpawnerDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoFixedConnectionSpawner
     ],
 ):
-
     __tablename__ = "MujocoFixedConnectionSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4103,7 +3995,6 @@ class MujocoFreejointSpawnerDAO(
     MujocoEntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoFreejointSpawner],
 ):
-
     __tablename__ = "MujocoFreejointSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4124,7 +4015,6 @@ class MujocoGeneralActuatorConverterDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoGeneralActuatorConverter
     ],
 ):
-
     __tablename__ = "MujocoGeneralActuatorConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4143,7 +4033,6 @@ class MujocoJointConverterDAO(
     ConnectionConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoJointConverter],
 ):
-
     __tablename__ = "MujocoJointConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4178,7 +4067,6 @@ class Mujoco1DOFJointConverterDAO(
     MujocoJointConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.Mujoco1DOFJointConverter],
 ):
-
     __tablename__ = "Mujoco1DOFJointConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4204,7 +4092,6 @@ class Mujoco6DOFJointConverterDAO(
     MujocoJointConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.Mujoco6DOFJointConverter],
 ):
-
     __tablename__ = "Mujoco6DOFJointConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4225,7 +4112,6 @@ class MujocoKinematicStructureEntityConverterDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoKinematicStructureEntityConverter
     ],
 ):
-
     __tablename__ = "MujocoKinematicStructureEntityConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4251,7 +4137,6 @@ class MujocoBodyConverterDAO(
     MujocoKinematicStructureEntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoBodyConverter],
 ):
-
     __tablename__ = "MujocoBodyConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4286,7 +4171,6 @@ class MujocoKinematicStructureEntitySpawnerDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoKinematicStructureEntitySpawner
     ],
 ):
-
     __tablename__ = "MujocoKinematicStructureEntitySpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4305,7 +4189,6 @@ class MujocoBodySpawnerDAO(
     MujocoKinematicStructureEntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoBodySpawner],
 ):
-
     __tablename__ = "MujocoBodySpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4327,7 +4210,6 @@ class MujocoPrismaticJointConverterDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoPrismaticJointConverter
     ],
 ):
-
     __tablename__ = "MujocoPrismaticJointConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4348,7 +4230,6 @@ class MujocoPrismaticJointSpawnerDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoPrismaticJointSpawner
     ],
 ):
-
     __tablename__ = "MujocoPrismaticJointSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4369,7 +4250,6 @@ class MujocoRevoluteJointConverterDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoRevoluteJointConverter
     ],
 ):
-
     __tablename__ = "MujocoRevoluteJointConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4390,7 +4270,6 @@ class MujocoRevoluteJointSpawnerDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoRevoluteJointSpawner
     ],
 ):
-
     __tablename__ = "MujocoRevoluteJointSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4408,7 +4287,6 @@ class MujocoRevoluteJointSpawnerDAO(
 class MultiSimBuilderDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.multi_sim.MultiSimBuilder]
 ):
-
     __tablename__ = "MultiSimBuilderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4429,7 +4307,6 @@ class MujocoBuilderDAO(
     MultiSimBuilderDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoBuilder],
 ):
-
     __tablename__ = "MujocoBuilderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4447,7 +4324,6 @@ class MujocoBuilderDAO(
 class MultiSimErrorDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.multi_sim.MultiSimError]
 ):
-
     __tablename__ = "MultiSimErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4472,7 +4348,6 @@ class MujocoErrorDAO(
     MultiSimErrorDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoError],
 ):
-
     __tablename__ = "MujocoErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4493,7 +4368,6 @@ class MujocoEntityNotFoundErrorDAO(
         semantic_digital_twin.adapters.multi_sim.MujocoEntityNotFoundError
     ],
 ):
-
     __tablename__ = "MujocoEntityNotFoundErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4514,7 +4388,6 @@ class NPMatrix3x3DAO(
         semantic_digital_twin.world_description.inertial_properties.NPMatrix3x3
     ],
 ):
-
     __tablename__ = "NPMatrix3x3DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4537,7 +4410,6 @@ class InertiaTensorDAO(
         semantic_digital_twin.world_description.inertial_properties.InertiaTensor
     ],
 ):
-
     __tablename__ = "InertiaTensorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4558,7 +4430,6 @@ class NPVector3DAO(
         semantic_digital_twin.world_description.inertial_properties.NPVector3
     ],
 ):
-
     __tablename__ = "NPVector3DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4581,7 +4452,6 @@ class NegativeCollisionCheckingDistanceErrorDAO(
         semantic_digital_twin.exceptions.NegativeCollisionCheckingDistanceError
     ],
 ):
-
     __tablename__ = "NegativeCollisionCheckingDistanceErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4599,7 +4469,6 @@ class NegativeCollisionCheckingDistanceErrorDAO(
 class NegativeConnectionVelocityDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.NegativeConnectionVelocity]
 ):
-
     __tablename__ = "NegativeConnectionVelocityDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4615,7 +4484,6 @@ class NegativeConnectionVelocityDAO(
 class NoJointStateWithTypeDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.NoJointStateWithType]
 ):
-
     __tablename__ = "NoJointStateWithTypeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4641,7 +4509,6 @@ class NoServiceFoundErrorDAO(
         semantic_digital_twin.adapters.ros.world_fetcher.NoServiceFoundError
     ],
 ):
-
     __tablename__ = "NoServiceFoundErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4657,7 +4524,6 @@ class NodeProcessingResultDAO(
     Base,
     DataAccessObject[semantic_digital_twin.pipeline.gltf_loader.NodeProcessingResult],
 ):
-
     __tablename__ = "NodeProcessingResultDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4686,7 +4552,6 @@ class NonMonotonicTimeErrorDAO(
     LogicalErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.NonMonotonicTimeError],
 ):
-
     __tablename__ = "NonMonotonicTimeErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4707,7 +4572,6 @@ class NonMonotonicTimeErrorDAO(
 class NotJsonSerializableDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.NotJsonSerializable]
 ):
-
     __tablename__ = "NotJsonSerializableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4731,7 +4595,6 @@ class NotJsonSerializableDAO(
 class OBJParserDAO(
     MeshParserDAO, DataAccessObject[semantic_digital_twin.adapters.mesh.OBJParser]
 ):
-
     __tablename__ = "OBJParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4749,7 +4612,6 @@ class OBJParserDAO(
 class OFFParserDAO(
     MeshParserDAO, DataAccessObject[semantic_digital_twin.adapters.mesh.OFFParser]
 ):
-
     __tablename__ = "OFFParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4767,7 +4629,6 @@ class OFFParserDAO(
 class PLYParserDAO(
     MeshParserDAO, DataAccessObject[semantic_digital_twin.adapters.mesh.PLYParser]
 ):
-
     __tablename__ = "PLYParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4788,7 +4649,6 @@ class PackageUriResolverDAO(
         semantic_digital_twin.adapters.package_resolver.PackageUriResolver
     ],
 ):
-
     __tablename__ = "PackageUriResolverDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4799,7 +4659,6 @@ class PackageUriResolverDAO(
 class ParsingErrorDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.ParsingError]
 ):
-
     __tablename__ = "ParsingErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4820,7 +4679,6 @@ class PartNetLabelClassDescriptionDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.loader.PartNetLabelClassDescription
     ],
 ):
-
     __tablename__ = "PartNetLabelClassDescriptionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4842,7 +4700,6 @@ class PartNetMobilityDatasetLoaderDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.loader.PartNetMobilityDatasetLoader
     ],
 ):
-
     __tablename__ = "PartNetMobilityDatasetLoaderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4867,7 +4724,6 @@ class PartNetMobilityDatasetLoaderDAO(
 class PipelineDAO(
     Base, DataAccessObject[semantic_digital_twin.pipeline.pipeline.Pipeline]
 ):
-
     __tablename__ = "PipelineDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4885,7 +4741,6 @@ class PipelineDAO(
 class PointOccupiedErrorDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.PointOccupiedError]
 ):
-
     __tablename__ = "PointOccupiedErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4911,7 +4766,6 @@ class PointSpatialRelationDAO(
     Base,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.PointSpatialRelation],
 ):
-
     __tablename__ = "PointSpatialRelationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4952,7 +4806,6 @@ class PositionVariableDAO(
         semantic_digital_twin.world_description.degree_of_freedom.PositionVariable
     ],
 ):
-
     __tablename__ = "PositionVariableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4978,7 +4831,6 @@ class PrefixedNameDAO(
     Base,
     DataAccessObject[semantic_digital_twin.datastructures.prefixed_name.PrefixedName],
 ):
-
     __tablename__ = "PrefixedNameDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -4999,7 +4851,6 @@ class PrincipalAxesDAO(
         semantic_digital_twin.world_description.inertial_properties.PrincipalAxes
     ],
 ):
-
     __tablename__ = "PrincipalAxesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5020,7 +4871,6 @@ class PrincipalMomentsDAO(
         semantic_digital_twin.world_description.inertial_properties.PrincipalMoments
     ],
 ):
-
     __tablename__ = "PrincipalMomentsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5039,7 +4889,6 @@ class ProcTHORParserDAO(
         semantic_digital_twin.adapters.procthor.procthor_parser.ProcTHORParser
     ],
 ):
-
     __tablename__ = "ProcTHORParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5057,7 +4906,6 @@ class ProcthorDoorDAO(
         semantic_digital_twin.adapters.procthor.procthor_parser.ProcthorDoor
     ],
 ):
-
     __tablename__ = "ProcthorDoorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5091,7 +4939,6 @@ class ProcthorObjectDAO(
         semantic_digital_twin.adapters.procthor.procthor_parser.ProcthorObject
     ],
 ):
-
     __tablename__ = "ProcthorObjectDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5105,7 +4952,6 @@ class ProcthorRoomDAO(
         semantic_digital_twin.adapters.procthor.procthor_parser.ProcthorRoom
     ],
 ):
-
     __tablename__ = "ProcthorRoomDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5119,7 +4965,6 @@ class ProcthorWallDAO(
         semantic_digital_twin.adapters.procthor.procthor_parser.ProcthorWall
     ],
 ):
-
     __tablename__ = "ProcthorWallDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5133,7 +4978,6 @@ class QPMatricesDAO(
     Base,
     DataAccessObject[semantic_digital_twin.spatial_computations.ik_solver.QPMatrices],
 ):
-
     __tablename__ = "QPMatricesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5145,7 +4989,6 @@ class QPProblemDAO(
     Base,
     DataAccessObject[semantic_digital_twin.spatial_computations.ik_solver.QPProblem],
 ):
-
     __tablename__ = "QPProblemDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5212,7 +5055,6 @@ class QoSProfileJSONSerializerDAO(
         semantic_digital_twin.adapters.ros.ros_msg_serializer.QoSProfileJSONSerializer
     ],
 ):
-
     __tablename__ = "QoSProfileJSONSerializerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5226,7 +5068,6 @@ class ROS2ConversionErrorDAO(
         semantic_digital_twin.adapters.ros.msg_converter.ROS2ConversionError
     ],
 ):
-
     __tablename__ = "ROS2ConversionErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5249,7 +5090,6 @@ class CannotConvertRos2ToSemDTErrorDAO(
         semantic_digital_twin.adapters.ros.msg_converter.CannotConvertRos2ToSemDTError
     ],
 ):
-
     __tablename__ = "CannotConvertRos2ToSemDTErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5274,7 +5114,6 @@ class CannotConvertSemDTToRos2ErrorDAO(
         semantic_digital_twin.adapters.ros.msg_converter.CannotConvertSemDTToRos2Error
     ],
 ):
-
     __tablename__ = "CannotConvertSemDTToRos2ErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5297,7 +5136,6 @@ class ROSPackageLocatorDAO(
     Base,
     DataAccessObject[semantic_digital_twin.adapters.package_resolver.ROSPackageLocator],
 ):
-
     __tablename__ = "ROSPackageLocatorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5311,7 +5149,6 @@ class ROSPackagePathLocatorDAO(
         semantic_digital_twin.adapters.package_resolver.ROSPackagePathLocator
     ],
 ):
-
     __tablename__ = "ROSPackagePathLocatorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5323,7 +5160,6 @@ class RegionConverterDAO(
     KinematicStructureEntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.RegionConverter],
 ):
-
     __tablename__ = "RegionConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5343,7 +5179,6 @@ class MujocoRegionConverterDAO(
     MujocoKinematicStructureEntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoRegionConverter],
 ):
-
     __tablename__ = "MujocoRegionConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5363,7 +5198,6 @@ class RegionSpawnerDAO(
     KinematicStructureEntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.RegionSpawner],
 ):
-
     __tablename__ = "RegionSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5383,7 +5217,6 @@ class MujocoRegionSpawnerDAO(
     MujocoKinematicStructureEntitySpawnerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoRegionSpawner],
 ):
-
     __tablename__ = "MujocoRegionSpawnerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5403,7 +5236,6 @@ class RobotPartMixinDAO(
     Base,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.RobotPartMixin],
 ):
-
     __tablename__ = "RobotPartMixinDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5424,7 +5256,6 @@ class HasArmsDAO(
     RobotPartMixinDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasArms],
 ):
-
     __tablename__ = "HasArmsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5443,7 +5274,6 @@ class HasEndEffectorDAO(
     RobotPartMixinDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasEndEffector],
 ):
-
     __tablename__ = "HasEndEffectorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5462,7 +5292,6 @@ class HasFingersDAO(
     RobotPartMixinDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasFingers],
 ):
-
     __tablename__ = "HasFingersDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5481,7 +5310,6 @@ class HasTwoFingersDAO(
     HasFingersDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers],
 ):
-
     __tablename__ = "HasTwoFingersDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5500,7 +5328,6 @@ class HasLeftRightArmDAO(
     HasArmsDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasLeftRightArm],
 ):
-
     __tablename__ = "HasLeftRightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5517,7 +5344,6 @@ class HasMobileBaseDAO(
     RobotPartMixinDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasMobileBase],
 ):
-
     __tablename__ = "HasMobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5536,7 +5362,6 @@ class HasNeckDAO(
     RobotPartMixinDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasNeck],
 ):
-
     __tablename__ = "HasNeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5555,7 +5380,6 @@ class HasOneArmDAO(
     HasArmsDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasOneArm],
 ):
-
     __tablename__ = "HasOneArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5572,7 +5396,6 @@ class HasSensorsDAO(
     RobotPartMixinDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasSensors],
 ):
-
     __tablename__ = "HasSensorsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5591,7 +5414,6 @@ class HasTorsoDAO(
     RobotPartMixinDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_part_mixins.HasTorso],
 ):
-
     __tablename__ = "HasTorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5609,7 +5431,6 @@ class HasTorsoDAO(
 class RootNodeNotFoundErrorDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.RootNodeNotFoundError]
 ):
-
     __tablename__ = "RootNodeNotFoundErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5631,7 +5452,6 @@ class Ros2MessageJSONSerializerDAO(
         semantic_digital_twin.adapters.ros.ros_msg_serializer.Ros2MessageJSONSerializer
     ],
 ):
-
     __tablename__ = "Ros2MessageJSONSerializerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5645,7 +5465,6 @@ class Ros2ToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.msg_converter.Ros2ToSemDTConverter
     ],
 ):
-
     __tablename__ = "Ros2ToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5668,7 +5487,6 @@ class ColorToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.ColorToSemDTConverter
     ],
 ):
-
     __tablename__ = "ColorToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5689,7 +5507,6 @@ class CubeMarkerToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.CubeMarkerToSemDTConverter
     ],
 ):
-
     __tablename__ = "CubeMarkerToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5710,7 +5527,6 @@ class CylinderMarkerToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.CylinderMarkerToSemDTConverter
     ],
 ):
-
     __tablename__ = "CylinderMarkerToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5731,7 +5547,6 @@ class MeshMarkerToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.MeshMarkerToSemDTConverter
     ],
 ):
-
     __tablename__ = "MeshMarkerToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5752,7 +5567,6 @@ class PointStampedToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.PointStampedToSemDTConverter
     ],
 ):
-
     __tablename__ = "PointStampedToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5773,7 +5587,6 @@ class PoseStampedToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.PoseStampedToSemDTConverter
     ],
 ):
-
     __tablename__ = "PoseStampedToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5794,7 +5607,6 @@ class PoseToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.PoseToSemDTConverter
     ],
 ):
-
     __tablename__ = "PoseToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5815,7 +5627,6 @@ class QuaternionToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.QuaternionToSemDTConverter
     ],
 ):
-
     __tablename__ = "QuaternionToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5833,7 +5644,6 @@ class QuaternionToSemDTConverterDAO(
 class STLParserDAO(
     MeshParserDAO, DataAccessObject[semantic_digital_twin.adapters.mesh.STLParser]
 ):
-
     __tablename__ = "STLParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5854,7 +5664,6 @@ class Sage10kBaseDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kBase
     ],
 ):
-
     __tablename__ = "Sage10kBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5875,7 +5684,6 @@ class HasXYZDAO(
     Sage10kBaseDAO,
     DataAccessObject[semantic_digital_twin.adapters.sage_10k_dataset.schema.HasXYZ],
 ):
-
     __tablename__ = "HasXYZDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5900,7 +5708,6 @@ class Sage10kDatasetLoaderDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.loader.Sage10kDatasetLoader
     ],
 ):
-
     __tablename__ = "Sage10kDatasetLoaderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5918,7 +5725,6 @@ class Sage10kPhysicallyBasedRenderingDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kPhysicallyBasedRendering
     ],
 ):
-
     __tablename__ = "Sage10kPhysicallyBasedRenderingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5935,7 +5741,6 @@ class Sage10kPositionDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kPosition
     ],
 ):
-
     __tablename__ = "Sage10kPositionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5954,7 +5759,6 @@ class Sage10kRotationDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kRotation
     ],
 ):
-
     __tablename__ = "Sage10kRotationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5973,7 +5777,6 @@ class Sage10kSizeDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kSize
     ],
 ):
-
     __tablename__ = "Sage10kSizeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -5998,7 +5801,6 @@ class Sage10kWithIDDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kWithID
     ],
 ):
-
     __tablename__ = "Sage10kWithIDDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6023,7 +5825,6 @@ class Sage10kDoorDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kDoor
     ],
 ):
-
     __tablename__ = "Sage10kDoorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6059,7 +5860,6 @@ class Sage10kObjectDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kObject
     ],
 ):
-
     __tablename__ = "Sage10kObjectDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6146,7 +5946,6 @@ class Sage10kRoomDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kRoom
     ],
 ):
-
     __tablename__ = "Sage10kRoomDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6213,7 +6012,6 @@ class Sage10kSceneDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kScene
     ],
 ):
-
     __tablename__ = "Sage10kSceneDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6256,7 +6054,6 @@ class Sage10kWallDAO(
         semantic_digital_twin.adapters.sage_10k_dataset.schema.Sage10kWall
     ],
 ):
-
     __tablename__ = "Sage10kWallDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6304,7 +6101,6 @@ class Sage10kWallDAO(
 class ScaleDAO(
     Base, DataAccessObject[semantic_digital_twin.world_description.geometry.Scale]
 ):
-
     __tablename__ = "ScaleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6322,7 +6118,6 @@ class SelfCollisionMatrixRuleDAO(
         semantic_digital_twin.collision_checking.collision_rules.SelfCollisionMatrixRule
     ],
 ):
-
     __tablename__ = "SelfCollisionMatrixRuleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6360,7 +6155,6 @@ class SelfCollisionVariableManagerDAO(
         semantic_digital_twin.collision_checking.collision_variable_managers.SelfCollisionVariableManager
     ],
 ):
-
     __tablename__ = "SelfCollisionVariableManagerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6381,7 +6175,6 @@ class SemDTToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.msg_converter.SemDTToRos2Converter
     ],
 ):
-
     __tablename__ = "SemDTToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6404,7 +6197,6 @@ class ColorToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.ColorToRos2Converter
     ],
 ):
-
     __tablename__ = "ColorToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6425,7 +6217,6 @@ class HomogeneousTransformationMatrixToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.HomogeneousTransformationMatrixToRos2Converter
     ],
 ):
-
     __tablename__ = "HomogeneousTransformationMatrixToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6446,7 +6237,6 @@ class Point3ToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.Point3ToRos2Converter
     ],
 ):
-
     __tablename__ = "Point3ToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6467,7 +6257,6 @@ class PoseToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.PoseToRos2Converter
     ],
 ):
-
     __tablename__ = "PoseToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6488,7 +6277,6 @@ class PoseToRos2StampedConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.PoseToRos2StampedConverter
     ],
 ):
-
     __tablename__ = "PoseToRos2StampedConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6509,7 +6297,6 @@ class QuaternionToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.QuaternionToRos2Converter
     ],
 ):
-
     __tablename__ = "QuaternionToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6530,7 +6317,6 @@ class SemanticPositionDescriptionDAO(
         semantic_digital_twin.semantic_annotations.position_descriptions.SemanticPositionDescription
     ],
 ):
-
     __tablename__ = "SemanticPositionDescriptionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6553,7 +6339,6 @@ class ShapeDAO(
     HasSimulatorPropertiesDAO,
     DataAccessObject[semantic_digital_twin.world_description.geometry.Shape],
 ):
-
     __tablename__ = "ShapeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6594,7 +6379,6 @@ class ShapeDAO(
 class BoxDAO(
     ShapeDAO, DataAccessObject[semantic_digital_twin.world_description.geometry.Box]
 ):
-
     __tablename__ = "BoxDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6621,7 +6405,6 @@ class CylinderDAO(
     ShapeDAO,
     DataAccessObject[semantic_digital_twin.world_description.geometry.Cylinder],
 ):
-
     __tablename__ = "CylinderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6640,7 +6423,6 @@ class CylinderDAO(
 class MeshDAO(
     ShapeDAO, DataAccessObject[semantic_digital_twin.world_description.geometry.Mesh]
 ):
-
     __tablename__ = "MeshDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6673,7 +6455,6 @@ class ShapeCollectionDAO(
         semantic_digital_twin.world_description.shape_collection.ShapeCollection
     ],
 ):
-
     __tablename__ = "ShapeCollectionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6715,7 +6496,6 @@ class BoundingBoxCollectionDAO(
         semantic_digital_twin.world_description.shape_collection.BoundingBoxCollection
     ],
 ):
-
     __tablename__ = "BoundingBoxCollectionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6734,7 +6514,6 @@ class ShapeConverterDAO(
     EntityConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.ShapeConverter],
 ):
-
     __tablename__ = "ShapeConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6763,7 +6542,6 @@ class BoxConverterDAO(
     ShapeConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.BoxConverter],
 ):
-
     __tablename__ = "BoxConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6782,7 +6560,6 @@ class CylinderConverterDAO(
     ShapeConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.CylinderConverter],
 ):
-
     __tablename__ = "CylinderConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6801,7 +6578,6 @@ class MeshConverterDAO(
     ShapeConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MeshConverter],
 ):
-
     __tablename__ = "MeshConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6820,7 +6596,6 @@ class MujocoGeomConverterDAO(
     MujocoConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoGeomConverter],
 ):
-
     __tablename__ = "MujocoGeomConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6849,7 +6624,6 @@ class MujocoBoxConverterDAO(
     MujocoGeomConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoBoxConverter],
 ):
-
     __tablename__ = "MujocoBoxConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6868,7 +6642,6 @@ class MujocoCylinderConverterDAO(
     MujocoGeomConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoCylinderConverter],
 ):
-
     __tablename__ = "MujocoCylinderConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6887,7 +6660,6 @@ class MujocoMeshConverterDAO(
     MujocoGeomConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoMeshConverter],
 ):
-
     __tablename__ = "MujocoMeshConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6908,7 +6680,6 @@ class ShapeToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.ShapeToRos2Converter
     ],
 ):
-
     __tablename__ = "ShapeToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6929,7 +6700,6 @@ class BoxToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.BoxToRos2Converter
     ],
 ):
-
     __tablename__ = "BoxToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6950,7 +6720,6 @@ class CylinderToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.CylinderToRos2Converter
     ],
 ):
-
     __tablename__ = "CylinderToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6971,7 +6740,6 @@ class FileMeshToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.FileMeshToRos2Converter
     ],
 ):
-
     __tablename__ = "FileMeshToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -6989,7 +6757,6 @@ class FileMeshToRos2ConverterDAO(
 class SimulatorAdditionalPropertyDAO(
     Base, DataAccessObject[semantic_digital_twin.mixin.SimulatorAdditionalProperty]
 ):
-
     __tablename__ = "SimulatorAdditionalPropertyDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7010,7 +6777,6 @@ class MujocoActuatorDAO(
     SimulatorAdditionalPropertyDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoActuator],
 ):
-
     __tablename__ = "MujocoActuatorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7048,7 +6814,6 @@ class MujocoBodyDAO(
     SimulatorAdditionalPropertyDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoBody],
 ):
-
     __tablename__ = "MujocoBodyDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7072,7 +6837,6 @@ class MujocoEqualityDAO(
     SimulatorAdditionalPropertyDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoEquality],
 ):
-
     __tablename__ = "MujocoEqualityDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7102,7 +6866,6 @@ class MujocoGeomDAO(
     SimulatorAdditionalPropertyDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoGeom],
 ):
-
     __tablename__ = "MujocoGeomDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7131,7 +6894,6 @@ class MujocoJointDAO(
     SimulatorAdditionalPropertyDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoJoint],
 ):
-
     __tablename__ = "MujocoJointDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7156,7 +6918,6 @@ class MujocoTendonDAO(
     SimulatorAdditionalPropertyDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoTendon],
 ):
-
     __tablename__ = "MujocoTendonDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7221,7 +6982,6 @@ class MultiSimCameraDAO(
     SimulatorAdditionalPropertyDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MultiSimCamera],
 ):
-
     __tablename__ = "MultiSimCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7244,7 +7004,6 @@ class MujocoCameraDAO(
     MultiSimCameraDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoCamera],
 ):
-
     __tablename__ = "MujocoCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7294,7 +7053,6 @@ class SpatialTypeDAO(
     Base,
     DataAccessObject[semantic_digital_twin.spatial_types.spatial_types.SpatialType],
 ):
-
     __tablename__ = "SpatialTypeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7330,7 +7088,6 @@ class HomogeneousTransformationMatrixMappingDAO(
         semantic_digital_twin.orm.model.HomogeneousTransformationMatrixMapping
     ],
 ):
-
     __tablename__ = "HomogeneousTransformationMatrixMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7380,7 +7137,6 @@ class HomogeneousTransformationMatrixMappingDAO(
 class Point3MappingDAO(
     SpatialTypeDAO, DataAccessObject[semantic_digital_twin.orm.model.Point3Mapping]
 ):
-
     __tablename__ = "Point3MappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7402,7 +7158,6 @@ class Point3MappingDAO(
 class PoseMappingDAO(
     SpatialTypeDAO, DataAccessObject[semantic_digital_twin.orm.model.PoseMapping]
 ):
-
     __tablename__ = "PoseMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7441,7 +7196,6 @@ class PoseMappingDAO(
 class Pose2DMappingDAO(
     SpatialTypeDAO, DataAccessObject[semantic_digital_twin.orm.model.Pose2DMapping]
 ):
-
     __tablename__ = "Pose2DMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7463,7 +7217,6 @@ class Pose2DMappingDAO(
 class QuaternionMappingDAO(
     SpatialTypeDAO, DataAccessObject[semantic_digital_twin.orm.model.QuaternionMapping]
 ):
-
     __tablename__ = "QuaternionMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7487,7 +7240,6 @@ class RotationMatrixMappingDAO(
     SpatialTypeDAO,
     DataAccessObject[semantic_digital_twin.orm.model.RotationMatrixMapping],
 ):
-
     __tablename__ = "RotationMatrixMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7519,7 +7271,6 @@ class SpatialTypeNotJsonSerializableDAO(
     NotJsonSerializableDAO,
     DataAccessObject[semantic_digital_twin.exceptions.SpatialTypeNotJsonSerializable],
 ):
-
     __tablename__ = "SpatialTypeNotJsonSerializableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7537,7 +7288,6 @@ class SpatialTypeNotJsonSerializableDAO(
 class SphereDAO(
     ShapeDAO, DataAccessObject[semantic_digital_twin.world_description.geometry.Sphere]
 ):
-
     __tablename__ = "SphereDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7556,7 +7306,6 @@ class SphereConverterDAO(
     ShapeConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.SphereConverter],
 ):
-
     __tablename__ = "SphereConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7575,7 +7324,6 @@ class MujocoSphereConverterDAO(
     MujocoGeomConverterDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoSphereConverter],
 ):
-
     __tablename__ = "MujocoSphereConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7596,7 +7344,6 @@ class SphereMarkerToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.SphereMarkerToSemDTConverter
     ],
 ):
-
     __tablename__ = "SphereMarkerToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7617,7 +7364,6 @@ class SphereToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.SphereToRos2Converter
     ],
 ):
-
     __tablename__ = "SphereToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7633,7 +7379,6 @@ class SphereToRos2ConverterDAO(
 
 
 class StepDAO(Base, DataAccessObject[semantic_digital_twin.pipeline.pipeline.Step]):
-
     __tablename__ = "StepDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7654,7 +7399,6 @@ class BodyFactoryReplaceDAO(
     StepDAO,
     DataAccessObject[semantic_digital_twin.pipeline.pipeline.BodyFactoryReplace],
 ):
-
     __tablename__ = "BodyFactoryReplaceDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7670,7 +7414,6 @@ class BodyFactoryReplaceDAO(
 class BodyFilterDAO(
     StepDAO, DataAccessObject[semantic_digital_twin.pipeline.pipeline.BodyFilter]
 ):
-
     __tablename__ = "BodyFilterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7689,7 +7432,6 @@ class CenterLocalGeometryAndPreserveWorldPoseDAO(
         semantic_digital_twin.pipeline.pipeline.CenterLocalGeometryAndPreserveWorldPose
     ],
 ):
-
     __tablename__ = "CenterLocalGeometryAndPreserveWorldPoseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7705,7 +7447,6 @@ class CenterLocalGeometryAndPreserveWorldPoseDAO(
 class GLTFLoaderDAO(
     StepDAO, DataAccessObject[semantic_digital_twin.pipeline.gltf_loader.GLTFLoader]
 ):
-
     __tablename__ = "GLTFLoaderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7731,7 +7472,6 @@ class MeshDecomposerDAO(
         semantic_digital_twin.pipeline.mesh_decomposition.base.MeshDecomposer
     ],
 ):
-
     __tablename__ = "MeshDecomposerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7750,7 +7490,6 @@ class BoxDecomposerDAO(
         semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer.BoxDecomposer
     ],
 ):
-
     __tablename__ = "BoxDecomposerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7778,7 +7517,6 @@ class BulletVHACDMeshDecomposerDAO(
         semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd.BulletVHACDMeshDecomposer
     ],
 ):
-
     __tablename__ = "BulletVHACDMeshDecomposerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7824,7 +7562,6 @@ class COACDMeshDecomposerDAO(
         semantic_digital_twin.pipeline.mesh_decomposition.coacd.COACDMeshDecomposer
     ],
 ):
-
     __tablename__ = "COACDMeshDecomposerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7878,7 +7615,6 @@ class COACDMeshDecomposerDAO(
 class TFWrapperDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.ros.tfwrapper.TFWrapper]
 ):
-
     __tablename__ = "TFWrapperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7892,7 +7628,6 @@ class TransformStampedToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.TransformStampedToSemDTConverter
     ],
 ):
-
     __tablename__ = "TransformStampedToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7910,7 +7645,6 @@ class TransformStampedToSemDTConverterDAO(
 class URDFParserDAO(
     Base, DataAccessObject[semantic_digital_twin.adapters.urdf.URDFParser]
 ):
-
     __tablename__ = "URDFParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7928,7 +7662,6 @@ class URDFParserDAO(
 class UnknownWorldModificationDAO(
     Base, DataAccessObject[semantic_digital_twin.exceptions.UnknownWorldModification]
 ):
-
     __tablename__ = "UnknownWorldModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7943,7 +7676,6 @@ class UnknownWorldModificationDAO(
 class UsageErrorDAO(
     LogicalErrorDAO, DataAccessObject[semantic_digital_twin.exceptions.UsageError]
 ):
-
     __tablename__ = "UsageErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7964,7 +7696,6 @@ class AddingAnExistingSemanticAnnotationErrorDAO(
         semantic_digital_twin.exceptions.AddingAnExistingSemanticAnnotationError
     ],
 ):
-
     __tablename__ = "AddingAnExistingSemanticAnnotationErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -7996,7 +7727,6 @@ class AlreadyBelongsToAWorldErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.AlreadyBelongsToAWorldError],
 ):
-
     __tablename__ = "AlreadyBelongsToAWorldErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8031,7 +7761,6 @@ class ApplyMissedMessagesWhileWorldIsBeingModifiedErrorDAO(
         semantic_digital_twin.exceptions.ApplyMissedMessagesWhileWorldIsBeingModifiedError
     ],
 ):
-
     __tablename__ = "ApplyMissedMessagesWhileWorldIsBeingModifiedErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8050,7 +7779,6 @@ class DoesNotBelongToAWorldErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.DoesNotBelongToAWorldError],
 ):
-
     __tablename__ = "DoesNotBelongToAWorldErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8084,7 +7812,6 @@ class DuplicateKinematicStructureEntityErrorDAO(
         semantic_digital_twin.exceptions.DuplicateKinematicStructureEntityError
     ],
 ):
-
     __tablename__ = "DuplicateKinematicStructureEntityErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8112,7 +7839,6 @@ class DuplicateRobotAssignmentsErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.DuplicateRobotAssignmentsError],
 ):
-
     __tablename__ = "DuplicateRobotAssignmentsErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8152,7 +7878,6 @@ class DuplicateWorldEntityErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.DuplicateWorldEntityError],
 ):
-
     __tablename__ = "DuplicateWorldEntityErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8180,7 +7905,6 @@ class InvalidConnectionLimitsDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.InvalidConnectionLimits],
 ):
-
     __tablename__ = "InvalidConnectionLimitsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8220,7 +7944,6 @@ class InvalidHingeActiveAxisDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.InvalidHingeActiveAxis],
 ):
-
     __tablename__ = "InvalidHingeActiveAxisDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8249,7 +7972,6 @@ class InvalidPlaneDimensionsDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.InvalidPlaneDimensions],
 ):
-
     __tablename__ = "InvalidPlaneDimensionsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8284,7 +8006,6 @@ class MismatchingPublishChangesAttributeDAO(
         semantic_digital_twin.exceptions.MismatchingPublishChangesAttribute
     ],
 ):
-
     __tablename__ = "MismatchingPublishChangesAttributeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8309,7 +8030,6 @@ class MismatchingPublishChangesAttributeDAO(
 class MismatchingWorldDAO(
     UsageErrorDAO, DataAccessObject[semantic_digital_twin.exceptions.MismatchingWorld]
 ):
-
     __tablename__ = "MismatchingWorldDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8352,7 +8072,6 @@ class MissingDefaultCameraErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingDefaultCameraError],
 ):
-
     __tablename__ = "MissingDefaultCameraErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8375,7 +8094,6 @@ class MissingPublishChangesKWARGDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingPublishChangesKWARG],
 ):
-
     __tablename__ = "MissingPublishChangesKWARGDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8394,7 +8112,6 @@ class MissingSemanticAnnotationErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingSemanticAnnotationError],
 ):
-
     __tablename__ = "MissingSemanticAnnotationErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8419,7 +8136,6 @@ class MissingSemanticAnnotationErrorDAO(
 class MissingWorldErrorDAO(
     UsageErrorDAO, DataAccessObject[semantic_digital_twin.exceptions.MissingWorldError]
 ):
-
     __tablename__ = "MissingWorldErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8440,7 +8156,6 @@ class MissingWorldModificationContextErrorDAO(
         semantic_digital_twin.exceptions.MissingWorldModificationContextError
     ],
 ):
-
     __tablename__ = "MissingWorldModificationContextErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8461,7 +8176,6 @@ class SemanticAnnotationCircularDependencyErrorDAO(
         semantic_digital_twin.exceptions.SemanticAnnotationCircularDependencyError
     ],
 ):
-
     __tablename__ = "SemanticAnnotationCircularDependencyErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8493,7 +8207,6 @@ class SemanticAnnotationNotInWorldErrorDAO(
         semantic_digital_twin.exceptions.SemanticAnnotationNotInWorldError
     ],
 ):
-
     __tablename__ = "SemanticAnnotationNotInWorldErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8524,7 +8237,6 @@ class SemanticAnnotationNotInWorldErrorDAO(
 class SpatialTypesErrorDAO(
     UsageErrorDAO, DataAccessObject[semantic_digital_twin.exceptions.SpatialTypesError]
 ):
-
     __tablename__ = "SpatialTypesErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8543,7 +8255,6 @@ class MissingReferenceFrameErrorDAO(
     SpatialTypesErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.MissingReferenceFrameError],
 ):
-
     __tablename__ = "MissingReferenceFrameErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8575,7 +8286,6 @@ class ReferenceFrameMismatchErrorDAO(
     SpatialTypesErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.ReferenceFrameMismatchError],
 ):
-
     __tablename__ = "ReferenceFrameMismatchErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8620,7 +8330,6 @@ class StateUpdateContainsUnknownDegreesOfFreedomErrorDAO(
         semantic_digital_twin.exceptions.StateUpdateContainsUnknownDegreesOfFreedomError
     ],
 ):
-
     __tablename__ = "StateUpdateContainsUnknownDegreesOfFreedomErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8643,7 +8352,6 @@ class UselessConceptErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.UselessConceptError],
 ):
-
     __tablename__ = "UselessConceptErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8664,7 +8372,6 @@ class VHACDMeshDecomposerDAO(
         semantic_digital_twin.pipeline.mesh_decomposition.vhacd.VHACDMeshDecomposer
     ],
 ):
-
     __tablename__ = "VHACDMeshDecomposerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8704,7 +8411,6 @@ class VHACDMeshDecomposerDAO(
 class Vector3MappingDAO(
     SpatialTypeDAO, DataAccessObject[semantic_digital_twin.orm.model.Vector3Mapping]
 ):
-
     __tablename__ = "Vector3MappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8729,7 +8435,6 @@ class Vector3StampedToSemDTConverterDAO(
         semantic_digital_twin.adapters.ros.ros2_to_semdt_converters.Vector3StampedToSemDTConverter
     ],
 ):
-
     __tablename__ = "Vector3StampedToSemDTConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8750,7 +8455,6 @@ class Vector3ToRos2ConverterDAO(
         semantic_digital_twin.adapters.ros.semdt_to_ros2_converters.Vector3ToRos2Converter
     ],
 ):
-
     __tablename__ = "Vector3ToRos2ConverterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8771,7 +8475,6 @@ class VelocityVariableDAO(
         semantic_digital_twin.world_description.degree_of_freedom.VelocityVariable
     ],
 ):
-
     __tablename__ = "VelocityVariableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8799,7 +8502,6 @@ class ViewDependentSpatialRelationDAO(
         semantic_digital_twin.reasoning.predicates.ViewDependentSpatialRelation
     ],
 ):
-
     __tablename__ = "ViewDependentSpatialRelationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8838,7 +8540,6 @@ class AboveDAO(
     ViewDependentSpatialRelationDAO,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.Above],
 ):
-
     __tablename__ = "AboveDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8857,7 +8558,6 @@ class BehindDAO(
     ViewDependentSpatialRelationDAO,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.Behind],
 ):
-
     __tablename__ = "BehindDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8876,7 +8576,6 @@ class BelowDAO(
     ViewDependentSpatialRelationDAO,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.Below],
 ):
-
     __tablename__ = "BelowDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8895,7 +8594,6 @@ class InFrontOfDAO(
     ViewDependentSpatialRelationDAO,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.InFrontOf],
 ):
-
     __tablename__ = "InFrontOfDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8914,7 +8612,6 @@ class LeftOfDAO(
     ViewDependentSpatialRelationDAO,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.LeftOf],
 ):
-
     __tablename__ = "LeftOfDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8933,7 +8630,6 @@ class RightOfDAO(
     ViewDependentSpatialRelationDAO,
     DataAccessObject[semantic_digital_twin.reasoning.predicates.RightOf],
 ):
-
     __tablename__ = "RightOfDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -8952,7 +8648,6 @@ class WorldMappingDAO(
     HasSimulatorPropertiesDAO,
     DataAccessObject[semantic_digital_twin.orm.model.WorldMapping],
 ):
-
     __tablename__ = "WorldMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9025,7 +8720,6 @@ class WorldEntityDAO(
     Base,
     DataAccessObject[semantic_digital_twin.world_description.world_entity.WorldEntity],
 ):
-
     __tablename__ = "WorldEntityDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9056,7 +8750,6 @@ class ConnectionDAO(
     WorldEntityDAO,
     DataAccessObject[semantic_digital_twin.world_description.world_entity.Connection],
 ):
-
     __tablename__ = "ConnectionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9139,7 +8832,6 @@ class ActiveConnectionDAO(
         semantic_digital_twin.world_description.connections.ActiveConnection
     ],
 ):
-
     __tablename__ = "ActiveConnectionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9160,7 +8852,6 @@ class ActiveConnection1DOFDAO(
         semantic_digital_twin.world_description.connections.ActiveConnection1DOF
     ],
 ):
-
     __tablename__ = "ActiveConnection1DOFDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9206,7 +8897,6 @@ class PrismaticConnectionDAO(
         semantic_digital_twin.world_description.connections.PrismaticConnection
     ],
 ):
-
     __tablename__ = "PrismaticConnectionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9227,7 +8917,6 @@ class RevoluteConnectionDAO(
         semantic_digital_twin.world_description.connections.RevoluteConnection
     ],
 ):
-
     __tablename__ = "RevoluteConnectionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9246,7 +8935,6 @@ class WheeledDriveDAO(
     ActiveConnectionDAO,
     DataAccessObject[semantic_digital_twin.world_description.connections.WheeledDrive],
 ):
-
     __tablename__ = "WheeledDriveDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9267,7 +8955,6 @@ class DifferentialDriveDAO(
         semantic_digital_twin.world_description.connections.DifferentialDrive
     ],
 ):
-
     __tablename__ = "DifferentialDriveDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9305,7 +8992,6 @@ class OmniDriveDAO(
     WheeledDriveDAO,
     DataAccessObject[semantic_digital_twin.world_description.connections.OmniDrive],
 ):
-
     __tablename__ = "OmniDriveDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9348,7 +9034,6 @@ class Connection6DoFDAO(
         semantic_digital_twin.world_description.connections.Connection6DoF
     ],
 ):
-
     __tablename__ = "Connection6DoFDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9391,7 +9076,6 @@ class FixedConnectionDAO(
         semantic_digital_twin.world_description.connections.FixedConnection
     ],
 ):
-
     __tablename__ = "FixedConnectionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9410,7 +9094,6 @@ class WorldEntityNotFoundErrorDAO(
     UsageErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.WorldEntityNotFoundError],
 ):
-
     __tablename__ = "WorldEntityNotFoundErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9431,7 +9114,6 @@ class WorldEntityWithIDDAO(
         semantic_digital_twin.world_description.world_entity.WorldEntityWithID
     ],
 ):
-
     __tablename__ = "WorldEntityWithIDDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9456,7 +9138,6 @@ class DegreeOfFreedomDAO(
         semantic_digital_twin.world_description.degree_of_freedom.DegreeOfFreedom
     ],
 ):
-
     __tablename__ = "DegreeOfFreedomDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9494,7 +9175,6 @@ class WorldEntityWithClassBasedIDDAO(
         semantic_digital_twin.world_description.world_entity.WorldEntityWithClassBasedID
     ],
 ):
-
     __tablename__ = "WorldEntityWithClassBasedIDDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9513,7 +9193,6 @@ class CallbackDAO(
     WorldEntityWithClassBasedIDDAO,
     DataAccessObject[semantic_digital_twin.callbacks.callback.Callback],
 ):
-
     __tablename__ = "CallbackDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9532,7 +9211,6 @@ class ModelChangeCallbackDAO(
     CallbackDAO,
     DataAccessObject[semantic_digital_twin.callbacks.callback.ModelChangeCallback],
 ):
-
     __tablename__ = "ModelChangeCallbackDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9551,7 +9229,6 @@ class CollisionDetectorModelUpdaterDAO(
         semantic_digital_twin.collision_checking.collision_detector.CollisionDetectorModelUpdater
     ],
 ):
-
     __tablename__ = "CollisionDetectorModelUpdaterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9585,7 +9262,6 @@ class CollisionManagerDAO(
         semantic_digital_twin.collision_checking.collision_manager.CollisionManager
     ],
 ):
-
     __tablename__ = "CollisionManagerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9657,7 +9333,6 @@ class MultiSimSynchronizerDAO(
     ModelChangeCallbackDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MultiSimSynchronizer],
 ):
-
     __tablename__ = "MultiSimSynchronizerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9683,7 +9358,6 @@ class MujocoSynchronizerDAO(
     MultiSimSynchronizerDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim.MujocoSynchronizer],
 ):
-
     __tablename__ = "MujocoSynchronizerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9706,7 +9380,6 @@ class PosePublisherDAO(
         semantic_digital_twin.adapters.ros.visualization.pose_publisher.PosePublisher
     ],
 ):
-
     __tablename__ = "PosePublisherDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9735,7 +9408,6 @@ class TfPublisherModelCallbackDAO(
         semantic_digital_twin.adapters.ros.tf_publisher.TfPublisherModelCallback
     ],
 ):
-
     __tablename__ = "TfPublisherModelCallbackDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9767,7 +9439,6 @@ class VizMarkerPublisherDAO(
         semantic_digital_twin.adapters.ros.visualization.viz_marker.VizMarkerPublisher
     ],
 ):
-
     __tablename__ = "VizMarkerPublisherDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9799,7 +9470,6 @@ class StateChangeCallbackDAO(
     CallbackDAO,
     DataAccessObject[semantic_digital_twin.callbacks.callback.StateChangeCallback],
 ):
-
     __tablename__ = "StateChangeCallbackDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9818,7 +9488,6 @@ class CollisionDetectorStateUpdaterDAO(
         semantic_digital_twin.collision_checking.collision_detector.CollisionDetectorStateUpdater
     ],
 ):
-
     __tablename__ = "CollisionDetectorStateUpdaterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9850,7 +9519,6 @@ class TFPublisherDAO(
     StateChangeCallbackDAO,
     DataAccessObject[semantic_digital_twin.adapters.ros.tf_publisher.TFPublisher],
 ):
-
     __tablename__ = "TFPublisherDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9887,7 +9555,6 @@ class CollisionDetectorDAO(
         semantic_digital_twin.collision_checking.collision_detector.CollisionDetector
     ],
 ):
-
     __tablename__ = "CollisionDetectorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9908,7 +9575,6 @@ class BulletCollisionDetectorDAO(
         semantic_digital_twin.collision_checking.pybullet_collision_detector.BulletCollisionDetector
     ],
 ):
-
     __tablename__ = "BulletCollisionDetectorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9942,7 +9608,6 @@ class FCLCollisionDetectorDAO(
         semantic_digital_twin.collision_checking.trimesh_collision_detector.FCLCollisionDetector
     ],
 ):
-
     __tablename__ = "FCLCollisionDetectorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9963,7 +9628,6 @@ class SynchronizerDAO(
         semantic_digital_twin.adapters.ros.world_synchronizer.Synchronizer
     ],
 ):
-
     __tablename__ = "SynchronizerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -9995,7 +9659,6 @@ class ModelReloadSynchronizerDAO(
         semantic_digital_twin.adapters.ros.world_synchronizer.ModelReloadSynchronizer
     ],
 ):
-
     __tablename__ = "ModelReloadSynchronizerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10016,7 +9679,6 @@ class WorldEntityWithIDKwargsTrackerDAO(
         semantic_digital_twin.adapters.world_entity_kwargs_tracker.WorldEntityWithIDKwargsTracker
     ],
 ):
-
     __tablename__ = "WorldEntityWithIDKwargsTrackerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10028,7 +9690,6 @@ class WorldEntityWithIDNotFoundErrorDAO(
     WorldEntityNotFoundErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.WorldEntityWithIDNotFoundError],
 ):
-
     __tablename__ = "WorldEntityWithIDNotFoundErrorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10051,7 +9712,6 @@ class WorldEntityWithIDNotInKwargsDAO(
     Base,
     DataAccessObject[semantic_digital_twin.exceptions.WorldEntityWithIDNotInKwargs],
 ):
-
     __tablename__ = "WorldEntityWithIDNotInKwargsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10073,7 +9733,6 @@ class WorldEntityWithSimulatorPropertiesDAO(
         semantic_digital_twin.world_description.world_entity.WorldEntityWithSimulatorProperties
     ],
 ):
-
     __tablename__ = "WorldEntityWithSimulatorPropertiesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10103,7 +9762,6 @@ class ActuatorDAO(
     WorldEntityWithSimulatorPropertiesDAO,
     DataAccessObject[semantic_digital_twin.world_description.world_entity.Actuator],
 ):
-
     __tablename__ = "ActuatorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10125,7 +9783,6 @@ class KinematicStructureEntityDAO(
         semantic_digital_twin.world_description.world_entity.KinematicStructureEntity
     ],
 ):
-
     __tablename__ = "KinematicStructureEntityDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10145,7 +9802,6 @@ class BodyDAO(
     KinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.world_description.world_entity.Body],
 ):
-
     __tablename__ = "BodyDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10193,7 +9849,6 @@ class RegionDAO(
     KinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.world_description.world_entity.Region],
 ):
-
     __tablename__ = "RegionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10224,7 +9879,6 @@ class SemanticAnnotationDAO(
         semantic_digital_twin.world_description.world_entity.SemanticAnnotation
     ],
 ):
-
     __tablename__ = "SemanticAnnotationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10246,7 +9900,6 @@ class DoubleDoorDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.DoubleDoor
     ],
 ):
-
     __tablename__ = "DoubleDoorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10285,7 +9938,6 @@ class FurnitureDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Furniture
     ],
 ):
-
     __tablename__ = "FurnitureDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10306,7 +9958,6 @@ class BedDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Bed
     ],
 ):
-
     __tablename__ = "BedDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10325,7 +9976,6 @@ class ChairDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Chair
     ],
 ):
-
     __tablename__ = "ChairDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10344,7 +9994,6 @@ class ArmchairDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Armchair
     ],
 ):
-
     __tablename__ = "ArmchairDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10363,7 +10012,6 @@ class OfficeChairDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.OfficeChair
     ],
 ):
-
     __tablename__ = "OfficeChairDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10382,7 +10030,6 @@ class ShelvingUnitDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.ShelvingUnit
     ],
 ):
-
     __tablename__ = "ShelvingUnitDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10401,7 +10048,6 @@ class HasRootKinematicStructureEntityDAO(
         semantic_digital_twin.semantic_annotations.mixins.HasRootKinematicStructureEntity
     ],
 ):
-
     __tablename__ = "HasRootKinematicStructureEntityDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10433,7 +10079,6 @@ class HasDoorsDAO(
     HasRootKinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasDoors],
 ):
-
     __tablename__ = "HasDoorsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10460,7 +10105,6 @@ class HasDrawersDAO(
     HasRootKinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasDrawers],
 ):
-
     __tablename__ = "HasDrawersDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10487,7 +10131,6 @@ class HasRootBodyDAO(
     HasRootKinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasRootBody],
 ):
-
     __tablename__ = "HasRootBodyDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10507,7 +10150,6 @@ class AbstractRobotPartDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_parts.AbstractRobotPart],
 ):
-
     __tablename__ = "AbstractRobotPartDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10535,7 +10177,6 @@ class EndEffectorDAO(
     AbstractRobotPartDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_parts.EndEffector],
 ):
-
     __tablename__ = "EndEffectorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10575,7 +10216,6 @@ class Armar7LeftGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7LeftGripper],
 ):
-
     __tablename__ = "Armar7LeftGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10594,7 +10234,6 @@ class Armar7RightGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7RightGripper],
 ):
-
     __tablename__ = "Armar7RightGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10613,7 +10252,6 @@ class GarmiLeftGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.garmi.GarmiLeftGripper],
 ):
-
     __tablename__ = "GarmiLeftGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10632,7 +10270,6 @@ class GarmiRightGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.garmi.GarmiRightGripper],
 ):
-
     __tablename__ = "GarmiRightGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10650,7 +10287,6 @@ class GarmiRightGripperDAO(
 class HSRBGripperDAO(
     EndEffectorDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBGripper]
 ):
-
     __tablename__ = "HSRBGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10668,7 +10304,6 @@ class HSRBGripperDAO(
 class ICub3LeftHandDAO(
     EndEffectorDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3LeftHand]
 ):
-
     __tablename__ = "ICub3LeftHandDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10686,7 +10321,6 @@ class ICub3LeftHandDAO(
 class ICub3RightHandDAO(
     EndEffectorDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3RightHand]
 ):
-
     __tablename__ = "ICub3RightHandDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10704,7 +10338,6 @@ class ICub3RightHandDAO(
 class JustinLeftHandDAO(
     EndEffectorDAO, DataAccessObject[semantic_digital_twin.robots.justin.JustinLeftHand]
 ):
-
     __tablename__ = "JustinLeftHandDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10723,7 +10356,6 @@ class JustinRightHandDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.justin.JustinRightHand],
 ):
-
     __tablename__ = "JustinRightHandDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10742,7 +10374,6 @@ class MMPDresdenGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresdenGripper],
 ):
-
     __tablename__ = "MMPDresdenGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10760,7 +10391,6 @@ class MMPDresdenGripperDAO(
 class PR2LeftGripperDAO(
     EndEffectorDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2LeftGripper]
 ):
-
     __tablename__ = "PR2LeftGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10778,7 +10408,6 @@ class PR2LeftGripperDAO(
 class PR2RightGripperDAO(
     EndEffectorDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2RightGripper]
 ):
-
     __tablename__ = "PR2RightGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10797,7 +10426,6 @@ class StretchGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.stretch.StretchGripper],
 ):
-
     __tablename__ = "StretchGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10816,7 +10444,6 @@ class TiagoLeftGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoLeftGripper],
 ):
-
     __tablename__ = "TiagoLeftGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10835,7 +10462,6 @@ class TiagoMujocoLeftGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoLeftGripper],
 ):
-
     __tablename__ = "TiagoMujocoLeftGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10854,7 +10480,6 @@ class TiagoMujocoRightGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoRightGripper],
 ):
-
     __tablename__ = "TiagoMujocoRightGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10873,7 +10498,6 @@ class TiagoRightGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoRightGripper],
 ):
-
     __tablename__ = "TiagoRightGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10892,7 +10516,6 @@ class TracyLeftGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.tracy.TracyLeftGripper],
 ):
-
     __tablename__ = "TracyLeftGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10911,7 +10534,6 @@ class TracyRightGripperDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.tracy.TracyRightGripper],
 ):
-
     __tablename__ = "TracyRightGripperDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10930,7 +10552,6 @@ class UnitreeG1LeftHandDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1LeftHand],
 ):
-
     __tablename__ = "UnitreeG1LeftHandDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10949,7 +10570,6 @@ class UnitreeG1RightHandDAO(
     EndEffectorDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1RightHand],
 ):
-
     __tablename__ = "UnitreeG1RightHandDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10968,7 +10588,6 @@ class KinematicChainDAO(
     AbstractRobotPartDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_parts.KinematicChain],
 ):
-
     __tablename__ = "KinematicChainDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -10996,7 +10615,6 @@ class KinematicChainDAO(
 class ArmDAO(
     KinematicChainDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Arm]
 ):
-
     __tablename__ = "ArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11014,7 +10632,6 @@ class ArmDAO(
 class Armar7LeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.armar7.Armar7LeftArm]
 ):
-
     __tablename__ = "Armar7LeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11030,7 +10647,6 @@ class Armar7LeftArmDAO(
 class Armar7RightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.armar7.Armar7RightArm]
 ):
-
     __tablename__ = "Armar7RightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11046,7 +10662,6 @@ class Armar7RightArmDAO(
 class GarmiLeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiLeftArm]
 ):
-
     __tablename__ = "GarmiLeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11062,7 +10677,6 @@ class GarmiLeftArmDAO(
 class GarmiRightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiRightArm]
 ):
-
     __tablename__ = "GarmiRightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11076,7 +10690,6 @@ class GarmiRightArmDAO(
 
 
 class HSRBArmDAO(ArmDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBArm]):
-
     __tablename__ = "HSRBArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11099,7 +10712,6 @@ class HSRBArmDAO(ArmDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRB
 class ICub3LeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3LeftArm]
 ):
-
     __tablename__ = "ICub3LeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11115,7 +10727,6 @@ class ICub3LeftArmDAO(
 class ICub3RightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3RightArm]
 ):
-
     __tablename__ = "ICub3RightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11131,7 +10742,6 @@ class ICub3RightArmDAO(
 class JustinLeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.justin.JustinLeftArm]
 ):
-
     __tablename__ = "JustinLeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11147,7 +10757,6 @@ class JustinLeftArmDAO(
 class JustinRightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.justin.JustinRightArm]
 ):
-
     __tablename__ = "JustinRightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11163,7 +10772,6 @@ class JustinRightArmDAO(
 class MMPDresdenArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresdenArm]
 ):
-
     __tablename__ = "MMPDresdenArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11179,7 +10787,6 @@ class MMPDresdenArmDAO(
 class PR2LeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2LeftArm]
 ):
-
     __tablename__ = "PR2LeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11195,7 +10802,6 @@ class PR2LeftArmDAO(
 class PR2RightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2RightArm]
 ):
-
     __tablename__ = "PR2RightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11211,7 +10817,6 @@ class PR2RightArmDAO(
 class StretchArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.stretch.StretchArm]
 ):
-
     __tablename__ = "StretchArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11227,7 +10832,6 @@ class StretchArmDAO(
 class TiagoLeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoLeftArm]
 ):
-
     __tablename__ = "TiagoLeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11243,7 +10847,6 @@ class TiagoLeftArmDAO(
 class TiagoMujocoLeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoLeftArm]
 ):
-
     __tablename__ = "TiagoMujocoLeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11259,7 +10862,6 @@ class TiagoMujocoLeftArmDAO(
 class TiagoMujocoRightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoRightArm]
 ):
-
     __tablename__ = "TiagoMujocoRightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11275,7 +10877,6 @@ class TiagoMujocoRightArmDAO(
 class TiagoRightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoRightArm]
 ):
-
     __tablename__ = "TiagoRightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11291,7 +10892,6 @@ class TiagoRightArmDAO(
 class TracyLeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.tracy.TracyLeftArm]
 ):
-
     __tablename__ = "TracyLeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11307,7 +10907,6 @@ class TracyLeftArmDAO(
 class TracyRightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.tracy.TracyRightArm]
 ):
-
     __tablename__ = "TracyRightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11323,7 +10922,6 @@ class TracyRightArmDAO(
 class UnitreeG1LeftArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1LeftArm]
 ):
-
     __tablename__ = "UnitreeG1LeftArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11339,7 +10937,6 @@ class UnitreeG1LeftArmDAO(
 class UnitreeG1RightArmDAO(
     ArmDAO, DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1RightArm]
 ):
-
     __tablename__ = "UnitreeG1RightArmDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11355,7 +10952,6 @@ class UnitreeG1RightArmDAO(
 class FingerDAO(
     KinematicChainDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Finger]
 ):
-
     __tablename__ = "FingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11384,7 +10980,6 @@ class Armar7LeftIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7LeftIndexFinger],
 ):
-
     __tablename__ = "Armar7LeftIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11401,7 +10996,6 @@ class Armar7LeftMiddleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7LeftMiddleFinger],
 ):
-
     __tablename__ = "Armar7LeftMiddleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11418,7 +11012,6 @@ class Armar7LeftPinkyFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7LeftPinkyFinger],
 ):
-
     __tablename__ = "Armar7LeftPinkyFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11435,7 +11028,6 @@ class Armar7LeftRingFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7LeftRingFinger],
 ):
-
     __tablename__ = "Armar7LeftRingFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11451,7 +11043,6 @@ class Armar7LeftRingFingerDAO(
 class Armar7LeftThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.armar7.Armar7LeftThumb]
 ):
-
     __tablename__ = "Armar7LeftThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11468,7 +11059,6 @@ class Armar7RightIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7RightIndexFinger],
 ):
-
     __tablename__ = "Armar7RightIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11485,7 +11075,6 @@ class Armar7RightMiddleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7RightMiddleFinger],
 ):
-
     __tablename__ = "Armar7RightMiddleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11502,7 +11091,6 @@ class Armar7RightPinkyFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7RightPinkyFinger],
 ):
-
     __tablename__ = "Armar7RightPinkyFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11519,7 +11107,6 @@ class Armar7RightRingFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7RightRingFinger],
 ):
-
     __tablename__ = "Armar7RightRingFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11535,7 +11122,6 @@ class Armar7RightRingFingerDAO(
 class Armar7RightThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.armar7.Armar7RightThumb]
 ):
-
     __tablename__ = "Armar7RightThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11552,7 +11138,6 @@ class GarmiLeftGripperLeftFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.garmi.GarmiLeftGripperLeftFinger],
 ):
-
     __tablename__ = "GarmiLeftGripperLeftFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11569,7 +11154,6 @@ class GarmiLeftGripperRightFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.garmi.GarmiLeftGripperRightFinger],
 ):
-
     __tablename__ = "GarmiLeftGripperRightFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11586,7 +11170,6 @@ class GarmiRightGripperLeftFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.garmi.GarmiRightGripperLeftFinger],
 ):
-
     __tablename__ = "GarmiRightGripperLeftFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11603,7 +11186,6 @@ class GarmiRightGripperRightFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.garmi.GarmiRightGripperRightFinger],
 ):
-
     __tablename__ = "GarmiRightGripperRightFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11619,7 +11201,6 @@ class GarmiRightGripperRightFingerDAO(
 class HSRBLeftFingerDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBLeftFinger]
 ):
-
     __tablename__ = "HSRBLeftFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11635,7 +11216,6 @@ class HSRBLeftFingerDAO(
 class HSRBRightFingerDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBRightFinger]
 ):
-
     __tablename__ = "HSRBRightFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11651,7 +11231,6 @@ class HSRBRightFingerDAO(
 class ICub3LeftIndexFingerDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3LeftIndexFinger]
 ):
-
     __tablename__ = "ICub3LeftIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11668,7 +11247,6 @@ class ICub3LeftLittleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.icub3.ICub3LeftLittleFinger],
 ):
-
     __tablename__ = "ICub3LeftLittleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11685,7 +11263,6 @@ class ICub3LeftMiddleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.icub3.ICub3LeftMiddleFinger],
 ):
-
     __tablename__ = "ICub3LeftMiddleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11701,7 +11278,6 @@ class ICub3LeftMiddleFingerDAO(
 class ICub3LeftRingFingerDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3LeftRingFinger]
 ):
-
     __tablename__ = "ICub3LeftRingFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11717,7 +11293,6 @@ class ICub3LeftRingFingerDAO(
 class ICub3LeftThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3LeftThumb]
 ):
-
     __tablename__ = "ICub3LeftThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11734,7 +11309,6 @@ class ICub3RightIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.icub3.ICub3RightIndexFinger],
 ):
-
     __tablename__ = "ICub3RightIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11751,7 +11325,6 @@ class ICub3RightLittleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.icub3.ICub3RightLittleFinger],
 ):
-
     __tablename__ = "ICub3RightLittleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11768,7 +11341,6 @@ class ICub3RightMiddleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.icub3.ICub3RightMiddleFinger],
 ):
-
     __tablename__ = "ICub3RightMiddleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11784,7 +11356,6 @@ class ICub3RightMiddleFingerDAO(
 class ICub3RightRingFingerDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3RightRingFinger]
 ):
-
     __tablename__ = "ICub3RightRingFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11800,7 +11371,6 @@ class ICub3RightRingFingerDAO(
 class ICub3RightThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3RightThumb]
 ):
-
     __tablename__ = "ICub3RightThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11817,7 +11387,6 @@ class JustinLeftIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.justin.JustinLeftIndexFinger],
 ):
-
     __tablename__ = "JustinLeftIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11834,7 +11403,6 @@ class JustinLeftMiddleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.justin.JustinLeftMiddleFinger],
 ):
-
     __tablename__ = "JustinLeftMiddleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11851,7 +11419,6 @@ class JustinLeftRingFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.justin.JustinLeftRingFinger],
 ):
-
     __tablename__ = "JustinLeftRingFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11867,7 +11434,6 @@ class JustinLeftRingFingerDAO(
 class JustinLeftThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.justin.JustinLeftThumb]
 ):
-
     __tablename__ = "JustinLeftThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11884,7 +11450,6 @@ class JustinRightIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.justin.JustinRightIndexFinger],
 ):
-
     __tablename__ = "JustinRightIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11901,7 +11466,6 @@ class JustinRightMiddleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.justin.JustinRightMiddleFinger],
 ):
-
     __tablename__ = "JustinRightMiddleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11918,7 +11482,6 @@ class JustinRightRingFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.justin.JustinRightRingFinger],
 ):
-
     __tablename__ = "JustinRightRingFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11934,7 +11497,6 @@ class JustinRightRingFingerDAO(
 class JustinRightThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.justin.JustinRightThumb]
 ):
-
     __tablename__ = "JustinRightThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11951,7 +11513,6 @@ class MMPDresdenIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresdenIndexFinger],
 ):
-
     __tablename__ = "MMPDresdenIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11968,7 +11529,6 @@ class MMPDresdenThumbDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresdenThumb],
 ):
-
     __tablename__ = "MMPDresdenThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -11985,7 +11545,6 @@ class PR2LeftGripperLeftFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.pr2.PR2LeftGripperLeftFinger],
 ):
-
     __tablename__ = "PR2LeftGripperLeftFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12002,7 +11561,6 @@ class PR2LeftGripperRightFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.pr2.PR2LeftGripperRightFinger],
 ):
-
     __tablename__ = "PR2LeftGripperRightFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12019,7 +11577,6 @@ class PR2RightGripperLeftFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.pr2.PR2RightGripperLeftFinger],
 ):
-
     __tablename__ = "PR2RightGripperLeftFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12036,7 +11593,6 @@ class PR2RightGripperRightFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.pr2.PR2RightGripperRightFinger],
 ):
-
     __tablename__ = "PR2RightGripperRightFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12052,7 +11608,6 @@ class PR2RightGripperRightFingerDAO(
 class StretchLeftFingerDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.stretch.StretchLeftFinger]
 ):
-
     __tablename__ = "StretchLeftFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12068,7 +11623,6 @@ class StretchLeftFingerDAO(
 class StretchRightFingerDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.stretch.StretchRightFinger]
 ):
-
     __tablename__ = "StretchRightFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12084,7 +11638,6 @@ class StretchRightFingerDAO(
 class TiagoLeftIndexFingerDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoLeftIndexFinger]
 ):
-
     __tablename__ = "TiagoLeftIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12100,7 +11653,6 @@ class TiagoLeftIndexFingerDAO(
 class TiagoLeftThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoLeftThumb]
 ):
-
     __tablename__ = "TiagoLeftThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12117,7 +11669,6 @@ class TiagoMujocoLeftIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoLeftIndexFinger],
 ):
-
     __tablename__ = "TiagoMujocoLeftIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12133,7 +11684,6 @@ class TiagoMujocoLeftIndexFingerDAO(
 class TiagoMujocoLeftThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoLeftThumb]
 ):
-
     __tablename__ = "TiagoMujocoLeftThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12150,7 +11700,6 @@ class TiagoMujocoRightIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoRightIndexFinger],
 ):
-
     __tablename__ = "TiagoMujocoRightIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12167,7 +11716,6 @@ class TiagoMujocoRightThumbDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoRightThumb],
 ):
-
     __tablename__ = "TiagoMujocoRightThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12184,7 +11732,6 @@ class TiagoRightIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoRightIndexFinger],
 ):
-
     __tablename__ = "TiagoRightIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12200,7 +11747,6 @@ class TiagoRightIndexFingerDAO(
 class TiagoRightThumbDAO(
     FingerDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoRightThumb]
 ):
-
     __tablename__ = "TiagoRightThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12217,7 +11763,6 @@ class TracyLeftGripperLeftFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.tracy.TracyLeftGripperLeftFinger],
 ):
-
     __tablename__ = "TracyLeftGripperLeftFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12234,7 +11779,6 @@ class TracyLeftGripperRightFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.tracy.TracyLeftGripperRightFinger],
 ):
-
     __tablename__ = "TracyLeftGripperRightFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12251,7 +11795,6 @@ class TracyRightGripperLeftFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.tracy.TracyRightGripperLeftFinger],
 ):
-
     __tablename__ = "TracyRightGripperLeftFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12268,7 +11811,6 @@ class TracyRightGripperRightFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.tracy.TracyRightGripperRightFinger],
 ):
-
     __tablename__ = "TracyRightGripperRightFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12285,7 +11827,6 @@ class UnitreeG1LeftIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1LeftIndexFinger],
 ):
-
     __tablename__ = "UnitreeG1LeftIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12302,7 +11843,6 @@ class UnitreeG1LeftMiddleFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1LeftMiddleFinger],
 ):
-
     __tablename__ = "UnitreeG1LeftMiddleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12319,7 +11859,6 @@ class UnitreeG1LeftThumbDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1LeftThumb],
 ):
-
     __tablename__ = "UnitreeG1LeftThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12336,7 +11875,6 @@ class UnitreeG1RightIndexFingerDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1RightIndexFinger],
 ):
-
     __tablename__ = "UnitreeG1RightIndexFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12355,7 +11893,6 @@ class UnitreeG1RightMiddleFingerDAO(
         semantic_digital_twin.robots.unitree_g1.UnitreeG1RightMiddleFinger
     ],
 ):
-
     __tablename__ = "UnitreeG1RightMiddleFingerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12372,7 +11909,6 @@ class UnitreeG1RightThumbDAO(
     FingerDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1RightThumb],
 ):
-
     __tablename__ = "UnitreeG1RightThumbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12388,7 +11924,6 @@ class UnitreeG1RightThumbDAO(
 class NeckDAO(
     KinematicChainDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Neck]
 ):
-
     __tablename__ = "NeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12406,7 +11941,6 @@ class NeckDAO(
 class Armar7NeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.armar7.Armar7Neck]
 ):
-
     __tablename__ = "Armar7NeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12429,7 +11963,6 @@ class Armar7NeckDAO(
 class GarmiNeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiNeck]
 ):
-
     __tablename__ = "GarmiNeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12452,7 +11985,6 @@ class GarmiNeckDAO(
 class HSRBNeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBNeck]
 ):
-
     __tablename__ = "HSRBNeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12475,7 +12007,6 @@ class HSRBNeckDAO(
 class ICub3NeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3Neck]
 ):
-
     __tablename__ = "ICub3NeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12498,7 +12029,6 @@ class ICub3NeckDAO(
 class JustinNeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.justin.JustinNeck]
 ):
-
     __tablename__ = "JustinNeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12519,7 +12049,6 @@ class JustinNeckDAO(
 
 
 class PR2NeckDAO(NeckDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2Neck]):
-
     __tablename__ = "PR2NeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12542,7 +12071,6 @@ class PR2NeckDAO(NeckDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2N
 class StretchNeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.stretch.StretchNeck]
 ):
-
     __tablename__ = "StretchNeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12565,7 +12093,6 @@ class StretchNeckDAO(
 class TiagoMujocoNeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoNeck]
 ):
-
     __tablename__ = "TiagoMujocoNeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12590,7 +12117,6 @@ class TiagoMujocoNeckDAO(
 class TiagoNeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoNeck]
 ):
-
     __tablename__ = "TiagoNeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12613,7 +12139,6 @@ class TiagoNeckDAO(
 class UnitreeG1NeckDAO(
     NeckDAO, DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1Neck]
 ):
-
     __tablename__ = "UnitreeG1NeckDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12636,7 +12161,6 @@ class UnitreeG1NeckDAO(
 class TorsoDAO(
     KinematicChainDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Torso]
 ):
-
     __tablename__ = "TorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12654,7 +12178,6 @@ class TorsoDAO(
 class Armar7TorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.armar7.Armar7Torso]
 ):
-
     __tablename__ = "Armar7TorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12670,7 +12193,6 @@ class Armar7TorsoDAO(
 class GarmiTorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiTorso]
 ):
-
     __tablename__ = "GarmiTorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12686,7 +12208,6 @@ class GarmiTorsoDAO(
 class HSRBTorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBTorso]
 ):
-
     __tablename__ = "HSRBTorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12702,7 +12223,6 @@ class HSRBTorsoDAO(
 class ICub3TorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3Torso]
 ):
-
     __tablename__ = "ICub3TorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12718,7 +12238,6 @@ class ICub3TorsoDAO(
 class JustinTorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.justin.JustinTorso]
 ):
-
     __tablename__ = "JustinTorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12734,7 +12253,6 @@ class JustinTorsoDAO(
 class MMPDresdenTorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresdenTorso]
 ):
-
     __tablename__ = "MMPDresdenTorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12759,7 +12277,6 @@ class MMPDresdenTorsoDAO(
 class PR2TorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2Torso]
 ):
-
     __tablename__ = "PR2TorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12775,7 +12292,6 @@ class PR2TorsoDAO(
 class StretchTorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.stretch.StretchTorso]
 ):
-
     __tablename__ = "StretchTorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12791,7 +12307,6 @@ class StretchTorsoDAO(
 class TiagoMujocoTorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoTorso]
 ):
-
     __tablename__ = "TiagoMujocoTorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12807,7 +12322,6 @@ class TiagoMujocoTorsoDAO(
 class TiagoTorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoTorso]
 ):
-
     __tablename__ = "TiagoTorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12823,7 +12337,6 @@ class TiagoTorsoDAO(
 class UnitreeG1TorsoDAO(
     TorsoDAO, DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1Torso]
 ):
-
     __tablename__ = "UnitreeG1TorsoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12840,7 +12353,6 @@ class MobileBaseDAO(
     AbstractRobotPartDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_parts.MobileBase],
 ):
-
     __tablename__ = "MobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12876,7 +12388,6 @@ class Armar7MobileBaseDAO(
     MobileBaseDAO,
     DataAccessObject[semantic_digital_twin.robots.armar7.Armar7MobileBase],
 ):
-
     __tablename__ = "Armar7MobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12894,7 +12405,6 @@ class Armar7MobileBaseDAO(
 class GarmiMobileBaseDAO(
     MobileBaseDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiMobileBase]
 ):
-
     __tablename__ = "GarmiMobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12912,7 +12422,6 @@ class GarmiMobileBaseDAO(
 class HSRBMobileBaseDAO(
     MobileBaseDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBMobileBase]
 ):
-
     __tablename__ = "HSRBMobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12930,7 +12439,6 @@ class HSRBMobileBaseDAO(
 class ICub3MobileBaseDAO(
     MobileBaseDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3MobileBase]
 ):
-
     __tablename__ = "ICub3MobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12949,7 +12457,6 @@ class JustinMobileBaseDAO(
     MobileBaseDAO,
     DataAccessObject[semantic_digital_twin.robots.justin.JustinMobileBase],
 ):
-
     __tablename__ = "JustinMobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12968,7 +12475,6 @@ class MMPDresdenMobileBaseDAO(
     MobileBaseDAO,
     DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresdenMobileBase],
 ):
-
     __tablename__ = "MMPDresdenMobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -12986,7 +12492,6 @@ class MMPDresdenMobileBaseDAO(
 class PR2MobileBaseDAO(
     MobileBaseDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2MobileBase]
 ):
-
     __tablename__ = "PR2MobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13005,7 +12510,6 @@ class StretchMobileBaseDAO(
     MobileBaseDAO,
     DataAccessObject[semantic_digital_twin.robots.stretch.StretchMobileBase],
 ):
-
     __tablename__ = "StretchMobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13023,7 +12527,6 @@ class StretchMobileBaseDAO(
 class TiagoMobileBaseDAO(
     MobileBaseDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMobileBase]
 ):
-
     __tablename__ = "TiagoMobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13042,7 +12545,6 @@ class TiagoMujocoMobileBaseDAO(
     MobileBaseDAO,
     DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujocoMobileBase],
 ):
-
     __tablename__ = "TiagoMujocoMobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13061,7 +12563,6 @@ class UnitreeG1MobileBaseDAO(
     MobileBaseDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1MobileBase],
 ):
-
     __tablename__ = "UnitreeG1MobileBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13080,7 +12581,6 @@ class SensorDAO(
     AbstractRobotPartDAO,
     DataAccessObject[semantic_digital_twin.robots.robot_parts.Sensor],
 ):
-
     __tablename__ = "SensorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13098,7 +12598,6 @@ class SensorDAO(
 class CameraDAO(
     SensorDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.Camera]
 ):
-
     __tablename__ = "CameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13142,7 +12641,6 @@ class CameraDAO(
 class AzureKinectRGBDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.armar7.AzureKinectRGB]
 ):
-
     __tablename__ = "AzureKinectRGBDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13158,7 +12656,6 @@ class AzureKinectRGBDAO(
 class D435DAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.unitree_g1.D435]
 ):
-
     __tablename__ = "D435DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13174,7 +12671,6 @@ class D435DAO(
 class GarmiCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.garmi.GarmiCamera]
 ):
-
     __tablename__ = "GarmiCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13190,7 +12686,6 @@ class GarmiCameraDAO(
 class HSRBHandCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBHandCamera]
 ):
-
     __tablename__ = "HSRBHandCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13206,7 +12701,6 @@ class HSRBHandCameraDAO(
 class HSRBHeadCenterCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBHeadCenterCamera]
 ):
-
     __tablename__ = "HSRBHeadCenterCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13222,7 +12716,6 @@ class HSRBHeadCenterCameraDAO(
 class HSRBHeadLeftCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBHeadLeftCamera]
 ):
-
     __tablename__ = "HSRBHeadLeftCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13238,7 +12731,6 @@ class HSRBHeadLeftCameraDAO(
 class HSRBHeadRGBDCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBHeadRGBDCamera]
 ):
-
     __tablename__ = "HSRBHeadRGBDCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13254,7 +12746,6 @@ class HSRBHeadRGBDCameraDAO(
 class HSRBHeadRightCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRBHeadRightCamera]
 ):
-
     __tablename__ = "HSRBHeadRightCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13270,7 +12761,6 @@ class HSRBHeadRightCameraDAO(
 class ICub3CameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3Camera]
 ):
-
     __tablename__ = "ICub3CameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13286,7 +12776,6 @@ class ICub3CameraDAO(
 class JustinCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.justin.JustinCamera]
 ):
-
     __tablename__ = "JustinCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13303,7 +12792,6 @@ class MMPDresdenCameraDAO(
     CameraDAO,
     DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresdenCamera],
 ):
-
     __tablename__ = "MMPDresdenCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13319,7 +12807,6 @@ class MMPDresdenCameraDAO(
 class PR2KinectV1DAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2KinectV1]
 ):
-
     __tablename__ = "PR2KinectV1DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13335,7 +12822,6 @@ class PR2KinectV1DAO(
 class StretchCameraColorDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.stretch.StretchCameraColor]
 ):
-
     __tablename__ = "StretchCameraColorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13351,7 +12837,6 @@ class StretchCameraColorDAO(
 class StretchCameraDepthDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.stretch.StretchCameraDepth]
 ):
-
     __tablename__ = "StretchCameraDepthDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13368,7 +12853,6 @@ class StretchCameraInfra1DAO(
     CameraDAO,
     DataAccessObject[semantic_digital_twin.robots.stretch.StretchCameraInfra1],
 ):
-
     __tablename__ = "StretchCameraInfra1DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13385,7 +12869,6 @@ class StretchCameraInfra2DAO(
     CameraDAO,
     DataAccessObject[semantic_digital_twin.robots.stretch.StretchCameraInfra2],
 ):
-
     __tablename__ = "StretchCameraInfra2DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13401,7 +12884,6 @@ class StretchCameraInfra2DAO(
 class TiagoCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoCamera]
 ):
-
     __tablename__ = "TiagoCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13417,7 +12899,6 @@ class TiagoCameraDAO(
 class TracyCameraDAO(
     CameraDAO, DataAccessObject[semantic_digital_twin.robots.tracy.TracyCamera]
 ):
-
     __tablename__ = "TracyCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13436,7 +12917,6 @@ class AgentDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Agent
     ],
 ):
-
     __tablename__ = "AgentDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13454,7 +12934,6 @@ class AgentDAO(
 class AbstractRobotDAO(
     AgentDAO, DataAccessObject[semantic_digital_twin.robots.robot_parts.AbstractRobot]
 ):
-
     __tablename__ = "AbstractRobotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13470,7 +12949,6 @@ class AbstractRobotDAO(
 class Armar7DAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.armar7.Armar7]
 ):
-
     __tablename__ = "Armar7DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13488,7 +12966,6 @@ class Armar7DAO(
 class GarmiDAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.garmi.Garmi]
 ):
-
     __tablename__ = "GarmiDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13506,7 +12983,6 @@ class GarmiDAO(
 class HSRBDAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRB]
 ):
-
     __tablename__ = "HSRBDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13524,7 +13000,6 @@ class HSRBDAO(
 class ICub3DAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.icub3.ICub3]
 ):
-
     __tablename__ = "ICub3DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13555,7 +13030,6 @@ class ICub3DAO(
 class JustinDAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.justin.Justin]
 ):
-
     __tablename__ = "JustinDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13574,7 +13048,6 @@ class MMPDresdenDAO(
     AbstractRobotDAO,
     DataAccessObject[semantic_digital_twin.robots.mmp_dresden.MMPDresden],
 ):
-
     __tablename__ = "MMPDresdenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13593,7 +13066,6 @@ class MinimalRobotDAO(
     AbstractRobotDAO,
     DataAccessObject[semantic_digital_twin.robots.minimal_robot.MinimalRobot],
 ):
-
     __tablename__ = "MinimalRobotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13618,7 +13090,6 @@ class MinimalRobotDAO(
 
 
 class PR2DAO(AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2]):
-
     __tablename__ = "PR2DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13636,7 +13107,6 @@ class PR2DAO(AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.pr2
 class StretchDAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.stretch.Stretch]
 ):
-
     __tablename__ = "StretchDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13654,7 +13124,6 @@ class StretchDAO(
 class TiagoDAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.tiago.Tiago]
 ):
-
     __tablename__ = "TiagoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13672,7 +13141,6 @@ class TiagoDAO(
 class TiagoMujocoDAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.tiago.TiagoMujoco]
 ):
-
     __tablename__ = "TiagoMujocoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13690,7 +13158,6 @@ class TiagoMujocoDAO(
 class TracyDAO(
     AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.tracy.Tracy]
 ):
-
     __tablename__ = "TracyDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13716,7 +13183,6 @@ class UnitreeG1DAO(
     AbstractRobotDAO,
     DataAccessObject[semantic_digital_twin.robots.unitree_g1.UnitreeG1],
 ):
-
     __tablename__ = "UnitreeG1DAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13750,7 +13216,6 @@ class HumanDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Human
     ],
 ):
-
     __tablename__ = "HumanDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13769,7 +13234,6 @@ class BaseballDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Baseball
     ],
 ):
-
     __tablename__ = "BaseballDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13790,7 +13254,6 @@ class BookDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Book
     ],
 ):
-
     __tablename__ = "BookDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13821,7 +13284,6 @@ class BookFrontDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.BookFront
     ],
 ):
-
     __tablename__ = "BookFrontDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13842,7 +13304,6 @@ class BottleDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Bottle
     ],
 ):
-
     __tablename__ = "BottleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13863,7 +13324,6 @@ class MustardBottleDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.MustardBottle
     ],
 ):
-
     __tablename__ = "MustardBottleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13882,7 +13342,6 @@ class SoapBottleDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.SoapBottle
     ],
 ):
-
     __tablename__ = "SoapBottleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13901,7 +13360,6 @@ class WineBottleDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.WineBottle
     ],
 ):
-
     __tablename__ = "WineBottleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13920,7 +13378,6 @@ class ClothDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Cloth
     ],
 ):
-
     __tablename__ = "ClothDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13941,7 +13398,6 @@ class CookingContainerDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.CookingContainer
     ],
 ):
-
     __tablename__ = "CookingContainerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13962,7 +13418,6 @@ class KettleDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Kettle
     ],
 ):
-
     __tablename__ = "KettleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -13983,7 +13438,6 @@ class PanDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Pan
     ],
 ):
-
     __tablename__ = "PanDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14004,7 +13458,6 @@ class PotDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Pot
     ],
 ):
-
     __tablename__ = "PotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14025,7 +13478,6 @@ class CuttleryDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Cuttlery
     ],
 ):
-
     __tablename__ = "CuttleryDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14046,7 +13498,6 @@ class ForkDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Fork
     ],
 ):
-
     __tablename__ = "ForkDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14065,7 +13516,6 @@ class KnifeDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Knife
     ],
 ):
-
     __tablename__ = "KnifeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14084,7 +13534,6 @@ class SpoonDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Spoon
     ],
 ):
-
     __tablename__ = "SpoonDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14107,7 +13556,6 @@ class DecorDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Decor
     ],
 ):
-
     __tablename__ = "DecorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14128,7 +13576,6 @@ class WallDecorDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.WallDecor
     ],
 ):
-
     __tablename__ = "WallDecorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14147,7 +13594,6 @@ class PosterDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Poster
     ],
 ):
-
     __tablename__ = "PosterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14166,7 +13612,6 @@ class DrinkingContainerDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.DrinkingContainer
     ],
 ):
-
     __tablename__ = "DrinkingContainerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14187,7 +13632,6 @@ class CupDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Cup
     ],
 ):
-
     __tablename__ = "CupDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14212,7 +13656,6 @@ class MugDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Mug
     ],
 ):
-
     __tablename__ = "MugDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14233,7 +13676,6 @@ class DroneDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Drone
     ],
 ):
-
     __tablename__ = "DroneDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14254,7 +13696,6 @@ class FoodDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Food
     ],
 ):
-
     __tablename__ = "FoodDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14275,7 +13716,6 @@ class BreadDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Bread
     ],
 ):
-
     __tablename__ = "BreadDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14294,7 +13734,6 @@ class CandyDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Candy
     ],
 ):
-
     __tablename__ = "CandyDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14317,7 +13756,6 @@ class CerealDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Cereal
     ],
 ):
-
     __tablename__ = "CerealDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14340,7 +13778,6 @@ class CheezeItDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.CheezeIt
     ],
 ):
-
     __tablename__ = "CheezeItDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14359,7 +13796,6 @@ class GelatinBoxDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.GelatinBox
     ],
 ):
-
     __tablename__ = "GelatinBoxDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14378,7 +13814,6 @@ class MilkDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Milk
     ],
 ):
-
     __tablename__ = "MilkDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14401,7 +13836,6 @@ class NoodlesDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Noodles
     ],
 ):
-
     __tablename__ = "NoodlesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14424,7 +13858,6 @@ class PringlesDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Pringles
     ],
 ):
-
     __tablename__ = "PringlesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14443,7 +13876,6 @@ class ProduceDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Produce
     ],
 ):
-
     __tablename__ = "ProduceDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14462,7 +13894,6 @@ class FruitDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Fruit
     ],
 ):
-
     __tablename__ = "FruitDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14481,7 +13912,6 @@ class AppleDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Apple
     ],
 ):
-
     __tablename__ = "AppleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14500,7 +13930,6 @@ class BananaDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Banana
     ],
 ):
-
     __tablename__ = "BananaDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14519,7 +13948,6 @@ class OrangeDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Orange
     ],
 ):
-
     __tablename__ = "OrangeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14538,7 +13966,6 @@ class TomatoDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Tomato
     ],
 ):
-
     __tablename__ = "TomatoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14557,7 +13984,6 @@ class PotatoDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
     ],
 ):
-
     __tablename__ = "PotatoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14576,7 +14002,6 @@ class VegetableDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Vegetable
     ],
 ):
-
     __tablename__ = "VegetableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14595,7 +14020,6 @@ class CarrotDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Carrot
     ],
 ):
-
     __tablename__ = "CarrotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14614,7 +14038,6 @@ class LettuceDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Lettuce
     ],
 ):
-
     __tablename__ = "LettuceDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14633,7 +14056,6 @@ class SaltDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Salt
     ],
 ):
-
     __tablename__ = "SaltDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14652,7 +14074,6 @@ class TomatoSoupDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.TomatoSoup
     ],
 ):
-
     __tablename__ = "TomatoSoupDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14671,7 +14092,6 @@ class TunaCanDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.TunaCan
     ],
 ):
-
     __tablename__ = "TunaCanDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14690,7 +14110,6 @@ class GarbageBinDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.GarbageBin
     ],
 ):
-
     __tablename__ = "GarbageBinDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14711,7 +14130,6 @@ class HandleDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Handle
     ],
 ):
-
     __tablename__ = "HandleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14730,7 +14148,6 @@ class HasAperturesDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasApertures],
 ):
-
     __tablename__ = "HasAperturesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14760,7 +14177,6 @@ class WallDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Wall
     ],
 ):
-
     __tablename__ = "WallDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14779,7 +14195,6 @@ class HasHandleDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasHandle],
 ):
-
     __tablename__ = "HasHandleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14808,7 +14223,6 @@ class HasHingeDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasHinge],
 ):
-
     __tablename__ = "HasHingeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14839,7 +14253,6 @@ class DoorDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Door
     ],
 ):
-
     __tablename__ = "DoorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14876,7 +14289,6 @@ class DoorWithTypeDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.DoorWithType
     ],
 ):
-
     __tablename__ = "DoorWithTypeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14897,7 +14309,6 @@ class HasStorageSpaceDAO(
     HasRootBodyDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasStorageSpace],
 ):
-
     __tablename__ = "HasStorageSpaceDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14927,7 +14338,6 @@ class HasSupportingSurfaceDAO(
         semantic_digital_twin.semantic_annotations.mixins.HasSupportingSurface
     ],
 ):
-
     __tablename__ = "HasSupportingSurfaceDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14961,7 +14371,6 @@ class BowlDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Bowl
     ],
 ):
-
     __tablename__ = "BowlDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -14986,7 +14395,6 @@ class CounterTopDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.CounterTop
     ],
 ):
-
     __tablename__ = "CounterTopDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15032,7 +14440,6 @@ class FloorDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Floor
     ],
 ):
-
     __tablename__ = "FloorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15053,7 +14460,6 @@ class HasCaseAsRootBodyDAO(
         semantic_digital_twin.semantic_annotations.mixins.HasCaseAsRootBody
     ],
 ):
-
     __tablename__ = "HasCaseAsRootBodyDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15074,7 +14480,6 @@ class CabinetDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Cabinet
     ],
 ):
-
     __tablename__ = "CabinetDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15128,7 +14533,6 @@ class CupboardDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Cupboard
     ],
 ):
-
     __tablename__ = "CupboardDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15154,7 +14558,6 @@ class DresserDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Dresser
     ],
 ):
-
     __tablename__ = "DresserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15186,7 +14589,6 @@ class FridgeDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Fridge
     ],
 ):
-
     __tablename__ = "FridgeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15218,7 +14620,6 @@ class WardrobeDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Wardrobe
     ],
 ):
-
     __tablename__ = "WardrobeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15250,7 +14651,6 @@ class DishwasherDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Dishwasher
     ],
 ):
-
     __tablename__ = "DishwasherDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15284,7 +14684,6 @@ class PlateDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Plate
     ],
 ):
-
     __tablename__ = "PlateDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15305,7 +14704,6 @@ class ShelfLayerDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.ShelfLayer
     ],
 ):
-
     __tablename__ = "ShelfLayerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15326,7 +14724,6 @@ class SofaDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Sofa
     ],
 ):
-
     __tablename__ = "SofaDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15372,7 +14769,6 @@ class TableDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Table
     ],
 ):
-
     __tablename__ = "TableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15418,7 +14814,6 @@ class CoffeeTableDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.CoffeeTable
     ],
 ):
-
     __tablename__ = "CoffeeTableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15437,7 +14832,6 @@ class DeskDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Desk
     ],
 ):
-
     __tablename__ = "DeskDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15456,7 +14850,6 @@ class DiningTableDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.DiningTable
     ],
 ):
-
     __tablename__ = "DiningTableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15475,7 +14868,6 @@ class SideTableDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.SideTable
     ],
 ):
-
     __tablename__ = "SideTableDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15494,7 +14886,6 @@ class HingeDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Hinge
     ],
 ):
-
     __tablename__ = "HingeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15515,7 +14906,6 @@ class HouseplantDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Houseplant
     ],
 ):
-
     __tablename__ = "HouseplantDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15536,7 +14926,6 @@ class LidDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Lid
     ],
 ):
-
     __tablename__ = "LidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15557,7 +14946,6 @@ class PanLidDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.PanLid
     ],
 ):
-
     __tablename__ = "PanLidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15576,7 +14964,6 @@ class PotLidDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.PotLid
     ],
 ):
-
     __tablename__ = "PotLidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15595,7 +14982,6 @@ class LiquidCapDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.LiquidCap
     ],
 ):
-
     __tablename__ = "LiquidCapDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15616,7 +15002,6 @@ class NaturalLanguageDescriptionDAO(
         semantic_digital_twin.semantic_annotations.natural_language.NaturalLanguageDescription
     ],
 ):
-
     __tablename__ = "NaturalLanguageDescriptionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15641,7 +15026,6 @@ class NaturalLanguageWithTypeDescriptionDAO(
         semantic_digital_twin.semantic_annotations.natural_language.NaturalLanguageWithTypeDescription
     ],
 ):
-
     __tablename__ = "NaturalLanguageWithTypeDescriptionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15666,7 +15050,6 @@ class OvenDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Oven
     ],
 ):
-
     __tablename__ = "OvenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15687,7 +15070,6 @@ class PartNetLabelDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.semantic_annotations.PartNetLabel
     ],
 ):
-
     __tablename__ = "PartNetLabelDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15708,7 +15090,6 @@ class PartNetAlarmRingDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetAlarmRing
     ],
 ):
-
     __tablename__ = "PartNetAlarmRingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15729,7 +15110,6 @@ class PartNetBallDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetBall
     ],
 ):
-
     __tablename__ = "PartNetBallDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15750,7 +15130,6 @@ class PartNetBoardDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetBoard
     ],
 ):
-
     __tablename__ = "PartNetBoardDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15771,7 +15150,6 @@ class PartNetBottleDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetBottle
     ],
 ):
-
     __tablename__ = "PartNetBottleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15792,7 +15170,6 @@ class PartNetBoxDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetBox
     ],
 ):
-
     __tablename__ = "PartNetBoxDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15813,7 +15190,6 @@ class PartNetBucketDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetBucket
     ],
 ):
-
     __tablename__ = "PartNetBucketDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15834,7 +15210,6 @@ class PartNetButtonDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetButton
     ],
 ):
-
     __tablename__ = "PartNetButtonDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15855,7 +15230,6 @@ class PartNetCameraDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetCamera
     ],
 ):
-
     __tablename__ = "PartNetCameraDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15876,7 +15250,6 @@ class PartNetCapDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetCap
     ],
 ):
-
     __tablename__ = "PartNetCapDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15897,7 +15270,6 @@ class PartNetCartDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetCart
     ],
 ):
-
     __tablename__ = "PartNetCartDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15918,7 +15290,6 @@ class PartNetCasterDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetCaster
     ],
 ):
-
     __tablename__ = "PartNetCasterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15939,7 +15310,6 @@ class PartNetChairLegDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetChairLeg
     ],
 ):
-
     __tablename__ = "PartNetChairLegDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15960,7 +15330,6 @@ class PartNetCircleDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetCircle
     ],
 ):
-
     __tablename__ = "PartNetCircleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -15981,7 +15350,6 @@ class PartNetClockDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetClock
     ],
 ):
-
     __tablename__ = "PartNetClockDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16002,7 +15370,6 @@ class PartNetCoffeeMachineDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetCoffeeMachine
     ],
 ):
-
     __tablename__ = "PartNetCoffeeMachineDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16023,7 +15390,6 @@ class PartNetConnectorDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetConnector
     ],
 ):
-
     __tablename__ = "PartNetConnectorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16044,7 +15410,6 @@ class PartNetContainerDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetContainer
     ],
 ):
-
     __tablename__ = "PartNetContainerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16065,7 +15430,6 @@ class PartNetCoverLidDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetCoverLid
     ],
 ):
-
     __tablename__ = "PartNetCoverLidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16086,7 +15450,6 @@ class PartNetDishwasherDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetDishwasher
     ],
 ):
-
     __tablename__ = "PartNetDishwasherDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16107,7 +15470,6 @@ class PartNetDispenserDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetDispenser
     ],
 ):
-
     __tablename__ = "PartNetDispenserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16128,7 +15490,6 @@ class PartNetDisplayBaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetDisplayBase
     ],
 ):
-
     __tablename__ = "PartNetDisplayBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16149,7 +15510,6 @@ class PartNetDoorDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetDoor
     ],
 ):
-
     __tablename__ = "PartNetDoorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16170,7 +15530,6 @@ class PartNetDoorFrameDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetDoorFrame
     ],
 ):
-
     __tablename__ = "PartNetDoorFrameDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16191,7 +15550,6 @@ class PartNetDrawerDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetDrawer
     ],
 ):
-
     __tablename__ = "PartNetDrawerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16212,7 +15570,6 @@ class PartNetFanFrameDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetFanFrame
     ],
 ):
-
     __tablename__ = "PartNetFanFrameDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16233,7 +15590,6 @@ class PartNetFastenerDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetFastener
     ],
 ):
-
     __tablename__ = "PartNetFastenerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16254,7 +15610,6 @@ class PartNetFastenerConnectorDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetFastenerConnector
     ],
 ):
-
     __tablename__ = "PartNetFastenerConnectorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16275,7 +15630,6 @@ class PartNetFaucetBaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetFaucetBase
     ],
 ):
-
     __tablename__ = "PartNetFaucetBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16296,7 +15650,6 @@ class PartNetFootPadDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetFootPad
     ],
 ):
-
     __tablename__ = "PartNetFootPadDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16317,7 +15670,6 @@ class PartNetFurnitureDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetFurniture
     ],
 ):
-
     __tablename__ = "PartNetFurnitureDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16338,7 +15690,6 @@ class PartNetGlassesDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetGlasses
     ],
 ):
-
     __tablename__ = "PartNetGlassesDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16359,7 +15710,6 @@ class PartNetGlobeFrameDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetGlobeFrame
     ],
 ):
-
     __tablename__ = "PartNetGlobeFrameDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16380,7 +15730,6 @@ class PartNetHandDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetHand
     ],
 ):
-
     __tablename__ = "PartNetHandDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16401,7 +15750,6 @@ class PartNetHandleDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetHandle
     ],
 ):
-
     __tablename__ = "PartNetHandleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16422,7 +15770,6 @@ class PartNetHeadDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetHead
     ],
 ):
-
     __tablename__ = "PartNetHeadDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16443,7 +15790,6 @@ class PartNetKettleDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetKettle
     ],
 ):
-
     __tablename__ = "PartNetKettleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16464,7 +15810,6 @@ class PartNetKeyDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetKey
     ],
 ):
-
     __tablename__ = "PartNetKeyDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16485,7 +15830,6 @@ class PartNetKeyboardBaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetKeyboardBase
     ],
 ):
-
     __tablename__ = "PartNetKeyboardBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16506,7 +15850,6 @@ class PartNetKnifeDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetKnife
     ],
 ):
-
     __tablename__ = "PartNetKnifeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16527,7 +15870,6 @@ class PartNetKnobDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetKnob
     ],
 ):
-
     __tablename__ = "PartNetKnobDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16548,7 +15890,6 @@ class PartNetLampBaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetLampBase
     ],
 ):
-
     __tablename__ = "PartNetLampBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16569,7 +15910,6 @@ class PartNetLaptopBaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetLaptopBase
     ],
 ):
-
     __tablename__ = "PartNetLaptopBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16590,7 +15930,6 @@ class PartNetLegDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetLeg
     ],
 ):
-
     __tablename__ = "PartNetLegDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16611,7 +15950,6 @@ class PartNetLensDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetLens
     ],
 ):
-
     __tablename__ = "PartNetLensDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16632,7 +15970,6 @@ class PartNetLeverDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetLever
     ],
 ):
-
     __tablename__ = "PartNetLeverDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16653,7 +15990,6 @@ class PartNetLidDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetLid
     ],
 ):
-
     __tablename__ = "PartNetLidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16674,7 +16010,6 @@ class PartNetLighterDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetLighter
     ],
 ):
-
     __tablename__ = "PartNetLighterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16695,7 +16030,6 @@ class PartNetLockDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetLock
     ],
 ):
-
     __tablename__ = "PartNetLockDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16716,7 +16050,6 @@ class PartNetMicrowaveDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetMicrowave
     ],
 ):
-
     __tablename__ = "PartNetMicrowaveDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16737,7 +16070,6 @@ class PartNetMouseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetMouse
     ],
 ):
-
     __tablename__ = "PartNetMouseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16758,7 +16090,6 @@ class PartNetNoseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetNose
     ],
 ):
-
     __tablename__ = "PartNetNoseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16779,7 +16110,6 @@ class PartNetOvenDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetOven
     ],
 ):
-
     __tablename__ = "PartNetOvenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16800,7 +16130,6 @@ class PartNetPenDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetPen
     ],
 ):
-
     __tablename__ = "PartNetPenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16821,7 +16150,6 @@ class PartNetPhoneBaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetPhoneBase
     ],
 ):
-
     __tablename__ = "PartNetPhoneBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16842,7 +16170,6 @@ class PartNetPortafilterDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetPortafilter
     ],
 ):
-
     __tablename__ = "PartNetPortafilterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16863,7 +16190,6 @@ class PartNetPotDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetPot
     ],
 ):
-
     __tablename__ = "PartNetPotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16884,7 +16210,6 @@ class PartNetPressingLidDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetPressingLid
     ],
 ):
-
     __tablename__ = "PartNetPressingLidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16905,7 +16230,6 @@ class PartNetPrinterDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetPrinter
     ],
 ):
-
     __tablename__ = "PartNetPrinterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16926,7 +16250,6 @@ class PartNetPumpLidDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetPumpLid
     ],
 ):
-
     __tablename__ = "PartNetPumpLidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16947,7 +16270,6 @@ class PartNetRefrigeratorDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRefrigerator
     ],
 ):
-
     __tablename__ = "PartNetRefrigeratorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16968,7 +16290,6 @@ class PartNetRemoteBaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRemoteBase
     ],
 ):
-
     __tablename__ = "PartNetRemoteBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -16989,7 +16310,6 @@ class PartNetRotationDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotation
     ],
 ):
-
     __tablename__ = "PartNetRotationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17010,7 +16330,6 @@ class PartNetRotationBarDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationBar
     ],
 ):
-
     __tablename__ = "PartNetRotationBarDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17031,7 +16350,6 @@ class PartNetRotationBladeDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationBlade
     ],
 ):
-
     __tablename__ = "PartNetRotationBladeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17052,7 +16370,6 @@ class PartNetRotationButtonDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationButton
     ],
 ):
-
     __tablename__ = "PartNetRotationButtonDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17073,7 +16390,6 @@ class PartNetRotationContainerDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationContainer
     ],
 ):
-
     __tablename__ = "PartNetRotationContainerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17094,7 +16410,6 @@ class PartNetRotationDoorDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationDoor
     ],
 ):
-
     __tablename__ = "PartNetRotationDoorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17115,7 +16430,6 @@ class PartNetRotationHandleDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationHandle
     ],
 ):
-
     __tablename__ = "PartNetRotationHandleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17136,7 +16450,6 @@ class PartNetRotationLidDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationLid
     ],
 ):
-
     __tablename__ = "PartNetRotationLidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17157,7 +16470,6 @@ class PartNetRotationScreenDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationScreen
     ],
 ):
-
     __tablename__ = "PartNetRotationScreenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17178,7 +16490,6 @@ class PartNetRotationSliderDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationSlider
     ],
 ):
-
     __tablename__ = "PartNetRotationSliderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17199,7 +16510,6 @@ class PartNetRotationTrayDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationTray
     ],
 ):
-
     __tablename__ = "PartNetRotationTrayDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17220,7 +16530,6 @@ class PartNetRotationWindowDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotationWindow
     ],
 ):
-
     __tablename__ = "PartNetRotationWindowDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17241,7 +16550,6 @@ class PartNetRotorDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetRotor
     ],
 ):
-
     __tablename__ = "PartNetRotorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17262,7 +16570,6 @@ class PartNetSafeDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSafe
     ],
 ):
-
     __tablename__ = "PartNetSafeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17283,7 +16590,6 @@ class PartNetScreenDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetScreen
     ],
 ):
-
     __tablename__ = "PartNetScreenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17304,7 +16610,6 @@ class PartNetSeatDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSeat
     ],
 ):
-
     __tablename__ = "PartNetSeatDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17325,7 +16630,6 @@ class PartNetShelfDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetShelf
     ],
 ):
-
     __tablename__ = "PartNetShelfDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17346,7 +16650,6 @@ class PartNetSliderDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSlider
     ],
 ):
-
     __tablename__ = "PartNetSliderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17367,7 +16670,6 @@ class PartNetSlotDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSlot
     ],
 ):
-
     __tablename__ = "PartNetSlotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17388,7 +16690,6 @@ class PartNetSphereDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSphere
     ],
 ):
-
     __tablename__ = "PartNetSphereDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17409,7 +16710,6 @@ class PartNetSpoutDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSpout
     ],
 ):
-
     __tablename__ = "PartNetSpoutDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17430,7 +16730,6 @@ class PartNetStaplerDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetStapler
     ],
 ):
-
     __tablename__ = "PartNetStaplerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17451,7 +16750,6 @@ class PartNetStaplerBaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetStaplerBase
     ],
 ):
-
     __tablename__ = "PartNetStaplerBaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17472,7 +16770,6 @@ class PartNetSteeringWheelDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSteeringWheel
     ],
 ):
-
     __tablename__ = "PartNetSteeringWheelDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17493,7 +16790,6 @@ class PartNetStemDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetStem
     ],
 ):
-
     __tablename__ = "PartNetStemDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17514,7 +16810,6 @@ class PartNetSuitcaseDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSuitcase
     ],
 ):
-
     __tablename__ = "PartNetSuitcaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17535,7 +16830,6 @@ class PartNetSwitchDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSwitch
     ],
 ):
-
     __tablename__ = "PartNetSwitchDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17556,7 +16850,6 @@ class PartNetSwitchFrameDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetSwitchFrame
     ],
 ):
-
     __tablename__ = "PartNetSwitchFrameDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17577,7 +16870,6 @@ class PartNetTiltLegDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTiltLeg
     ],
 ):
-
     __tablename__ = "PartNetTiltLegDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17598,7 +16890,6 @@ class PartNetToasterDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetToaster
     ],
 ):
-
     __tablename__ = "PartNetToasterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17619,7 +16910,6 @@ class PartNetToggleButtonDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetToggleButton
     ],
 ):
-
     __tablename__ = "PartNetToggleButtonDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17640,7 +16930,6 @@ class PartNetToiletDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetToilet
     ],
 ):
-
     __tablename__ = "PartNetToiletDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17661,7 +16950,6 @@ class PartNetTranslationBarDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTranslationBar
     ],
 ):
-
     __tablename__ = "PartNetTranslationBarDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17682,7 +16970,6 @@ class PartNetTranslationBladeDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTranslationBlade
     ],
 ):
-
     __tablename__ = "PartNetTranslationBladeDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17703,7 +16990,6 @@ class PartNetTranslationDoorDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTranslationDoor
     ],
 ):
-
     __tablename__ = "PartNetTranslationDoorDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17724,7 +17010,6 @@ class PartNetTranslationHandleDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTranslationHandle
     ],
 ):
-
     __tablename__ = "PartNetTranslationHandleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17745,7 +17030,6 @@ class PartNetTranslationLidDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTranslationLid
     ],
 ):
-
     __tablename__ = "PartNetTranslationLidDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17766,7 +17050,6 @@ class PartNetTranslationScreenDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTranslationScreen
     ],
 ):
-
     __tablename__ = "PartNetTranslationScreenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17787,7 +17070,6 @@ class PartNetTranslationTrayDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTranslationTray
     ],
 ):
-
     __tablename__ = "PartNetTranslationTrayDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17808,7 +17090,6 @@ class PartNetTranslationWindowDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTranslationWindow
     ],
 ):
-
     __tablename__ = "PartNetTranslationWindowDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17829,7 +17110,6 @@ class PartNetTrashcanDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetTrashcan
     ],
 ):
-
     __tablename__ = "PartNetTrashcanDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17850,7 +17130,6 @@ class PartNetUsbDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetUsb
     ],
 ):
-
     __tablename__ = "PartNetUsbDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17871,7 +17150,6 @@ class PartNetUsbRotationDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetUsbRotation
     ],
 ):
-
     __tablename__ = "PartNetUsbRotationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17892,7 +17170,6 @@ class PartNetWashingMachineDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetWashingMachine
     ],
 ):
-
     __tablename__ = "PartNetWashingMachineDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17913,7 +17190,6 @@ class PartNetWheelDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetWheel
     ],
 ):
-
     __tablename__ = "PartNetWheelDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17934,7 +17210,6 @@ class PartNetWindowFrameDAO(
         semantic_digital_twin.adapters.partnet_mobility_dataset.generated_semantic_annotations.PartNetWindowFrame
     ],
 ):
-
     __tablename__ = "PartNetWindowFrameDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17955,7 +17230,6 @@ class PenDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Pen
     ],
 ):
-
     __tablename__ = "PenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17976,7 +17250,6 @@ class PencilDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Pencil
     ],
 ):
-
     __tablename__ = "PencilDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -17997,7 +17270,6 @@ class ProcthorBoxDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.ProcthorBox
     ],
 ):
-
     __tablename__ = "ProcthorBoxDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18018,7 +17290,6 @@ class SaltContainerDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.SaltContainer
     ],
 ):
-
     __tablename__ = "SaltContainerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18043,7 +17314,6 @@ class SaltPepperShakerDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.SaltPepperShaker
     ],
 ):
-
     __tablename__ = "SaltPepperShakerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18064,7 +17334,6 @@ class SemanticEnvironmentAnnotationDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.SemanticEnvironmentAnnotation
     ],
 ):
-
     __tablename__ = "SemanticEnvironmentAnnotationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18085,7 +17354,6 @@ class SinkDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Sink
     ],
 ):
-
     __tablename__ = "SinkDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18106,7 +17374,6 @@ class SliderDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Slider
     ],
 ):
-
     __tablename__ = "SliderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18127,7 +17394,6 @@ class SprayBottleDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.SprayBottle
     ],
 ):
-
     __tablename__ = "SprayBottleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18148,7 +17414,6 @@ class StatueDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Statue
     ],
 ):
-
     __tablename__ = "StatueDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18169,7 +17434,6 @@ class TrashCanDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.TrashCan
     ],
 ):
-
     __tablename__ = "TrashCanDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18190,7 +17454,6 @@ class VaseDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Vase
     ],
 ):
-
     __tablename__ = "VaseDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18211,7 +17474,6 @@ class WallPanelDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.WallPanel
     ],
 ):
-
     __tablename__ = "WallPanelDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18230,7 +17492,6 @@ class HasRootRegionDAO(
     HasRootKinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasRootRegion],
 ):
-
     __tablename__ = "HasRootRegionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18252,7 +17513,6 @@ class ApertureDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Aperture
     ],
 ):
-
     __tablename__ = "ApertureDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18273,7 +17533,6 @@ class EntryWayDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.EntryWay
     ],
 ):
-
     __tablename__ = "EntryWayDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18290,7 +17549,6 @@ class HasSliderDAO(
     HasRootKinematicStructureEntityDAO,
     DataAccessObject[semantic_digital_twin.semantic_annotations.mixins.HasSlider],
 ):
-
     __tablename__ = "HasSliderDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18322,7 +17580,6 @@ class DrawerDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Drawer
     ],
 ):
-
     __tablename__ = "DrawerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18384,7 +17641,6 @@ class RoomDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Room
     ],
 ):
-
     __tablename__ = "RoomDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18415,7 +17671,6 @@ class BathroomDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Bathroom
     ],
 ):
-
     __tablename__ = "BathroomDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18434,7 +17689,6 @@ class BedroomDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Bedroom
     ],
 ):
-
     __tablename__ = "BedroomDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18453,7 +17707,6 @@ class KitchenDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.Kitchen
     ],
 ):
-
     __tablename__ = "KitchenDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18472,7 +17725,6 @@ class LivingRoomDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.LivingRoom
     ],
 ):
-
     __tablename__ = "LivingRoomDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18491,7 +17743,6 @@ class RoomWithWallsAndDoorsDAO(
         semantic_digital_twin.semantic_annotations.semantic_annotations.RoomWithWallsAndDoors
     ],
 ):
-
     __tablename__ = "RoomWithWallsAndDoorsDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18528,7 +17779,6 @@ class RoomWithWallsAndDoorsDAO(
 class WorldModelManagerDAO(
     Base, DataAccessObject[semantic_digital_twin.world.WorldModelManager]
 ):
-
     __tablename__ = "WorldModelManagerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18553,7 +17803,6 @@ class WorldModelModificationBlockDAO(
         semantic_digital_twin.world_description.world_modification.WorldModelModificationBlock
     ],
 ):
-
     __tablename__ = "WorldModelModificationBlockDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18574,7 +17823,6 @@ class WorldModelSnapshotDAO(
     Base,
     DataAccessObject[semantic_digital_twin.adapters.ros.messages.WorldModelSnapshot],
 ):
-
     __tablename__ = "WorldModelSnapshotDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18604,7 +17852,6 @@ class WorldModificationDAO(
         semantic_digital_twin.world_description.world_modification.WorldModification
     ],
 ):
-
     __tablename__ = "WorldModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18627,7 +17874,6 @@ class AddSemanticAnnotationModificationDAO(
         semantic_digital_twin.world_description.world_modification.AddSemanticAnnotationModification
     ],
 ):
-
     __tablename__ = "AddSemanticAnnotationModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18656,7 +17902,6 @@ class AttributeUpdateModificationDAO(
         semantic_digital_twin.world_description.world_modification.AttributeUpdateModification
     ],
 ):
-
     __tablename__ = "AttributeUpdateModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18684,7 +17929,6 @@ class RemoveActuatorModificationDAO(
         semantic_digital_twin.world_description.world_modification.RemoveActuatorModification
     ],
 ):
-
     __tablename__ = "RemoveActuatorModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18709,7 +17953,6 @@ class RemoveConnectionModificationDAO(
         semantic_digital_twin.world_description.world_modification.RemoveConnectionModification
     ],
 ):
-
     __tablename__ = "RemoveConnectionModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18737,7 +17980,6 @@ class RemoveDegreeOfFreedomModificationDAO(
         semantic_digital_twin.world_description.world_modification.RemoveDegreeOfFreedomModification
     ],
 ):
-
     __tablename__ = "RemoveDegreeOfFreedomModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18762,7 +18004,6 @@ class RemoveKinematicStructureEntityModificationDAO(
         semantic_digital_twin.world_description.world_modification.RemoveKinematicStructureEntityModification
     ],
 ):
-
     __tablename__ = "RemoveKinematicStructureEntityModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18787,7 +18028,6 @@ class RemoveSemanticAnnotationModificationDAO(
         semantic_digital_twin.world_description.world_modification.RemoveSemanticAnnotationModification
     ],
 ):
-
     __tablename__ = "RemoveSemanticAnnotationModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18812,7 +18052,6 @@ class SetDofHasHardwareInterfaceDAO(
         semantic_digital_twin.world_description.world_modification.SetDofHasHardwareInterface
     ],
 ):
-
     __tablename__ = "SetDofHasHardwareInterfaceDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18839,7 +18078,6 @@ class WorldModificationWithWorldEntityReferenceDAO(
         semantic_digital_twin.world_description.world_modification.WorldModificationWithWorldEntityReference
     ],
 ):
-
     __tablename__ = "WorldModificationWithWorldEntityReferenceDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18860,7 +18098,6 @@ class AddActuatorModificationDAO(
         semantic_digital_twin.world_description.world_modification.AddActuatorModification
     ],
 ):
-
     __tablename__ = "AddActuatorModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18896,7 +18133,6 @@ class AddConnectionModificationDAO(
         semantic_digital_twin.world_description.world_modification.AddConnectionModification
     ],
 ):
-
     __tablename__ = "AddConnectionModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18935,7 +18171,6 @@ class AddDegreeOfFreedomModificationDAO(
         semantic_digital_twin.world_description.world_modification.AddDegreeOfFreedomModification
     ],
 ):
-
     __tablename__ = "AddDegreeOfFreedomModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -18974,7 +18209,6 @@ class AddKinematicStructureEntityModificationDAO(
         semantic_digital_twin.world_description.world_modification.AddKinematicStructureEntityModification
     ],
 ):
-
     __tablename__ = "AddKinematicStructureEntityModificationDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19012,7 +18246,6 @@ class AddKinematicStructureEntityModificationDAO(
 class WorldReasonerDAO(
     Base, DataAccessObject[semantic_digital_twin.reasoning.world_reasoner.WorldReasoner]
 ):
-
     __tablename__ = "WorldReasonerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19033,7 +18266,6 @@ class WorldReasonerDAO(
 class WorldStateMappingDAO(
     Base, DataAccessObject[semantic_digital_twin.orm.model.WorldStateMapping]
 ):
-
     __tablename__ = "WorldStateMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19054,7 +18286,6 @@ class WorldStateEntryViewDAO(
         semantic_digital_twin.world_description.world_state.WorldStateEntryView
     ],
 ):
-
     __tablename__ = "WorldStateEntryViewDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19068,7 +18299,6 @@ class WorldStateTrajectoryDAO(
         semantic_digital_twin.world_description.world_state.WorldStateTrajectory
     ],
 ):
-
     __tablename__ = "WorldStateTrajectoryDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19092,7 +18322,6 @@ class WorldStateTrajectoryPlotterDAO(
         semantic_digital_twin.world_description.world_state_trajectory_plotter.WorldStateTrajectoryPlotter
     ],
 ):
-
     __tablename__ = "WorldStateTrajectoryPlotterDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19119,7 +18348,6 @@ class WorldStateUpdateDAO(
     MessageDAO,
     DataAccessObject[semantic_digital_twin.adapters.ros.messages.WorldStateUpdate],
 ):
-
     __tablename__ = "WorldStateUpdateDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19145,7 +18373,6 @@ class WorldStateViewDAO(
         semantic_digital_twin.world_description.world_state.WorldStateView
     ],
 ):
-
     __tablename__ = "WorldStateViewDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19159,7 +18386,6 @@ class WorldSynchronizerDAO(
         semantic_digital_twin.adapters.ros.world_synchronizer.WorldSynchronizer
     ],
 ):
-
     __tablename__ = "WorldSynchronizerDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19181,7 +18407,6 @@ class WorldUpdateDAO(
     MessageDAO,
     DataAccessObject[semantic_digital_twin.adapters.ros.messages.WorldUpdate],
 ):
-
     __tablename__ = "WorldUpdateDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19321,7 +18546,6 @@ class WrongWorldModelVersionDAO(
     LogicalErrorDAO,
     DataAccessObject[semantic_digital_twin.exceptions.WrongWorldModelVersion],
 ):
-
     __tablename__ = "WrongWorldModelVersionDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19342,7 +18566,6 @@ class WrongWorldModelVersionDAO(
 class XYZParserDAO(
     MeshParserDAO, DataAccessObject[semantic_digital_twin.adapters.mesh.XYZParser]
 ):
-
     __tablename__ = "XYZParserDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19361,7 +18584,6 @@ class _MultiSimStateCallbackDAO(
     StateChangeCallbackDAO,
     DataAccessObject[semantic_digital_twin.adapters.multi_sim._MultiSimStateCallback],
 ):
-
     __tablename__ = "_MultiSimStateCallbackDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
@@ -19395,7 +18617,6 @@ class FunctionMappingDAO(
         krrood.ormatic.data_access_objects.alternative_mappings.FunctionMapping
     ],
 ):
-
     __tablename__ = "FunctionMappingDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(

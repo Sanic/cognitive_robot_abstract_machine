@@ -278,12 +278,14 @@ class ORMatic:
 
         # import classes from the existing interface
         for ormatic_interface in ormatic_interface_dependencies:
-            classes, alternative_mappings, type_mappings = (
-                get_classes_of_ormatic_interface(ormatic_interface)
-            )
-            all_classes |= set(classes)
-            all_alternative_mappings |= set(alternative_mappings)
-            all_type_mappings.update(type_mappings)
+            (
+                interface_classes,
+                interface_alternative_mappings,
+                interface_type_mappings,
+            ) = get_classes_of_ormatic_interface(ormatic_interface)
+            all_classes |= set(interface_classes)
+            all_alternative_mappings |= set(interface_alternative_mappings)
+            all_type_mappings.update(interface_type_mappings)
 
         for package in packages:
             all_classes |= set(classes_of_package(package))
@@ -293,8 +295,8 @@ class ORMatic:
         all_alternative_mappings |= set(
             am
             for am in recursive_subclasses(AlternativeMapping)
-            if ignore_krrood_test_classes
-            and "krrood_test" not in am.original_class().__module__
+            if not ignore_krrood_test_classes
+            or "krrood_test" not in am.original_class().__module__
         )
 
         # keep only dataclasses that are not AlternativeMapping or DataAccessObject subclasses
