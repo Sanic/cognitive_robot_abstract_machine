@@ -50,7 +50,7 @@ Pass a shared {py:class}`~krrood.entity_query_language.verbalization.context.Ver
 ```{mermaid}
 graph LR
     A[EQL Expression] --> B[fold + realisation passes]
-    B -- realised VerbFragment tree --> C[FragmentRenderer]
+    B -- realised Fragment tree --> C[FragmentRenderer]
     C -- formatted string --> D[Output]
     E[grammar RULES / select] -. dispatch .-> B
     F[VerbalizationContext] -. services .-> B
@@ -62,7 +62,7 @@ graph LR
 
 {py:class}`~krrood.entity_query_language.verbalization.verbalizer.EQLVerbalizer` is the internal fragment builder behind the pipeline (use it directly only when you want the fragment tree itself, e.g. in tests).  `build(expression, context)`:
 
-1. **Folds** the EQL tree into a {py:class}`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment` tree via the grammar (see [Rule dispatch](#rule-dispatch-the-fold)).
+1. **Folds** the EQL tree into a {py:class}`~krrood.entity_query_language.verbalization.fragments.base.Fragment` tree via the grammar (see [Rule dispatch](#rule-dispatch-the-fold)).
 2. Runs the ordered **realisation passes** ({py:func}`~krrood.entity_query_language.verbalization.rendering.realization.realize_tree`): coreference → determiner → morphology → orthography (see [Realisation passes](#realisation-passes)).
 
 It never produces strings — formatting is Layer 2/3.
@@ -90,11 +90,11 @@ It never produces strings — formatting is Layer 2/3.
 
 ## Fragment Type Hierarchy
 
-All verbalization output is expressed as a tree of `VerbFragment` subclasses.  There are **leaf** nodes (text), **structural** containers (hold children), and two **coreference markers** the realisation passes consume and strip.
+All verbalization output is expressed as a tree of `Fragment` subclasses.  There are **leaf** nodes (text), **structural** containers (hold children), and two **coreference markers** the realisation passes consume and strip.
 
 ```{mermaid}
 classDiagram
-    class VerbFragment {
+    class Fragment {
         <<abstract>>
     }
     class WordFragment {
@@ -118,13 +118,13 @@ classDiagram
     class PossessiveChain {
         a chain whose its/of form coreference decides (stripped after coreference)
     }
-    VerbFragment <|-- WordFragment
-    VerbFragment <|-- RoleFragment
-    VerbFragment <|-- PhraseFragment
-    VerbFragment <|-- NounPhrase
-    VerbFragment <|-- BlockFragment
-    VerbFragment <|-- SubjectScope
-    VerbFragment <|-- PossessiveChain
+    Fragment <|-- WordFragment
+    Fragment <|-- RoleFragment
+    Fragment <|-- PhraseFragment
+    Fragment <|-- NounPhrase
+    Fragment <|-- BlockFragment
+    Fragment <|-- SubjectScope
+    Fragment <|-- PossessiveChain
 ```
 
 `NounPhrase` is a *spec*, not a lowered phrase: rules emit it with grammatical features (`Definiteness`, `Number`) but **no** determiner; the [determiner pass](#realisation-passes) lowers it to a `PhraseFragment`.  The two recursion helpers over this tree are {py:func}`~krrood.entity_query_language.verbalization.fragments.base.fold_fragment` (a catamorphism to any value — used by the renderer/flatten) and {py:func}`~krrood.entity_query_language.verbalization.fragments.base.map_structural_children` (a structure-preserving rebuild — used by the realisation passes).
@@ -218,7 +218,7 @@ class BetweenRule(PhraseRule):
     construct = Between
     name = "between"
 
-    def build(self, node, ctx: Ctx) -> VerbFragment:
+    def build(self, node, ctx: Ctx) -> Fragment:
         return PhraseFragment(
             parts=[
                 ctx.child(node.left),                       # recurse via the fold
@@ -347,7 +347,7 @@ deferred = ctx.scope.pop_constraint_frame()
 
 ### Binding overrides (BindingScope)
 
-`ctx.scope.binding_overrides` maps `expression._id_` → `VerbFragment`.  `fold` checks it before dispatch, so when a bound variable appears again as a WHERE value it reuses the *"the field of the Type"* fragment instead of re-verbalizing the raw variable.
+`ctx.scope.binding_overrides` maps `expression._id_` → `Fragment`.  `fold` checks it before dispatch, so when a bound variable appears again as a WHERE value it reuses the *"the field of the Type"* fragment instead of re-verbalizing the raw variable.
 
 ---
 
@@ -385,7 +385,7 @@ The resolver is passed to the renderer at construction (via the `VerbalizationPi
 | Area | Modules |
 |---|---|
 | Engine | `engine.py` (`fold`, `UnverbalizableExpressionError`), `verbalizer.py` (`EQLVerbalizer`), `pipeline.py` (`VerbalizationPipeline`, `verbalize_expression`), `context.py` |
-| Fragment IR | `fragments/base.py` (the `VerbFragment` hierarchy + `fold_fragment` / `map_structural_children` / `oxford_and`), `fragments/features.py`, `fragments/roles.py`, `fragments/source_ref.py` |
+| Fragment IR | `fragments/base.py` (the `Fragment` hierarchy + `fold_fragment` / `map_structural_children` / `oxford_and`), `fragments/features.py`, `fragments/roles.py`, `fragments/source_ref.py` |
 | Lexicon | `vocabulary/english.py`, `vocabulary/words.py` — **all** English words/phrases/punctuation |
 | Grammar | `grammar/english.py` (one `PhraseRule` per construct + auto-discovered `RULES`), `grammar/phrase_rule.py` (`PhraseRule`, `Ctx`, `select`), `grammar/selection.py`, `grammar/restriction.py`, `grammar/aggregation_kinds.py` |
 | Assembly | `grammar/assembly/` — `base.Assembler`, `query`, `chains`, `clauses`, `restrictions`, `aggregation_value`, `instantiated`, `inference` |
@@ -460,7 +460,7 @@ text = VerbalizationPipeline(ParagraphRenderer(MarkdownFormatter())).verbalize(q
 
 ### Fragment hierarchy
 
-- {py:class}`~krrood.entity_query_language.verbalization.fragments.base.VerbFragment` / `WordFragment` / `RoleFragment` / `PhraseFragment` / `NounPhrase` / `BlockFragment` / `SubjectScope` / `PossessiveChain`
+- {py:class}`~krrood.entity_query_language.verbalization.fragments.base.Fragment` / `WordFragment` / `RoleFragment` / `PhraseFragment` / `NounPhrase` / `BlockFragment` / `SubjectScope` / `PossessiveChain`
 - {py:func}`~krrood.entity_query_language.verbalization.fragments.base.fold_fragment` / {py:func}`~krrood.entity_query_language.verbalization.fragments.base.map_structural_children` / {py:func}`~krrood.entity_query_language.verbalization.fragments.base.oxford_and`
 - {py:class}`~krrood.entity_query_language.verbalization.fragments.roles.SemanticRole` / {py:func}`~krrood.entity_query_language.verbalization.fragments.roles.role_for` / {py:class}`~krrood.entity_query_language.verbalization.fragments.source_ref.SourceRef`
 
