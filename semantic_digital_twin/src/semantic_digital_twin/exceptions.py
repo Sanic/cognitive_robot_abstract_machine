@@ -57,6 +57,9 @@ class NoJointStateWithType(DataclassException):
     def error_message(self) -> str:
         return f"There is no JointState with the type: {self.joint_state}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UnknownWorldModification(DataclassException):
@@ -69,9 +72,11 @@ class UnknownWorldModification(DataclassException):
 
     def error_message(self) -> str:
         call_name = getattr(self.call, "__name__", repr(self.call))
+        return f"No WorldModification subclass is registered for the call '{call_name}' with kwargs {self.kwargs}."
+
+    def suggest_correction(self) -> str:
         return (
-            f"No WorldModification subclass is registered for the call '{call_name}' with kwargs {self.kwargs}. "
-            "Make sure that world modifications are atomic and that every atomic modification is "
+            "make sure that world modifications are atomic and that every atomic modification is "
             "represented by exactly one subclass of WorldModelModification. "
             "This module might be incomplete, you can help by expanding it."
         )
@@ -99,9 +104,13 @@ class MismatchingIDsInWorldModification(DataclassException):
         return (
             f"The world modification of type {self.modification_type.__name__} was initialized with the following UUIDs: {self.original_uuids}. "
             f"But during the application of those modifications, the UUIDs were {self.actual_uuids}. "
-            f"Somehow the original UUIDs were overridden, which should not happen unless a user deliberately does so. "
-            f"If you are sure you did not do so, this may be an internal error in semantic_digital_twin. In that case, please"
-            f" open a bug report with a script reproducing the error."
+            f"Somehow the original UUIDs were overridden, which should not happen unless a user deliberately does so."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "if you are sure you did not override the UUIDs yourself, this may be an internal error in "
+            "semantic_digital_twin. In that case, please open a bug report with a script reproducing the error."
         )
 
 
@@ -131,6 +140,9 @@ class NegativeConnectionVelocity(DataclassException):
     def error_message(self) -> str:
         return f"Velocity limit must be non-negative, got {self.velocity} for joint {self.connection_name}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class DofNotInWorldStateError(DataclassException, KeyError):
@@ -141,10 +153,13 @@ class DofNotInWorldStateError(DataclassException, KeyError):
     dof_id: UUID
 
     def error_message(self) -> str:
+        return f"Degree of freedom {self.dof_id} not found in world state."
+
+    def suggest_correction(self) -> str:
         return (
-            f"Degree of freedom {self.dof_id} not found in world state. "
-            f"Did you possibly try to merge states of two different world models?"
-            f"States of two different worlds can only be merged iif other._world.degrees_of_freedom is a subset of self._world.degrees_of_freedom"
+            "did you possibly try to merge states of two different world models? "
+            "States of two different worlds can only be merged if other._world.degrees_of_freedom "
+            "is a subset of self._world.degrees_of_freedom."
         )
 
 
@@ -161,6 +176,9 @@ class IncorrectWorldStateValueShapeError(DataclassException, ValueError):
             f"Value for '{self.dof_id}' must be length-4 array (pos, vel, acc, jerk)."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class WrongWorldModelVersion(LogicalError):
@@ -175,9 +193,11 @@ class WrongWorldModelVersion(LogicalError):
         return (
             f"Expected world model version {self.expected_version}, but got {self.actual_version}. "
             f"The model version increments with every structural change (adding/removing bodies, "
-            f"connections or degrees of freedom), so the world model changed since this object was created. "
-            f"Recreate whatever was derived from the old world model."
+            f"connections or degrees of freedom), so the world model changed since this object was created."
         )
+
+    def suggest_correction(self) -> str:
+        return "recreate whatever was derived from the old world model."
 
 
 @dataclass
@@ -192,6 +212,9 @@ class NonMonotonicTimeError(LogicalError):
     def error_message(self) -> str:
         return f"Time must be strictly increasing. Last time: {self.last_time}, attempted time: {self.attempted_time}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class MismatchingCommandLengthError(DataclassException, ValueError):
@@ -204,6 +227,9 @@ class MismatchingCommandLengthError(DataclassException, ValueError):
 
     def error_message(self) -> str:
         return f"Commands length {self.actual_length} does not match number of free variables {self.expected_length}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -237,6 +263,9 @@ class WorldIsNotATreeError(WorldValidationError):
             f"structure entities but {len(self.world.connections)} connections."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class BrokenWorldModificationHistoryError(WorldValidationError):
@@ -256,6 +285,9 @@ class BrokenWorldModificationHistoryError(WorldValidationError):
             f" Potential cause: {self.potential_cause}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
@@ -272,8 +304,10 @@ class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
         return (
             "self.degrees_of_freedom does not match the actual dofs used in connections. The orphaned degrees of freedom are: "
             f"{set(self.world.degrees_of_freedom) - self.actual_dofs}"
-            " Did you forget to call self.delete_orphaned_dofs()?"
         )
+
+    def suggest_correction(self) -> str:
+        return "did you forget to call self.delete_orphaned_dofs()?"
 
 
 @dataclass
@@ -295,6 +329,9 @@ class InvalidConnectionLimits(UsageError):
     def error_message(self) -> str:
         return f"Lower limit for {self.name} must be less than upper limit. Given limits: {self.limits}."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class MimicDofLimitOverwriteError(UsageError):
@@ -310,9 +347,11 @@ class MimicDofLimitOverwriteError(UsageError):
     def error_message(self) -> str:
         return (
             f"Cannot overwrite limits of the mimic DOF '{self.dof_name}'. "
-            f"Mimic DOF limits are derived from the DOF they mimic; "
-            f"use .raw_dof._overwrite_dof_limits instead."
+            f"Mimic DOF limits are derived from the DOF they mimic."
         )
+
+    def suggest_correction(self) -> str:
+        return "use .raw_dof._overwrite_dof_limits instead."
 
 
 @dataclass
@@ -335,8 +374,13 @@ class MismatchingWorld(UsageError):
         return (
             f"The two entities have mismatching worlds: expected world '{self.expected_world.name}', "
             f"given world '{self.given_world.name}'. Entities can only reference each other when they belong to "
-            f"the same world. Bring everything into one world first, e.g. with "
-            f"world.merge_world(other_world) or world.merge_world_at_pose(other_world, pose)."
+            f"the same world."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "bring everything into one world first, e.g. with "
+            "world.merge_world(other_world) or world.merge_world_at_pose(other_world, pose)."
         )
 
 
@@ -353,6 +397,9 @@ class SemanticAnnotationCircularDependencyError(UsageError):
 
     def error_message(self) -> str:
         return f"The following semantic annotations have circular dependencies: {self.semantic_annotations}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -377,6 +424,9 @@ class MissingSemanticAnnotationError(UsageError):
             f" by {self.semantic_annotation_class.__name__}, but is missing."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class InvalidPlaneDimensions(UsageError):
@@ -397,6 +447,9 @@ class InvalidPlaneDimensions(UsageError):
     def error_message(self) -> str:
         return f"The Dimensions {self.scale} are invalid for the class {self.clazz.__name__}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UselessConceptError(UsageError):
@@ -413,6 +466,9 @@ class UselessConceptError(UsageError):
     def error_message(self) -> str:
         return self.reason
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class InvalidHingeActiveAxis(UsageError):
@@ -426,10 +482,10 @@ class InvalidHingeActiveAxis(UsageError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"Axis {self.axis} provided when trying to calculate the hinge position is invalid. "
-            f"If you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle"
-        )
+        return f"Axis {self.axis} provided when trying to calculate the hinge position is invalid."
+
+    def suggest_correction(self) -> str:
+        return "if you think this is incorrect, consider extending Door.calculate_world_T_hinge_based_on_handle."
 
 
 @dataclass
@@ -439,22 +495,31 @@ class SemanticAnnotationNotInWorldError(UsageError):
     def error_message(self) -> str:
         return (
             f"Semantic annotation {self.semantic_annotation} does not belong to a world, "
-            f"but this operation requires one. Add it first via world.add_semantic_annotation(annotation)."
+            f"but this operation requires one."
         )
+
+    def suggest_correction(self) -> str:
+        return "add it first via world.add_semantic_annotation(annotation)."
 
 
 @dataclass
 class MissingWorldModificationContextError(UsageError):
     function: Callable
 
-    def error_message(self) -> str:
+    def _public_function_name(self) -> str:
         # Strip leading underscores so the hint shows the public method, not the internal one it delegates to.
-        function_name = getattr(self.function, "__name__", repr(self.function)).lstrip(
-            "_"
-        )
+        return getattr(self.function, "__name__", repr(self.function)).lstrip("_")
+
+    def error_message(self) -> str:
         return (
-            f"'{function_name}' modifies the world model and must be called inside a world modification context. "
-            f"Wrap the call like this:\n"
+            f"'{self._public_function_name()}' modifies the world model and must be called inside "
+            f"a world modification context."
+        )
+
+    def suggest_correction(self) -> str:
+        function_name = self._public_function_name()
+        return (
+            f"wrap the call like this:\n"
             f"    with world.modify_world():\n"
             f"        world.{function_name}(...)"
         )
@@ -478,9 +543,11 @@ class MismatchingPublishChangesAttribute(UsageError):
     def error_message(self) -> str:
         return (
             f"Cannot enter context with publish_changes={self.proposed_publish_changes} when the currently active "
-            f"modification context has publish_changes={self.active_publish_changes}. "
-            f"Make sure to not nest contexts with different publish_changes states."
+            f"modification context has publish_changes={self.active_publish_changes}."
         )
+
+    def suggest_correction(self) -> str:
+        return "make sure to not nest contexts with different publish_changes states."
 
 
 @dataclass
@@ -493,6 +560,9 @@ class MissingPublishChangesKWARG(UsageError):
             f"If you see this exception you probably notified a synchronizer without setting publish_changes, "
             f"which will cause hard to debug issues."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -516,6 +586,9 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
             "This means the world model and state are severely out of sync."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
@@ -526,10 +599,10 @@ class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
     """
 
     def error_message(self) -> str:
-        return (
-            "apply_missed_messages must not be called while a modify_world context is active on the synchronizer's world. "
-            "Call apply_missed_messages after the modify_world context has exited."
-        )
+        return "apply_missed_messages must not be called while a modify_world context is active on the synchronizer's world."
+
+    def suggest_correction(self) -> str:
+        return "call apply_missed_messages after the modify_world context has exited."
 
 
 @dataclass
@@ -538,11 +611,13 @@ class DuplicateWorldEntityError(UsageError):
 
     def error_message(self) -> str:
         names = [str(world_entity.name) for world_entity in self.world_entities]
+        return f"Multiple world entities match: {names}, but the result must be unique."
+
+    def suggest_correction(self) -> str:
         return (
-            f"Multiple world entities match: {names}, but the result must be unique. "
-            f"If this came from a lookup with a plain string name, disambiguate by passing a "
-            f"PrefixedName with the desired prefix, or use the plural get_..._by_name variant "
-            f"to retrieve all matches."
+            "if this came from a lookup with a plain string name, disambiguate by passing a "
+            "PrefixedName with the desired prefix, or use the plural get_..._by_name variant "
+            "to retrieve all matches."
         )
 
 
@@ -567,6 +642,9 @@ class DuplicateRobotAssignmentsError(UsageError):
             f"Robot part {self.robot_part} is assigned to multiple robots: {self.robots}."
             f" Each robot part should be assigned to at most one robot."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -593,6 +671,9 @@ class InsufficientVectorsError(SpatialTypesError):
             f"Z Vector was: {self.z}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class ReferenceFrameMismatchError(SpatialTypesError):
@@ -615,9 +696,13 @@ class ReferenceFrameMismatchError(SpatialTypesError):
         checked_value = self.context or "the given value"
         return (
             f"Expected {checked_value} to be expressed in frame '{self.expected_frame.name}', "
-            f"but it is expressed in frame '{self.actual_frame.name}'. "
-            f"Transform it into the expected frame first, e.g. via "
-            f"world.transform(value, target_frame), or construct it with the expected frame."
+            f"but it is expressed in frame '{self.actual_frame.name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "transform it into the expected frame first, e.g. via "
+            "world.transform(value, target_frame), or construct it with the expected frame."
         )
 
 
@@ -634,10 +719,10 @@ class MissingReferenceFrameError(SpatialTypesError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"Spatial type {self.spatial_type} has no reference frame, but this operation requires one. "
-            f"Construct it with an explicit frame, e.g. Point3(x, y, z, reference_frame=some_body)."
-        )
+        return f"Spatial type {self.spatial_type} has no reference frame, but this operation requires one."
+
+    def suggest_correction(self) -> str:
+        return "construct it with an explicit frame, e.g. Point3(x, y, z, reference_frame=some_body)."
 
 
 @dataclass
@@ -650,6 +735,9 @@ class ParsingError(DataclassException, Exception):
 
     def error_message(self) -> str:
         return f"Error parsing file {self.file_path}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -674,6 +762,9 @@ class PackageResolutionError(ParsingError):
             message += f" Details: {self.details}"
         return message
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class PathResolutionError(ParsingError):
@@ -697,6 +788,9 @@ class PathResolutionError(ParsingError):
             message += f" Details: {self.details}"
         return message
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class WorldEntityNotFoundError(UsageError):
@@ -709,14 +803,16 @@ class WorldEntityNotFoundError(UsageError):
 
     def error_message(self) -> str:
         if isinstance(self.name_or_hash, (str, PrefixedName)):
-            message = f"No world entity with name '{self.name_or_hash}' found."
-            if self.suggestions:
-                formatted_suggestions = ", ".join(
-                    f"'{suggestion}'" for suggestion in self.suggestions
-                )
-                message += f" Did you mean: {formatted_suggestions}?"
-            return message
+            return f"No world entity with name '{self.name_or_hash}' found."
         return f"No world entity with hash {self.name_or_hash} found."
+
+    def suggest_correction(self) -> str:
+        if not self.suggestions:
+            return ""
+        formatted_suggestions = ", ".join(
+            f"'{suggestion}'" for suggestion in self.suggestions
+        )
+        return f"did you mean: {formatted_suggestions}?"
 
 
 @dataclass
@@ -733,6 +829,9 @@ class MissingDefaultCameraError(UsageError):
     def error_message(self) -> str:
         return f"Robot {self.robot.name} does not have a default camera."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class MissingWorldError(UsageError):
@@ -741,10 +840,10 @@ class MissingWorldError(UsageError):
     """
 
     def error_message(self) -> str:
-        return (
-            "A world is required for this operation, but None was found. "
-            "Make sure the involved entities have been added to a world before calling this."
-        )
+        return "A world is required for this operation, but None was found."
+
+    def suggest_correction(self) -> str:
+        return "make sure the involved entities have been added to a world before calling this."
 
 
 @dataclass
@@ -753,6 +852,9 @@ class WorldEntityWithIDNotFoundError(WorldEntityNotFoundError):
 
     def error_message(self) -> str:
         return f"WorldEntity with id {self.name_or_hash} not found"
+
+    def suggest_correction(self) -> str:
+        return ""
 
     @property
     def id(self) -> UUID:
@@ -767,9 +869,11 @@ class AlreadyBelongsToAWorldError(UsageError):
     def error_message(self) -> str:
         return (
             f"Cannot add this {self.type_trying_to_add.__name__} because it already belongs to the world "
-            f"'{self.world.name}'. A world entity can belong to at most one world. "
-            f"To combine two worlds, use world.merge_world(other_world); to reuse an entity, create a fresh copy."
+            f"'{self.world.name}'. A world entity can belong to at most one world."
         )
+
+    def suggest_correction(self) -> str:
+        return "to combine two worlds, use world.merge_world(other_world); to reuse an entity, create a fresh copy."
 
 
 @dataclass
@@ -784,11 +888,13 @@ class DoesNotBelongToAWorldError(UsageError):
     """
 
     def error_message(self) -> str:
+        return f"WorldEntity '{self.world_entity.name}' does not belong to a world, but this operation requires one."
+
+    def suggest_correction(self) -> str:
         return (
-            f"WorldEntity '{self.world_entity.name}' does not belong to a world, but this operation requires one. "
-            f"Add it to a world first, e.g.:\n"
-            f"    with world.modify_world():\n"
-            f"        world.add_kinematic_structure_entity(entity)"
+            "add it to a world first, e.g.:\n"
+            "    with world.modify_world():\n"
+            "        world.add_kinematic_structure_entity(entity)"
         )
 
 
@@ -805,6 +911,9 @@ class SpatialTypeNotJsonSerializable(NotJsonSerializable):
             f"free variables: {self.spatial_object.free_variables()}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class WorldEntityWithIDNotInKwargs(JSONSerializationError):
@@ -815,6 +924,9 @@ class WorldEntityWithIDNotInKwargs(JSONSerializationError):
             f"World entity '{self.world_entity_id}' is not in the kwargs of the "
             f"method that created it."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 class AmbiguousNameError(ValueError):
@@ -837,6 +949,9 @@ class RootNodeNotFoundError(DataclassException):
     def error_message(self) -> str:
         return f"Could not determine unique root node. Candidates: {self.candidates}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class CollisionCheckingError(DataclassException):
@@ -855,11 +970,17 @@ class NegativeCollisionCheckingDistanceError(InvalidCollisionCheckError):
     def error_message(self) -> str:
         return f"Distance must be positive, got {self.collision_check.distance}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class InvalidBodiesInCollisionCheckError(InvalidCollisionCheckError):
     def error_message(self) -> str:
         return f"Body_a and body_b must be different, got {self.collision_check.body_a} and {self.collision_check.body_b}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -874,6 +995,9 @@ class BodyHasNoGeometryError(InvalidCollisionCheckError):
             f"Body {body.name} has no collision geometry."
             for body in bodies_without_geometry
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -899,8 +1023,13 @@ class AtomicWorldModificationNotAtomic(DataclassException):
             f"World '{self.world.name}' is already being modified atomically by "
             f"'{self.world._current_active_atomic_world_modification.__name__}' while "
             f"'{self.modification.__name__}' attempted another atomic world modification. "
-            f"Atomic world modifications must never trigger each other. This is an internal error in "
-            f"semantic_digital_twin, not a usage error - please open a bug report with the stack trace."
+            f"Atomic world modifications must never trigger each other."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "this is an internal error in semantic_digital_twin, not a usage error - "
+            "please open a bug report with the stack trace."
         )
 
 
@@ -917,3 +1046,6 @@ class PointOccupiedError(DataclassException):
 
     def error_message(self) -> str:
         return f"The point {self.point} is occupied."
+
+    def suggest_correction(self) -> str:
+        return ""

@@ -1443,7 +1443,7 @@ def test_not_found_error_contains_suggestions(world_setup):
     with pytest.raises(WorldEntityNotFoundError) as exc_info:
         world.get_kinematic_structure_entity_by_name("rooot")
     assert exc_info.value.suggestions == [PrefixedName("root", "world")]
-    assert "Did you mean" in str(exc_info.value)
+    assert "Suggestion: did you mean" in str(exc_info.value)
     assert "world/root" in str(exc_info.value)
 
 
@@ -1459,7 +1459,7 @@ def test_not_found_error_without_suggestions(world_setup):
     with pytest.raises(WorldEntityNotFoundError) as exc_info:
         world.get_body_by_name("quaternion_flux_capacitor")
     assert exc_info.value.suggestions == []
-    assert "Did you mean" not in str(exc_info.value)
+    assert "Suggestion" not in str(exc_info.value)
 
 
 def test_not_found_error_suggestions_for_connections(world_setup):

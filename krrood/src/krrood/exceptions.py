@@ -13,8 +13,9 @@ from typing_extensions import Optional
 class DataclassException(Exception, ABC):
     """
     A base exception class for dataclass-based exceptions.
-    Subclasses implement error_message(); it is evaluated at construction time and becomes the
-    actual exception message (the args passed to Exception).
+    Subclasses implement error_message() and suggest_correction(); both are evaluated at
+    construction time and composed into the actual exception message (the args passed to
+    Exception). A non-empty suggest_correction() is rendered as a trailing "Suggestion: ..." line.
     Subclasses that override __post_init__ must call super().__post_init__() at the end.
     """
 
@@ -25,7 +26,11 @@ class DataclassException(Exception, ABC):
                 f"Can't instantiate abstract class {type(self).__name__} without an implementation of "
                 f"{', '.join(sorted(type(self).__abstractmethods__))}."
             )
-        super().__init__(self.error_message())
+        message = self.error_message()
+        correction = self.suggest_correction()
+        if correction:
+            message = f"{message}\nSuggestion: {correction}"
+        super().__init__(message)
 
     def __str__(self) -> str:
         # Stdlib mixins like KeyError override __str__ to repr their args; always render the
@@ -35,7 +40,13 @@ class DataclassException(Exception, ABC):
     @abstractmethod
     def error_message(self) -> str:
         """
-        :return: A human-readable description of the error including, where possible, how to fix it.
+        :return: A human-readable description of what went wrong.
+        """
+
+    @abstractmethod
+    def suggest_correction(self) -> str:
+        """
+        :return: Advice on how to fix the error, or an empty string if there is no specific advice.
         """
 
 
@@ -75,6 +86,9 @@ class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
             f"Parameters: {self.parameters}, resolved_types: {self.resolved_types}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
@@ -96,6 +110,9 @@ class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
             f"Current module is required for relative import conversion, path: {self.path},"
             f" source code: {self.source_code}."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -124,6 +141,9 @@ class NoSourceDataToParseImportsFrom(InputError):
             f" file_path: {self.file_path}, ast_tree: {self.ast_tree}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NoModuleSourceProvided(InputError):
@@ -146,6 +166,9 @@ class NoModuleSourceProvided(InputError):
             f"Instead got, imported_module_path: {self.imported_module_path}, module_name: {self.module_name}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NoDefaultValueFound(DataclassException):
@@ -164,6 +187,9 @@ class NoDefaultValueFound(DataclassException):
 
     def error_message(self) -> str:
         return f"No default value for field '{self.field_name}' in class '{self.clazz.__name__}'"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -184,6 +210,9 @@ class PackageNameNotFoundError(DataclassException):
     def error_message(self) -> str:
         return f"Could not find {self.package_name} in {self.path}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class PathMissingRequiredPartsError(DataclassException):
@@ -203,6 +232,9 @@ class PathMissingRequiredPartsError(DataclassException):
 
     def error_message(self) -> str:
         return f"Path '{self.path}' is missing required parts: {', '.join(self.required_parts)}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -234,6 +266,9 @@ class SubprocessExecutionError(DataclassException):
             f"\n{self.stderr}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class SourceDataNotProvided(InputError):
@@ -259,3 +294,6 @@ class SourceDataNotProvided(InputError):
             f"Either file_path, tree, or source must be provided, got file_path: {self.file_path},"
             f" tree: {self.tree}, source_code: {self.source_code}"
         )
+
+    def suggest_correction(self) -> str:
+        return ""

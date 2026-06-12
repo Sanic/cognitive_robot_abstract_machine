@@ -19,6 +19,9 @@ class ClassIsUnMappedInClassDiagram(DataclassException):
     def error_message(self) -> str:
         return f"Class {self.class_} is not mapped in the class diagram"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class MissingContainedTypeOfContainer(DataclassException):
@@ -46,6 +49,9 @@ class MissingContainedTypeOfContainer(DataclassException):
             f" for field '{self.field_name}' of class {self.class_}, please specify it."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class CouldNotResolveType(DataclassException):
@@ -71,6 +77,9 @@ class CouldNotResolveType(DataclassException):
             f"Could not resolve type {self.type_name}.\n{self.extra_information}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class MockedClassInstantiationError(DataclassException):
@@ -80,3 +89,6 @@ class MockedClassInstantiationError(DataclassException):
 
     def error_message(self) -> str:
         return "MockedClass cannot be instantiated directly"
+
+    def suggest_correction(self) -> str:
+        return ""

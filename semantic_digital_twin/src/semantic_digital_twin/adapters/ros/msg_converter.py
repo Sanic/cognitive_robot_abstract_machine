@@ -28,6 +28,9 @@ class CannotConvertSemDTToRos2Error(ROS2ConversionError):
     def error_message(self) -> str:
         return f"Cannot convert {self.data_type.__name__} to ROS2 message."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class CannotConvertRos2ToSemDTError(ROS2ConversionError):
@@ -37,6 +40,9 @@ class CannotConvertRos2ToSemDTError(ROS2ConversionError):
 
     def error_message(self) -> str:
         return f"Cannot convert {self.data_type.__name__} to our semDT type."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass

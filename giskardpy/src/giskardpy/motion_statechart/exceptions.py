@@ -26,6 +26,9 @@ class CollisionViolatedError(DataclassException):
         )
         return f"Violated collision constraints: \n{violations}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class MotionStatechartError(DataclassException):
@@ -42,11 +45,17 @@ class NodeInitializationError(MotionStatechartError):
     def error_message(self) -> str:
         return f'Failed to initialize Goal "{self.node.unique_name}". Reason: {self.reason}'
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class EmptyMotionStatechartError(MotionStatechartError):
     def error_message(self) -> str:
         return "MotionStatechart is empty."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -79,6 +88,9 @@ class InvalidConstraintExpressionShapeError(MotionStatechartError):
     def error_message(self) -> str:
         return f"Constraint expression must have shape (1, 1), has ({" ".join(map(str, self.actual_shape))})."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NodeNotFoundError(MotionStatechartError):
@@ -87,6 +99,9 @@ class NodeNotFoundError(MotionStatechartError):
     def error_message(self) -> str:
         return f"Node '{self.name}' not found in MotionStatechart."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NotInMotionStatechartError(MotionStatechartError):
@@ -94,6 +109,9 @@ class NotInMotionStatechartError(MotionStatechartError):
 
     def error_message(self) -> str:
         return f"Operation can't be performed because node '{self.name}' does not belong to a MotionStatechart."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -107,11 +125,17 @@ class InvalidConditionError(MotionStatechartError):
     def error_message(self) -> str:
         return f'Invalid {self.condition.kind.name} condition of node "{self.condition.owner.unique_name}": "{self.new_expression}". Reason: "{self.reason()}"'
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class InputNotExpressionError(InvalidConditionError):
     def reason(self) -> str:
-        return "Input is not an expression. Did you forget '.observation_variable'?"
+        return "Input is not an expression."
+
+    def suggest_correction(self) -> str:
+        return "did you forget '.observation_variable'?"
 
 
 @dataclass
@@ -135,6 +159,9 @@ class MissingContextExtensionError(MotionStatechartError):
     def error_message(self) -> str:
         return f'Missing context extension "{self.expected_extension.__name__}".'
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class DuplicateContextExtensionError(MotionStatechartError):
@@ -142,3 +169,6 @@ class DuplicateContextExtensionError(MotionStatechartError):
 
     def error_message(self) -> str:
         return f"Extension of type {self.extension_type.__name__} already exists. You cannot add it twice."
+
+    def suggest_correction(self) -> str:
+        return ""

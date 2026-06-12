@@ -65,6 +65,9 @@ class GreaterThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
     def error_message(self) -> str:
         return f"More than {self.expected_number} solutions found for the expression {self.expression}."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class LessThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
@@ -85,6 +88,9 @@ class LessThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
             f"Found {self.found_number} solutions which is less than the expected {self.expected_number} "
             f"solutions for the expression {self.expression}."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -133,6 +139,9 @@ class VariableCannotBeEvaluated(DataclassException):
             f"Check that the variable is correctly defined and that all required information is provided."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UsageError(DataclassException):
@@ -159,6 +168,9 @@ class TryingToModifyAnAlreadyBuiltQuery(UsageError):
     def error_message(self) -> str:
         return f"{self.query} was already built."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UnsupportedExpressionTypeForDistinct(UsageError):
@@ -172,6 +184,9 @@ class UnsupportedExpressionTypeForDistinct(UsageError):
 
     def error_message(self) -> str:
         return f"Distinct operation is not supported for expression type {self.unsupported_expression_type}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -189,6 +204,9 @@ class NoConditionsProvided(UsageError):
 
     def error_message(self) -> str:
         return f"No conditions were provided to the where/having statement of the query {self.query}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -211,6 +229,9 @@ class NestedAggregationError(UsageError):
             f"grouped, E.g. eql.max(eql.count(...).grouped_by(...)) ), or wrapped in an entity query, "
             f"E.g. eql.max(entity(eql.count(...)))"
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -247,6 +268,9 @@ class UnsupportedAggregationOfAGroupedByVariable(AggregationUsageError):
             f" {self.grouped_by}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NonAggregatedSelectedVariablesError(AggregationUsageError):
@@ -276,6 +300,9 @@ class NonAggregatedSelectedVariablesError(AggregationUsageError):
             f" either aggregated or are in the grouped by variables {self.grouped_by_builder.variables_to_group_by}."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NonAggregatorInHavingConditionsError(AggregationUsageError):
@@ -289,6 +316,9 @@ class NonAggregatorInHavingConditionsError(AggregationUsageError):
 
     def error_message(self) -> str:
         return f"The having condition of the query {self.query} contains non-aggregators {self.non_aggregators}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -305,10 +335,12 @@ class AggregatorInWhereConditionsError(AggregationUsageError):
     """
 
     def error_message(self) -> str:
+        return f"The where condition of the query {self.query} contains aggregators {self.aggregators}."
+
+    def suggest_correction(self) -> str:
         return (
-            f"The where condition of the query {self.query} contains aggregators {self.aggregators}."
-            f"If you want filter using aggregators, use `QueryObjectquery.having()` instead. Or wrap the aggregator"
-            f"in a subquery e.g. `an(entity(...).where(entity(eql.count(...)) > n))`"
+            "if you want to filter using aggregators, use `QueryObjectquery.having()` instead, or wrap the "
+            "aggregator in a subquery e.g. `an(entity(...).where(entity(eql.count(...)) > n))`."
         )
 
 
@@ -323,10 +355,10 @@ class NoKwargsInMatchVar(UsageError):
     match_variable: Match
 
     def error_message(self) -> str:
-        return (
-            f"The match variable {self.match_variable} was used without any keyword arguments."
-            f"If you don't want to specify keyword arguments use variable() instead"
-        )
+        return f"The match variable {self.match_variable} was used without any keyword arguments."
+
+    def suggest_correction(self) -> str:
+        return "if you don't want to specify keyword arguments use variable() instead."
 
 
 @dataclass
@@ -342,6 +374,9 @@ class WrongSelectableType(UsageError):
 
     def error_message(self) -> str:
         return f"Select expects one of {self.expected_types}, instead {self.wrong_variable_type} was given."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -377,6 +412,9 @@ class LiteralConditionError(UsageError):
             f"either True or False, independent on any other values/bindings in the query"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class CannotProcessResultOfGivenChildType(UsageError):
@@ -397,6 +435,9 @@ class CannotProcessResultOfGivenChildType(UsageError):
             f" during evaluation because it doesn't implement the `_process_result_` method."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NonPositiveLimitValue(UsageError):
@@ -413,6 +454,9 @@ class NonPositiveLimitValue(UsageError):
             f"Quantifier limit value must be a positive integer (i.e., greater than 0),"
             f" instead got {self.wrong_limit_value}"
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -446,6 +490,9 @@ class UnSupportedOperand(UnsupportedOperation):
     def error_message(self) -> str:
         return f"{self.unsupported_operand} cannot be used as an operand for {self.operation} operations."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UnsupportedNegation(UnsupportedOperation):
@@ -463,12 +510,12 @@ class UnsupportedNegation(UnsupportedOperation):
     def error_message(self) -> str:
         return (
             f"Symbolic NOT operations on {self.operation_type} types"
-            f" operands are not allowed, you can negate the conditions instead,"
-            f" as negating them is most likely not what you want"
+            f" operands are not allowed, as negating them is most likely not what you want"
             f" because it is ambiguous and can be very expensive to compute."
-            f"To Negate Conditions do:"
-            f" `not_(condition)` instead of `not_(an(entity(..., condition)))`."
         )
+
+    def suggest_correction(self) -> str:
+        return "negate the conditions instead: `not_(condition)` instead of `not_(an(entity(..., condition)))`."
 
 
 @dataclass
@@ -512,6 +559,9 @@ class InvalidQuantificationRangeError(QuantificationConsistencyError):
     def error_message(self) -> str:
         return f"at_most {self.at_most} cannot be less than at_least {self.at_least}."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NegativeQuantificationError(QuantificationConsistencyError):
@@ -523,6 +573,9 @@ class NegativeQuantificationError(QuantificationConsistencyError):
 
     def error_message(self) -> str:
         return "ResultQuantificationConstraint must be a non-negative integer."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -545,6 +598,9 @@ class InvalidChildType(UsageError):
     def error_message(self) -> str:
         return f"The child type {self.invalid_child_type} is not valid. It must be a subclass of {self.correct_child_types}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NoExpressionFoundForGivenID(DataclassException):
@@ -563,6 +619,9 @@ class NoExpressionFoundForGivenID(DataclassException):
 
     def error_message(self) -> str:
         return f"No expression found for ID: {self.expression_id} during evaluation of {self.symbolic_expression}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -588,6 +647,9 @@ class NoneWrappedFieldError(ClassDiagramError):
     def error_message(self) -> str:
         return f"Field '{self.attr_name}' of class '{self.clazz.__name__}' is not wrapped by a WrappedField."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NoChildToReplace(DataclassException):
@@ -611,6 +673,9 @@ class NoChildToReplace(DataclassException):
     def error_message(self) -> str:
         return f"Expression '{self.expression}' has no child '{self.old_child}' to replace with '{self.new_child}'."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class GenerativeBackendQueryIsNotUnderspecifiedVariable(DataclassException):
@@ -625,6 +690,9 @@ class GenerativeBackendQueryIsNotUnderspecifiedVariable(DataclassException):
 
     def error_message(self) -> str:
         return f"Query {self.expression} is not an underspecified variable inside a generative backend."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -642,6 +710,9 @@ class CalledMatchMultipleTimes(DataclassException):
             f"Invoking the `__call__` method multiple times has unexpected side effects."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
@@ -651,11 +722,16 @@ class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
 
     def error_message(self) -> str:
         return (
-            "If you want to use EQL to generate answers,"
-            f"assignments in underspecified queries must be concrete objects or a symbolic expression."
-            f"If the assignment is Ellipsis it must, the type of the field must be an Enum, otherwise EQL cant"
-            f"generate it. If your looking for more flexible generations, try ProbabilisticBackend."
+            "If you want to use EQL to generate answers, "
+            f"assignments in underspecified queries must be concrete objects or a symbolic expression. "
+            f"If the assignment is Ellipsis, the type of the field must be an Enum, otherwise EQL can't "
+            f"generate it. "
             f"Got {self.attribute_match.name_from_variable_access_path} = {self.attribute_match.assigned_variable._type_}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "if you're looking for more flexible generations, try ProbabilisticBackend."
         )
 
 
@@ -679,3 +755,6 @@ class MatchTypeCannotBeDetermined(DataclassException):
             f"TYPE_CHECKING). If that is not an option for you, set the `target_type` of the "
             f"`underspecified` method."
         )
+
+    def suggest_correction(self) -> str:
+        return ""

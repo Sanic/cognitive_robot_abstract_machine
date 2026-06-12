@@ -30,6 +30,9 @@ class RDRLoadError(DataclassException):
             f"Could not load the rdr model {self.model_name} from {self.model_path}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NoSavePathFoundForExpertAnswers(InputError):
@@ -48,6 +51,9 @@ class NoSavePathFoundForExpertAnswers(InputError):
             f"answers_save_path attribute."
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NoLoadPathFoundForExpertAnswers(InputError):
@@ -65,3 +71,6 @@ class NoLoadPathFoundForExpertAnswers(InputError):
             f"No load path found for expert {self.expert}, either provide a path or set the "
             f"answers_save_path attribute."
         )
+
+    def suggest_correction(self) -> str:
+        return ""

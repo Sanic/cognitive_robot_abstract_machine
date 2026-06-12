@@ -19,6 +19,9 @@ class IntractableError(DataclassException):
     def error_message(self) -> str:
         return f"Inference is intractable for {self.model}."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UndefinedOperationError(DataclassException):
@@ -31,6 +34,9 @@ class UndefinedOperationError(DataclassException):
 
     def error_message(self) -> str:
         return f"Operation is not defined for {self.model}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 @dataclass
 class ShapeMismatchError(DataclassException, ValueError):
@@ -50,3 +56,6 @@ class ShapeMismatchError(DataclassException, ValueError):
 
     def error_message(self) -> str:
         return f"Expected shape {self.expected_shape}, received shape {self.received_shape}"
+
+    def suggest_correction(self) -> str:
+        return ""

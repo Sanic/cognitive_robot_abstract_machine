@@ -38,6 +38,9 @@ class UnsupportedOperationError(SymbolicMathError, TypeError):
     def error_message(self) -> str:
         return f"unsupported operand type(s) for {self.operation}: '{self.left.__class__.__name__}' and '{self.right.__class__.__name__}'"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class CannotConvertToStringError(SymbolicMathError):
@@ -49,6 +52,9 @@ class CannotConvertToStringError(SymbolicMathError):
 
     def error_message(self) -> str:
         return f"cannot convert {self.expression} to a string"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -62,6 +68,9 @@ class WrongDimensionsError(SymbolicMathError):
 
     def error_message(self) -> str:
         return f"Expected {self.expected_dimensions} dimensions, but got {self.actual_dimensions}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -94,6 +103,9 @@ class HasFreeVariablesError(SymbolicMathError):
     def error_message(self) -> str:
         return f"Operation can't be performed on expression with free variables: {self.variables}."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class NoFreeVariablesError(SymbolicMathError):
@@ -105,6 +117,9 @@ class NoFreeVariablesError(SymbolicMathError):
         return (
             f"Operation can't be performed on expression with NO free variables."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 class ExpressionEvaluationError(SymbolicMathError):
@@ -126,6 +141,9 @@ class WrongNumberOfArgsError(ExpressionEvaluationError):
     def error_message(self) -> str:
         return f"Expected {self.expected_number_of_args} arguments, but got {self.actual_number_of_args}."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class DuplicateVariablesError(SymbolicMathError):
@@ -137,6 +155,9 @@ class DuplicateVariablesError(SymbolicMathError):
 
     def error_message(self) -> str:
         return f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -158,6 +179,9 @@ class FloatVariableAlreadyHasResolveError(FloatVariableDataError):
     def error_message(self) -> str:
         return f"Cannot register an expression which has a FloatVariable ({self.variable}) that already has a resolver."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class SymbolicMathExpressionNotRegisteredError(FloatVariableDataError):
@@ -170,6 +194,9 @@ class SymbolicMathExpressionNotRegisteredError(FloatVariableDataError):
     def error_message(self) -> str:
         return f"Symbolic math expression '{self.expression}' is not registered to FloatVariableData."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class SymbolicMathExpressionAlreadyRegisteredError(FloatVariableDataError):
@@ -181,3 +208,6 @@ class SymbolicMathExpressionAlreadyRegisteredError(FloatVariableDataError):
 
     def error_message(self) -> str:
         return f"Symbolic math expression '{self.expression}' is already registered to FloatVariableData."
+
+    def suggest_correction(self) -> str:
+        return ""

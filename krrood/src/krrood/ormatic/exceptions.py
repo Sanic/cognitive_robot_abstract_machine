@@ -25,10 +25,10 @@ class NoGenericError(DataclassException, TypeError):
     clazz: Type
 
     def error_message(self) -> str:
-        return (
-            f"Cannot determine original class for {self.clazz}. "
-            "Did you forget to parameterise the DataAccessObject subclass?"
-        )
+        return f"Cannot determine original class for {self.clazz}."
+
+    def suggest_correction(self) -> str:
+        return "did you forget to parameterise the DataAccessObject subclass?"
 
 
 @dataclass
@@ -46,10 +46,10 @@ class NoDAOFoundError(DataclassException, TypeError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"Class {type(self.obj)} does not have a DAO. Did you forget to import your ORM Interface? "
-            f"Otherwise the class may not be in the ORM Interface"
-        )
+        return f"Class {type(self.obj)} does not have a DAO."
+
+    def suggest_correction(self) -> str:
+        return "did you forget to import your ORM Interface? Otherwise the class may not be in the ORM Interface."
 
 
 @dataclass
@@ -88,6 +88,9 @@ class UnsupportedRelationshipError(DataclassException, ValueError):
     def error_message(self) -> str:
         return f"Unsupported relationship direction for {self.relationship}."
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UncallableFunction(NotImplementedError):
@@ -117,3 +120,6 @@ class UnsupportedColumnType(DataclassException, TypeError):
 
     def error_message(self) -> str:
         return f"Column type: {self.column_type} is neither a builtin sqlalchemy type nor does it exist in the dict of type_mappings."
+
+    def suggest_correction(self) -> str:
+        return ""

@@ -27,9 +27,11 @@ class ContextIsUnavailable(DataclassException):
     """
 
     def error_message(self) -> str:
+        return f"{self.instance} has no plan node."
+
+    def suggest_correction(self) -> str:
         return (
-            f"{self.instance} has no plan node. Did you forget to call `add_subplan` when creating"
-            f"plans inside actions?"
+            "did you forget to call `add_subplan` when creating plans inside actions?"
         )
 
 
@@ -47,6 +49,9 @@ class ConditionNotSatisfied(PlanFailure):
         false_statements = get_false_statements(self.condition)
         return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied, following statements are false: {[s._name_ for s in false_statements]}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class MotionDidNotFinish(PlanFailure):
@@ -54,6 +59,7 @@ class MotionDidNotFinish(PlanFailure):
     failed_motions: List[MotionStatechartNode]
 
     def error_message(self) -> str:
-        return (
-            f"Motion did not finish, following motions failed: {self.failed_motions}"
-        )
+        return f"Motion did not finish, following motions failed: {self.failed_motions}"
+
+    def suggest_correction(self) -> str:
+        return ""

@@ -163,6 +163,9 @@ class QuaternionConversionError(MultiSimError):
             f"Rotation matrix:\n{self.rotation_matrix}\nError message: {self.reason}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass(eq=False)
 class MultiSimCamera(SimulatorAdditionalProperty):
@@ -718,6 +721,9 @@ class MujocoEntityNotFoundError(MujocoError):
 
     def error_message(self) -> str:
         return f"Failed to {self.action}: type={self.entity_type}, name='{self.entity_name}'"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass

@@ -39,6 +39,9 @@ class MissingQueryVariableViolation(SupportDeterminismViolation):
             f"Available: {available}"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UnnormalizedSumUnitViolation(SupportDeterminismViolation):
@@ -61,6 +64,9 @@ class UnnormalizedSumUnitViolation(SupportDeterminismViolation):
             f"{self.actual_log_weight_sum:.6f}, expected 0.0. "
             f"Unnormalized circuits produce incorrect backdoor probabilities."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -86,6 +92,9 @@ class OverlappingChildSupportsViolation(SupportDeterminismViolation):
             f"on declared query Variable '{self.query_variable.name}': children are not "
             f"support-deterministic for this Variable."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -131,6 +140,9 @@ class SupportDeterminismVerificationResult(DataclassException):
                 lines.append(f"    - {str(violation)}")
         return "\n".join(lines)
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UnregisteredVariableError(DataclassException):
@@ -153,6 +165,9 @@ class UnregisteredVariableError(DataclassException):
             f"'{self.variable_name}' is not a registered {self.role} Variable. "
             f"Registered: {self.registered_names}."
         )
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -178,9 +193,11 @@ class EmptyInterventionalCircuitError(DataclassException):
                 f"adjustment={self.adjustment_variable_names}."
             )
         return (
-            f"Interventional circuit is empty for cause '{self.cause_variable_name}'. "
-            f"Ensure the circuit was trained on data covering this Variable's domain."
+            f"Interventional circuit is empty for cause '{self.cause_variable_name}'."
         )
+
+    def suggest_correction(self) -> str:
+        return "ensure the circuit was trained on data covering this Variable's domain."
 
 
 @dataclass
@@ -198,3 +215,6 @@ class NoCauseVariablesError(DataclassException):
             f"No cause Variables found in observed_values. "
             f"Expected at least one of: {self.registered_cause_names}."
         )
+
+    def suggest_correction(self) -> str:
+        return ""

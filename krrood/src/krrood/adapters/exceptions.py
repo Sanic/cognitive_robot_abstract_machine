@@ -20,6 +20,9 @@ class MissingTypeError(JSONSerializationError):
     def error_message(self) -> str:
         return f"Missing {JSON_TYPE_NAME} field in JSON data"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class InvalidTypeFormatError(JSONSerializationError):
@@ -30,6 +33,9 @@ class InvalidTypeFormatError(JSONSerializationError):
     def error_message(self) -> str:
         return f"Invalid type format: {self.invalid_type_value}"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UnknownModuleError(JSONSerializationError):
@@ -39,6 +45,9 @@ class UnknownModuleError(JSONSerializationError):
 
     def error_message(self) -> str:
         return f"Unknown module in type: {self.module_name}"
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -53,6 +62,9 @@ class ClassNotFoundError(JSONSerializationError):
             f"Class '{self.class_name}' not found in module '{self.module_name}'"
         )
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class ClassNotSerializableError(JSONSerializationError):
@@ -63,6 +75,9 @@ class ClassNotSerializableError(JSONSerializationError):
     def error_message(self) -> str:
         return f"Class '{self.clazz.__name__}' cannot be serialized"
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class ClassNotDeserializableError(JSONSerializationError):
@@ -72,3 +87,6 @@ class ClassNotDeserializableError(JSONSerializationError):
 
     def error_message(self) -> str:
         return f"Class '{self.clazz.__name__}' cannot be deserialized"
+
+    def suggest_correction(self) -> str:
+        return ""
