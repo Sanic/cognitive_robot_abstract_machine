@@ -652,8 +652,7 @@ class DataAccessObject(HasGeneric[T]):
             return state.resolve_result(state.get(self))
 
         if not state.is_processing:
-            with monitored.disabled():
-                result = self._perform_from_dao_conversion(state)
+            result = self._perform_from_dao_conversion(state)
 
             # if the instance that started this whole process is alternatively mapped, finally convert it
             return state.resolve_result(result)

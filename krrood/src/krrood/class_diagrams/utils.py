@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -259,6 +260,46 @@ def get_type_hints_of_object(
     return type_hints
 
 
+@lru_cache(maxsize=None)
+def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> Dict[str, Any]:
+    """
+    Import scope for *source_path*, cached per ``(source_path, mtime)``.
+
+    See :func:`_cached_scope_from_imports`; the *mtime* component of the key is what makes the
+    cache self-invalidate when the file changes on disk.
+
+    :param source_path: Path to the source file whose import scope is built.
+    :param mtime: Last-modification time of *source_path*, used only as part of the cache key.
+    :return: The import scope dictionary for *source_path*.
+    """
+    return get_scope_from_imports(file_path=source_path)
+
+
+def _cached_scope_from_imports(source_path: str) -> Dict[str, Any]:
+    """
+    Return the import scope of *source_path*, reusing a per-file cache.
+
+    The class-diagram type-hint fallback re-parses the same handful of library source files
+    thousands of times; caching by ``(path, mtime)`` collapses that to one parse per file while
+    self-invalidating if the file changes on disk. The returned dictionary is shared between callers
+    and must be treated as read-only, consistent with the :func:`lru_cache`-d
+    :func:`get_type_hints_of_object`.
+
+    This cache is intentionally local to the class-diagram resolution path and not applied to
+    :func:`~krrood.utils.get_scope_from_imports` itself, because other callers (ripple-down-rules
+    code generation) re-read regenerated files within a single process and rely on the uncached
+    behaviour.
+
+    :param source_path: Path to the source file whose import scope is needed.
+    :return: The import scope dictionary for *source_path*.
+    """
+    try:
+        mtime = os.path.getmtime(source_path)
+    except OSError:
+        return get_scope_from_imports(file_path=source_path)
+    return _scope_from_imports_by_mtime(source_path, mtime)
+
+
 def get_object_by_name_from_another_object_in_same_module(
     name: str, object_: Any
 ) -> Any:
@@ -278,7 +319,7 @@ def get_object_by_name_from_another_object_in_same_module(
         raise CouldNotResolveType(
             name, extra_information=f"Could not find source file for {object_}"
         )
-    scope = get_scope_from_imports(file_path=source_path)
+    scope = _cached_scope_from_imports(source_path)
     if name in scope:
         return scope[name]
     elif name in builtins.__dict__:

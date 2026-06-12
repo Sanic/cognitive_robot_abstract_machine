@@ -9,13 +9,12 @@ imports.
 
 from __future__ import annotations
 
-import inspect
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import wraps
 from typing_extensions import Any, Optional, Type, Callable, Union
 
-from krrood.entity_query_language._stack import CallStack, StackFrame
+from krrood.entity_query_language._stack import CallStack
 from krrood.singleton import SingletonMeta
 
 
@@ -46,11 +45,9 @@ class MonitoredRegistry(metaclass=SingletonMeta):
         @wraps(original_post_init)
         def new_post_init(self, *args, **kwargs):
             if not monitored._is_disabled:
-                raw_frames = inspect.stack()[1:]
-                stack = CallStack(
-                    [StackFrame.from_frame_info(frame_info) for frame_info in raw_frames]
-                )
-                self._creation_stack = stack.filter()  # drop site-packages immediately
+                # ``skip=1`` drops this ``new_post_init`` frame so capture starts at the caller
+                # of ``__post_init__``; site-packages frames are filtered during the walk.
+                self._creation_stack = CallStack.capture(skip=1)
             original_post_init(self, *args, **kwargs)
 
         cls.__post_init__ = new_post_init
