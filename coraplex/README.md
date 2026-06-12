@@ -1,15 +1,18 @@
-<img src="doc/source/_static/images/cora-plex-dark.png"
-     width="50%"
-     alt="CORA Plex Logo">
-     
-## Cite
+<img src="./doc/source/_static/images/cora-plex-dark.png" width="400">
+
+
+### Cite
+
+```bibtex
 @software{coraplex,
-  author  = {Dech, Jonas, Hassouna, Vanessa and Krohm, Luca},
-  title   = {{CoraPlex}: A Python Framework for Cognitive Orchestrated Reasoning Architecture Planning Executive },
+  author  = {Dech, Jonas and Hassouna, Vanessa and Krohm, Luca},
+  title   = {{CoraPlex}: A Python Framework for Cognitive Orchestrated Reasoning Architecture Planning Executive},
   url     = {https://github.com/cram2/cognitive_robot_abstract_machine/tree/main/coraplex},
   version = {2.0.0},
   year    = {2024}
 }
+```
+
 ## Key Features
 
 - Intent-based task specification: express “what” to do using designators; the framework decides the concrete “how” at run time.
