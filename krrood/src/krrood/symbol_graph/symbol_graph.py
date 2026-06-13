@@ -47,7 +47,7 @@ class Symbol:
     Whether instances of this class should be cached or not in the symbol graph.
     """
     _inference_explanation_: Optional[InferenceExplanation] = field(
-        default=None, init=False, repr=False
+        default=None, init=False, repr=False, compare=False
     )
     """If this symbol was inferred, this field can contain an explanation of how it
      was inferred.
