@@ -4,16 +4,6 @@ from enum import StrEnum
 
 from typing_extensions import Optional
 
-from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.core.mapped_variable import MappedVariable
-from krrood.entity_query_language.core.variable import Variable, Literal
-from krrood.entity_query_language.operators.aggregators import Aggregator
-from krrood.entity_query_language.operators.comparator import Comparator
-from krrood.entity_query_language.operators.core_logical_operators import (
-    LogicalOperator,
-)
-from krrood.entity_query_language.query.query import Entity, SetOf
-
 
 class SemanticRole(StrEnum):
     """Semantic category of a fragment, determining its colour markup."""
@@ -48,33 +38,3 @@ ROLE_COLORS: dict[SemanticRole, Optional[str]] = {
     SemanticRole.ATTRIBUTE: "#8FC7B8",  # MappedVariable teal
     SemanticRole.PLAIN: None,
 }
-
-
-def _build_role_map() -> dict[type, SemanticRole]:
-    """:return: The mapping of EQL expression types to their semantic role."""
-    return {
-        LogicalOperator: SemanticRole.LOGICAL,
-        Aggregator: SemanticRole.AGGREGATION,
-        Comparator: SemanticRole.OPERATOR,
-        MappedVariable: SemanticRole.ATTRIBUTE,
-        Literal: SemanticRole.LITERAL,  # before Variable in MRO traversal
-        Variable: SemanticRole.VARIABLE,
-        Entity: SemanticRole.VARIABLE,
-        SetOf: SemanticRole.VARIABLE,
-    }
-
-
-_role_map: dict[type, SemanticRole] = _build_role_map()
-
-
-def role_for(expression: SymbolicExpression) -> SemanticRole:
-    """
-    Falls back to ``PLAIN`` when the expression's type matches no known role.
-
-    :param expression: Any EQL expression instance.
-    :return: The most-specific matching semantic role for an EQL expression instance.
-    """
-    for cls in type(expression).__mro__:
-        if cls in _role_map:
-            return _role_map[cls]
-    return SemanticRole.PLAIN
