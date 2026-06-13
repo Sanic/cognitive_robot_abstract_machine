@@ -14,3 +14,8 @@ build/
 
 # Local working clone of the CRAM monorepo the plugin targets (its own git repo)
 /cognitive_robot_abstract_machine/
+
+# Marketplace signing secrets — never commit these
+*.pem
+*.ks
+chain.crt

@@ -47,7 +47,7 @@ intellijPlatform {
     // `./gradlew publishPlugin` uploads to the JetBrains Marketplace using a permanent token
     // generated at https://plugins.jetbrains.com/author/me/tokens.
     publishing {
-        token = providers.environmentVariable("PUBLISH_TOKEN")
+        token = providers.environmentVariable("PYCHARM_PUBLISH_TOKEN")
     }
 
     // The Marketplace recommends signed plugins. Supply the certificate chain + private key
