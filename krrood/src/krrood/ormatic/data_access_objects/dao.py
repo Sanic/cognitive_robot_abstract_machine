@@ -594,7 +594,7 @@ class DataAccessObject(HasGeneric[T]):
         )
         for domain_object_field in fields(domain_object):
             if hasattr(base_domain_object, domain_object_field.name):
-                setattr(
+                object.__setattr__(
                     domain_object,
                     domain_object_field.name,
                     getattr(base_domain_object, domain_object_field.name),
@@ -629,7 +629,8 @@ class DataAccessObject(HasGeneric[T]):
                 continue
             value = getattr(domain_object, attr_name, None)
             if isinstance(value, list):
-                setattr(domain_object, attr_name, set(value))
+                # object.__setattr__ (not setattr) so this also works on frozen dataclasses.
+                object.__setattr__(domain_object, attr_name, set(value))
 
     def _call_post_inits(
         self,
