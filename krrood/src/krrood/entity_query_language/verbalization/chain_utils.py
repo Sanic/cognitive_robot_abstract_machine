@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass
 
-from typing_extensions import List, Optional, Tuple
+from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import (
@@ -15,6 +15,22 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.core.variable import Literal, Variable
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+
+
+@dataclass(frozen=True)
+class PathStep:
+    """
+    One hop of a navigation chain — a display name and the source reference it links to.
+
+    Replaces a bare ``(name, source_ref)`` tuple so the two halves are named (``.name`` /
+    ``.source_ref``) rather than positional.
+    """
+
+    name: str
+    """The display text for this hop (e.g. ``"amount"``, ``"handle[0]"``, ``"()"``)."""
+
+    source_ref: Optional[SourceRef] = None
+    """The attribute's source reference, or ``None`` for composite / index / call hops."""
 
 
 def walk_chain(
@@ -74,25 +90,22 @@ def chain_ends_in_boolean_attribute(chain: list[MappedVariable]) -> bool:
     return bool(chain) and isinstance(chain[-1], Attribute) and chain[-1]._type_ is bool
 
 
-def build_path_parts(
-    chain: list[MappedVariable],
-) -> list[tuple[str, Optional[SourceRef]]]:
+def build_path_parts(chain: list[MappedVariable]) -> list[PathStep]:
     """
-    Convert a walked chain into ``(display_name, SourceRef | None)`` pairs.
+    Convert a walked chain into :class:`PathStep` hops.
 
     Merging rules:
 
-    * Consecutive ``Attribute → Index`` pairs are merged into ``"attribute[key]"`` with ``ref=None``
-      (composite indexed access has no clean single-symbol anchor).
-    * Standalone ``Index`` nodes appear as ``"[key]"`` with ``ref=None``.
-    * ``Call`` nodes appear as ``"()"`` with ``ref=None``.
+    * Consecutive ``Attribute → Index`` pairs are merged into ``"attribute[key]"`` with no source
+      ref (composite indexed access has no clean single-symbol anchor).
+    * Standalone ``Index`` nodes appear as ``"[key]"`` with no source ref.
+    * ``Call`` nodes appear as ``"()"`` with no source ref.
     * ``FlatVariable`` nodes are skipped.
 
     :param chain: Outermost-first chain list.
-    :return: Ordered list of ``(display_name, SourceRef | None)`` pairs, outermost attribute
-        first.
+    :return: Ordered list of :class:`PathStep`, outermost attribute first.
     """
-    parts: list[tuple[str, Optional[SourceRef]]] = []
+    parts: list[PathStep] = []
     i = 0
     while i < len(chain):
         node = chain[i]
@@ -104,11 +117,11 @@ def build_path_parts(
                 i += 1
                 name += f"[{repr(chain[i]._key_)}]"
                 ref = None  # composite indexed access has no clean single-line anchor
-            parts.append((name, ref))
+            parts.append(PathStep(name, ref))
         elif isinstance(node, Index):
-            parts.append((f"[{repr(node._key_)}]", None))
+            parts.append(PathStep(f"[{repr(node._key_)}]", None))
         elif isinstance(node, Call):
-            parts.append(("()", None))
+            parts.append(PathStep("()", None))
         elif isinstance(node, FlatVariable):
             pass
         i += 1
@@ -128,7 +141,7 @@ class ChainAnalysis:
     root: SymbolicExpression
     """The chain root (first non-``MappedVariable`` node)."""
 
-    parts: List[Tuple[str, Optional[SourceRef]]]
+    parts: List[PathStep]
     """The display path-parts."""
 
     is_boolean_terminal: bool

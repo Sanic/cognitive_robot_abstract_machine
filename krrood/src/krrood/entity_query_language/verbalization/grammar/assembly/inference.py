@@ -209,5 +209,5 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         )
         self.context.refer.mark_introduced(current)
         parts = build_path_parts(chain)
-        field = list(reversed(parts))[0][0] if parts else root_type
+        field = list(reversed(parts))[0].name if parts else root_type
         return GroupKeyPhrases.COMMON_OF.build_phrase(field, root_type)

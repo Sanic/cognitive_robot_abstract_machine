@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 
+from krrood.entity_query_language.verbalization.chain_utils import PathStep
 from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
     NounPhrase,
@@ -165,7 +166,7 @@ def test_entity_repeat_drops_restriction_modifiers():
 
 
 def _attr_part(name):
-    return (name, None)
+    return PathStep(name, None)
 
 
 def test_chain_rooted_at_subject_pronominalises():

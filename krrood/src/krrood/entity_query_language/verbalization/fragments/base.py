@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing_extensions import Callable, List, Optional, Tuple, TypeVar
+from typing_extensions import Callable, List, Optional, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.fragments.features import (
@@ -12,6 +12,7 @@ from krrood.entity_query_language.verbalization.fragments.features import (
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.fragments.source_ref import SourceRef
+from krrood.entity_query_language.verbalization.chain_utils import PathStep
 from krrood.entity_query_language.verbalization.exceptions import UnloweredFragmentError
 
 _T = TypeVar("_T")
@@ -192,8 +193,8 @@ class PossessiveChain(Fragment):
     BankTransaction"*).
     """
 
-    parts: List[Tuple[str, Optional[SourceRef]]]
-    """The chain's ``(attr_name, source_ref)`` path, innermost-last."""
+    parts: List[PathStep]
+    """The chain's navigation path (:class:`PathStep` hops), innermost-last."""
 
     root_fragment: Fragment
     """The referring noun phrase for the chain root."""

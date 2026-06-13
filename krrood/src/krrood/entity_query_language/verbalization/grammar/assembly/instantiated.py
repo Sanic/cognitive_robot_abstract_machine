@@ -5,6 +5,7 @@ import uuid
 from typing_extensions import Dict, List, Tuple
 
 from krrood.entity_query_language.core.variable import InstantiatedVariable
+from krrood.entity_query_language.verbalization.chain_utils import PathStep
 from krrood.entity_query_language.verbalization.fragments.base import (
     NounPhrase,
     oxford_and,
@@ -104,7 +105,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
                 ),
             ]
         )
-        return possessive_path([(field_name, None)], type_root)
+        return possessive_path([PathStep(field_name, None)], type_root)
 
     def _copula(self, binding: BindingPlan) -> Fragment:
         """:return: *"is"* / *"are"* agreeing with the binding's plurality."""
