@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.role import Role
+from krrood.patterns.role import Role, role_taker_field
 
 # ---------------------------------------------------------------------------
 # Simple two-role / one-taker scenario
@@ -23,44 +21,15 @@ class PersonForRoleRecursion:
 
 
 @dataclass(eq=False)
-class RoleForPersonForRoleRecursion(ABC):
-    """Mixin that delegates PersonForRoleRecursion fields to the role taker."""
-
-    @property
-    @abstractmethod
-    def role_taker(self) -> PersonForRoleRecursion: ...
-
-    @property
-    def name(self) -> str:
-        return self.role_taker.name
-
-    @name.setter
-    def name(self, value: str):
-        self.role_taker.name = value
-
-
-@dataclass(eq=False)
-class StudentForRoleRecursion(
-    Role[PersonForRoleRecursion], RoleForPersonForRoleRecursion
-):
+class StudentForRoleRecursion(Role[PersonForRoleRecursion]):
     student_id: str
-    person: PersonForRoleRecursion
-
-    @classmethod
-    def role_taker_attribute(cls) -> PersonForRoleRecursion:
-        return variable_from(cls).person
+    person: PersonForRoleRecursion = role_taker_field()
 
 
 @dataclass(eq=False)
-class TeacherForRoleRecursion(
-    Role[PersonForRoleRecursion], RoleForPersonForRoleRecursion
-):
+class TeacherForRoleRecursion(Role[PersonForRoleRecursion]):
     employee_id: str
-    person: PersonForRoleRecursion
-
-    @classmethod
-    def role_taker_attribute(cls) -> PersonForRoleRecursion:
-        return variable_from(cls).person
+    person: PersonForRoleRecursion = role_taker_field()
 
 
 # ---------------------------------------------------------------------------
@@ -74,58 +43,12 @@ class BaseForRoleRecursion:
 
 
 @dataclass(eq=False)
-class RoleForBaseForRoleRecursion(ABC):
-    """Mixin that delegates BaseForRoleRecursion fields to the role taker."""
-
-    @property
-    @abstractmethod
-    def role_taker(self) -> BaseForRoleRecursion: ...
-
-    @property
-    def base_attr(self) -> str:
-        return self.role_taker.base_attr
-
-    @base_attr.setter
-    def base_attr(self, value: str):
-        self.role_taker.base_attr = value
-
-
-@dataclass(eq=False)
-class IntermediateForRoleRecursion(
-    Role[BaseForRoleRecursion], RoleForBaseForRoleRecursion
-):
-    base: BaseForRoleRecursion
+class IntermediateForRoleRecursion(Role[BaseForRoleRecursion]):
+    base: BaseForRoleRecursion = role_taker_field()
     inter_attr: str = "inter"
 
-    @classmethod
-    def role_taker_attribute(cls) -> BaseForRoleRecursion:
-        return variable_from(cls).base
-
 
 @dataclass(eq=False)
-class RoleForIntermediateForRoleRecursion(RoleForBaseForRoleRecursion, ABC):
-    """Mixin that delegates IntermediateForRoleRecursion fields to the role taker."""
-
-    @property
-    @abstractmethod
-    def role_taker(self) -> IntermediateForRoleRecursion: ...
-
-    @property
-    def inter_attr(self) -> str:
-        return self.role_taker.inter_attr
-
-    @inter_attr.setter
-    def inter_attr(self, value: str):
-        self.role_taker.inter_attr = value
-
-
-@dataclass(eq=False)
-class TopForRoleRecursion(
-    Role[IntermediateForRoleRecursion], RoleForIntermediateForRoleRecursion
-):
-    inter: IntermediateForRoleRecursion
+class TopForRoleRecursion(Role[IntermediateForRoleRecursion]):
+    inter: IntermediateForRoleRecursion = role_taker_field()
     top_attr: str = "top"
-
-    @classmethod
-    def role_taker_attribute(cls) -> IntermediateForRoleRecursion:
-        return variable_from(cls).inter

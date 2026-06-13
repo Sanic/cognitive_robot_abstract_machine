@@ -8,9 +8,7 @@ from typing import Tuple
 import numpy as np
 from typing_extensions import Optional, Union, List
 
-from krrood.entity_query_language.core.mapped_variable import Attribute
-from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.role import Role
+from krrood.patterns.role import Role, role_taker_field
 from semantic_digital_twin.robots.abstract_robot import Manipulator
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -280,7 +278,9 @@ class GraspDescription:
         :return: A sorted list of GraspDescription instances representing all grasp permutations.
         """
         world = end_effector._world
-        map_T_object = world.transform(pose.to_homogeneous_matrix(), world.root).to_pose()
+        map_T_object = world.transform(
+            pose.to_homogeneous_matrix(), world.root
+        ).to_pose()
 
         map_T_robot = end_effector._robot.root.global_pose
 
@@ -400,6 +400,7 @@ class GraspDescription:
     def __hash__(self):
         return id(self)
 
+
 @dataclass
 class PreferredGraspAlignment:
     """
@@ -423,12 +424,12 @@ class PreferredGraspAlignment:
 
 
 @dataclass(eq=False)
-class GraspPose(Role[Pose], Pose):
+class GraspPose(Role[Pose]):
     """
     A pose from which a grasp can be performed along with the respective arm and grasp description.
     """
 
-    pose: Pose = field(kw_only=True)
+    pose: Pose = role_taker_field()
     """
     The pose of the grasp.
     """
@@ -440,7 +441,3 @@ class GraspPose(Role[Pose], Pose):
     """
     Grasp description corresponding to the grasp pose.
     """
-
-    @classmethod
-    def role_taker_attribute(cls) -> Attribute[Pose]:
-        return variable_from(cls).pose

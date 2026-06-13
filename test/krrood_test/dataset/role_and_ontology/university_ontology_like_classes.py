@@ -4,8 +4,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Set, List, Type
 
-from krrood.entity_query_language.factories import variable_from
-from krrood.patterns.role import Role
+from krrood.patterns.role import Role, role_taker_field
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ontomatic.property_descriptor.mixins import (
     HasInverseProperty,
@@ -47,33 +46,21 @@ class Person(Symbol):
 
 @dataclass(eq=False)
 class CEOAsFirstRole(Role[Person], Symbol):
-    person: Person = field(kw_only=True)
+    person: Person = role_taker_field()
     head_of: RecognizedGroup = None
-
-    @classmethod
-    def role_taker_attribute(cls) -> Person:
-        return variable_from(cls).person
 
 
 @dataclass(eq=False)
 class RepresentativeAsSecondRole(Role[CEOAsFirstRole], Symbol):
-    ceo: CEOAsFirstRole = field(kw_only=True)
+    ceo: CEOAsFirstRole = role_taker_field()
     representative_of: RecognizedGroup = None
-
-    @classmethod
-    def role_taker_attribute(cls) -> CEOAsFirstRole:
-        return variable_from(cls).ceo
 
 
 @dataclass(eq=False)
 class DelegateAsThirdRole(Role[RepresentativeAsSecondRole], Symbol):
-    representative: RepresentativeAsSecondRole
+    representative: RepresentativeAsSecondRole = role_taker_field()
 
     delegate_of: RecognizedGroup = field(kw_only=True, default=None)
-
-    @classmethod
-    def role_taker_attribute(cls) -> RepresentativeAsSecondRole:
-        return variable_from(cls).representative
 
 
 @dataclass

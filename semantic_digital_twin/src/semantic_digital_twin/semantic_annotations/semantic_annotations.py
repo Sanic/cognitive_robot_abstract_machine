@@ -6,12 +6,8 @@ from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING
 
 from typing_extensions import List, Type, TypeVar
 
-from krrood.entity_query_language.core.mapped_variable import Attribute
-from krrood.entity_query_language.factories import (
-    variable_from,
-)
 from krrood.ormatic.utils import classproperty
-from krrood.patterns.role import Role
+from krrood.patterns.role import Role, role_taker_field
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -502,67 +498,51 @@ class Room(SemanticAnnotation):
 
 
 @dataclass(eq=False)
-class Kitchen(Role[Room], Room):
+class Kitchen(Role[Room]):
     """
     A kitchen is a room that has kitchen utilities and machines.
     """
 
-    room: Room = field(kw_only=True)
+    room: Room = role_taker_field()
     """
     The kitchen's room.
     """
 
-    @classmethod
-    def role_taker_attribute(cls) -> Attribute[Room]:
-        return variable_from(cls).room
-
 
 @dataclass(eq=False)
-class Bedroom(Role[Room], Room):
+class Bedroom(Role[Room]):
     """
     A bedroom is a room that is used for sleeping.
     """
 
-    room: Room = field(kw_only=True)
+    room: Room = role_taker_field()
     """
     The bedroom's room.
     """
 
-    @classmethod
-    def role_taker_attribute(cls) -> Attribute[Room]:
-        return variable_from(cls).room
-
 
 @dataclass(eq=False)
-class Bathroom(Role[Room], Room):
+class Bathroom(Role[Room]):
     """
     A bathroom is a room that is used for personal hygiene activities.
     """
 
-    room: Room = field(kw_only=True)
+    room: Room = role_taker_field()
     """
     The bathroom's room.
     """
 
-    @classmethod
-    def role_taker_attribute(cls) -> Attribute[Room]:
-        return variable_from(cls).room
-
 
 @dataclass(eq=False)
-class LivingRoom(Role[Room], Room):
+class LivingRoom(Role[Room]):
     """
     A living room is a room that is used for social activities and relaxation.
     """
 
-    room: Room = field(kw_only=True)
+    room: Room = role_taker_field()
     """
     The living room's room.
     """
-
-    @classmethod
-    def role_taker_attribute(cls) -> Attribute[Room]:
-        return variable_from(cls).room
 
 
 @dataclass(eq=False)
