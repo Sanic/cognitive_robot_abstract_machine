@@ -1,0 +1,10 @@
+# Gradle
+.gradle/
+build/
+
+# IntelliJ project files (this project is imported from Gradle)
+.idea/
+*.iml
+
+# Kotlin
+.kotlin/

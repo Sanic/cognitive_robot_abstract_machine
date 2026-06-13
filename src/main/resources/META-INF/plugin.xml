@@ -1,0 +1,33 @@
+<idea-plugin>
+    <!-- Unique id. Change to your own reverse-DNS identifier before publishing. -->
+    <id>com.example.pyroles</id>
+    <name>Python Role Lens</name>
+    <vendor email="you@example.com" url="https://example.com">Example</vendor>
+
+    <description><![CDATA[
+        Adds IDE awareness for the <b>Role / delegation</b> pattern in Python, where a class
+        subclasses <code>Role[SomeTaker]</code> and forwards attribute access to a wrapped
+        instance through <code>__getattr__</code>.
+        <br/><br/>
+        The members of the taker class — together with everything it inherits, and any
+        nested roles — become available on the role instance for <b>code completion</b>,
+        <b>type inference</b>, and <b>Go to Declaration</b> (Ctrl/Cmd+Click), without
+        using inheritance.
+    ]]></description>
+
+    <!--
+      Marks this as a Python-aware plugin. The module com.intellij.modules.python is
+      provided by both PyCharm Community (PythonCore) and PyCharm Professional /
+      IntelliJ IDEA + Python plugin (Pythonid), so the plugin loads in all of them.
+    -->
+    <depends>com.intellij.modules.python</depends>
+
+    <!--
+      The Python plugin declares its extension points under the "Pythonid" namespace,
+      even in the Community edition. Using the wrong namespace makes the plugin load
+      WITHOUT ever instantiating the provider class (a silent no-op) — a classic gotcha.
+    -->
+    <extensions defaultExtensionNs="Pythonid">
+        <pyClassMembersProvider implementation="com.example.pyroles.RoleMembersProvider"/>
+    </extensions>
+</idea-plugin>
