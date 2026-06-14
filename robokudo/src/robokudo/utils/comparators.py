@@ -363,8 +363,8 @@ class PoseComparator(FeatureComparator):
             query_value.translation, obj_value.translation
         )
 
-        pose_sim = self.translation_comparator.compute_similarity(
+        orientation_sim = self.orientation_comparator.compute_similarity(
             query_value.rotation, obj_value.rotation
         )
 
-        return (position_sim + pose_sim) / 2.0
+        return (position_sim + orientation_sim) / 2.0
