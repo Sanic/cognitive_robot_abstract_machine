@@ -37,6 +37,12 @@ class GroupedByPlanner(Planner[Union[Query, GroupedBy], GroupPlan]):
     Decompose the GROUP BY of *node* (a query or a bare grouped-by node) into a ``GroupPlan``.
 
     Reference: Reiter & Dale (2000) — content/structure determination (microplanning).
+
+    >>> employee = variable(Employee, [])
+    >>> GroupedByPlanner(
+    ...     a(set_of(employee.department, sum(employee.salary)).grouped_by(employee.department))
+    ... ).plan().has_keys
+    True
     """
 
     def plan(self) -> GroupPlan:

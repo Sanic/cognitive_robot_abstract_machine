@@ -36,6 +36,12 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
 
     Reference: Reiter & Dale (2000) — aggregation / clause structuring; Gatt & Reiter (2009),
     SimpleNLG — surface realisation.
+
+    >>> employee = variable(Employee, [])
+    >>> verbalize_expression(
+    ...     a(set_of(employee.department, sum(employee.salary)).grouped_by(employee.department))
+    ... )
+    'Find sets of (the department of an Employee, the sum of salaries of Employees) grouped by the department of the Employee'
     """
 
     planner = GroupedByPlanner
@@ -90,7 +96,12 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
 
 
 class OrderedByAssembler(Assembler[Union[OrderedBy, OrderedByBuilder], None]):
-    """*"ordered by <variable> (ascending|descending)"*. Realisation-only (no plan)."""
+    """*"ordered by <variable> (ascending|descending)"*. Realisation-only (no plan).
+
+    >>> employee = variable(Employee, [])
+    >>> verbalize_expression(a(set_of(employee).ordered_by(employee.salary, descending=True)))
+    'Find sets of (an Employee) ordered by the salary of the Employee (descending)'
+    """
 
     def realize(
         self, node: Union[OrderedBy, OrderedByBuilder], plan: None = None
@@ -131,7 +142,15 @@ class OrderedByAssembler(Assembler[Union[OrderedBy, OrderedByBuilder], None]):
 
 
 class HavingAssembler(Assembler[Query, None]):
-    """*"having <condition>"* (compact comparators). Realisation-only (no plan)."""
+    """*"having <condition>"* (compact comparators). Realisation-only (no plan).
+
+    >>> employee = variable(Employee, [])
+    >>> total = sum(employee.salary)
+    >>> verbalize_expression(
+    ...     a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
+    ... )
+    'Find sets of (the department of an Employee, the sum of salaries of Employees) grouped by the department of the Employee, having the sum of salaries of Employees greater than 30000'
+    """
 
     def realize(self, node: Query, plan: None = None) -> Fragment:
         """

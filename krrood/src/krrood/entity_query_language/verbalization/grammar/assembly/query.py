@@ -60,6 +60,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
     afterwards (Reiter & Dale 2000).
 
     Reference: Gatt & Reiter (2009), SimpleNLG — surface realisation.
+
+    >>> robot = variable(Robot, [])
+    >>> verbalize_expression(an(entity(robot).where(robot.battery > 50)))
+    'Find a Robot whose battery is greater than 50'
     """
 
     planner = QueryPlanner

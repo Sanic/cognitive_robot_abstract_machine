@@ -136,6 +136,9 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     entity is an aggregation value-subquery.
 
     Reference: Reiter & Dale (2000) — content/structure determination (microplanning).
+
+    >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
+    'Robot'
     """
 
     def plan(self) -> QueryPlan:

@@ -69,6 +69,9 @@ class ChainPlanner(Planner[MappedVariable, ChainPlan]):
     say*, before any surface form is chosen.
 
     Reference: Reiter & Dale (2000) — content/structure determination (microplanning).
+
+    >>> ChainPlanner(variable(Task, []).completed).plan().is_boolean_terminal
+    True
     """
 
     def plan(self) -> ChainPlan:

@@ -23,11 +23,33 @@ from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
 from krrood.entity_query_language.verbalization import example_domain
 from krrood.entity_query_language.verbalization.grammar import english, restriction
-from krrood.entity_query_language.verbalization.grammar.assembly import chains
+from krrood.entity_query_language.verbalization.grammar.assembly import (
+    aggregation_value,
+    chains,
+    clauses as assembly_clauses,
+    query as assembly_query,
+)
+from krrood.entity_query_language.verbalization.grammar.planning import (
+    chains as planning_chains,
+    clauses as planning_clauses,
+    query as planning_query,
+)
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
-# The grammar modules whose rule/form docstrings carry executable examples.
-_MODULES = [english, restriction, chains]
+# The grammar modules whose rule/form/assembler/planner docstrings carry executable examples.
+# Assemblers show the rendered string (verbalize_expression); planners show the plan decision
+# they compute (a data record, not a rendered string).
+_MODULES = [
+    english,
+    restriction,
+    chains,
+    assembly_query,
+    assembly_clauses,
+    aggregation_value,
+    planning_chains,
+    planning_clauses,
+    planning_query,
+]
 
 # Names every rule docstring may use, so each example stays a single line.
 _FACTORY_NAMES = [
