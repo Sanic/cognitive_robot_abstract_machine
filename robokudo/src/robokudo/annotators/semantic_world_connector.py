@@ -2,25 +2,31 @@ from robokudo.world import world_instance
 from scipy.optimize import linear_sum_assignment
 from robokudo.types.cv import ImageROI
 from robokudo.types.belief_state import ObjectBeliefState
-from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypotheses
+from robokudo.utils.annotator_helper import (
+    draw_bounding_boxes_from_object_hypotheses,
+    transform_pose_from_cam_to_world,
+)
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 from timeit import default_timer
 
 import numpy as np
 from py_trees.common import Status
 
-from robokudo.annotators.core import BaseAnnotator
+from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CAS
 from robokudo.cas import CASViews
 from robokudo.types.annotation import (
     PoseAnnotation,
+    StampedPoseAnnotation,
     BoundingBox3DAnnotation,
 )
 from robokudo.types.scene import ObjectHypothesis
 from robokudo import world
 
+from line_profiler_pycharm import profile
 
-class SemanticDigitalTwinConnector(BaseAnnotator):
+
+class SemanticDigitalTwinConnector(ThreadedAnnotator):
     """An annotator that synchronizes the current state of the world with the semdt."""
 
     class Descriptor(BaseAnnotator.Descriptor):
@@ -45,11 +51,12 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
         self.object_comparator = (
             ObjectHypothesisComparator(self.get_cas)
             .with_comparator_for(ImageROI, weight=0.2)
-            .with_comparator_for(PoseAnnotation, weight=0.4)
+            .with_comparator_for(StampedPoseAnnotation, weight=0.4)
             .with_comparator_for(BoundingBox3DAnnotation, weight=0.4)
         )
 
-    def update(self) -> Status:
+    @profile
+    def compute(self) -> Status:
         """Synchronise the current RoboKudo state with the current semdt state."""
         start_timer = default_timer()
 
@@ -78,6 +85,12 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
         """Associate current object hypotheses with existing or new object beliefs."""
         if len(object_hypotheses) == 0:
             return []
+
+        # We assume that this Annotator is the final part of your pipeline, which will select
+        # the best poses of multiple pose candidates. The best pose will be transformed
+        # to the world frame for comparison with the belief state
+        self.add_world_pose_annotations(object_hypotheses, cas)
+
         if len(object_beliefs) == 0:
             return self.create_new_beliefs_for_hypotheses(object_hypotheses, cas)
 
@@ -100,6 +113,40 @@ class SemanticDigitalTwinConnector(BaseAnnotator):
             )
         )
         return associated_hypotheses
+
+    def add_world_pose_annotations(
+        self, object_hypotheses: list[ObjectHypothesis], cas: CAS
+    ) -> None:
+        """Add world-frame stamped poses to hypotheses when a camera pose is available."""
+        if cas.cam_to_world_transform is None:
+            return
+
+        for object_hypothesis in object_hypotheses:
+            pose_annotation = self.get_latest_pose_annotation(object_hypothesis)
+            if pose_annotation is None:
+                continue
+
+            pose_in_world = transform_pose_from_cam_to_world(cas, pose_annotation)
+            stamped_pose = StampedPoseAnnotation()
+            stamped_pose.source = self.get_class_name()
+            stamped_pose.translation = pose_in_world.translation
+            stamped_pose.rotation = pose_in_world.rotation
+            if cas.world_frame is not None:
+                stamped_pose.frame = cas.world_frame
+            if cas.contains(CASViews.CAM_INFO):
+                stamped_pose.timestamp = cas.get(CASViews.CAM_INFO).header.stamp
+
+            object_hypothesis.annotations.append(stamped_pose)
+
+    @staticmethod
+    def get_latest_pose_annotation(
+        object_hypothesis: ObjectHypothesis,
+    ) -> PoseAnnotation | None:
+        """Return the latest plain pose annotation for a hypothesis."""
+        for annotation in reversed(object_hypothesis.annotations):
+            if type(annotation) is PoseAnnotation:
+                return annotation
+        return None
 
     def create_association_cost_matrix(
         self,
