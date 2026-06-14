@@ -1,16 +1,14 @@
-import copy
-
-import clip
-from transformers import CLIPProcessor, CLIPModel
 import faiss
 import torch
 from PIL import Image
 from py_trees.common import Status
+from transformers import CLIPModel, CLIPProcessor
+from typing_extensions import List
+
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
-from typing_extensions import List
 
 
 class ClipAnnotator(BaseAnnotator):
@@ -22,13 +20,16 @@ class ClipAnnotator(BaseAnnotator):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         """Torch device to be used by the annotator."""
 
-        clip_model, clip_preprocess = clip.load("ViT-B/32", device=self.device)
+        self.model_name: str = "openai/clip-vit-large-patch14"
 
-        self.clip_model = clip_model
+        self.clip_model = CLIPModel.from_pretrained(self.model_name)
         """CLIP model used for feature extraction."""
 
-        self.clip_preprocess = clip_preprocess
-        """CLIP preprocessor used for feature extraction."""
+        self.clip_preprocess = CLIPProcessor.from_pretrained(self.model_name)
+        """CLIP preprocessor used for input preprocessing."""
+
+        self.clip_tokenizer = self.clip_preprocess.tokenizer
+        """CLIP tokenizer used for text preprocessing."""
 
         self.vocabulary_template: str = "A photo of a {}"
 
@@ -42,15 +43,21 @@ class ClipAnnotator(BaseAnnotator):
         ]
         """The vocabulary used for object classification"""
 
-        self.vocabulary_index: faiss.IndexFlatIP = faiss.IndexFlatIP(512)
+        self.vocabulary_index: faiss.IndexFlatIP = faiss.IndexFlatIP(
+            self.clip_model.config.projection_dim
+        )
         """A faiss index for text features used in similarity search."""
 
         with torch.no_grad():
             templated_texts = [
                 self.vocabulary_template.format(name) for name in self.vocabulary
             ]
-            tokenized_vocabulary = clip.tokenize(templated_texts).to(self.device)
-            text_features = self.clip_model.encode_text(tokenized_vocabulary)
+            inputs = self.clip_tokenizer(
+                templated_texts,
+                padding=True,
+                return_tensors="pt",
+            ).to(self.device)
+            text_features = self.clip_model.get_text_features(**inputs).pooler_output
             text_features /= torch.norm(text_features, p=2, dim=-1, keepdim=True)
             text_features = text_features.cpu().numpy()
         self.vocabulary_index.add(text_features)
@@ -62,18 +69,17 @@ class ClipAnnotator(BaseAnnotator):
         if len(ohs) == 0:
             return Status.SUCCESS
 
-        color_pil = Image.fromarray(
-            copy.deepcopy(self.get_cas().get(CASViews.COLOR_IMAGE))
-        )
+        color_image = self.get_cas().get(CASViews.COLOR_IMAGE).copy()
+        color_pil = Image.fromarray(color_image)
 
         # Create per-object image crop
-        cropped_images = (color_pil.crop(oh.roi.roi.get_corner_points()) for oh in ohs)
+        cropped_images = [color_pil.crop(oh.roi.roi.get_corner_points()) for oh in ohs]
 
         with torch.no_grad():
-            preprocessed_images = torch.stack(
-                [self.clip_preprocess(crop) for crop in cropped_images]
+            inputs = self.clip_preprocess(
+                images=cropped_images, return_tensors="pt"
             ).to(self.device)
-            crop_features = self.clip_model.encode_image(preprocessed_images)
+            crop_features = self.clip_model.get_image_features(**inputs).pooler_output
             crop_features /= torch.norm(crop_features, p=2, dim=-1, keepdim=True)
             crop_features = crop_features.cpu().numpy()
 
