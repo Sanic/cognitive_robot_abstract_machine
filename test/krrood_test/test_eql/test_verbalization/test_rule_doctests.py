@@ -18,7 +18,7 @@ import doctest
 
 import pytest
 
-from krrood.entity_query_language import factories
+import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
 from krrood.entity_query_language.verbalization import example_domain
@@ -51,26 +51,19 @@ _MODULES = [
     planning_query,
 ]
 
-# Names every rule docstring may use, so each example stays a single line.
-_FACTORY_NAMES = [
-    "variable",
-    "a",
-    "an",
-    "the",
-    "entity",
-    "set_of",
-    "and_",
-    "or_",
-    "max",
-    "min",
-    "sum",
-    "count",
-    "contains",
-    "in_",
-    "for_all",
-    "exists",
+# A shared namespace for all examples. It includes the EQL factories, so an example can write
+# *"verbalize_expression(variable(Task, []).completed)"* rather than re-import everything.
+# It also includes the example-domain classes, so the rendered examples also hyperlink to real API pages.
+factories = [
+    eql.variable, # variables
+    eql.a, eql.an, eql.the, # quantifiers
+    eql.entity, eql.set_of, # query construction
+    eql.and_, eql.or_, # boolean logic
+    eql.max, eql.min, eql.sum, eql.count, # aggregations
+    eql.contains, eql.in_, # membership
+    eql.for_all, eql.exists # quantified conditionals
 ]
-_GLOBS = {name: getattr(factories, name) for name in _FACTORY_NAMES}
+_GLOBS = {factory.__name__: factory for factory in factories}
 _GLOBS.update(
     verbalize_expression=verbalize_expression,
     Not=Not,
