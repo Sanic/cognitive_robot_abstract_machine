@@ -492,13 +492,11 @@ class ActionNode(DesignatorNode):
 
         # recursively expand nested actions, conditions are only evaluated during execution
         for child in self.children:
-            if isinstance(child, ConditionNode):
-                continue
             child.notify()
 
         # only the outermost action parses and executes the fully expanded plan
-        if self.parent_action_node is None:
-            self.parse().execute()
+        # if self.parent_action_node is None:
+        #     self.parse().execute()
 
         # TODO: This can't stay here
         self.update_execution_data_post_perform()
@@ -520,6 +518,9 @@ class ActionNode(DesignatorNode):
             execution_list=self.merge_motion_executables(exec_list),
             context=self.plan.context,
         )
+
+    def execute(self):
+        self.parse().execute()
 
 
 @dataclass(eq=False, repr=False)

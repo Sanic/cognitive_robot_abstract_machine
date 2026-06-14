@@ -14,8 +14,9 @@ from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
+from krrood.entity_query_language.factories import evaluate_condition
 from pycram.datastructures.enums import ExecutionType
-from pycram.exceptions import MotionDidNotFinish
+from pycram.exceptions import MotionDidNotFinish, ConditionNotSatisfied
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -196,7 +197,13 @@ class ConditionExecutable(Executable):
         """
         Executes the condition node.
         """
-        pass
+        if evaluate_condition(self.condition_node.condition):
+            return True
+        raise ConditionNotSatisfied(
+            pre_condition=self.condition_node.pre_condition,
+            action=self.condition_node.__class__,
+            condition=self.condition_node.condition,
+        )
 
 
 @dataclass

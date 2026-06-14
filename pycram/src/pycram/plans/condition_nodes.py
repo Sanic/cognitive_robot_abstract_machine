@@ -22,10 +22,4 @@ class ConditionNode(PlanNode):
     """
 
     def notify(self):
-        if evaluate_condition(self.condition):
-            return True
-        raise ConditionNotSatisfied(
-            pre_condition=self.pre_condition,
-            action=self.__class__,
-            condition=self.condition,
-        )
+        pass

@@ -6,15 +6,15 @@ from pycram.plans.executables import (
 )
 from pycram.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from pycram.datastructures.grasp import GraspDescription
-from pycram.plans.factories import execute_single
+from pycram.plans.factories import execute_single, sequential
 from pycram.robot_plans.actions.core.pick_up import ReachAction, PickUpAction
-from pycram.robot_plans.actions.core.robot_body import MoveTorsoAction
+from pycram.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from pycram.robot_plans.motions.gripper import MoveToolCenterPointMotion
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     VerticalSemanticDirection,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3
 from pycram.utils import split_list_by_type
 
 
@@ -84,6 +84,33 @@ def test_parse_pick_up(immutable_model_world):
     assert type(executable.execution_list[0]) == ConditionExecutable
     assert type(executable.execution_list[1]) == LanguageExecutable
     assert len(executable.execution_list[1].execution_list) == 5
+
+
+def test_parse_complex_plan(immutable_model_world):
+    world, view, context = immutable_model_world
+
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.BOTH),
+            ReachAction(
+                target_pose=Pose(
+                    Point3.from_iterable([1, -2, 0.8]), reference_frame=world.root
+                ),
+                object_designator=world.get_body_by_name("milk.stl"),
+                arm=Arms.LEFT,
+                grasp_description=GraspDescription(
+                    ApproachDirection.FRONT,
+                    VerticalAlignment.NoAlignment,
+                    view.right_arm.end_effector,
+                ),
+            ),
+        ],
+        context=context,
+    )
+
+    plan.notify()
+    exec = plan.parse()
+    assert len(exec.execution_list) == 2
 
 
 def test_split_by_type():
