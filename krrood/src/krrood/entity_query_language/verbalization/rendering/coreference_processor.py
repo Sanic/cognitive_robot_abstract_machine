@@ -22,15 +22,16 @@ from krrood.entity_query_language.verbalization.microplanning.possessive import 
 from krrood.entity_query_language.verbalization.vocabulary.english import Pronouns
 
 
-@dataclass(frozen=True)
+@dataclass
 class SubjectFrame:
     """One entry of the coreference pass's subject stack — the current pronoun-eligible subject."""
 
     subject_id: Optional[uuid.UUID]
     """The subject's referent id, or ``None`` for a scope with no single subject (e.g. ``SetOf``)."""
 
-    number: Number
-    """The subject's grammatical number — selects *"its"* (singular) vs. *"their"* (plural)."""
+    number: Number = Number.SINGULAR
+    """The subject's grammatical number — selects *"its"* (singular) vs. *"their"* (plural). Filled
+    from the subject's own noun phrase when the pass walks it (rules supply no number)."""
 
 
 @dataclass
@@ -78,10 +79,8 @@ class CoreferenceProcessor:
     def _walk(self, fragment: Fragment) -> Fragment:
         """Document-order rebuild, threading the accumulating discourse state."""
         match fragment:
-            case SubjectScope(
-                subject_id=subject_id, child=child, subject_number=subject_number
-            ):
-                self._subject_stack.append(SubjectFrame(subject_id, subject_number))
+            case SubjectScope(subject_id=subject_id, child=child):
+                self._subject_stack.append(SubjectFrame(subject_id))
                 try:
                     return self._walk(child)
                 finally:
@@ -139,6 +138,7 @@ class CoreferenceProcessor:
         """
         if noun_phrase.referent_id is None:
             return self._rebuilt(noun_phrase)
+        self._record_subject_number(noun_phrase)
         repeat = noun_phrase.referent_id in self._seen
         self._seen.add(noun_phrase.referent_id)
         downgrade = (
@@ -154,6 +154,15 @@ class CoreferenceProcessor:
                 referent_id=noun_phrase.referent_id,
             )
         return self._rebuilt(noun_phrase)
+
+    def _record_subject_number(self, noun_phrase: NounPhrase) -> None:
+        """If this noun phrase *is* an enclosing scope's subject, record its grammatical number on
+        that frame — the subject is rendered before the chains that refer to it, so the number
+        (*"its"*/*"their"*) is known by the time pronominalisation is decided. Rules supply none."""
+        for frame in reversed(self._subject_stack):
+            if frame.subject_id == noun_phrase.referent_id:
+                frame.number = noun_phrase.number
+                return
 
     def _rebuilt(self, noun_phrase: NounPhrase) -> NounPhrase:
         """Rebuild *noun_phrase* with its head and modifiers recursed (document order preserved).

@@ -86,11 +86,12 @@ def test_number_passed_by_keyword():
     )
 
 
-def test_subject_scope_does_not_use_hasnumber():
-    """``SubjectScope.subject_number`` is the *antecedent's* agreement number (a different concept
-    the morphology pass never reads) — it must stay its own field, not the shared ``HasNumber``.
+def test_subject_scope_carries_no_number():
+    """``SubjectScope`` is identity-only: it carries no grammatical number — neither the shared
+    ``HasNumber`` ``number`` nor its own ``subject_number``. The coreference pass derives the
+    subject's number from its noun phrase when it walks it, so rules supply none.
     """
     assert HasNumber not in SubjectScope.__mro__
     field_names = {f.name for f in dc.fields(SubjectScope)}
-    assert "subject_number" in field_names
+    assert "subject_number" not in field_names
     assert "number" not in field_names

@@ -176,6 +176,11 @@ class NounPhrase(HasNumber, Fragment):
 class SubjectScope(Fragment):
     """
     Marks the region in which ``subject_id`` is the pronoun-eligible discourse subject.
+
+    Identity only: the rule states *which* referent is the subject (a structural fact — it is the
+    variable whose clause this is). The grammatical number that selects the pronoun (*"its"* vs
+    *"their"*) is **not** supplied here — the coreference pass reads it off the subject's own noun
+    phrase when it walks it, so rules carry no morphology.
     """
 
     subject_id: Optional[uuid.UUID]
@@ -184,10 +189,6 @@ class SubjectScope(Fragment):
 
     child: Fragment
     """The wrapped fragment the scope applies to."""
-
-    subject_number: Number = Number.SINGULAR
-    """The subject's grammatical number — selects the possessive pronoun (*"its"* for a singular
-    subject, *"their"* for a plural population)."""
 
 
 @dataclass
@@ -304,14 +305,8 @@ def map_structural_children(
                 header=None if header is None else recurse(header),
                 items=[recurse(i) for i in items],
             )
-        case SubjectScope(
-            subject_id=subject_id, child=child, subject_number=subject_number
-        ):
-            return SubjectScope(
-                subject_id=subject_id,
-                child=recurse(child),
-                subject_number=subject_number,
-            )
+        case SubjectScope(subject_id=subject_id, child=child):
+            return SubjectScope(subject_id=subject_id, child=recurse(child))
         case _:
             return None
 

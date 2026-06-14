@@ -119,8 +119,6 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         scope_phrase = PhraseFragment(parts=parts)
         if source is None:
             return scope_phrase
-        return SubjectScope(
-            subject_id=source._id_,
-            child=scope_phrase,
-            subject_number=Number.PLURAL,
-        )
+        # Identity only — the pass reads the *"their"* number off the (plural) population noun
+        # phrase rendered inside the scope.
+        return SubjectScope(subject_id=source._id_, child=scope_phrase)

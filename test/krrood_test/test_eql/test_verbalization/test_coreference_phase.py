@@ -209,10 +209,11 @@ def test_chain_rooted_at_plural_subject_pronominalises_with_their():
     intro = NounPhrase(
         head=_noun("Robot"), number=Number.PLURAL, referent_id=rid
     )  # "Robots" (bare plural population intro)
+    # SubjectScope is identity-only: the pass derives "their" from the plural population intro
+    # (referent_id == subject_id) it walks before the chain.
     tree = SubjectScope(
         subject_id=rid,
         child=PhraseFragment(parts=[intro, chain]),
-        subject_number=Number.PLURAL,
     )
     # _realise runs coreference + determiner only; the head inflects to "Robots" later in the
     # morphology pass (the full pipeline is pinned by test_deeply_nested_subqueries_golden).
