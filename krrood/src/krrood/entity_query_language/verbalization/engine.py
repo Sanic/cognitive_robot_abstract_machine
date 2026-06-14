@@ -5,7 +5,7 @@ from typing_extensions import TYPE_CHECKING, Optional, Sequence
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.fragments.base import Fragment
 from krrood.entity_query_language.verbalization.fragments.features import Number
-from krrood.entity_query_language.verbalization.grammar.phrase_rule import (
+from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     RuleContext,
     PhraseRule,
     select,

@@ -16,7 +16,7 @@ from krrood.entity_query_language.verbalization.grammar.assembly.restrictions im
 from krrood.entity_query_language.verbalization.exceptions import (
     UnplacedRestrictionError,
 )
-from krrood.entity_query_language.verbalization.grammar.phrase_rule import RuleContext
+from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import RuleContext
 from krrood.entity_query_language.verbalization.grammar.planning.query import (
     MatchedRestriction,
     RestrictionPlan,

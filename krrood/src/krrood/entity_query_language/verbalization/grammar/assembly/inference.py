@@ -16,7 +16,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     Fragment,
 )
-from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
 from krrood.entity_query_language.verbalization.grammar.conditions.verbalizer import (
     ConditionVerbalizer,
 )

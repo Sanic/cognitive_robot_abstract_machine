@@ -7,7 +7,10 @@ from typing_extensions import TYPE_CHECKING, Callable, ClassVar, Optional, Seque
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.fragments.base import Fragment
 from krrood.entity_query_language.verbalization.fragments.features import Number
-from krrood.entity_query_language.verbalization.grammar.selection import most_specific
+from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
+    most_specific,
+    mro_depth,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import MicroplanningServices
@@ -109,14 +112,6 @@ class PhraseRule(ABC):
         """
 
 
-def _mro_depth(cls: type) -> int:
-    """
-    :param cls: A construct (EQL node) class.
-    :return: Specificity of *cls* — deeper in the MRO ⇒ more specific (``Literal`` > ``Variable``).
-    """
-    return len(cls.__mro__)
-
-
 def _is_guarded(rule: PhraseRule) -> bool:
     """
     :param rule: A phrase rule instance.
@@ -153,8 +148,8 @@ def select(
     return most_specific(
         candidates,
         key=lambda rule: (
-            _mro_depth(rule.construct),
+            mro_depth(rule.construct),
             _is_guarded(rule),
-            _mro_depth(type(rule)),
+            mro_depth(type(rule)),
         ),
     )

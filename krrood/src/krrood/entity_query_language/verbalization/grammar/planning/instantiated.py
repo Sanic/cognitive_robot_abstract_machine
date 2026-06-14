@@ -8,7 +8,7 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.predicate import Verbalizable
 from krrood.entity_query_language.verbalization import morphology
-from krrood.entity_query_language.verbalization.grammar.planning.base import Planner
+from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
 
 @dataclass(frozen=True)

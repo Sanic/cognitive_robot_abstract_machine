@@ -18,7 +18,7 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 from krrood.entity_query_language.verbalization.fragments.source_reference import (
     SourceReference,
 )
-from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
 from krrood.entity_query_language.verbalization.grammar.planning.instantiated import (
     BindingPlan,
     InstantiatedPlan,

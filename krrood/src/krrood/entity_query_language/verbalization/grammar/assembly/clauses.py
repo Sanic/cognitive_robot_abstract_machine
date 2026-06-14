@@ -15,7 +15,7 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Number,
     Separator,
 )
-from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
 from krrood.entity_query_language.verbalization.grammar.planning.clauses import (
     GroupedByPlanner,
     GroupPlan,

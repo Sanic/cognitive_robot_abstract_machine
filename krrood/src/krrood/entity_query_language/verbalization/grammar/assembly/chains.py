@@ -27,7 +27,7 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     Number,
 )
-from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
 from krrood.entity_query_language.verbalization.grammar.assembly.query import (
     QueryAssembler,
 )
@@ -35,7 +35,7 @@ from krrood.entity_query_language.verbalization.grammar.planning.chains import (
     ChainPlan,
     ChainPlanner,
 )
-from krrood.entity_query_language.verbalization.grammar.selection import (
+from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
     SpecificityRule,
 )
 from krrood.entity_query_language.verbalization.microplanning.possessive import (

@@ -18,7 +18,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     WordFragment,
 )
-from krrood.entity_query_language.verbalization.grammar.phrase_rule import (
+from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     RuleContext,
     PhraseRule,
     select,

@@ -6,8 +6,14 @@ from dataclasses import dataclass
 from typing_extensions import ClassVar, Generic, Optional, Type
 
 from krrood.entity_query_language.verbalization.fragments.base import Fragment
-from krrood.entity_query_language.verbalization.grammar.phrase_rule import RuleContext
-from krrood.entity_query_language.verbalization.grammar.planning.base import Planner, TSymbolicExpression, TPlan
+from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
+    RuleContext,
+)
+from krrood.entity_query_language.verbalization.grammar.framework.planner import (
+    Planner,
+    TSymbolicExpression,
+    TPlan,
+)
 
 
 @dataclass

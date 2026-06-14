@@ -27,7 +27,7 @@ def most_specific(candidates: Sequence[_T], key: Callable[[_T], Any]) -> Optiona
     return max(candidates, key=key, default=None)
 
 
-def _mro_depth(cls: type) -> int:
+def mro_depth(cls: type) -> int:
     """
     :param cls: A class.
     :return: Its specificity — deeper in the hierarchy ⇒ more specific (a subclass outranks the
@@ -74,5 +74,5 @@ class SpecificityRule(ABC):
         :return: The most-specific alternative whose ``applies(*args)`` holds, or ``None``.
         """
         applicable = [alt for alt in cls.alternatives() if alt.applies(*args)]
-        return most_specific(applicable, key=_mro_depth)
+        return most_specific(applicable, key=mro_depth)
 

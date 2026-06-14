@@ -11,7 +11,7 @@ from krrood.entity_query_language.core.variable import InstantiatedVariable, Var
 from krrood.entity_query_language.query.operations import GroupedBy
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.entity_query_language.verbalization.chain_utils import chain_root
-from krrood.entity_query_language.verbalization.grammar.planning.base import Planner
+from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
 
 @dataclass(frozen=True)

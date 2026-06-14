@@ -22,7 +22,7 @@ from krrood.entity_query_language.verbalization.fragments.features import (
 from krrood.entity_query_language.verbalization.grammar.assembly.aggregation_value import (
     AggregationValueAssembler,
 )
-from krrood.entity_query_language.verbalization.grammar.assembly.base import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
 from krrood.entity_query_language.verbalization.grammar.assembly.clauses import (
     GroupedByAssembler,
     HavingAssembler,

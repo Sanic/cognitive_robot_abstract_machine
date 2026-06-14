@@ -21,7 +21,7 @@ from krrood.entity_query_language.verbalization.chain_utils import chain_root
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     attribute_names,
 )
-from krrood.entity_query_language.verbalization.grammar.planning.base import Planner
+from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 from krrood.entity_query_language.verbalization.subquery import (
     unwrap_result_quantifiers,
 )

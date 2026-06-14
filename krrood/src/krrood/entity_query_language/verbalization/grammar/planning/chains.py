@@ -17,7 +17,7 @@ from krrood.entity_query_language.verbalization.chain_utils import (
     walk_chain,
 )
 from krrood.entity_query_language.verbalization.fragments.features import Number
-from krrood.entity_query_language.verbalization.grammar.planning.base import Planner
+from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
 
 @dataclass(frozen=True)
