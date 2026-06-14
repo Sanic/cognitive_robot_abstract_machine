@@ -25,6 +25,7 @@ class CrDescriptorFactory:
         "orbbec_wo_tf": KinectCameraInterface,
         "file_reader": RGBDFileReaderInterface,
         "semdt_raytracer": SemDTRayTracerCameraInterface,
+        "hsr_ros2": KinectCameraInterface,
     }
     """Mapping of camera names to their corresponding camera interface types."""
 

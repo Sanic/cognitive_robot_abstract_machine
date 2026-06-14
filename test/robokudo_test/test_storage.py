@@ -315,7 +315,7 @@ class TestStorage:
             child_frame=camera_body,
             reference_frame=world_body,
         )
-        cas_data.set(CASViews.CAM_TO_WORLD_TRANSFORM, transform)
+        cas_data.cam_to_world_transform = transform
 
         result = store_cas_in_storage(storage_instance, cas_data)
         assert result.acknowledged

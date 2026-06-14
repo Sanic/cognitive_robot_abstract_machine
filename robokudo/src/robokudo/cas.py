@@ -15,14 +15,14 @@ The module provides:
 """
 
 from __future__ import annotations
+
 import copy
 import time
-import open3d as o3d
-import numpy as np
-
-from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
+import numpy as np
+import open3d as o3d
 from sensor_msgs.msg import CameraInfo
 from typing_extensions import (
     TYPE_CHECKING,
@@ -38,11 +38,12 @@ from typing_extensions import (
 from robokudo.types.tf import StampedTransform
 
 if TYPE_CHECKING:
-    from robokudo.types.core import Annotation
     from semantic_digital_twin.spatial_types.spatial_types import (
         HomogeneousTransformationMatrix,
     )
     from semantic_digital_twin.world import World
+
+    from robokudo.types.core import Annotation
 
 
 class CASViews:
@@ -80,6 +81,12 @@ class CASViews:
 
     QUERY: str = "query"
     """Query information"""
+
+    WORLD_FRAME: str = "world_frame"
+    """Name of the world frame."""
+
+    CAM_FRAME: str = "camera_frame"
+    """Name of the camera frame."""
 
     VIEWPOINT_CAM_TO_WORLD: str = "viewpoint_cam_to_world"
     """DEPRECATED: Use CAM_TO_WORLD_TRANSFORM instead.
@@ -208,6 +215,24 @@ class CAS:
     @cloud.setter
     def cloud(self, value: o3d.geometry.PointCloud) -> None:
         self.views[CASViews.CLOUD] = value
+
+    @property
+    def world_frame(self) -> Optional[str]:
+        """Name of the world frame."""
+        return self.views.get(CASViews.WORLD_FRAME)
+
+    @world_frame.setter
+    def world_frame(self, value: str) -> None:
+        self.views[CASViews.WORLD_FRAME] = value
+
+    @property
+    def cam_frame(self) -> Optional[str]:
+        """Name of the camera frame."""
+        return self.views.get(CASViews.CAM_FRAME)
+
+    @cam_frame.setter
+    def cam_frame(self, value: str) -> None:
+        self.views[CASViews.CAM_FRAME] = value
 
     @property
     def viewpoint_cam_to_world(self) -> Optional[StampedTransform]:

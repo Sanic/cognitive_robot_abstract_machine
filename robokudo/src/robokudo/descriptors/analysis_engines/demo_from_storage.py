@@ -1,8 +1,8 @@
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
-from robokudo.descriptors import CrDescriptorFactory
-
+from robokudo.io.ros import get_node
+from robokudo.world import world_instance
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from robokudo.analysis_engine import AnalysisEngineInterface
-
+from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.outlier_removal_objecthypothesis import (
@@ -11,8 +11,9 @@ from robokudo.annotators.outlier_removal_objecthypothesis import (
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.pipeline import Pipeline
+from robokudo.descriptors import CrDescriptorFactory
 from robokudo.idioms import pipeline_init
+from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -38,6 +39,8 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for tabletop segmentation
         """
+        tf_publisher = TFPublisher(_world=world_instance(), node=get_node())
+
         cr_storage_config = CrDescriptorFactory.create_descriptor("mongo")
 
         seq = Pipeline("StoragePipeline")

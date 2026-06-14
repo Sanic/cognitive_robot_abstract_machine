@@ -18,18 +18,20 @@ The module uses:
    This is typically the first annotator in a pipeline.
 """
 
+from __future__ import annotations
 from timeit import default_timer as timer
-from typing_extensions import Optional, List
 
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree
+from typing_extensions import TYPE_CHECKING, List, Optional
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.io.camera_interface import CameraInterface
-from robokudo.cas import CASViews
-from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
-import robokudo.world
+from robokudo.descriptors.camera_configs.components import TfComponent
+
+if TYPE_CHECKING:
+    from robokudo.io.camera_interface import CameraInterface
+    from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 
 
 class CollectionReaderAnnotator(BaseAnnotator):
@@ -65,10 +67,10 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 """Parameters for configuring collection reader."""
 
                 def __init__(self) -> None:
-                    self.camera_config = camera_config
+                    self.camera_config: BaseCameraConfig = camera_config
                     """Configuration for camera interface"""
 
-                    self.camera_interface = camera_interface
+                    self.camera_interface: CameraInterface = camera_interface
                     """Interface for reading camera data"""
 
             self.parameters = Parameters()
@@ -157,12 +159,13 @@ class CollectionReaderAnnotator(BaseAnnotator):
             self.rk_logger.debug("Waited for %f seconds \n" % time_difference)
             self.start_timer = None
             pipeline = self.get_parent_pipeline()
+            if pipeline is None:
+                self.feedback_message = "Pipeline is not set!"
+                return Status.FAILURE
 
             # Special case: If there is already a query present in this CAS, we need to temporarily save it and set
             # it in the new CAS
-            query = None
-            if pipeline.cas.contains(CASViews.QUERY):
-                query = pipeline.cas.get(CASViews.QUERY)
+            query = pipeline.cas.query
 
             # Create a fresh CAS for the pipeline
             pipeline.create_new_cas()
@@ -171,11 +174,17 @@ class CollectionReaderAnnotator(BaseAnnotator):
             )
 
             # Create a fresh world
-            robokudo.world.clear_world()
+            # world.clear_world()
+
+            cam_config = self.descriptor.parameters.camera_config
+            if issubclass(type(cam_config), TfComponent):
+                cas = self.get_cas()
+                cas.world_frame = cam_config.tf_to
+                cas.cam_frame = cam_config.tf_from
 
             # Restore any existing queries
             if query:
-                pipeline.cas.set(robokudo.cas.CASViews.QUERY, query)
+                pipeline.cas.query = query
 
             for collection_reader in self.collection_readers:
                 collection_reader.parameters.camera_interface.set_data(self.get_cas())

@@ -1,6 +1,3 @@
-import itertools
-import os
-
 from setuptools import find_packages, setup
 
 package_name = "robokudo_ros"
@@ -25,7 +22,6 @@ setup(
     maintainer_email="pmania@uni-bremen.de",
     description="RoboKudo ROS2 package",
     license="Apache License 2.0",
-    tests_require=["pytest"],
     entry_points={
         "console_scripts": [
             "main = robokudo_ros.scripts.main:main",

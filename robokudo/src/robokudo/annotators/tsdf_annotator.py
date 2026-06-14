@@ -11,8 +11,7 @@ from typing_extensions import TYPE_CHECKING, List, Any, Dict, Optional, Tuple
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.types.annotation import PoseAnnotation
-from robokudo.types.cv import TSDFAnnotation
+from robokudo.types.annotation import PoseAnnotation, TSDFAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.comparators import TranslationComparator
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
