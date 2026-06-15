@@ -166,15 +166,13 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
         )
     )
 
-    mask_without_occluders = segmentation_mask_without_occlusion[
-        segmentation_mask_without_occlusion == copied_body.index
-    ].nonzero()
+    # pixels where the target body is visible when nothing else is in the scene
+    target_pixels = segmentation_mask_without_occlusion == copied_body.index
 
-    mask_with_occluders = segmentation_mask_with_occlusion[
-        mask_without_occluders != body.index
-    ]
-    indices = np.unique(mask_with_occluders)
-    indices = indices[indices > -1]
+    # whatever covers those pixels in the real scene (except the target itself)
+    # is occluding the target
+    indices = np.unique(segmentation_mask_with_occlusion[target_pixels])
+    indices = indices[(indices > -1) & (indices != body.index)]
     bodies = [camera._world.kinematic_structure[i] for i in indices]
     return bodies
 

@@ -1,7 +1,11 @@
 from copy import deepcopy
+from dataclasses import dataclass
+from typing import List
 
 import numpy as np
 
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.predicates import (
     contact,
     visible,
@@ -24,10 +28,11 @@ from semantic_digital_twin.reasoning.robot_predicates import (
     is_body_in_gripper,
     bodies_in_gripper,
     is_pose_free_for_robot,
+    is_gripper_holding_something,
 )
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.spatial_types.spatial_types import Pose, Quaternion
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -41,7 +46,11 @@ from semantic_digital_twin.world_description.geometry import (
     BoundingBox,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body, Region
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    Region,
+    KinematicStructureEntity,
+)
 
 
 @pytest.fixture(scope="function")
@@ -532,3 +541,109 @@ def test_bodies_in_gripper(pr2_apartment_world):
     assert len(bodies) == 1
     assert bodies[0].name.name == "mock_milk"
     assert bodies[0] == body
+
+
+def test_empty_gripper_is_not_holding_something():
+
+    @dataclass(eq=False)
+    class ReviewEndEffector(EndEffector):
+        """Minimal concrete EndEffector for predicate tests."""
+
+        def setup_hardware_interfaces(self):
+            pass
+
+        def setup_joint_states(self) -> List[JointState]:
+            return []
+
+        @classmethod
+        def setup_default_configuration_in_world_below_robot_root(
+            cls, robot_root: KinematicStructureEntity
+        ):
+            raise NotImplementedError
+
+    world = World()
+    root = Body(name=PrefixedName("root", prefix="review"))
+    palm = Body(name=PrefixedName("palm", prefix="review"))
+    collision = Box(
+        scale=Scale(),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=palm),
+    )
+    palm.collision = ShapeCollection([collision], reference_frame=palm)
+    tool_frame = Body(name=PrefixedName("tool_frame", prefix="review"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(palm)
+        world.add_kinematic_structure_entity(tool_frame)
+        world.add_connection(FixedConnection(parent=root, child=palm))
+        world.add_connection(FixedConnection(parent=palm, child=tool_frame))
+        gripper = ReviewEndEffector(
+            name=PrefixedName("gripper", prefix="review"),
+            root=palm,
+            tool_frame=tool_frame,
+            front_facing_orientation=Quaternion(0, 0, 0, 1),
+        )
+        world.add_semantic_annotation(gripper)
+
+    # nothing is attached below the tool frame -> the gripper holds nothing
+    assert is_gripper_holding_something(gripper) is False
+
+
+@dataclass(eq=False)
+class ReviewCamera(Camera):
+    """Minimal concrete Camera for predicate tests."""
+
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ):
+        raise NotImplementedError
+
+
+def test_nothing_occludes_a_body_in_clear_line_of_sight():
+
+    world = World()
+    root = Body(name=PrefixedName("root", prefix="review"))
+    camera_body = Body(name=PrefixedName("camera_body", prefix="review"))
+    target = Body(name=PrefixedName("target", prefix="review"))
+    collision = Box(
+        scale=Scale(),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=target),
+    )
+    target.collision = ShapeCollection([collision], reference_frame=target)
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(camera_body)
+        world.add_kinematic_structure_entity(target)
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=camera_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    z=1.0, reference_frame=root
+                ),
+            )
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=root,
+                child=target,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=3.0, z=1.0, reference_frame=root
+                ),
+            )
+        )
+        camera = ReviewCamera(
+            name=PrefixedName("camera", prefix="review"),
+            root=camera_body,
+            forward_facing_axis=Vector3.X(),
+            field_of_view=FieldOfView(horizontal_angle=0.99, vertical_angle=0.75),
+        )
+        world.add_semantic_annotation(camera)
+
+    assert occluding_bodies(camera, target) == []

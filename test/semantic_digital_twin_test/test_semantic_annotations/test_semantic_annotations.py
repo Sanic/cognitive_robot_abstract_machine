@@ -11,8 +11,9 @@ from numpy.ma.testutils import (
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.testing import *
@@ -320,3 +321,44 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(AbstractRobot)[0]
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)
+
+
+def test_kinematic_chain_with_root_equal_tip_has_no_connections():
+
+    @dataclass(eq=False)
+    class ReviewKinematicChain(KinematicChain):
+        """Minimal concrete KinematicChain for chain tests."""
+
+        def setup_hardware_interfaces(self):
+            pass
+
+        def setup_joint_states(self) -> List[JointState]:
+            return []
+
+        @classmethod
+        def setup_default_configuration_in_world_below_robot_root(
+            cls, robot_root: KinematicStructureEntity
+        ):
+            raise NotImplementedError
+
+    world = World()
+    root = Body(name=PrefixedName("root", prefix="review"))
+    link = Body(name=PrefixedName("link", prefix="review"))
+    collision = Box(
+        scale=Scale(),
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=link),
+    )
+    link.collision = ShapeCollection([collision], reference_frame=link)
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(link)
+        joint = RevoluteConnection.create_with_dofs(
+            world=world, parent=root, child=link, axis=Vector3.Z(reference_frame=root)
+        )
+        world.add_connection(joint)
+        chain = ReviewKinematicChain(
+            name=PrefixedName("chain", prefix="review"), root=link, tip=link
+        )
+        world.add_semantic_annotation(chain)
+
+    assert chain.connections == []

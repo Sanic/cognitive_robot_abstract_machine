@@ -33,6 +33,7 @@ from semantic_digital_twin.exceptions import (
     MismatchingPublishChangesAttribute,
     ApplyMissedMessagesWhileWorldIsBeingModifiedError,
     StateUpdateContainsUnknownDegreesOfFreedomError,
+    BrokenWorldModificationHistoryError,
 )
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -146,6 +147,24 @@ def wait_for_sync_kse_and_return_ids(
     body_ids_1 = {body.id for body in w1.kinematic_structure_entities}
     body_ids_2 = {body.id for body in w2.kinematic_structure_entities}
     return body_ids_1, body_ids_2
+
+
+def wait_for_condition(condition, timeout: float = 5.0, interval: float = 0.05) -> bool:
+    """
+    Waits until the condition callable returns True, or until the timeout is reached.
+
+    :param condition: A callable returning a truthy value once the awaited state is reached.
+    :param timeout: The maximum time to wait, in seconds. Defaults to 5.0.
+    :param interval: The time interval between checks, in seconds. Defaults to 0.05.
+
+    :return: The final result of the condition.
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        if condition():
+            return True
+        time.sleep(interval)
+    return bool(condition())
 
 
 def test_state_synchronization(rclpy_node):
@@ -291,7 +310,8 @@ def test_model_synchronization_creation_only(rclpy_node):
 
         c = Connection6DoF.create_with_dofs(parent=b2, child=new_body, world=w1)
         w1.add_connection(c)
-    time.sleep(0.1)
+    wait_for_sync_kse_and_return_ids(w1, w2)
+    wait_for_condition(lambda: len(w2.connections) == 1)
     assert len(w1.kinematic_structure_entities) == 2
     assert len(w2.kinematic_structure_entities) == 2
     assert len(w1.connections) == 1
@@ -1108,11 +1128,11 @@ def test_nested_modify_world_publish_changes_true_false(rclpy_node):
         new_body = Body(name=PrefixedName("b3"))
         w1.add_kinematic_structure_entity(new_body)
 
-    time.sleep(0.2)
+    time.sleep(0.5)
 
     assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
 
-    with pytest.raises(MismatchingPublishChangesAttribute):
+    with pytest.raises(BrokenWorldModificationHistoryError):
         with w1.modify_world():
             handle = Handle.create_with_new_body_in_world(PrefixedName("handle"), w1)
 

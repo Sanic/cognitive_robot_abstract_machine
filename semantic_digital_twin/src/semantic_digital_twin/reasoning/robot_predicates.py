@@ -186,7 +186,9 @@ def is_gripper_holding_something(gripper: EndEffector) -> bool:
     bodies_under_tcp = gripper._world.get_kinematic_structure_entities_of_branch(
         gripper.tool_frame
     )
-    return len(bodies_under_tcp) > 0
+    # the branch always contains the tool frame itself, so only additional
+    # entities below it count as something being held
+    return len(bodies_under_tcp) > 1
 
 
 @symbolic_function

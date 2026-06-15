@@ -922,7 +922,7 @@ class MujocoTendon(SimulatorAdditionalProperty):
     Inertia associated with changes in tendon length.
     """
 
-    damping: float = 0.0
+    damping: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
     """
     Damping coefficient. A positive value generates a damping force (linear in velocity) acting along the tendon.
     """
@@ -992,7 +992,7 @@ class MujocoTendon(SimulatorAdditionalProperty):
     Spring resting position, can take either one or two values. If one value is given, it corresponds to the length of the tendon at rest.
     """
 
-    stiffness: float = 0.0
+    stiffness: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
     """
     Stiffness coefficient. A positive value generates a spring force (linear in position) acting along the tendon.
     """
@@ -1044,7 +1044,7 @@ class MujocoJoint(SimulatorAdditionalProperty):
     An additional property declaring that a Connection is a MujocoJoint.
     """
 
-    stiffness: float = 0.0
+    stiffness: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
     """
     The stiffness of the joint.
     """
@@ -1740,7 +1740,11 @@ class MujocoBuilder(MultiSimBuilder):
             equality.data = equality_joint["data"]
         for mujoco_joint in connection.simulator_additional_properties:
             if isinstance(mujoco_joint, MujocoJoint):
-                joint_props["stiffness"] = mujoco_joint.stiffness
+                joint_props["stiffness"] = (
+                    mujoco_joint.stiffness[0]
+                    if mujoco.mj_version() < 3007000
+                    else mujoco_joint.stiffness
+                )
                 joint_props["actfrcrange"] = mujoco_joint.actuator_force_range
                 break
 
@@ -1872,7 +1876,11 @@ class MujocoBuilder(MultiSimBuilder):
                 tendon.actfrclimited = mujoco_tendon.actuator_force_limited
                 tendon.actfrcrange = mujoco_tendon.actuator_force_range
                 tendon.armature = mujoco_tendon.armature
-                tendon.damping = mujoco_tendon.damping
+                tendon.damping = (
+                    mujoco_tendon.damping[0]
+                    if mujoco.mj_version() < 3007000
+                    else mujoco_tendon.damping
+                )
                 tendon.frictionloss = mujoco_tendon.frictionloss
                 tendon.group = mujoco_tendon.group
                 tendon.limited = mujoco_tendon.limited
@@ -1885,7 +1893,11 @@ class MujocoBuilder(MultiSimBuilder):
                 tendon.solref_friction = mujoco_tendon.solver_reference_friction
                 tendon.solref_limit = mujoco_tendon.solver_reference_limit
                 tendon.springlength = mujoco_tendon.spring_length
-                tendon.stiffness = mujoco_tendon.stiffness
+                tendon.stiffness = (
+                    mujoco_tendon.stiffness[0]
+                    if mujoco.mj_version() < 3007000
+                    else mujoco_tendon.stiffness
+                )
                 tendon.width = mujoco_tendon.width
                 for joint_name, joint_coef in mujoco_tendon.joints.items():
                     tendon.wrap_joint(joint_name, joint_coef)

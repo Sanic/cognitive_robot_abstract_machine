@@ -315,7 +315,7 @@ with simulated_robot:
     sequential([
         MoveTorsoAction(TorsoState.HIGH),
         ParkArmsAction(Arms.BOTH),
-        NavigateAction(Pose.from_xyz_quaternion(1.7474915981292725, 2.6873629093170166, 0.0,
+        NavigateAction(Pose.from_xyz_quaternion(1.72, 2.65, 0.0,
                                                -0.0, 0.0, 0.5253598267689507, -0.850880163370435, reference_frame=world.root)),
         CloseAction(world.get_body_by_name("handle_cab10_t"), Arms.RIGHT)], context=context).perform()
 ```
