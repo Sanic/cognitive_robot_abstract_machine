@@ -8,6 +8,7 @@ world descriptor instead of reading a physical camera stream.
 import numpy as np
 
 from robokudo.analysis_engine import AnalysisEngineInterface
+from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.lambda_function import LambdaFunctionAnnotator
@@ -30,7 +31,7 @@ class AnalysisEngine(AnalysisEngineInterface):
     def implementation(self) -> Pipeline:
         raytracer_config = CrDescriptorFactory.create_descriptor(
             "semdt_raytracer",
-            world_descriptor_name="world_semdt_raytracer_cylinders",
+            world_descriptor_name="world_semdt_raytracer_tabletop",
         )
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01
@@ -44,6 +45,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(),
+                ClusterColorAnnotator(),
                 ClusterPoseBBAnnotator(),
             ]
         )
