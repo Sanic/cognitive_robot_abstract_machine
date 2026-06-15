@@ -605,7 +605,8 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         an order of magnitude faster and covers the common case for values
         loaded from a database.
 
-        :param q: A constant quaternion (``q._casadi_sx.is_constant()`` must be True).
+        :param q: Quaternion whose underlying CasADi expression satisfies
+                  ``q.is_constant()``.
         :return: The corresponding rotation matrix.
         """
         x, y, z, w = q.to_np().ravel()
@@ -626,7 +627,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         Unit quaternion to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
         """
-        if q._casadi_sx.is_constant():
+        if q.is_constant():
             return cls._from_constant_quaternion(q)
         x = q[0]
         y = q[1]

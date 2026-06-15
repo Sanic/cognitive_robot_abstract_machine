@@ -443,7 +443,7 @@ class SymbolicMathType(ABC):
     def __post_init__(self):
         # save free variables at the instance to prevent them from getting cleaned up.
         # constants have none, so skip the casadi graph scan for them.
-        if self._casadi_sx.is_constant():
+        if self.is_constant():
             self.__FREE_VARIABLES__ = []
         else:
             self.__FREE_VARIABLES__ = self.free_variables()
