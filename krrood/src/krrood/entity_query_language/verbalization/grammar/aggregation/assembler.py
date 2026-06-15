@@ -112,9 +112,7 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         composer = ClauseComposer(self.context)
         rendered = composer.restriction(plan)
         if rendered is not None:
-            parts.extend(rendered.superlatives)
-            if rendered.whose is not None:
-                parts.append(rendered.whose)
+            parts.extend(rendered.modifiers)
             if rendered.residual is not None:
                 parts += [Keywords.SUCH_THAT.as_fragment(), rendered.residual]
 

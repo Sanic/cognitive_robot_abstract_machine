@@ -32,16 +32,19 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 @dataclass(frozen=True)
 class RestrictionFragments:
-    """The rendered pieces of a subject restriction, each placed by the caller."""
+    """The rendered pieces of a subject restriction, for the caller to place.
 
-    superlatives: List[Fragment] = field(default_factory=list)
-    """Selection prepositional phrase modifiers, e.g. *"with the maximum amount"* (attach right after the noun)."""
+    Only two pieces, because they go to two different sentence positions: the *modifiers* attach to
+    the selection noun, the *residual* becomes a separate clause. The finer superlative-vs-appositive
+    split is internal — callers always place those together — so it is not exposed."""
 
-    whose: Optional[Fragment] = None
-    """The appositive *"whose <grouped>"* modifier, or ``None``."""
+    modifiers: List[Fragment] = field(default_factory=list)
+    """The noun-attaching modifiers, in order — superlative selection phrases (*"with the maximum
+    amount"*) then the appositive *"whose <grouped>"* — placed right after the selection noun."""
 
     residual: Optional[Fragment] = None
-    """The residual condition for a *"such that …"* / *"where …"* clause, or ``None``."""
+    """The residual condition for a separate *"such that …"* / *"where …"* clause; the caller picks
+    the keyword and position. ``None`` when the WHERE folds entirely into modifiers."""
 
 
 @dataclass
@@ -96,9 +99,8 @@ class RestrictionAssembler:
         residual = (
             self._residual(restriction.residual) if restriction.has_residual else None
         )
-        return RestrictionFragments(
-            superlatives=superlatives, whose=whose, residual=residual
-        )
+        modifiers = superlatives + ([whose] if whose is not None else [])
+        return RestrictionFragments(modifiers=modifiers, residual=residual)
 
     def _residual(self, items: List[Union[SymbolicExpression, RangeFold]]) -> Fragment:
         """

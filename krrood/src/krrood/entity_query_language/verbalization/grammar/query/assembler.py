@@ -168,11 +168,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         rendered = ClauseComposer(self.context).restriction(plan)
         if rendered is None:
             return selected, None
-        modifiers = [*rendered.superlatives] + (
-            [rendered.whose] if rendered.whose is not None else []
-        )
-        if modifiers:
-            selected = PhraseFragment(parts=[selected, *modifiers])
+        if rendered.modifiers:
+            selected = PhraseFragment(parts=[selected, *rendered.modifiers])
         where_item = (
             PhraseFragment(parts=[Keywords.SUCH_THAT.as_fragment(), rendered.residual])
             if rendered.residual is not None
@@ -197,9 +194,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         modifiers: List[Fragment] = []
         rendered = ClauseComposer(self.context).restriction(plan)
         if rendered is not None:
-            modifiers.extend(rendered.superlatives)
-            if rendered.whose is not None:
-                modifiers.append(rendered.whose)
+            modifiers.extend(rendered.modifiers)
             if rendered.residual is not None:
                 modifiers.append(
                     PhraseFragment(
