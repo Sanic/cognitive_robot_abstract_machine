@@ -804,48 +804,6 @@ class TestFactories(unittest.TestCase):
         self.assertIn(door, doors)
         self.assertNotIn(door2, doors)
 
-    def test_kinematic_helpers(self):
-        world = World()
-        root = Body(name=PrefixedName("root"))
-        with world.modify_world():
-            world.add_body(root)
-
-        mid = Body(name=PrefixedName("mid"))
-        child = Body(name=PrefixedName("child"))
-        with world.modify_world():
-            world.add_body(mid)
-            world.add_connection(
-                FixedConnection(
-                    root,
-                    mid,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        x=1
-                    ),
-                )
-            )
-            world.add_body(child)
-            world.add_connection(
-                FixedConnection(
-                    mid,
-                    child,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                        x=1
-                    ),
-                )
-            )
-
-        slider = Slider(name=PrefixedName("slider"), root=child)
-        with world.modify_world():
-            world.add_semantic_annotation(slider)
-
-        parent_T_self = root.global_transform.inverse() @ slider.root.global_transform
-        self.assertAlmostEqual(parent_T_self[0, 3], 2.0)
-
-        self_T_child = slider.root.global_transform.inverse() @ root.global_transform
-        self.assertAlmostEqual(self_T_child[0, 3], -2.0)
-
-        self.assertEqual(slider.get_new_grandparent(mid), root)
-
     def test_handle_with_thickness(self):
         world = World()
         root = Body(name=PrefixedName("root"))

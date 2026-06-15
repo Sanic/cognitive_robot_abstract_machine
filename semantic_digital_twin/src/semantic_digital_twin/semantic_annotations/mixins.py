@@ -47,7 +47,6 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    ActiveConnection1DOF,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -180,99 +179,6 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
         world.add_semantic_annotation(self_instance)
 
         return self_instance
-
-    def get_new_grandparent(
-        self,
-        parent_kinematic_structure_entity: KinematicStructureEntity,
-    ):
-        """
-        Determine the new grandparent entity when changing the kinematic structure.
-
-        :param parent_kinematic_structure_entity: The entity that will be the new parent.
-        :return: The entity that will be the new grandparent.
-        """
-        grandparent_kinematic_structure_entity = (
-            parent_kinematic_structure_entity.parent_connection.parent
-        )
-        new_hinge_parent = (
-            grandparent_kinematic_structure_entity
-            if grandparent_kinematic_structure_entity != self.root
-            else self.root.parent_kinematic_structure_entity
-        )
-        return new_hinge_parent
-
-    def _reparent_root_preserving_connection(
-        self, new_parent_entity: KinematicStructureEntity
-    ) -> None:
-        """
-        Move this annotation's root under ``new_parent_entity``, recreating its parent connection with
-        the **same** type, degree of freedom, axis, multiplier, offset and child offset, so an active
-        joint (revolute/prismatic) is preserved and the root keeps its world pose. No-op if the root is
-        already a child of ``new_parent_entity``.
-
-        Used to splice a mechanical joint in between a host and the host's current parent without
-        collapsing the joint to a rigid connection.
-        """
-        old_connection = self.root.parent_connection
-        if old_connection.parent == new_parent_entity:
-            return
-
-        world = self._world
-
-        # root_T_entity is the identity for the world root itself (it has no parent connection).
-        def root_T(entity: KinematicStructureEntity) -> HomogeneousTransformationMatrix:
-            if entity == world.root:
-                return HomogeneousTransformationMatrix()
-            return world._manually_compute_world_root_T_self(entity)
-
-        new_parent_T_old_parent = root_T(new_parent_entity).inverse() @ root_T(
-            old_connection.parent
-        )
-        old_parent_T_connection = (
-            old_connection.parent_T_connection_expression
-            or HomogeneousTransformationMatrix()
-        )
-        new_parent_T_connection = HomogeneousTransformationMatrix(
-            (new_parent_T_old_parent @ old_parent_T_connection).evaluate()
-        )
-
-        new_connection = self._clone_connection_with_new_parent(
-            old_connection, new_parent_entity, new_parent_T_connection
-        )
-        world.remove_connection(old_connection)
-        world.add_connection(new_connection)
-
-    @staticmethod
-    def _clone_connection_with_new_parent(
-        old_connection: Connection,
-        new_parent_entity: KinematicStructureEntity,
-        new_parent_T_connection: HomogeneousTransformationMatrix,
-    ) -> Connection:
-        """
-        Recreate ``old_connection`` under ``new_parent_entity`` with ``new_parent_T_connection`` as the
-        parent offset, keeping everything else identical. Active 1-DOF connections reuse the same
-        ``dof_id`` (the degree of freedom persists across remove/add), so the joint state is preserved.
-        """
-        shared = dict(
-            parent=new_parent_entity,
-            child=old_connection.child,
-            parent_T_connection_expression=new_parent_T_connection,
-            connection_T_child_expression=old_connection.connection_T_child_expression,
-        )
-        if isinstance(old_connection, ActiveConnection1DOF):
-            return type(old_connection)(
-                axis=old_connection.axis,
-                multiplier=old_connection.multiplier,
-                offset=old_connection.offset,
-                dof_id=old_connection.dof_id,
-                dynamics=old_connection.dynamics,
-                **shared,
-            )
-        if isinstance(old_connection, FixedConnection):
-            return FixedConnection(**shared)
-        raise NotImplementedError(
-            f"Cannot reparent a connection of type {type(old_connection).__name__} while preserving it."
-        )
 
     def _mount_strategy(self, host: HasRootBody) -> None:
         """

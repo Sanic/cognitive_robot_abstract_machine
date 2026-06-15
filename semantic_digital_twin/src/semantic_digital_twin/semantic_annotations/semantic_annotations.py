@@ -244,8 +244,9 @@ class MechanicalJoint(HasRootBody):
         if list(self._world.kinematic_structure.successors(self.root.index)):
             raise MechanicalJointAlreadyMounted(self, host)
 
-        host_parent = host.root.parent_kinematic_structure_entity
-        self._reparent_root_preserving_connection(host_parent)
+        self._world.move_branch(
+            self.root, host.root.parent_kinematic_structure_entity, True
+        )
         host._world.move_branch(host.root, self.root, True)
 
 

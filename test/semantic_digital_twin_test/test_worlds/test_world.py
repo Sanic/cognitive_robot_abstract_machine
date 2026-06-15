@@ -1411,6 +1411,26 @@ def test_move_branch_offline_preserves_connection_type_and_pose():
     assert np.allclose(free_child.global_transform, free_child_pose)
 
 
+def test_move_branch_preserves_active_connection(world_setup):
+    """
+    move_branch keeps an active 1-DOF connection (e.g. a RevoluteConnection) intact - same type and
+    same degree of freedom - instead of collapsing it to a FixedConnection, while preserving the pose.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    old_connection = r2.parent_connection
+    assert isinstance(old_connection, RevoluteConnection)
+    old_dof_id = old_connection.dof_id
+    old_pose = r2.global_transform
+
+    with world.modify_world():
+        world.move_branch(r2, bf)
+
+    assert r2.parent_kinematic_structure_entity == bf
+    assert isinstance(r2.parent_connection, RevoluteConnection)
+    assert r2.parent_connection.dof_id == old_dof_id
+    assert np.allclose(r2.global_transform, old_pose)
+
+
 def test_reset_state_context(pr2_world_state_reset):
     state_copy = pr2_world_state_reset.state._data.copy()
     with pr2_world_state_reset.reset_state_context():
