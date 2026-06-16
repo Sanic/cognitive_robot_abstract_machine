@@ -52,15 +52,19 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         :return: The match's block, sourced at the resolved query so the coreference pass scopes the
             selection as the discourse subject (*"its …"*).
         """
+        predict_groups = [group for group in plan.groups if group.predicted]
+        inline_predict = self._inline_predict(predict_groups, plan)
+
         header_parts: List[Fragment] = [
             Directive.for_underspecified(plan.underspecified).as_fragment(),
             self.context.child(plan.selection),
         ]
-        predict = self._predict_clause(plan)
-        if predict is not None:
-            header_parts.append(predict)
+        if inline_predict is not None:
+            header_parts.append(inline_predict)
 
         items: List[Fragment] = []
+        if inline_predict is None and predict_groups:
+            items.append(self._predict_block(predict_groups, plan))
         given = self._given_that_block(plan)
         if given is not None:
             items.append(given)
@@ -74,19 +78,20 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
             source=node.expression,
         )
 
-    # ── header: predict ──────────────────────────────────────────────────────
+    # ── predict ────────────────────────────────────────────────────────────────
 
-    def _predict_clause(self, plan: MatchPlan) -> Optional[Fragment]:
-        """:return: *", and predict its <attrs> value(s)"* for the selection's Ellipsis attributes,
-        or ``None`` when none are predicted on the selection."""
-        attributes = [
-            assignment.attribute
-            for group in plan.groups
-            if group.object._id_ == plan.selection._id_
-            for assignment in group.predicted
-        ]
-        if not attributes:
+    def _inline_predict(
+        self, predict_groups: List[AttributeGroup], plan: MatchPlan
+    ) -> Optional[Fragment]:
+        """:return: The header-folded *"and predict its <attrs> value(s)"* clause when the only
+        predicted attributes are the selection's own (the simple case), else ``None`` (a *"predict"*
+        block is used instead — see :meth:`_predict_block`)."""
+        if len(predict_groups) != 1:
             return None
+        group = predict_groups[0]
+        if group.object._id_ != plan.selection._id_:
+            return None
+        attributes = [assignment.attribute for assignment in group.predicted]
         noun = "values" if len(attributes) > 1 else "value"
         return PhraseFragment(
             parts=[
@@ -95,6 +100,36 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
                 Pronouns.ITS.as_fragment(),
                 self._attribute_list(attributes),
                 WordFragment(text=noun),
+            ]
+        )
+
+    def _predict_block(
+        self, predict_groups: List[AttributeGroup], plan: MatchPlan
+    ) -> Fragment:
+        """:return: The *"and predict"* block — one point per object whose attributes are generated
+        (*"x, y, and z of its position"*, or *"its <attrs>"* for the selection's own).
+        """
+        points = [self._predict_point(group, plan) for group in predict_groups]
+        return BlockFragment(
+            header=PhraseFragment(
+                parts=[Conjunctions.AND.as_fragment(), Keywords.PREDICT.as_fragment()]
+            ),
+            items=points,
+        )
+
+    def _predict_point(self, group: AttributeGroup, plan: MatchPlan) -> Fragment:
+        """:return: *"its <attrs>"* for the selection's own attributes, else
+        *"<attrs> of <object>"* (*"x, y, and z of its position"*)."""
+        attribute_list = self._attribute_list(
+            [assignment.attribute for assignment in group.predicted]
+        )
+        if group.object._id_ == plan.selection._id_:
+            return PhraseFragment(parts=[Pronouns.ITS.as_fragment(), attribute_list])
+        return PhraseFragment(
+            parts=[
+                attribute_list,
+                Prepositions.OF.as_fragment(),
+                self.context.child(group.object),
             ]
         )
 
@@ -139,10 +174,15 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
     # ── where ────────────────────────────────────────────────────────────────
 
     def _where_block(self, plan: MatchPlan) -> Optional[Fragment]:
-        """:return: The *"where"* block — one point per free condition — or ``None`` when absent."""
+        """:return: The *"where"* block — one point per free condition — or ``None`` when absent.
+
+        The conditions arrive already range-folded from the planner (a bound pair is one
+        :class:`RangeFold`), so each point is just the standard recursion — a raw comparator or a
+        range fold, rendered by its own rule. The assembler never folds anything itself.
+        """
         if not plan.where_conditions:
             return None
-        points = [self.context.child(condition) for condition in plan.where_conditions]
+        points = [self.context.child(item) for item in plan.where_conditions]
         return BlockFragment(header=Keywords.WHERE.as_fragment(), items=points)
 
     # ── shared ───────────────────────────────────────────────────────────────

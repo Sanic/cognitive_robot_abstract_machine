@@ -35,6 +35,14 @@ class Position:
     z: float
 
 
+@dataclass
+class Pose:
+    """A pose with two nested sub-objects — a nested match groups attributes per sub-object."""
+
+    position: Position
+    orientation: Position
+
+
 def _hierarchical(expression) -> str:
     """:return: *expression* rendered as a plain-text indented bullet list (point per condition)."""
     return VerbalizationPipeline(HierarchicalRenderer(PlainFormatter())).verbalize(
@@ -134,3 +142,54 @@ def test_where_only_match_has_no_given_that_block():
     match.where(match.variable.x > 0)
     text = _hierarchical(match)
     assert text == "Generate a Position\n  where\n    - its x is greater than 0"
+
+
+def test_where_folds_a_range_pair_into_one_between_point():
+    """Complementary bounds on one chain fold into a single *"is between …"* point — the same
+    conjunction reduction the ``AND`` / restriction assemblers apply, invoked over the flat
+    ``where`` list."""
+    match = underspecified(Position)()
+    match.resolve()
+    match.where(match.variable.x > 0.0, match.variable.x < 5.0)
+    text = _hierarchical(match)
+    assert text == "Generate a Position\n  where\n    - its x is between 0.0, and 5.0"
+
+
+# ── nested matches: per-sub-object grouping ──────────────────────────────────
+
+
+def _nested_pose():
+    """:return: An underspecified pose whose position and orientation are themselves
+    underspecified (all-``Ellipsis``) matches."""
+    return underspecified(Pose)(
+        position=underspecified(Position)(x=..., y=..., z=...),
+        orientation=underspecified(Position)(x=..., y=..., z=...),
+    )
+
+
+def test_nested_predict_groups_per_sub_object():
+    """Predicted attributes of a nested match group per sub-object into a *"predict"* block —
+    *"x, y, and z of its position"* — never the raw ``Ellipsis`` literal."""
+    text = _hierarchical(_nested_pose())
+    assert text == (
+        "Generate a Pose\n"
+        "  and predict\n"
+        "    - x, y, and z of its position\n"
+        "    - x, y, and z of its orientation"
+    )
+    assert "Ellipsis" not in text
+
+
+def test_nested_predict_with_where_range_on_sub_object():
+    """A nested predict block coexists with a ``where`` block that folds a sub-object range."""
+    pose = underspecified(Pose)(position=underspecified(Position)(x=..., y=..., z=...))
+    pose.expression
+    pose.where(pose.variable.position.x > 0.0, pose.variable.position.x < 5.0)
+    text = _hierarchical(pose)
+    assert text == (
+        "Generate a Pose\n"
+        "  and predict\n"
+        "    - x, y, and z of its position\n"
+        "  where\n"
+        "    - the x of its position is between 0.0, and 5.0"
+    )

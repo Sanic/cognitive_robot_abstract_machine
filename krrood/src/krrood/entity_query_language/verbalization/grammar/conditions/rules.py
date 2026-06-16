@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing_extensions import List
-
 from krrood.entity_query_language.core.base_expressions import Filter
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import (
@@ -23,7 +21,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
 from krrood.entity_query_language.verbalization.grammar.chain.assembler import (
     ChainAssembler,
 )
-from krrood.entity_query_language.verbalization.grammar.chain.planner import ChainPlanner
+from krrood.entity_query_language.verbalization.grammar.chain.planner import (
+    ChainPlanner,
+)
 from krrood.entity_query_language.verbalization.grammar.conditions.assembler import (
     ConditionAssembler,
 )
@@ -35,9 +35,9 @@ from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule im
     RuleContext,
 )
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
+    build_between,
     fold_range_pairs,
-    fragment_for_folded_conjunct,
-    has_pair,
+    RangeFold,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
@@ -62,47 +62,52 @@ class ComparatorRule(PhraseRule):
 
 
 class AndRule(PhraseRule):
-    """Conjunction *"a, b, and c"* (Oxford comma); flattens nested ANDs.
+    """Conjunction *"a, b, and c"* (Oxford comma); flattens nested ANDs. A complementary low/high
+    pair on one chain folds into *"… is between low and high"* — handled by the shared conjunct
+    rendering, so there is no separate range rule.
 
     >>> robot = variable(Robot, [])
     >>> verbalize_expression(and_(robot.battery > 50, robot.name == 'x'))
     "the battery of a Robot is greater than 50, and the name of the Robot is 'x'"
+    >>> verbalize_expression(and_(robot.battery > 10, robot.battery < 90))
+    'the battery of a Robot is between 10, and 90'
     """
 
     construct = AND
     name = "and"
 
     def build(self, node: AND, context: RuleContext) -> Fragment:
-        parts = [context.child(conjunct) for conjunct in flatten_operands(node, AND)]
-        if len(parts) == 1:
-            return parts[0]
-        return oxford_comma(parts, Conjunctions.AND.as_fragment())
-
-
-class RangeConjunctionRule(PhraseRule):
-    """A conjunction containing a low/high pair on one chain → *"… is between low and high"*.
-
-    >>> robot = variable(Robot, [])
-    >>> verbalize_expression(and_(robot.battery > 10, robot.battery < 90))
-    'the battery of a Robot is between 10, and 90'
-    """
-
-    construct = AND
-    name = "and-range"
-
-    def when(self, node: AND, context: RuleContext) -> bool:
-        return has_pair(flatten_operands(node, AND))
-
-    def build(self, node: AND, context: RuleContext) -> Fragment:
-        parts: List[Fragment] = [
-            fragment_for_folded_conjunct(
-                item, context.child, compact=context.configuration.compact_predicates
-            )
+        # Reduce complementary bound pairs to range folds, then recurse each item uniformly — a
+        # raw conjunct via its rule, a range fold via RangeFoldRule. The fold is a list reduction,
+        # so it runs once here over the operands.
+        parts = [
+            context.child(item)
             for item in fold_range_pairs(flatten_operands(node, AND))
         ]
         if len(parts) == 1:
             return parts[0]
         return oxford_comma(parts, Conjunctions.AND.as_fragment())
+
+
+class RangeFoldRule(PhraseRule):
+    """A folded lower/upper bound pair → *"<chain> is between low and high"*.
+
+    A :class:`RangeFold` is the coordination microplanning artifact produced when two complementary
+    bounds on one chain are reduced (by :func:`fold_range_pairs`). Making it a first-class
+    verbalizable means any caller that has reduced its conjuncts renders the result through the
+    normal recursion (``context.child``) — it never has to know a folding helper exists.
+    """
+
+    construct = RangeFold
+    name = "range-fold"
+
+    def build(self, node: RangeFold, context: RuleContext) -> Fragment:
+        return build_between(
+            context.child(node.chain_expression),
+            context.child(node.lower_expression),
+            context.child(node.upper_expression),
+            compact=context.configuration.compact_predicates,
+        )
 
 
 class OrRule(PhraseRule):
