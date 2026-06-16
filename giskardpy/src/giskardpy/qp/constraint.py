@@ -125,62 +125,13 @@ class DirectLimits:
 
 
 @dataclass
-class DofLimits:
+class DofLimitProfiler:
     """
-    Builds a :class:`DirectLimits` holding the bounds and weights of the robot's free variables
-    (velocity and jerk decision variables across the prediction horizon).
+    Computes the per-degree-of-freedom velocity, acceleration, and jerk bounds across the
+    prediction horizon, including the MPC-based position-aware slowdown profiles.
     """
 
-    @classmethod
-    def create(
-        cls,
-        degrees_of_freedom: List[DegreeOfFreedom],
-        config: QPControllerConfig,
-    ) -> DirectLimits:
-        self = cls()
-        lower_bounds, upper_bounds = self.free_variable_bounds(
-            degrees_of_freedom, config
-        )
-        quadratic_weights, linear_weights = self.init_weights(
-            degrees_of_freedom, config
-        )
-        return DirectLimits(
-            lower_bounds=lower_bounds,
-            upper_bounds=upper_bounds,
-            quadratic_weights=quadratic_weights,
-            linear_weights=linear_weights,
-            names=self.make_names(degrees_of_freedom, config),
-        )
-
-    def active_slots(
-        self,
-        degrees_of_freedom: List[DegreeOfFreedom],
-        config: QPControllerConfig,
-    ):
-        """
-        Yields every active decision variable slot as a ``(derivative, time_step, dof)`` tuple.
-        The order defines the layout shared by bounds, weights, and names so they stay aligned.
-        """
-        max_derivative = config.max_derivative
-        for derivative, time_step in product(
-            [Derivatives.velocity, Derivatives.jerk],
-            range(config.prediction_horizon),
-        ):
-            if time_step >= config.prediction_horizon - (max_derivative - derivative):
-                continue
-            for degree_of_freedom in degrees_of_freedom:
-                yield derivative, time_step, degree_of_freedom
-
-    def make_names(
-        self, degrees_of_freedom: List[DegreeOfFreedom], config: QPControllerConfig
-    ) -> list[str]:
-        short_label = {Derivatives.velocity: "vel", Derivatives.jerk: "jerk"}
-        return [
-            f"{dof.name}_{short_label[derivative]}_k_{time_step}"
-            for derivative, time_step, dof in self.active_slots(
-                degrees_of_freedom, config
-            )
-        ]
+    config: QPControllerConfig
 
     def _compute_position_constrained_velocity_bounds(
         self,
@@ -413,12 +364,12 @@ class DofLimits:
         )
         return best_jerk_limit
 
-    def all_limits(
+    def compute(
         self,
         degree_of_freedom: DegreeOfFreedom,
         max_derivative: Derivatives,
-        config: QPControllerConfig,
     ) -> DegreeOfFreedomLimits[sm.Vector]:
+        config = self.config
         lower_limits = DerivativeMap()
         upper_limits = DerivativeMap()
 
@@ -488,6 +439,65 @@ class DofLimits:
             else:
                 raise
 
+
+@dataclass
+class DofLimits:
+    """
+    Builds a :class:`DirectLimits` holding the bounds and weights of the robot's free variables
+    (velocity and jerk decision variables across the prediction horizon).
+    """
+
+    @classmethod
+    def create(
+        cls,
+        degrees_of_freedom: List[DegreeOfFreedom],
+        config: QPControllerConfig,
+    ) -> DirectLimits:
+        self = cls()
+        lower_bounds, upper_bounds = self.free_variable_bounds(
+            degrees_of_freedom, config
+        )
+        quadratic_weights, linear_weights = self.init_weights(
+            degrees_of_freedom, config
+        )
+        return DirectLimits(
+            lower_bounds=lower_bounds,
+            upper_bounds=upper_bounds,
+            quadratic_weights=quadratic_weights,
+            linear_weights=linear_weights,
+            names=self.make_names(degrees_of_freedom, config),
+        )
+
+    def active_slots(
+        self,
+        degrees_of_freedom: List[DegreeOfFreedom],
+        config: QPControllerConfig,
+    ):
+        """
+        Yields every active decision variable slot as a ``(derivative, time_step, dof)`` tuple.
+        The order defines the layout shared by bounds, weights, and names so they stay aligned.
+        """
+        max_derivative = config.max_derivative
+        for derivative, time_step in product(
+            [Derivatives.velocity, Derivatives.jerk],
+            range(config.prediction_horizon),
+        ):
+            if time_step >= config.prediction_horizon - (max_derivative - derivative):
+                continue
+            for degree_of_freedom in degrees_of_freedom:
+                yield derivative, time_step, degree_of_freedom
+
+    def make_names(
+        self, degrees_of_freedom: List[DegreeOfFreedom], config: QPControllerConfig
+    ) -> list[str]:
+        short_label = {Derivatives.velocity: "vel", Derivatives.jerk: "jerk"}
+        return [
+            f"{dof.name}_{short_label[derivative]}_k_{time_step}"
+            for derivative, time_step, dof in self.active_slots(
+                degrees_of_freedom, config
+            )
+        ]
+
     def free_variable_bounds(
         self,
         degrees_of_freedom: list[DegreeOfFreedom],
@@ -496,14 +506,13 @@ class DofLimits:
         max_derivative = config.max_derivative
         lower_bounds = []
         upper_bounds = []
+        profiler = DofLimitProfiler(config)
         cache: dict[UUID, DegreeOfFreedomLimits[sm.Vector]] = {}
         for degree_of_freedom in degrees_of_freedom:
-            all_limits = self.all_limits(
+            cache[degree_of_freedom.id] = profiler.compute(
                 degree_of_freedom=degree_of_freedom,
                 max_derivative=max_derivative,
-                config=config,
             )
-            cache[degree_of_freedom.id] = all_limits
         for derivative, t, degree_of_freedom in self.active_slots(
             degrees_of_freedom, config
         ):
@@ -948,6 +957,9 @@ class SystemDynamicsStrategy(EnforcementStrategy):
 
     def create_slack_matrix(self) -> Matrix:
         return sm.Matrix.zeros(self.number_of_jerk_columns, 0)
+
+    def create_slack_variables(self) -> DirectLimits:
+        return DirectLimits.empty()
 
     def create_names(self) -> list[str]:
         names = []
