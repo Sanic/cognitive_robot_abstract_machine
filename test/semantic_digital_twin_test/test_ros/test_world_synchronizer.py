@@ -1530,10 +1530,9 @@ def test_bidirectional_nested_modify_worlds_no_deadlock(rclpy_node):
     """
     w1 = World(name="w1")
     w2 = World(name="w2")
-    # Use separate topics so ms2 doesn't receive ms1's world updates (and vice versa),
-    # which would cause cross-world contamination when both synchronizers share the same node.
-    ms1 = WorldSynchronizer(node=rclpy_node, _world=w1, topic_name="/test_deadlock_w1_sync")
-    ms2 = WorldSynchronizer(node=rclpy_node, _world=w2, topic_name="/test_deadlock_w2_sync")
+
+    ms1 = WorldSynchronizer(node=rclpy_node, _world=w1)
+    ms2 = WorldSynchronizer(node=rclpy_node, _world=w2)
 
     # Seed
     with w1.modify_world():
