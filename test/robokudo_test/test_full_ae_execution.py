@@ -6,13 +6,17 @@ import robokudo.cas
 import robokudo.defs
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
+import robokudo.descriptors.camera_configs.config_semdt_raytracer
 import robokudo.garden
 import robokudo.io.file_reader_interface
+import robokudo.io.semdt_raytracer_camera_interface
 import robokudo.io.storage_reader_interface
 import robokudo.types.annotation
 import robokudo.types.scene
 import robokudo.utils.data_downloader
 import robokudo.utils.tree_execution
+from robokudo.annotators.cluster_color import ClusterColorAnnotator
+from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
@@ -63,3 +67,57 @@ class TestFullAEExecution(object):
 
         assert types_of_annotations.count(robokudo.types.annotation.Plane) == 1
         assert types_of_annotations.count(robokudo.types.scene.ObjectHypothesis) == 1
+
+    def test_run_semdt_raytracer_ae_successfully(self, node):
+        raytracer_config = CrDescriptorFactory.create_descriptor(
+            "semdt_raytracer",
+            world_descriptor_name="world_semdt_raytracer_cylinders",
+            resolution=128,
+        )
+
+        plane_desc = PlaneAnnotator.Descriptor()
+        plane_desc.parameters.distance_threshold = 0.01
+
+        cluster_desc = PointCloudClusterExtractor.Descriptor()
+        cluster_desc.parameters.dbscan_min_cluster_count = 8
+        cluster_desc.parameters.min_cluster_count = 20
+        cluster_desc.parameters.min_on_plane_point_count = 10
+        cluster_desc.parameters.eps = 0.05
+
+        seq = robokudo.pipeline.Pipeline("SemDTRayTracerTestPipeline")
+        seq.add_children(
+            [
+                robokudo.annotators.outputs.ClearAnnotatorOutputs(),
+                CollectionReaderAnnotator(descriptor=raytracer_config),
+                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                PointcloudCropAnnotator(),
+                PlaneAnnotator(descriptor=plane_desc),
+                PointCloudClusterExtractor(descriptor=cluster_desc),
+                ClusterColorAnnotator(),
+                ClusterPoseBBAnnotator(),
+            ]
+        )
+
+        tree_result = robokudo.utils.tree_execution.run_tree_once(
+            seq, node, max_iterations=80, tick_rate=20
+        )
+        assert tree_result is py_trees.common.Status.SUCCESS
+
+        types_of_annotations = list(map(type, seq.cas.annotations))
+        assert types_of_annotations.count(robokudo.types.annotation.Plane) == 1
+        assert types_of_annotations.count(robokudo.types.scene.ObjectHypothesis) == 2
+
+        object_hypotheses = seq.cas.filter_annotations_by_type(
+            robokudo.types.scene.ObjectHypothesis
+        )
+        dominant_colors = {
+            colors[0].color
+            for object_hypothesis in object_hypotheses
+            if (
+                colors := seq.cas.filter_by_type(
+                    robokudo.types.annotation.SemanticColor,
+                    object_hypothesis.annotations,
+                )
+            )
+        }
+        assert dominant_colors == {"red", "blue"}
