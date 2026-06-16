@@ -32,6 +32,10 @@ from krrood.entity_query_language.verbalization.grammar.query.planner import (
     QueryPlanner,
     SelectionKind,
 )
+from krrood.entity_query_language.verbalization.grammar.query.ranking import (
+    ranking_surface,
+    RankingRequest,
+)
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     FallbackNouns,
     Keywords,
@@ -149,8 +153,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
     def _build_selection(
         self, node: Query, variable: SymbolicExpression, plan: QueryPlan
     ) -> Fragment:
-        """:return: *"the unique Robot"* (``eql.the``) or *"a Robot"* — the selection's referring
-        noun phrase."""
+        """:return: the selection's referring noun phrase — a ``limit`` ranking phrase (*"the top
+        three Robots"*), else *"the unique Robot"* (``eql.the``) / *"a Robot"*."""
+        if plan.ranking is not None:
+            return self._build_ranking_selection(variable, plan)
         if plan.is_the:
             # "the unique <type>" first mention; the coreference pass reduces a repeat to
             # "the <type>" (UNIQUE downgrades to DEFINITE) — so it is a referring noun phrase.
@@ -161,6 +167,25 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             )
         # context.child(variable) → VariableRule referring noun phrase; the entity shares its referent.
         return self.context.child(variable)
+
+    def _build_ranking_selection(
+        self, variable: SymbolicExpression, plan: QueryPlan
+    ) -> Fragment:
+        """:return: The ranking selection — *"the first two Robots"* / *"the top three Employees by
+        salary"* / *"the Employee with the highest salary"*. A ranking is inherently definite
+        (*"the"*), so it ignores ``is_the``; it stays a referring noun phrase so a repeat mention
+        reduces to *"the Robot"* and a WHERE pronominalises (*"its"* / *"their"*)."""
+        surface = ranking_surface(RankingRequest(plan=plan.ranking))
+        return NounPhrase(
+            head=RoleFragment.for_variable(
+                plan.selected_type, variable, number=surface.number
+            ),
+            number=surface.number,
+            definiteness=Definiteness.DEFINITE,
+            pre_head=surface.pre_head,
+            modifiers=surface.modifiers,
+            referent_id=_subject_id(variable),
+        )
 
     def _apply_subject_restrictions(
         self, plan: QueryPlan, selected: Fragment
@@ -237,18 +262,26 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         header = PhraseFragment(parts=[find_header, selection])
         clauses = [
             clause
-            for clause in [*where_items, *self._trailing_clauses(node)]
+            for clause in [*where_items, *self._trailing_clauses(node, plan)]
             if clause is not None
         ]
         return BlockFragment(header=header, items=clauses)
 
-    def _trailing_clauses(self, node: Query) -> List[Optional[Fragment]]:
-        """:return: The post-selection clauses, in canonical reading order (``None`` when absent)."""
+    def _trailing_clauses(
+        self, node: Query, plan: QueryPlan
+    ) -> List[Optional[Fragment]]:
+        """:return: The post-selection clauses, in canonical reading order (``None`` when absent).
+
+        The standalone *"ordered by …"* clause is suppressed when a ranking selection already
+        conveys the ordering — i.e. a ``limit`` on a plain-variable (SUBJECT) selection. Ordering
+        without a ``limit`` keeps the clause; a limited set-of keeps it too (no ranking selection).
+        """
         composer = ClauseComposer(self.context)
+        ranked = plan.kind is SelectionKind.SUBJECT and plan.ranking is not None
         return [
             composer.grouped_by(node),
             composer.having(node),
-            composer.ordered_by(node),
+            None if ranked else composer.ordered_by(node),
         ]
 
     def _where_clause(self, plan: QueryPlan) -> Optional[Fragment]:

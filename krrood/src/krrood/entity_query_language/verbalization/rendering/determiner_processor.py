@@ -59,7 +59,17 @@ class DeterminerProcessor:
         determiner = self._determiner(
             noun_phrase.definiteness, noun_phrase.number, head
         )
-        head_group_parts = [*([determiner] if determiner is not None else []), head]
+        # A pre-head qualifier sits between the determiner and the head: "the [first two] Robots".
+        pre_head = (
+            [self.process(noun_phrase.pre_head)]
+            if noun_phrase.pre_head is not None
+            else []
+        )
+        head_group_parts = [
+            *([determiner] if determiner is not None else []),
+            *pre_head,
+            head,
+        ]
         head_group = (
             head_group_parts[0]
             if len(head_group_parts) == 1

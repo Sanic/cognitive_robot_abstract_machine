@@ -292,6 +292,24 @@ class SortDirections(VocabEnum):
     DESCENDING = PlainWord("descending")
 
 
+class RankingWords(VocabEnum):
+    """The qualifier words a ``limit`` (+ ordering) puts on the selection — *"the first two"*,
+    *"the top three"*, *"the lowest"*, *"… by salary"*."""
+
+    FIRST = PlainWord("first")
+    """No ordering — the first *n* in natural order."""
+    TOP = PlainWord("top")
+    """Descending order, *n > 1* (*"the top three …"*)."""
+    BOTTOM = PlainWord("bottom")
+    """Ascending order, *n > 1* (*"the bottom three …"*)."""
+    HIGHEST = PlainWord("highest")
+    """Descending order, *n = 1* (*"the highest …"* / *"with the highest …"*)."""
+    LOWEST = PlainWord("lowest")
+    """Ascending order, *n = 1* (*"the lowest …"* / *"with the lowest …"*)."""
+    BY = PlainWord("by")
+    """Introduces the order key for a plural attribute ranking (*"… by salary"*)."""
+
+
 class Articles(VocabEnum):
     """
     Definite articles (THE, THE UNIQUE) and a static helper for indefinite articles.

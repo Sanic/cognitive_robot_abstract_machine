@@ -6,6 +6,7 @@ from enum import Enum, auto
 from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.expression_structure import walk_chain
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.aggregators import Aggregator
@@ -39,6 +40,48 @@ class SelectionKind(Enum):
     """A plain variable / aggregator selection that can carry restrictions."""
     SET_OF = auto()
     """A tuple selection over several variables."""
+
+
+class RankingDirection(Enum):
+    """The ordering direction a ``limit`` selects over, if any."""
+
+    NONE = auto()
+    """A ``limit`` with no ``ordered_by`` — the first *n* in natural order."""
+    ASCENDING = auto()
+    """``ordered_by(…, descending=False)`` — the lowest / bottom *n*."""
+    DESCENDING = auto()
+    """``ordered_by(…, descending=True)`` — the highest / top *n*."""
+
+
+class RankingKeyRelation(Enum):
+    """How the order key relates to the selected variable — it changes the surface form."""
+
+    SELF = auto()
+    """The order key *is* the selected variable (*"the highest int"*)."""
+    ATTRIBUTE = auto()
+    """The order key is an attribute chain of the selection (*"… with the highest salary"*)."""
+    OTHER = auto()
+    """The order key roots at a different variable — no clean noun-relative form."""
+
+
+@dataclass(frozen=True)
+class RankingPlan:
+    """The *what to say* decomposition of a query's ``limit`` (with optional ordering): how many,
+    in which direction, and how the order key relates to the selection. Present only when the query
+    has a ``limit``; the surface form is the ranking registry's concern at render time.
+    """
+
+    n: int
+    """The limit (always ``>= 1``)."""
+
+    direction: RankingDirection
+    """The ordering direction, or ``NONE`` for a bare ``limit``."""
+
+    relation: RankingKeyRelation
+    """How the order key relates to the selection (``SELF`` when there is no ordering)."""
+
+    order_key: Optional[SymbolicExpression]
+    """The ``ordered_by`` key expression, or ``None`` for a bare ``limit``."""
 
 
 @dataclass(frozen=True)
@@ -99,6 +142,9 @@ class QueryPlan:
     aggregation_data: Optional[AggregationData]
     """The collapsed aggregation details when this is an aggregation subquery, else ``None``."""
 
+    ranking: Optional[RankingPlan]
+    """The ``limit`` (+ ordering) decomposition, or ``None`` when the query has no ``limit``."""
+
 
 @dataclass
 class QueryPlanner(Planner[Query, QueryPlan]):
@@ -126,6 +172,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             where_condition=self._where_condition(),
             is_aggregation_subquery=is_aggregation_subquery(self.node),
             aggregation_data=self._aggregation_data(),
+            ranking=self._ranking(),
         )
 
     # ── selection shape ──────────────────────────────────────────────────────
@@ -188,3 +235,41 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             is_constrained=self.node.is_constrained,
             source=aggregation_source_root(self.node),
         )
+
+    # ── ranking (limit + ordering) ───────────────────────────────────────────
+
+    def _ranking(self) -> Optional[RankingPlan]:
+        """:return: The ``limit`` (+ ordering) decomposition, or ``None`` when the query has no
+        ``limit`` (ordering without a limit keeps the standalone *"ordered by …"* clause).
+        """
+        limit = getattr(self.node, "_limit_", None)
+        if limit is None:
+            return None
+        builder = getattr(self.node, "_ordered_by_builder_", None)
+        if builder is None:
+            return RankingPlan(
+                n=limit,
+                direction=RankingDirection.NONE,
+                relation=RankingKeyRelation.SELF,
+                order_key=None,
+            )
+        direction = (
+            RankingDirection.DESCENDING
+            if builder.descending
+            else RankingDirection.ASCENDING
+        )
+        return RankingPlan(
+            n=limit,
+            direction=direction,
+            relation=self._key_relation(builder.variable),
+            order_key=builder.variable,
+        )
+
+    def _key_relation(self, order_key: SymbolicExpression) -> RankingKeyRelation:
+        """:return: How *order_key* relates to the selected variable — ``SELF`` (the key is the
+        selection), ``ATTRIBUTE`` (a chain on it), or ``OTHER`` (a different root)."""
+        chain, root = walk_chain(order_key)
+        selected_id = getattr(self._selected, "_id_", None)
+        if selected_id is None or getattr(root, "_id_", None) != selected_id:
+            return RankingKeyRelation.OTHER
+        return RankingKeyRelation.ATTRIBUTE if chain else RankingKeyRelation.SELF

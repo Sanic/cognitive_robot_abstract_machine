@@ -90,3 +90,11 @@ def ordinal(index: int) -> str:
     :return: The English ordinal word for a zero-based *index* (``0`` → ``"first"``).
     """
     return _engine.ordinal(_engine.number_to_words(index + 1))
+
+
+def cardinal(n: int) -> str:
+    """
+    :param n: A positive integer.
+    :return: The English cardinal word for *n* (``2`` → ``"two"``).
+    """
+    return _engine.number_to_words(n)

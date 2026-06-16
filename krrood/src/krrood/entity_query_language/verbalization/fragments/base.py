@@ -178,6 +178,10 @@ class NounPhrase(HasNumber, Fragment):
     """When set, this noun phrase is a referring expression for that entity, and its
     definiteness holds the first-mention form."""
 
+    pre_head: Optional[Fragment] = None
+    """A qualifier placed between the determiner and the head (*"the [first two] Robots"*), e.g. a
+    ``limit`` ranking phrase. Pre-nominal, so distinct from the post-nominal :attr:`modifiers`."""
+
 
 @dataclass
 class PossessiveChain(Fragment):
