@@ -249,21 +249,22 @@ class RestrictionFragments:
     the keyword and position. ``None`` when the WHERE folds entirely into the other pieces."""
 
 
-def place_restriction(
+def as_subject_restrictions(
     conditions: List[SymbolicExpression],
     subject: Variable,
     context: RuleContext,
     number: Number = Number.SINGULAR,
 ) -> RestrictionFragments:
     """
-    Place a subject's WHERE conjuncts and bucket the results by slot into the pieces a caller
-    positions: superlative noun modifiers, the shared *"whose"* group, and the standalone residual.
-    This is the list form of :func:`place`, and the one place a subject's restriction is turned into
-    placed surface pieces.
+    Say a subject's WHERE conjuncts as restrictions on its noun — the counterpart to
+    :meth:`ConditionAssembler.as_statements` for when conditions attach to a subject rather than
+    standing alone. Each conjunct is placed and the results bucketed by slot into the pieces a
+    caller positions: superlative noun modifiers, the shared *"whose"* group, and the standalone
+    residual. This is the list form of :func:`place`.
 
     The conjuncts are range-folded here first (a complementary lower/upper bound pair on one chain
     becomes a single *"… is between …"*), so the caller hands over the raw conditions and never
-    invokes the fold itself — the same reduction :meth:`ConditionAssembler.verbalize` applies.
+    invokes the fold itself — the same reduction :meth:`ConditionAssembler.as_statements` applies.
 
     :param conditions: The subject's WHERE conjuncts (an ``AND`` already flattened to a list).
     :param subject: The variable the restriction is on.

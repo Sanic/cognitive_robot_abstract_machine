@@ -23,7 +23,7 @@ from krrood.entity_query_language.verbalization.grammar.conditions.assembler imp
     ConditionAssembler,
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
-    place_restriction,
+    as_subject_restrictions,
 )
 from krrood.entity_query_language.verbalization.grammar.inference.planner import (
     AggregationStatus,
@@ -100,7 +100,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         intro = self._antecedent_intro(antecedent)
         if not antecedent.conditions or antecedent.variable is None:
             return intro
-        restriction = place_restriction(
+        restriction = as_subject_restrictions(
             antecedent.conditions,
             antecedent.variable,
             self.context,

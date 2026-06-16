@@ -12,7 +12,7 @@ from krrood.entity_query_language.verbalization.grammar.clauses.assembler import
     OrderedByAssembler,
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.forms import (
-    place_restriction,
+    as_subject_restrictions,
     RestrictionFragments,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
@@ -39,7 +39,7 @@ class ClauseComposer:
         ``None`` when the query has no groupable subject restriction."""
         if plan.subject_restriction is None:
             return None
-        return place_restriction(
+        return as_subject_restrictions(
             plan.subject_restriction.conditions, plan.subject, self.context
         )
 
