@@ -326,11 +326,10 @@ def test_subset_of_integer_variables_expectation():
     assert circuit.expectation([x_var])[x_var] == 0
 
 
-class VectorizedTruncationTestCase(unittest.TestCase):
+class MixedLeafTruncationTestCase(unittest.TestCase):
     """
-    The vectorized truncation fast path must apply to circuits with discrete leaves
-    (not just continuous ones) and produce results identical to the per-simple-event
-    reference path.
+    Truncation over a composite event must work for circuits with mixed
+    (continuous + discrete) leaves.
     """
 
     x = Continuous("x")
@@ -367,31 +366,18 @@ class VectorizedTruncationTestCase(unittest.TestCase):
             | SimpleEvent.from_data({self.x: closed(1.0, 1.8), self.n: closed(2, 3)}).as_composite_set()
         )
 
-    def test_discrete_leaves_support_vectorized_truncation(self):
+    def test_truncation_log_probability_matches_event_probability(self):
         circuit = self.build_mixed_circuit()
-        leaves = [node for node in circuit.nodes() if isinstance(node, LeafUnit)]
-        self.assertTrue(all(leaf_unit.supports_vectorized_truncation for leaf_unit in leaves))
-
-    def test_vectorized_matches_reference_on_mixed_leaves(self):
         event = self.composite_event()
+        expected_probability = circuit.probability(event)
+        _, log_probability = circuit.log_truncated(event)
+        self.assertAlmostEqual(np.exp(log_probability), expected_probability, places=9)
 
-        _, log_probability_vectorized = self.build_mixed_circuit().log_truncated(event)
-        reference_circuit = self.build_mixed_circuit()
-        _, log_probability_reference = reference_circuit._log_truncated_in_place_per_simple_event(event)
-
-        self.assertAlmostEqual(log_probability_vectorized, log_probability_reference, places=9)
-
-    def test_vectorized_and_reference_densities_match(self):
+    def test_truncated_circuit_places_all_mass_inside_event(self):
+        circuit = self.build_mixed_circuit()
         event = self.composite_event()
-        vectorized, _ = self.build_mixed_circuit().log_truncated(event)
-        reference, _ = self.build_mixed_circuit()._log_truncated_in_place_per_simple_event(event)
-
-        points = np.column_stack(
-            [np.random.uniform(0.0, 2.0, 300), np.random.randint(0, 4, 300)]
-        )
-        np.testing.assert_allclose(
-            vectorized.log_likelihood(points), reference.log_likelihood(points), atol=1e-9
-        )
+        truncated, _ = circuit.log_truncated(event)
+        self.assertAlmostEqual(truncated.probability(event), 1.0, places=9)
 
 
 if __name__ == "__main__":
