@@ -148,7 +148,7 @@ class CollisionCheckingResultDAO_contacts_association(
     )
 
     target: Mapped[ClosestPointsDAO] = relationship(
-        "ClosestPointsDAO", foreign_keys=[target_closestpointsdao_id]
+        "ClosestPointsDAO", foreign_keys=[target_closestpointsdao_id], lazy="selectin"
     )
 
 
@@ -162,7 +162,9 @@ class CollisionGroupDAO_bodies_association(Base, AssociationDataAccessObject):
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class CollisionMatrixDAO_collision_checks_association(
@@ -180,7 +182,7 @@ class CollisionMatrixDAO_collision_checks_association(
     )
 
     target: Mapped[CollisionCheckDAO] = relationship(
-        "CollisionCheckDAO", foreign_keys=[target_collisioncheckdao_id]
+        "CollisionCheckDAO", foreign_keys=[target_collisioncheckdao_id], lazy="selectin"
     )
 
 
@@ -199,7 +201,7 @@ class AllowAlwaysInCollisionDAO_collision_checks_association(
     )
 
     target: Mapped[CollisionCheckDAO] = relationship(
-        "CollisionCheckDAO", foreign_keys=[target_collisioncheckdao_id]
+        "CollisionCheckDAO", foreign_keys=[target_collisioncheckdao_id], lazy="selectin"
     )
 
 
@@ -215,7 +217,9 @@ class AllowCollisionBetweenGroupsDAO_body_group_a_association(
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class AllowCollisionBetweenGroupsDAO_body_group_b_association(
@@ -230,7 +234,9 @@ class AllowCollisionBetweenGroupsDAO_body_group_b_association(
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class AllowCollisionForBodiesDAO_allowed_collision_bodies_association(
@@ -245,7 +251,9 @@ class AllowCollisionForBodiesDAO_allowed_collision_bodies_association(
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class AllowDefaultInCollisionDAO_bodies_association(Base, AssociationDataAccessObject):
@@ -258,7 +266,9 @@ class AllowDefaultInCollisionDAO_bodies_association(Base, AssociationDataAccessO
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class AllowNeverInCollisionDAO_collision_checks_association(
@@ -276,7 +286,7 @@ class AllowNeverInCollisionDAO_collision_checks_association(
     )
 
     target: Mapped[CollisionCheckDAO] = relationship(
-        "CollisionCheckDAO", foreign_keys=[target_collisioncheckdao_id]
+        "CollisionCheckDAO", foreign_keys=[target_collisioncheckdao_id], lazy="selectin"
     )
 
 
@@ -292,7 +302,9 @@ class AvoidCollisionBetweenGroupsDAO_body_group_a_association(
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class AvoidCollisionBetweenGroupsDAO_body_group_b_association(
@@ -307,7 +319,9 @@ class AvoidCollisionBetweenGroupsDAO_body_group_b_association(
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class HasSimulatorPropertiesDAO_simulator_additional_properties_association(
@@ -327,6 +341,7 @@ class HasSimulatorPropertiesDAO_simulator_additional_properties_association(
     target: Mapped[SimulatorAdditionalPropertyDAO] = relationship(
         "SimulatorAdditionalPropertyDAO",
         foreign_keys=[target_simulatoradditionalpropertydao_id],
+        lazy="selectin",
     )
 
 
@@ -343,7 +358,9 @@ class JointStateDAO_connections_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[ActiveConnection1DOFDAO] = relationship(
-        "ActiveConnection1DOFDAO", foreign_keys=[target_activeconnection1dofdao_id]
+        "ActiveConnection1DOFDAO",
+        foreign_keys=[target_activeconnection1dofdao_id],
+        lazy="selectin",
     )
 
 
@@ -359,7 +376,9 @@ class MaxAvoidedCollisionsOverrideDAO_bodies_association(
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class PipelineDAO_steps_association(Base, AssociationDataAccessObject):
@@ -372,7 +391,9 @@ class PipelineDAO_steps_association(Base, AssociationDataAccessObject):
     )
     target_stepdao_id: Mapped[int] = mapped_column(ForeignKey("StepDAO.database_id"))
 
-    target: Mapped[StepDAO] = relationship("StepDAO", foreign_keys=[target_stepdao_id])
+    target: Mapped[StepDAO] = relationship(
+        "StepDAO", foreign_keys=[target_stepdao_id], lazy="selectin"
+    )
 
 
 class Sage10kRoomDAO_objects_association(Base, AssociationDataAccessObject):
@@ -388,7 +409,7 @@ class Sage10kRoomDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[Sage10kObjectDAO] = relationship(
-        "Sage10kObjectDAO", foreign_keys=[target_sage10kobjectdao_id]
+        "Sage10kObjectDAO", foreign_keys=[target_sage10kobjectdao_id], lazy="selectin"
     )
 
 
@@ -405,7 +426,7 @@ class Sage10kRoomDAO_walls_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[Sage10kWallDAO] = relationship(
-        "Sage10kWallDAO", foreign_keys=[target_sage10kwalldao_id]
+        "Sage10kWallDAO", foreign_keys=[target_sage10kwalldao_id], lazy="selectin"
     )
 
 
@@ -422,7 +443,7 @@ class Sage10kRoomDAO_doors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[Sage10kDoorDAO] = relationship(
-        "Sage10kDoorDAO", foreign_keys=[target_sage10kdoordao_id]
+        "Sage10kDoorDAO", foreign_keys=[target_sage10kdoordao_id], lazy="selectin"
     )
 
 
@@ -439,7 +460,7 @@ class Sage10kSceneDAO_rooms_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[Sage10kRoomDAO] = relationship(
-        "Sage10kRoomDAO", foreign_keys=[target_sage10kroomdao_id]
+        "Sage10kRoomDAO", foreign_keys=[target_sage10kroomdao_id], lazy="selectin"
     )
 
 
@@ -458,7 +479,7 @@ class SelfCollisionMatrixRuleDAO_allowed_collision_pairs_association(
     )
 
     target: Mapped[CollisionCheckDAO] = relationship(
-        "CollisionCheckDAO", foreign_keys=[target_collisioncheckdao_id]
+        "CollisionCheckDAO", foreign_keys=[target_collisioncheckdao_id], lazy="selectin"
     )
 
 
@@ -474,7 +495,9 @@ class SelfCollisionMatrixRuleDAO_allowed_collision_bodies_association(
     )
     target_bodydao_id: Mapped[int] = mapped_column(ForeignKey("BodyDAO.database_id"))
 
-    target: Mapped[BodyDAO] = relationship("BodyDAO", foreign_keys=[target_bodydao_id])
+    target: Mapped[BodyDAO] = relationship(
+        "BodyDAO", foreign_keys=[target_bodydao_id], lazy="selectin"
+    )
 
 
 class ShapeCollectionDAO_shapes_association(Base, AssociationDataAccessObject):
@@ -488,7 +511,7 @@ class ShapeCollectionDAO_shapes_association(Base, AssociationDataAccessObject):
     target_shapedao_id: Mapped[int] = mapped_column(ForeignKey("ShapeDAO.database_id"))
 
     target: Mapped[ShapeDAO] = relationship(
-        "ShapeDAO", foreign_keys=[target_shapedao_id]
+        "ShapeDAO", foreign_keys=[target_shapedao_id], lazy="selectin"
     )
 
 
@@ -507,7 +530,7 @@ class DuplicateRobotAssignmentsErrorDAO_robots_association(
     )
 
     target: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", foreign_keys=[target_abstractrobotdao_id]
+        "AbstractRobotDAO", foreign_keys=[target_abstractrobotdao_id], lazy="selectin"
     )
 
 
@@ -526,7 +549,7 @@ class DuplicateWorldEntityErrorDAO_world_entities_association(
     )
 
     target: Mapped[WorldEntityDAO] = relationship(
-        "WorldEntityDAO", foreign_keys=[target_worldentitydao_id]
+        "WorldEntityDAO", foreign_keys=[target_worldentitydao_id], lazy="selectin"
     )
 
 
@@ -545,7 +568,9 @@ class SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_associat
     )
 
     target: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO", foreign_keys=[target_semanticannotationdao_id]
+        "SemanticAnnotationDAO",
+        foreign_keys=[target_semanticannotationdao_id],
+        lazy="selectin",
     )
 
 
@@ -566,6 +591,7 @@ class WorldMappingDAO_kinematic_structure_entities_association(
     target: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         foreign_keys=[target_kinematicstructureentitydao_id],
+        lazy="selectin",
     )
 
 
@@ -582,7 +608,7 @@ class WorldMappingDAO_connections_association(Base, AssociationDataAccessObject)
     )
 
     target: Mapped[ConnectionDAO] = relationship(
-        "ConnectionDAO", foreign_keys=[target_connectiondao_id]
+        "ConnectionDAO", foreign_keys=[target_connectiondao_id], lazy="selectin"
     )
 
 
@@ -601,7 +627,9 @@ class WorldMappingDAO_semantic_annotations_association(
     )
 
     target: Mapped[SemanticAnnotationDAO] = relationship(
-        "SemanticAnnotationDAO", foreign_keys=[target_semanticannotationdao_id]
+        "SemanticAnnotationDAO",
+        foreign_keys=[target_semanticannotationdao_id],
+        lazy="selectin",
     )
 
 
@@ -618,7 +646,9 @@ class WorldMappingDAO_degrees_of_freedom_association(Base, AssociationDataAccess
     )
 
     target: Mapped[DegreeOfFreedomDAO] = relationship(
-        "DegreeOfFreedomDAO", foreign_keys=[target_degreeoffreedomdao_id]
+        "DegreeOfFreedomDAO",
+        foreign_keys=[target_degreeoffreedomdao_id],
+        lazy="selectin",
     )
 
 
@@ -639,6 +669,7 @@ class WorldMappingDAO_modification_history_association(
     target: Mapped[WorldModelModificationBlockDAO] = relationship(
         "WorldModelModificationBlockDAO",
         foreign_keys=[target_worldmodelmodificationblockdao_id],
+        lazy="selectin",
     )
 
 
@@ -659,6 +690,7 @@ class ConnectionDAO_simulator_additional_properties_association(
     target: Mapped[SimulatorAdditionalPropertyDAO] = relationship(
         "SimulatorAdditionalPropertyDAO",
         foreign_keys=[target_simulatoradditionalpropertydao_id],
+        lazy="selectin",
     )
 
 
@@ -675,7 +707,7 @@ class CollisionManagerDAO_default_rules_association(Base, AssociationDataAccessO
     )
 
     target: Mapped[CollisionRuleDAO] = relationship(
-        "CollisionRuleDAO", foreign_keys=[target_collisionruledao_id]
+        "CollisionRuleDAO", foreign_keys=[target_collisionruledao_id], lazy="selectin"
     )
 
 
@@ -694,7 +726,7 @@ class CollisionManagerDAO_temporary_rules_association(
     )
 
     target: Mapped[CollisionRuleDAO] = relationship(
-        "CollisionRuleDAO", foreign_keys=[target_collisionruledao_id]
+        "CollisionRuleDAO", foreign_keys=[target_collisionruledao_id], lazy="selectin"
     )
 
 
@@ -713,7 +745,9 @@ class CollisionManagerDAO_ignore_collision_rules_association(
     )
 
     target: Mapped[AllowCollisionRuleDAO] = relationship(
-        "AllowCollisionRuleDAO", foreign_keys=[target_allowcollisionruledao_id]
+        "AllowCollisionRuleDAO",
+        foreign_keys=[target_allowcollisionruledao_id],
+        lazy="selectin",
     )
 
 
@@ -734,6 +768,7 @@ class CollisionManagerDAO_max_avoided_bodies_rules_association(
     target: Mapped[MaxAvoidedCollisionsRuleDAO] = relationship(
         "MaxAvoidedCollisionsRuleDAO",
         foreign_keys=[target_maxavoidedcollisionsruledao_id],
+        lazy="selectin",
     )
 
 
@@ -752,7 +787,9 @@ class CollisionManagerDAO_collision_consumers_association(
     )
 
     target: Mapped[CollisionConsumerDAO] = relationship(
-        "CollisionConsumerDAO", foreign_keys=[target_collisionconsumerdao_id]
+        "CollisionConsumerDAO",
+        foreign_keys=[target_collisionconsumerdao_id],
+        lazy="selectin",
     )
 
 
@@ -773,6 +810,7 @@ class TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_associati
     target: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         foreign_keys=[target_kinematicstructureentitydao_id],
+        lazy="selectin",
     )
 
 
@@ -793,6 +831,7 @@ class TFPublisherDAO_ignored_kinematic_structure_entities_association(
     target: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         foreign_keys=[target_kinematicstructureentitydao_id],
+        lazy="selectin",
     )
 
 
@@ -813,6 +852,7 @@ class WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_asso
     target: Mapped[SimulatorAdditionalPropertyDAO] = relationship(
         "SimulatorAdditionalPropertyDAO",
         foreign_keys=[target_simulatoradditionalpropertydao_id],
+        lazy="selectin",
     )
 
 
@@ -826,7 +866,9 @@ class HasDoorsDAO_doors_association(Base, AssociationDataAccessObject):
     )
     target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
 
-    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+    target: Mapped[DoorDAO] = relationship(
+        "DoorDAO", foreign_keys=[target_doordao_id], lazy="selectin"
+    )
 
 
 class HasDrawersDAO_drawers_association(Base, AssociationDataAccessObject):
@@ -842,7 +884,7 @@ class HasDrawersDAO_drawers_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[DrawerDAO] = relationship(
-        "DrawerDAO", foreign_keys=[target_drawerdao_id]
+        "DrawerDAO", foreign_keys=[target_drawerdao_id], lazy="selectin"
     )
 
 
@@ -859,7 +901,7 @@ class AbstractRobotPartDAO_joint_states_association(Base, AssociationDataAccessO
     )
 
     target: Mapped[JointStateDAO] = relationship(
-        "JointStateDAO", foreign_keys=[target_jointstatedao_id]
+        "JointStateDAO", foreign_keys=[target_jointstatedao_id], lazy="selectin"
     )
 
 
@@ -876,7 +918,7 @@ class HSRBArmDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[HSRBHandCameraDAO] = relationship(
-        "HSRBHandCameraDAO", foreign_keys=[target_hsrbhandcameradao_id]
+        "HSRBHandCameraDAO", foreign_keys=[target_hsrbhandcameradao_id], lazy="selectin"
     )
 
 
@@ -893,7 +935,7 @@ class Armar7NeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[AzureKinectRGBDAO] = relationship(
-        "AzureKinectRGBDAO", foreign_keys=[target_azurekinectrgbdao_id]
+        "AzureKinectRGBDAO", foreign_keys=[target_azurekinectrgbdao_id], lazy="selectin"
     )
 
 
@@ -910,7 +952,7 @@ class GarmiNeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[GarmiCameraDAO] = relationship(
-        "GarmiCameraDAO", foreign_keys=[target_garmicameradao_id]
+        "GarmiCameraDAO", foreign_keys=[target_garmicameradao_id], lazy="selectin"
     )
 
 
@@ -927,7 +969,9 @@ class HSRBNeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[HSRBHeadCenterCameraDAO] = relationship(
-        "HSRBHeadCenterCameraDAO", foreign_keys=[target_hsrbheadcentercameradao_id]
+        "HSRBHeadCenterCameraDAO",
+        foreign_keys=[target_hsrbheadcentercameradao_id],
+        lazy="selectin",
     )
 
 
@@ -944,7 +988,7 @@ class ICub3NeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[ICub3CameraDAO] = relationship(
-        "ICub3CameraDAO", foreign_keys=[target_icub3cameradao_id]
+        "ICub3CameraDAO", foreign_keys=[target_icub3cameradao_id], lazy="selectin"
     )
 
 
@@ -961,7 +1005,7 @@ class JustinNeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[JustinCameraDAO] = relationship(
-        "JustinCameraDAO", foreign_keys=[target_justincameradao_id]
+        "JustinCameraDAO", foreign_keys=[target_justincameradao_id], lazy="selectin"
     )
 
 
@@ -978,7 +1022,7 @@ class PR2NeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[PR2KinectV1DAO] = relationship(
-        "PR2KinectV1DAO", foreign_keys=[target_pr2kinectv1dao_id]
+        "PR2KinectV1DAO", foreign_keys=[target_pr2kinectv1dao_id], lazy="selectin"
     )
 
 
@@ -995,7 +1039,9 @@ class StretchNeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[StretchCameraColorDAO] = relationship(
-        "StretchCameraColorDAO", foreign_keys=[target_stretchcameracolordao_id]
+        "StretchCameraColorDAO",
+        foreign_keys=[target_stretchcameracolordao_id],
+        lazy="selectin",
     )
 
 
@@ -1012,7 +1058,7 @@ class TiagoMujocoNeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[TiagoCameraDAO] = relationship(
-        "TiagoCameraDAO", foreign_keys=[target_tiagocameradao_id]
+        "TiagoCameraDAO", foreign_keys=[target_tiagocameradao_id], lazy="selectin"
     )
 
 
@@ -1029,7 +1075,7 @@ class TiagoNeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[TiagoCameraDAO] = relationship(
-        "TiagoCameraDAO", foreign_keys=[target_tiagocameradao_id]
+        "TiagoCameraDAO", foreign_keys=[target_tiagocameradao_id], lazy="selectin"
     )
 
 
@@ -1043,7 +1089,9 @@ class UnitreeG1NeckDAO_sensors_association(Base, AssociationDataAccessObject):
     )
     target_d435dao_id: Mapped[int] = mapped_column(ForeignKey("D435DAO.database_id"))
 
-    target: Mapped[D435DAO] = relationship("D435DAO", foreign_keys=[target_d435dao_id])
+    target: Mapped[D435DAO] = relationship(
+        "D435DAO", foreign_keys=[target_d435dao_id], lazy="selectin"
+    )
 
 
 class MMPDresdenTorsoDAO_sensors_association(Base, AssociationDataAccessObject):
@@ -1059,7 +1107,9 @@ class MMPDresdenTorsoDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[MMPDresdenCameraDAO] = relationship(
-        "MMPDresdenCameraDAO", foreign_keys=[target_mmpdresdencameradao_id]
+        "MMPDresdenCameraDAO",
+        foreign_keys=[target_mmpdresdencameradao_id],
+        lazy="selectin",
     )
 
 
@@ -1078,6 +1128,7 @@ class MinimalRobotDAO_bodies_of_branch_association(Base, AssociationDataAccessOb
     target: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
         foreign_keys=[target_kinematicstructureentitydao_id],
+        lazy="selectin",
     )
 
 
@@ -1092,7 +1143,7 @@ class TracyDAO_sensors_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[TracyCameraDAO] = relationship(
-        "TracyCameraDAO", foreign_keys=[target_tracycameradao_id]
+        "TracyCameraDAO", foreign_keys=[target_tracycameradao_id], lazy="selectin"
     )
 
 
@@ -1109,7 +1160,7 @@ class HasAperturesDAO_apertures_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[ApertureDAO] = relationship(
-        "ApertureDAO", foreign_keys=[target_aperturedao_id]
+        "ApertureDAO", foreign_keys=[target_aperturedao_id], lazy="selectin"
     )
 
 
@@ -1126,7 +1177,7 @@ class HasStorageSpaceDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id]
+        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id], lazy="selectin"
     )
 
 
@@ -1143,7 +1194,7 @@ class CounterTopDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id]
+        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id], lazy="selectin"
     )
 
 
@@ -1160,7 +1211,7 @@ class CabinetDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id]
+        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id], lazy="selectin"
     )
 
 
@@ -1174,7 +1225,9 @@ class CupboardDAO_doors_association(Base, AssociationDataAccessObject):
     )
     target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
 
-    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+    target: Mapped[DoorDAO] = relationship(
+        "DoorDAO", foreign_keys=[target_doordao_id], lazy="selectin"
+    )
 
 
 class DresserDAO_doors_association(Base, AssociationDataAccessObject):
@@ -1187,7 +1240,9 @@ class DresserDAO_doors_association(Base, AssociationDataAccessObject):
     )
     target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
 
-    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+    target: Mapped[DoorDAO] = relationship(
+        "DoorDAO", foreign_keys=[target_doordao_id], lazy="selectin"
+    )
 
 
 class DresserDAO_drawers_association(Base, AssociationDataAccessObject):
@@ -1203,7 +1258,7 @@ class DresserDAO_drawers_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[DrawerDAO] = relationship(
-        "DrawerDAO", foreign_keys=[target_drawerdao_id]
+        "DrawerDAO", foreign_keys=[target_drawerdao_id], lazy="selectin"
     )
 
 
@@ -1220,7 +1275,7 @@ class FridgeDAO_drawers_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[DrawerDAO] = relationship(
-        "DrawerDAO", foreign_keys=[target_drawerdao_id]
+        "DrawerDAO", foreign_keys=[target_drawerdao_id], lazy="selectin"
     )
 
 
@@ -1234,7 +1289,9 @@ class FridgeDAO_doors_association(Base, AssociationDataAccessObject):
     )
     target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
 
-    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+    target: Mapped[DoorDAO] = relationship(
+        "DoorDAO", foreign_keys=[target_doordao_id], lazy="selectin"
+    )
 
 
 class WardrobeDAO_doors_association(Base, AssociationDataAccessObject):
@@ -1247,7 +1304,9 @@ class WardrobeDAO_doors_association(Base, AssociationDataAccessObject):
     )
     target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
 
-    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+    target: Mapped[DoorDAO] = relationship(
+        "DoorDAO", foreign_keys=[target_doordao_id], lazy="selectin"
+    )
 
 
 class WardrobeDAO_drawers_association(Base, AssociationDataAccessObject):
@@ -1263,7 +1322,7 @@ class WardrobeDAO_drawers_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[DrawerDAO] = relationship(
-        "DrawerDAO", foreign_keys=[target_drawerdao_id]
+        "DrawerDAO", foreign_keys=[target_drawerdao_id], lazy="selectin"
     )
 
 
@@ -1280,7 +1339,7 @@ class DishwasherDAO_drawers_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[DrawerDAO] = relationship(
-        "DrawerDAO", foreign_keys=[target_drawerdao_id]
+        "DrawerDAO", foreign_keys=[target_drawerdao_id], lazy="selectin"
     )
 
 
@@ -1294,7 +1353,9 @@ class DishwasherDAO_doors_association(Base, AssociationDataAccessObject):
     )
     target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
 
-    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+    target: Mapped[DoorDAO] = relationship(
+        "DoorDAO", foreign_keys=[target_doordao_id], lazy="selectin"
+    )
 
 
 class SofaDAO_objects_association(Base, AssociationDataAccessObject):
@@ -1308,7 +1369,7 @@ class SofaDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id]
+        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id], lazy="selectin"
     )
 
 
@@ -1323,7 +1384,7 @@ class TableDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id]
+        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id], lazy="selectin"
     )
 
 
@@ -1340,7 +1401,7 @@ class DrawerDAO_objects_association(Base, AssociationDataAccessObject):
     )
 
     target: Mapped[HasRootBodyDAO] = relationship(
-        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id]
+        "HasRootBodyDAO", foreign_keys=[target_hasrootbodydao_id], lazy="selectin"
     )
 
 
@@ -1354,7 +1415,9 @@ class RoomWithWallsAndDoorsDAO_walls_association(Base, AssociationDataAccessObje
     )
     target_walldao_id: Mapped[int] = mapped_column(ForeignKey("WallDAO.database_id"))
 
-    target: Mapped[WallDAO] = relationship("WallDAO", foreign_keys=[target_walldao_id])
+    target: Mapped[WallDAO] = relationship(
+        "WallDAO", foreign_keys=[target_walldao_id], lazy="selectin"
+    )
 
 
 class RoomWithWallsAndDoorsDAO_doors_association(Base, AssociationDataAccessObject):
@@ -1367,7 +1430,9 @@ class RoomWithWallsAndDoorsDAO_doors_association(Base, AssociationDataAccessObje
     )
     target_doordao_id: Mapped[int] = mapped_column(ForeignKey("DoorDAO.database_id"))
 
-    target: Mapped[DoorDAO] = relationship("DoorDAO", foreign_keys=[target_doordao_id])
+    target: Mapped[DoorDAO] = relationship(
+        "DoorDAO", foreign_keys=[target_doordao_id], lazy="selectin"
+    )
 
 
 class WorldModelManagerDAO_model_modification_blocks_association(
@@ -1387,6 +1452,7 @@ class WorldModelManagerDAO_model_modification_blocks_association(
     target: Mapped[WorldModelModificationBlockDAO] = relationship(
         "WorldModelModificationBlockDAO",
         foreign_keys=[target_worldmodelmodificationblockdao_id],
+        lazy="selectin",
     )
 
 
@@ -1405,7 +1471,9 @@ class WorldModelModificationBlockDAO_modifications_association(
     )
 
     target: Mapped[WorldModificationDAO] = relationship(
-        "WorldModificationDAO", foreign_keys=[target_worldmodificationdao_id]
+        "WorldModificationDAO",
+        foreign_keys=[target_worldmodificationdao_id],
+        lazy="selectin",
     )
 
 
@@ -1426,6 +1494,7 @@ class WorldModelSnapshotDAO_modifications_association(
     target: Mapped[WorldModelModificationBlockDAO] = relationship(
         "WorldModelModificationBlockDAO",
         foreign_keys=[target_worldmodelmodificationblockdao_id],
+        lazy="selectin",
     )
 
 
@@ -1444,7 +1513,9 @@ class WorldContainsOrphanedDegreeOfFreedomDAO_actual_dofs_association(
     )
 
     target: Mapped[DegreeOfFreedomDAO] = relationship(
-        "DegreeOfFreedomDAO", foreign_keys=[target_degreeoffreedomdao_id]
+        "DegreeOfFreedomDAO",
+        foreign_keys=[target_degreeoffreedomdao_id],
+        lazy="selectin",
     )
 
 
@@ -1680,6 +1751,7 @@ class CollisionCheckingResultDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[CollisionCheckingResultDAO_contacts_association.source_collisioncheckingresultdao_id]",
+            lazy="selectin",
         )
     )
 
@@ -1732,6 +1804,7 @@ class CollisionGroupDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionGroupDAO_bodies_association.source_collisiongroupdao_id]",
+        lazy="selectin",
     )
 
 
@@ -1752,6 +1825,7 @@ class CollisionGroupConsumerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CollisionGroupConsumerDAO",
         "inherit_condition": database_id == CollisionConsumerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1772,6 +1846,7 @@ class BaseCollisionVariableManagerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BaseCollisionVariableManagerDAO",
         "inherit_condition": database_id == CollisionGroupConsumerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1794,6 +1869,7 @@ class CollisionMatrixDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionMatrixDAO_collision_checks_association.source_collisionmatrixdao_id]",
+        lazy="selectin",
     )
 
 
@@ -1836,6 +1912,7 @@ class AllowCollisionRuleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AllowCollisionRuleDAO",
         "inherit_condition": database_id == CollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1856,6 +1933,7 @@ class AllowAllCollisionsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AllowAllCollisionsDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1895,11 +1973,13 @@ class AllowAlwaysInCollisionDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[AllowAlwaysInCollisionDAO_collision_checks_association.source_allowalwaysincollisiondao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "AllowAlwaysInCollisionDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1924,6 +2004,7 @@ class AllowCollisionBetweenGroupsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AllowCollisionBetweenGroupsDAO_body_group_a_association.source_allowcollisionbetweengroupsdao_id]",
+        lazy="selectin",
     )
     body_group_b: Mapped[
         builtins.list[AllowCollisionBetweenGroupsDAO_body_group_b_association]
@@ -1932,11 +2013,13 @@ class AllowCollisionBetweenGroupsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AllowCollisionBetweenGroupsDAO_body_group_b_association.source_allowcollisionbetweengroupsdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "AllowCollisionBetweenGroupsDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1957,6 +2040,7 @@ class AllowCollisionForAdjacentPairsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AllowCollisionForAdjacentPairsDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -1981,11 +2065,13 @@ class AllowCollisionForBodiesDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[AllowCollisionForBodiesDAO_allowed_collision_bodies_association.source_allowcollisionforbodiesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "AllowCollisionForBodiesDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2022,12 +2108,14 @@ class AllowDefaultInCollisionDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[AllowDefaultInCollisionDAO_bodies_association.source_allowdefaultincollisiondao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "AllowDefaultInCollisionDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2075,11 +2163,13 @@ class AllowNeverInCollisionDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[AllowNeverInCollisionDAO_collision_checks_association.source_allowneverincollisiondao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "AllowNeverInCollisionDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2100,6 +2190,7 @@ class AllowNonRobotCollisionsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AllowNonRobotCollisionsDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2130,6 +2221,7 @@ class AllowSelfCollisionsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AllowSelfCollisionsDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2155,6 +2247,7 @@ class AvoidCollisionRuleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AvoidCollisionRuleDAO",
         "inherit_condition": database_id == CollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2175,6 +2268,7 @@ class AvoidAllCollisionsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AvoidAllCollisionsDAO",
         "inherit_condition": database_id == AvoidCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2199,6 +2293,7 @@ class AvoidCollisionBetweenGroupsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AvoidCollisionBetweenGroupsDAO_body_group_a_association.source_avoidcollisionbetweengroupsdao_id]",
+        lazy="selectin",
     )
     body_group_b: Mapped[
         builtins.list[AvoidCollisionBetweenGroupsDAO_body_group_b_association]
@@ -2207,11 +2302,13 @@ class AvoidCollisionBetweenGroupsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AvoidCollisionBetweenGroupsDAO_body_group_b_association.source_avoidcollisionbetweengroupsdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "AvoidCollisionBetweenGroupsDAO",
         "inherit_condition": database_id == AvoidCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2242,6 +2339,7 @@ class AvoidExternalCollisionsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AvoidExternalCollisionsDAO",
         "inherit_condition": database_id == AvoidCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2272,6 +2370,7 @@ class AvoidSelfCollisionsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AvoidSelfCollisionsDAO",
         "inherit_condition": database_id == AvoidCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2477,6 +2576,7 @@ class DerivativeMap_floatDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DerivativeMap_floatDAO",
         "inherit_condition": database_id == DerivativeMapDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2545,6 +2645,7 @@ class ActuatorConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ActuatorConverterDAO",
         "inherit_condition": database_id == EntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2563,6 +2664,7 @@ class CameraConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CameraConverterDAO",
         "inherit_condition": database_id == EntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2581,6 +2683,7 @@ class ConnectionConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ConnectionConverterDAO",
         "inherit_condition": database_id == EntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2621,6 +2724,7 @@ class Connection1DOFConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Connection1DOFConverterDAO",
         "inherit_condition": database_id == ConnectionConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2641,6 +2745,7 @@ class ConnectionPrismaticConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ConnectionPrismaticConverterDAO",
         "inherit_condition": database_id == Connection1DOFConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2661,6 +2766,7 @@ class ConnectionRevoluteConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ConnectionRevoluteConverterDAO",
         "inherit_condition": database_id == Connection1DOFConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2679,6 +2785,7 @@ class Connection6DOFConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Connection6DOFConverterDAO",
         "inherit_condition": database_id == ConnectionConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2716,6 +2823,7 @@ class ActuatorSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ActuatorSpawnerDAO",
         "inherit_condition": database_id == EntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2734,6 +2842,7 @@ class ConnectionSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ConnectionSpawnerDAO",
         "inherit_condition": database_id == EntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2752,6 +2861,7 @@ class Connection1DOFSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Connection1DOFSpawnerDAO",
         "inherit_condition": database_id == ConnectionSpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2770,6 +2880,7 @@ class Connection6DOFSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Connection6DOFSpawnerDAO",
         "inherit_condition": database_id == ConnectionSpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2790,6 +2901,7 @@ class ConnectionPrismaticSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ConnectionPrismaticSpawnerDAO",
         "inherit_condition": database_id == ConnectionSpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2810,6 +2922,7 @@ class ConnectionRevoluteSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ConnectionRevoluteSpawnerDAO",
         "inherit_condition": database_id == ConnectionSpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2830,6 +2943,7 @@ class ExternalCollisionVariableManagerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ExternalCollisionVariableManagerDAO",
         "inherit_condition": database_id == BaseCollisionVariableManagerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -2912,6 +3026,7 @@ class FixedConnectionSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FixedConnectionSpawnerDAO",
         "inherit_condition": database_id == ConnectionSpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3003,6 +3118,7 @@ class HasSimulatorPropertiesDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HasSimulatorPropertiesDAO_simulator_additional_properties_association.source_hassimulatorpropertiesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
@@ -3132,6 +3248,7 @@ class InvalidCollisionCheckErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InvalidCollisionCheckErrorDAO",
         "inherit_condition": database_id == CollisionCheckingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3150,6 +3267,7 @@ class BodyHasNoGeometryErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BodyHasNoGeometryErrorDAO",
         "inherit_condition": database_id == InvalidCollisionCheckErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3170,6 +3288,7 @@ class InvalidBodiesInCollisionCheckErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InvalidBodiesInCollisionCheckErrorDAO",
         "inherit_condition": database_id == InvalidCollisionCheckErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3296,6 +3415,7 @@ class JointStateDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[JointStateDAO_connections_association.source_jointstatedao_id]",
+            lazy="selectin",
         )
     )
     name: Mapped[PrefixedNameDAO] = relationship(
@@ -3327,6 +3447,7 @@ class KinematicStructureEntityConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KinematicStructureEntityConverterDAO",
         "inherit_condition": database_id == EntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3359,6 +3480,7 @@ class BodyConverterDAO(
         "polymorphic_identity": "BodyConverterDAO",
         "inherit_condition": database_id
         == KinematicStructureEntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3426,6 +3548,7 @@ class InsideOfDAO(
         "polymorphic_identity": "InsideOfDAO",
         "inherit_condition": database_id
         == KinematicStructureEntitySpatialRelationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3446,6 +3569,7 @@ class KinematicStructureEntitySpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KinematicStructureEntitySpawnerDAO",
         "inherit_condition": database_id == EntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3465,6 +3589,7 @@ class BodySpawnerDAO(
         "polymorphic_identity": "BodySpawnerDAO",
         "inherit_condition": database_id
         == KinematicStructureEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3543,6 +3668,7 @@ class DefaultMaxAvoidedCollisionsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DefaultMaxAvoidedCollisionsDAO",
         "inherit_condition": database_id == MaxAvoidedCollisionsRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3568,12 +3694,14 @@ class MaxAvoidedCollisionsOverrideDAO(
             collection_class=builtins.set,
             cascade="all, delete-orphan",
             foreign_keys="[MaxAvoidedCollisionsOverrideDAO_bodies_association.source_maxavoidedcollisionsoverridedao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "MaxAvoidedCollisionsOverrideDAO",
         "inherit_condition": database_id == MaxAvoidedCollisionsRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3614,6 +3742,7 @@ class DAEParserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DAEParserDAO",
         "inherit_condition": database_id == MeshParserDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3631,6 +3760,7 @@ class FBXParserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FBXParserDAO",
         "inherit_condition": database_id == MeshParserDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3648,6 +3778,7 @@ class GLBParserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GLBParserDAO",
         "inherit_condition": database_id == MeshParserDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3697,6 +3828,7 @@ class LoadModelDAO(
     __mapper_args__ = {
         "polymorphic_identity": "LoadModelDAO",
         "inherit_condition": database_id == MessageDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3814,6 +3946,7 @@ class ModificationBlockDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ModificationBlockDAO",
         "inherit_condition": database_id == MessageDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3832,6 +3965,7 @@ class MujocoActuatorConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoActuatorConverterDAO",
         "inherit_condition": database_id == ActuatorConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3850,6 +3984,7 @@ class MujocoCameraConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoCameraConverterDAO",
         "inherit_condition": database_id == CameraConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3868,6 +4003,7 @@ class MujocoConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoConverterDAO",
         "inherit_condition": database_id == EntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3886,6 +4022,7 @@ class MujocoEntitySpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoEntitySpawnerDAO",
         "inherit_condition": database_id == EntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3904,6 +4041,7 @@ class MujocoActuatorSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoActuatorSpawnerDAO",
         "inherit_condition": database_id == MujocoEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3922,6 +4060,7 @@ class MujocoConnectionSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoConnectionSpawnerDAO",
         "inherit_condition": database_id == MujocoEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3942,6 +4081,7 @@ class MujocoFixedConnectionSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoFixedConnectionSpawnerDAO",
         "inherit_condition": database_id == MujocoEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3960,6 +4100,7 @@ class MujocoFreejointSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoFreejointSpawnerDAO",
         "inherit_condition": database_id == MujocoEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -3980,6 +4121,7 @@ class MujocoGeneralActuatorConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoGeneralActuatorConverterDAO",
         "inherit_condition": database_id == MujocoActuatorConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4014,6 +4156,7 @@ class MujocoJointConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoJointConverterDAO",
         "inherit_condition": database_id == ConnectionConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4039,6 +4182,7 @@ class Mujoco1DOFJointConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Mujoco1DOFJointConverterDAO",
         "inherit_condition": database_id == MujocoJointConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4057,6 +4201,7 @@ class Mujoco6DOFJointConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Mujoco6DOFJointConverterDAO",
         "inherit_condition": database_id == MujocoJointConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4084,6 +4229,7 @@ class MujocoKinematicStructureEntityConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoKinematicStructureEntityConverterDAO",
         "inherit_condition": database_id == MujocoConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4116,6 +4262,7 @@ class MujocoBodyConverterDAO(
         "polymorphic_identity": "MujocoBodyConverterDAO",
         "inherit_condition": database_id
         == MujocoKinematicStructureEntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4136,6 +4283,7 @@ class MujocoKinematicStructureEntitySpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoKinematicStructureEntitySpawnerDAO",
         "inherit_condition": database_id == MujocoEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4155,6 +4303,7 @@ class MujocoBodySpawnerDAO(
         "polymorphic_identity": "MujocoBodySpawnerDAO",
         "inherit_condition": database_id
         == MujocoKinematicStructureEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4175,6 +4324,7 @@ class MujocoPrismaticJointConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoPrismaticJointConverterDAO",
         "inherit_condition": database_id == Mujoco1DOFJointConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4195,6 +4345,7 @@ class MujocoPrismaticJointSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoPrismaticJointSpawnerDAO",
         "inherit_condition": database_id == MujocoConnectionSpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4215,6 +4366,7 @@ class MujocoRevoluteJointConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoRevoluteJointConverterDAO",
         "inherit_condition": database_id == Mujoco1DOFJointConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4235,6 +4387,7 @@ class MujocoRevoluteJointSpawnerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoRevoluteJointSpawnerDAO",
         "inherit_condition": database_id == MujocoConnectionSpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4272,6 +4425,7 @@ class MujocoBuilderDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoBuilderDAO",
         "inherit_condition": database_id == MultiSimBuilderDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4308,6 +4462,7 @@ class MujocoErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoErrorDAO",
         "inherit_condition": database_id == MultiSimErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4326,6 +4481,7 @@ class MujocoEntityNotFoundErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoEntityNotFoundErrorDAO",
         "inherit_condition": database_id == MujocoErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4368,6 +4524,7 @@ class InertiaTensorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InertiaTensorDAO",
         "inherit_condition": database_id == NPMatrix3x3DAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4410,6 +4567,7 @@ class NegativeCollisionCheckingDistanceErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "NegativeCollisionCheckingDistanceErrorDAO",
         "inherit_condition": database_id == InvalidCollisionCheckErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4506,6 +4664,7 @@ class NonMonotonicTimeErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "NonMonotonicTimeErrorDAO",
         "inherit_condition": database_id == LogicalErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4542,6 +4701,7 @@ class OBJParserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "OBJParserDAO",
         "inherit_condition": database_id == MeshParserDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4559,6 +4719,7 @@ class OFFParserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "OFFParserDAO",
         "inherit_condition": database_id == MeshParserDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4576,6 +4737,7 @@ class PLYParserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PLYParserDAO",
         "inherit_condition": database_id == MeshParserDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4637,6 +4799,7 @@ class PackageResolutionErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PackageResolutionErrorDAO",
         "inherit_condition": database_id == ParsingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4710,6 +4873,7 @@ class PathResolutionErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PathResolutionErrorDAO",
         "inherit_condition": database_id == ParsingErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4727,6 +4891,7 @@ class PipelineDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PipelineDAO_steps_association.source_pipelinedao_id]",
+        lazy="selectin",
     )
 
 
@@ -4850,6 +5015,7 @@ class PrincipalAxesDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PrincipalAxesDAO",
         "inherit_condition": database_id == NPMatrix3x3DAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -4868,6 +5034,7 @@ class PrincipalMomentsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PrincipalMomentsDAO",
         "inherit_condition": database_id == NPVector3DAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5069,6 +5236,7 @@ class QuaternionConversionErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "QuaternionConversionErrorDAO",
         "inherit_condition": database_id == MultiSimErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5115,6 +5283,7 @@ class CannotConvertRos2ToSemDTErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CannotConvertRos2ToSemDTErrorDAO",
         "inherit_condition": database_id == ROS2ConversionErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5139,6 +5308,7 @@ class CannotConvertSemDTToRos2ErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CannotConvertSemDTToRos2ErrorDAO",
         "inherit_condition": database_id == ROS2ConversionErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5182,6 +5352,7 @@ class RegionConverterDAO(
         "polymorphic_identity": "RegionConverterDAO",
         "inherit_condition": database_id
         == KinematicStructureEntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5201,6 +5372,7 @@ class MujocoRegionConverterDAO(
         "polymorphic_identity": "MujocoRegionConverterDAO",
         "inherit_condition": database_id
         == MujocoKinematicStructureEntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5220,6 +5392,7 @@ class RegionSpawnerDAO(
         "polymorphic_identity": "RegionSpawnerDAO",
         "inherit_condition": database_id
         == KinematicStructureEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5239,6 +5412,7 @@ class MujocoRegionSpawnerDAO(
         "polymorphic_identity": "MujocoRegionSpawnerDAO",
         "inherit_condition": database_id
         == MujocoKinematicStructureEntitySpawnerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5277,6 +5451,7 @@ class HasArmsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasArmsDAO",
         "inherit_condition": database_id == RobotPartMixinDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5295,6 +5470,7 @@ class HasEndEffectorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasEndEffectorDAO",
         "inherit_condition": database_id == RobotPartMixinDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5313,6 +5489,7 @@ class HasFingersDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasFingersDAO",
         "inherit_condition": database_id == RobotPartMixinDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5331,6 +5508,7 @@ class HasTwoFingersDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasTwoFingersDAO",
         "inherit_condition": database_id == HasFingersDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5347,6 +5525,7 @@ class HasLeftRightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasLeftRightArmDAO",
         "inherit_condition": database_id == HasArmsDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5365,6 +5544,7 @@ class HasMobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasMobileBaseDAO",
         "inherit_condition": database_id == RobotPartMixinDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5383,6 +5563,7 @@ class HasNeckDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasNeckDAO",
         "inherit_condition": database_id == RobotPartMixinDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5399,6 +5580,7 @@ class HasOneArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasOneArmDAO",
         "inherit_condition": database_id == HasArmsDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5417,6 +5599,7 @@ class HasSensorsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasSensorsDAO",
         "inherit_condition": database_id == RobotPartMixinDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5435,6 +5618,7 @@ class HasTorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasTorsoDAO",
         "inherit_condition": database_id == RobotPartMixinDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5504,6 +5688,7 @@ class ColorToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ColorToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5524,6 +5709,7 @@ class CubeMarkerToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CubeMarkerToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5544,6 +5730,7 @@ class CylinderMarkerToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CylinderMarkerToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5564,6 +5751,7 @@ class MeshMarkerToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MeshMarkerToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5584,6 +5772,7 @@ class PointStampedToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PointStampedToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5604,6 +5793,7 @@ class PoseStampedToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PoseStampedToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5624,6 +5814,7 @@ class PoseToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PoseToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5644,6 +5835,7 @@ class QuaternionToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "QuaternionToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5661,6 +5853,7 @@ class STLParserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "STLParserDAO",
         "inherit_condition": database_id == MeshParserDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5705,6 +5898,7 @@ class HasXYZDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasXYZDAO",
         "inherit_condition": database_id == Sage10kBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5756,6 +5950,7 @@ class Sage10kPositionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kPositionDAO",
         "inherit_condition": database_id == HasXYZDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5774,6 +5969,7 @@ class Sage10kRotationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kRotationDAO",
         "inherit_condition": database_id == HasXYZDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5798,6 +5994,7 @@ class Sage10kSizeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kSizeDAO",
         "inherit_condition": database_id == Sage10kBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5822,6 +6019,7 @@ class Sage10kWithIDDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kWithIDDAO",
         "inherit_condition": database_id == Sage10kBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5857,6 +6055,7 @@ class Sage10kDoorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kDoorDAO",
         "inherit_condition": database_id == Sage10kWithIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5943,6 +6142,7 @@ class Sage10kObjectDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kObjectDAO",
         "inherit_condition": database_id == Sage10kWithIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -5992,23 +6192,27 @@ class Sage10kRoomDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Sage10kRoomDAO_objects_association.source_sage10kroomdao_id]",
+        lazy="selectin",
     )
     walls: Mapped[builtins.list[Sage10kRoomDAO_walls_association]] = relationship(
         "Sage10kRoomDAO_walls_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Sage10kRoomDAO_walls_association.source_sage10kroomdao_id]",
+        lazy="selectin",
     )
     doors: Mapped[builtins.list[Sage10kRoomDAO_doors_association]] = relationship(
         "Sage10kRoomDAO_doors_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Sage10kRoomDAO_doors_association.source_sage10kroomdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kRoomDAO",
         "inherit_condition": database_id == Sage10kWithIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6046,11 +6250,13 @@ class Sage10kSceneDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Sage10kSceneDAO_rooms_association.source_sage10kscenedao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kSceneDAO",
         "inherit_condition": database_id == Sage10kWithIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6101,6 +6307,7 @@ class Sage10kWallDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Sage10kWallDAO",
         "inherit_condition": database_id == Sage10kWithIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6139,6 +6346,7 @@ class SelfCollisionMatrixRuleDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[SelfCollisionMatrixRuleDAO_allowed_collision_pairs_association.source_selfcollisionmatrixruledao_id]",
+        lazy="selectin",
     )
     allowed_collision_bodies: Mapped[
         builtins.set[SelfCollisionMatrixRuleDAO_allowed_collision_bodies_association]
@@ -6147,11 +6355,13 @@ class SelfCollisionMatrixRuleDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[SelfCollisionMatrixRuleDAO_allowed_collision_bodies_association.source_selfcollisionmatrixruledao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "SelfCollisionMatrixRuleDAO",
         "inherit_condition": database_id == AllowCollisionRuleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6172,6 +6382,7 @@ class SelfCollisionVariableManagerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SelfCollisionVariableManagerDAO",
         "inherit_condition": database_id == BaseCollisionVariableManagerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6214,6 +6425,7 @@ class ColorToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ColorToRos2ConverterDAO",
         "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6234,6 +6446,7 @@ class HomogeneousTransformationMatrixToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HomogeneousTransformationMatrixToRos2ConverterDAO",
         "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6254,6 +6467,7 @@ class Point3ToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Point3ToRos2ConverterDAO",
         "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6274,6 +6488,7 @@ class PoseToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PoseToRos2ConverterDAO",
         "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6294,6 +6509,7 @@ class PoseToRos2StampedConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PoseToRos2StampedConverterDAO",
         "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6314,6 +6530,7 @@ class QuaternionToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "QuaternionToRos2ConverterDAO",
         "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6379,6 +6596,7 @@ class ShapeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ShapeDAO",
         "inherit_condition": database_id == HasSimulatorPropertiesDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6404,6 +6622,7 @@ class BoxDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BoxDAO",
         "inherit_condition": database_id == ShapeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6423,6 +6642,7 @@ class CylinderDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CylinderDAO",
         "inherit_condition": database_id == ShapeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6452,6 +6672,7 @@ class MeshDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MeshDAO",
         "inherit_condition": database_id == ShapeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6482,6 +6703,7 @@ class ShapeCollectionDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ShapeCollectionDAO_shapes_association.source_shapecollectiondao_id]",
+        lazy="selectin",
     )
     reference_frame: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
@@ -6513,6 +6735,7 @@ class BoundingBoxCollectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BoundingBoxCollectionDAO",
         "inherit_condition": database_id == ShapeCollectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6541,6 +6764,7 @@ class ShapeConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ShapeConverterDAO",
         "inherit_condition": database_id == EntityConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6559,6 +6783,7 @@ class BoxConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BoxConverterDAO",
         "inherit_condition": database_id == ShapeConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6577,6 +6802,7 @@ class CylinderConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CylinderConverterDAO",
         "inherit_condition": database_id == ShapeConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6595,6 +6821,7 @@ class MeshConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MeshConverterDAO",
         "inherit_condition": database_id == ShapeConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6623,6 +6850,7 @@ class MujocoGeomConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoGeomConverterDAO",
         "inherit_condition": database_id == MujocoConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6641,6 +6869,7 @@ class MujocoBoxConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoBoxConverterDAO",
         "inherit_condition": database_id == MujocoGeomConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6659,6 +6888,7 @@ class MujocoCylinderConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoCylinderConverterDAO",
         "inherit_condition": database_id == MujocoGeomConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6677,6 +6907,7 @@ class MujocoMeshConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoMeshConverterDAO",
         "inherit_condition": database_id == MujocoGeomConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6697,6 +6928,7 @@ class ShapeToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ShapeToRos2ConverterDAO",
         "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6717,6 +6949,7 @@ class BoxToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BoxToRos2ConverterDAO",
         "inherit_condition": database_id == ShapeToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6737,6 +6970,7 @@ class CylinderToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CylinderToRos2ConverterDAO",
         "inherit_condition": database_id == ShapeToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6757,6 +6991,7 @@ class FileMeshToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FileMeshToRos2ConverterDAO",
         "inherit_condition": database_id == ShapeToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6813,6 +7048,7 @@ class MujocoActuatorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoActuatorDAO",
         "inherit_condition": database_id == SimulatorAdditionalPropertyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6836,6 +7072,7 @@ class MujocoBodyDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoBodyDAO",
         "inherit_condition": database_id == SimulatorAdditionalPropertyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6865,6 +7102,7 @@ class MujocoEqualityDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoEqualityDAO",
         "inherit_condition": database_id == SimulatorAdditionalPropertyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6893,6 +7131,7 @@ class MujocoGeomDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoGeomDAO",
         "inherit_condition": database_id == SimulatorAdditionalPropertyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6918,6 +7157,7 @@ class MujocoJointDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoJointDAO",
         "inherit_condition": database_id == SimulatorAdditionalPropertyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -6986,6 +7226,7 @@ class MujocoTendonDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoTendonDAO",
         "inherit_condition": database_id == SimulatorAdditionalPropertyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7008,6 +7249,7 @@ class MultiSimCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MultiSimCameraDAO",
         "inherit_condition": database_id == SimulatorAdditionalPropertyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7057,6 +7299,7 @@ class MujocoCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoCameraDAO",
         "inherit_condition": database_id == MultiSimCameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7142,6 +7385,7 @@ class HomogeneousTransformationMatrixMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HomogeneousTransformationMatrixMappingDAO",
         "inherit_condition": database_id == SpatialTypeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7163,6 +7407,7 @@ class Point3MappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Point3MappingDAO",
         "inherit_condition": database_id == SpatialTypeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7201,6 +7446,7 @@ class PoseMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PoseMappingDAO",
         "inherit_condition": database_id == SpatialTypeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7222,6 +7468,7 @@ class Pose2DMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Pose2DMappingDAO",
         "inherit_condition": database_id == SpatialTypeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7244,6 +7491,7 @@ class QuaternionMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "QuaternionMappingDAO",
         "inherit_condition": database_id == SpatialTypeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7275,6 +7523,7 @@ class RotationMatrixMappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RotationMatrixMappingDAO",
         "inherit_condition": database_id == SpatialTypeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7293,6 +7542,7 @@ class SpatialTypeNotJsonSerializableDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SpatialTypeNotJsonSerializableDAO",
         "inherit_condition": database_id == NotJsonSerializableDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7310,6 +7560,7 @@ class SphereDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SphereDAO",
         "inherit_condition": database_id == ShapeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7328,6 +7579,7 @@ class SphereConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SphereConverterDAO",
         "inherit_condition": database_id == ShapeConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7346,6 +7598,7 @@ class MujocoSphereConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoSphereConverterDAO",
         "inherit_condition": database_id == MujocoGeomConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7366,6 +7619,7 @@ class SphereMarkerToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SphereMarkerToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7386,6 +7640,7 @@ class SphereToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SphereToRos2ConverterDAO",
         "inherit_condition": database_id == ShapeToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7419,6 +7674,7 @@ class BodyFactoryReplaceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BodyFactoryReplaceDAO",
         "inherit_condition": database_id == StepDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7434,6 +7690,7 @@ class BodyFilterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BodyFilterDAO",
         "inherit_condition": database_id == StepDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7452,6 +7709,7 @@ class CenterLocalGeometryAndPreserveWorldPoseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CenterLocalGeometryAndPreserveWorldPoseDAO",
         "inherit_condition": database_id == StepDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7474,6 +7732,7 @@ class GLTFLoaderDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GLTFLoaderDAO",
         "inherit_condition": database_id == StepDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7492,6 +7751,7 @@ class MeshDecomposerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MeshDecomposerDAO",
         "inherit_condition": database_id == StepDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7519,6 +7779,7 @@ class BoxDecomposerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BoxDecomposerDAO",
         "inherit_condition": database_id == MeshDecomposerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7564,6 +7825,7 @@ class BulletVHACDMeshDecomposerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BulletVHACDMeshDecomposerDAO",
         "inherit_condition": database_id == MeshDecomposerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7620,6 +7882,7 @@ class COACDMeshDecomposerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "COACDMeshDecomposerDAO",
         "inherit_condition": database_id == MeshDecomposerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7650,6 +7913,7 @@ class TransformStampedToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TransformStampedToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7694,6 +7958,7 @@ class UsageErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UsageErrorDAO",
         "inherit_condition": database_id == LogicalErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7726,6 +7991,7 @@ class AlreadyBelongsToAWorldErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AlreadyBelongsToAWorldErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7746,6 +8012,7 @@ class ApplyMissedMessagesWhileWorldIsBeingModifiedErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ApplyMissedMessagesWhileWorldIsBeingModifiedErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7777,6 +8044,7 @@ class DoesNotBelongToAWorldErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DoesNotBelongToAWorldErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7811,11 +8079,13 @@ class DuplicateRobotAssignmentsErrorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DuplicateRobotAssignmentsErrorDAO_robots_association.source_duplicaterobotassignmentserrordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "DuplicateRobotAssignmentsErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7838,11 +8108,13 @@ class DuplicateWorldEntityErrorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DuplicateWorldEntityErrorDAO_world_entities_association.source_duplicateworldentityerrordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "DuplicateWorldEntityErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7882,6 +8154,7 @@ class InvalidConnectionLimitsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InvalidConnectionLimitsDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7910,6 +8183,7 @@ class InvalidHingeActiveAxisDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InvalidHingeActiveAxisDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7942,6 +8216,7 @@ class InvalidPlaneDimensionsDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InvalidPlaneDimensionsDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7970,6 +8245,7 @@ class MimicDofLimitOverwriteErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MimicDofLimitOverwriteErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -7997,6 +8273,7 @@ class MismatchingPublishChangesAttributeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MismatchingPublishChangesAttributeDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8038,6 +8315,7 @@ class MismatchingWorldDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MismatchingWorldDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8060,6 +8338,7 @@ class MissingDefaultCameraErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MissingDefaultCameraErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8078,6 +8357,7 @@ class MissingPublishChangesKWARGDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MissingPublishChangesKWARGDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8103,6 +8383,7 @@ class MissingSemanticAnnotationErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MissingSemanticAnnotationErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8120,6 +8401,7 @@ class MissingWorldErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MissingWorldErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8140,6 +8422,7 @@ class MissingWorldModificationContextErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MissingWorldModificationContextErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8166,11 +8449,13 @@ class SemanticAnnotationCircularDependencyErrorDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[SemanticAnnotationCircularDependencyErrorDAO_semantic_annotations_association.source_semanticannotationcirculardependencyerrordao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "SemanticAnnotationCircularDependencyErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8204,6 +8489,7 @@ class SemanticAnnotationNotInWorldErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SemanticAnnotationNotInWorldErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8221,6 +8507,7 @@ class SpatialTypesErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SpatialTypesErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8265,6 +8552,7 @@ class InsufficientVectorsErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InsufficientVectorsErrorDAO",
         "inherit_condition": database_id == SpatialTypesErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8296,6 +8584,7 @@ class MissingReferenceFrameErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MissingReferenceFrameErrorDAO",
         "inherit_condition": database_id == SpatialTypesErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8342,6 +8631,7 @@ class ReferenceFrameMismatchErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ReferenceFrameMismatchErrorDAO",
         "inherit_condition": database_id == SpatialTypesErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8366,6 +8656,7 @@ class StateUpdateContainsUnknownDegreesOfFreedomErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StateUpdateContainsUnknownDegreesOfFreedomErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8388,6 +8679,7 @@ class UselessConceptErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UselessConceptErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8430,6 +8722,7 @@ class VHACDMeshDecomposerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "VHACDMeshDecomposerDAO",
         "inherit_condition": database_id == MeshDecomposerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8451,6 +8744,7 @@ class Vector3MappingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Vector3MappingDAO",
         "inherit_condition": database_id == SpatialTypeDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8471,6 +8765,7 @@ class Vector3StampedToSemDTConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Vector3StampedToSemDTConverterDAO",
         "inherit_condition": database_id == Ros2ToSemDTConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8491,6 +8786,7 @@ class Vector3ToRos2ConverterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Vector3ToRos2ConverterDAO",
         "inherit_condition": database_id == SemDTToRos2ConverterDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8558,6 +8854,7 @@ class ViewDependentSpatialRelationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ViewDependentSpatialRelationDAO",
         "inherit_condition": database_id == PointSpatialRelationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8576,6 +8873,7 @@ class AboveDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AboveDAO",
         "inherit_condition": database_id == ViewDependentSpatialRelationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8594,6 +8892,7 @@ class BehindDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BehindDAO",
         "inherit_condition": database_id == ViewDependentSpatialRelationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8612,6 +8911,7 @@ class BelowDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BelowDAO",
         "inherit_condition": database_id == ViewDependentSpatialRelationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8630,6 +8930,7 @@ class InFrontOfDAO(
     __mapper_args__ = {
         "polymorphic_identity": "InFrontOfDAO",
         "inherit_condition": database_id == ViewDependentSpatialRelationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8648,6 +8949,7 @@ class LeftOfDAO(
     __mapper_args__ = {
         "polymorphic_identity": "LeftOfDAO",
         "inherit_condition": database_id == ViewDependentSpatialRelationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8666,6 +8968,7 @@ class RightOfDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RightOfDAO",
         "inherit_condition": database_id == ViewDependentSpatialRelationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8698,6 +9001,7 @@ class WorldMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldMappingDAO_kinematic_structure_entities_association.source_worldmappingdao_id]",
+        lazy="selectin",
     )
     connections: Mapped[builtins.list[WorldMappingDAO_connections_association]] = (
         relationship(
@@ -8705,6 +9009,7 @@ class WorldMappingDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[WorldMappingDAO_connections_association.source_worldmappingdao_id]",
+            lazy="selectin",
         )
     )
     semantic_annotations: Mapped[
@@ -8714,6 +9019,7 @@ class WorldMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldMappingDAO_semantic_annotations_association.source_worldmappingdao_id]",
+        lazy="selectin",
     )
     degrees_of_freedom: Mapped[
         builtins.list[WorldMappingDAO_degrees_of_freedom_association]
@@ -8722,6 +9028,7 @@ class WorldMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldMappingDAO_degrees_of_freedom_association.source_worldmappingdao_id]",
+        lazy="selectin",
     )
     state: Mapped[WorldStateMappingDAO] = relationship(
         "WorldStateMappingDAO", uselist=False, foreign_keys=[state_id], post_update=True
@@ -8733,11 +9040,13 @@ class WorldMappingDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldMappingDAO_modification_history_association.source_worldmappingdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "WorldMappingDAO",
         "inherit_condition": database_id == HasSimulatorPropertiesDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8815,6 +9124,7 @@ class ConnectionDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ConnectionDAO_simulator_additional_properties_association.source_connectiondao_id]",
+        lazy="selectin",
     )
     parent: Mapped[KinematicStructureEntityDAO] = relationship(
         "KinematicStructureEntityDAO",
@@ -8848,6 +9158,7 @@ class ConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ConnectionDAO",
         "inherit_condition": database_id == WorldEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8868,6 +9179,7 @@ class ActiveConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ActiveConnectionDAO",
         "inherit_condition": database_id == ConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8913,6 +9225,7 @@ class ActiveConnection1DOFDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ActiveConnection1DOFDAO",
         "inherit_condition": database_id == ActiveConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8933,6 +9246,7 @@ class PrismaticConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PrismaticConnectionDAO",
         "inherit_condition": database_id == ActiveConnection1DOFDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8953,6 +9267,7 @@ class RevoluteConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RevoluteConnectionDAO",
         "inherit_condition": database_id == ActiveConnection1DOFDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -8971,6 +9286,7 @@ class WheeledDriveDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WheeledDriveDAO",
         "inherit_condition": database_id == ActiveConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9010,6 +9326,7 @@ class DifferentialDriveDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DifferentialDriveDAO",
         "inherit_condition": database_id == WheeledDriveDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9050,6 +9367,7 @@ class OmniDriveDAO(
     __mapper_args__ = {
         "polymorphic_identity": "OmniDriveDAO",
         "inherit_condition": database_id == WheeledDriveDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9092,6 +9410,7 @@ class Connection6DoFDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Connection6DoFDAO",
         "inherit_condition": database_id == ConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9112,6 +9431,7 @@ class FixedConnectionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FixedConnectionDAO",
         "inherit_condition": database_id == ConnectionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9130,6 +9450,7 @@ class WorldEntityNotFoundErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldEntityNotFoundErrorDAO",
         "inherit_condition": database_id == UsageErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9154,6 +9475,7 @@ class WorldEntityWithIDDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldEntityWithIDDAO",
         "inherit_condition": database_id == WorldEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9191,6 +9513,7 @@ class DegreeOfFreedomDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DegreeOfFreedomDAO",
         "inherit_condition": database_id == WorldEntityWithIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9211,6 +9534,7 @@ class WorldEntityWithClassBasedIDDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldEntityWithClassBasedIDDAO",
         "inherit_condition": database_id == WorldEntityWithIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9229,6 +9553,7 @@ class CallbackDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CallbackDAO",
         "inherit_condition": database_id == WorldEntityWithClassBasedIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9245,6 +9570,7 @@ class ModelChangeCallbackDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ModelChangeCallbackDAO",
         "inherit_condition": database_id == CallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9278,6 +9604,7 @@ class CollisionDetectorModelUpdaterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CollisionDetectorModelUpdaterDAO",
         "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9314,6 +9641,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_default_rules_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
     temporary_rules: Mapped[
         builtins.list[CollisionManagerDAO_temporary_rules_association]
@@ -9322,6 +9650,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_temporary_rules_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
     ignore_collision_rules: Mapped[
         builtins.list[CollisionManagerDAO_ignore_collision_rules_association]
@@ -9330,6 +9659,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_ignore_collision_rules_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
     max_avoided_bodies_rules: Mapped[
         builtins.list[CollisionManagerDAO_max_avoided_bodies_rules_association]
@@ -9338,6 +9668,7 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_max_avoided_bodies_rules_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
     collision_consumers: Mapped[
         builtins.list[CollisionManagerDAO_collision_consumers_association]
@@ -9346,11 +9677,13 @@ class CollisionManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CollisionManagerDAO_collision_consumers_association.source_collisionmanagerdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "CollisionManagerDAO",
         "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9376,6 +9709,7 @@ class MultiSimSynchronizerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MultiSimSynchronizerDAO",
         "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9396,6 +9730,7 @@ class MujocoSynchronizerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MujocoSynchronizerDAO",
         "inherit_condition": database_id == MultiSimSynchronizerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9424,6 +9759,7 @@ class PosePublisherDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PosePublisherDAO",
         "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9450,11 +9786,13 @@ class TfPublisherModelCallbackDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[TfPublisherModelCallbackDAO_ignored_kinematic_structure_entities_association.source_tfpublishermodelcallbackdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "TfPublisherModelCallbackDAO",
         "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9488,6 +9826,7 @@ class VizMarkerPublisherDAO(
     __mapper_args__ = {
         "polymorphic_identity": "VizMarkerPublisherDAO",
         "inherit_condition": database_id == ModelChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9504,6 +9843,7 @@ class StateChangeCallbackDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StateChangeCallbackDAO",
         "inherit_condition": database_id == CallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9537,6 +9877,7 @@ class CollisionDetectorStateUpdaterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CollisionDetectorStateUpdaterDAO",
         "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9566,11 +9907,13 @@ class TFPublisherDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[TFPublisherDAO_ignored_kinematic_structure_entities_association.source_tfpublisherdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "TFPublisherDAO",
         "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9591,6 +9934,7 @@ class CollisionDetectorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CollisionDetectorDAO",
         "inherit_condition": database_id == WorldEntityWithClassBasedIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9624,6 +9968,7 @@ class BulletCollisionDetectorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BulletCollisionDetectorDAO",
         "inherit_condition": database_id == CollisionDetectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9644,6 +9989,7 @@ class FCLCollisionDetectorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FCLCollisionDetectorDAO",
         "inherit_condition": database_id == CollisionDetectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9675,6 +10021,7 @@ class SynchronizerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SynchronizerDAO",
         "inherit_condition": database_id == WorldEntityWithClassBasedIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9695,6 +10042,7 @@ class ModelReloadSynchronizerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ModelReloadSynchronizerDAO",
         "inherit_condition": database_id == SynchronizerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9730,6 +10078,7 @@ class WorldEntityWithIDNotFoundErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldEntityWithIDNotFoundErrorDAO",
         "inherit_condition": database_id == WorldEntityNotFoundErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9771,11 +10120,13 @@ class WorldEntityWithSimulatorPropertiesDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldEntityWithSimulatorPropertiesDAO_simulator_additional_properties_association.source_worldentitywithsimulatorpropertiesdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "WorldEntityWithSimulatorPropertiesDAO",
         "inherit_condition": database_id == WorldEntityWithIDDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9795,6 +10146,7 @@ class ActuatorDAO(
         "polymorphic_identity": "ActuatorDAO",
         "inherit_condition": database_id
         == WorldEntityWithSimulatorPropertiesDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9816,6 +10168,7 @@ class KinematicStructureEntityDAO(
         "polymorphic_identity": "KinematicStructureEntityDAO",
         "inherit_condition": database_id
         == WorldEntityWithSimulatorPropertiesDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9863,6 +10216,7 @@ class BodyDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BodyDAO",
         "inherit_condition": database_id == KinematicStructureEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9891,6 +10245,7 @@ class RegionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RegionDAO",
         "inherit_condition": database_id == KinematicStructureEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9912,6 +10267,7 @@ class SemanticAnnotationDAO(
         "polymorphic_identity": "SemanticAnnotationDAO",
         "inherit_condition": database_id
         == WorldEntityWithSimulatorPropertiesDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9950,6 +10306,7 @@ class DoubleDoorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DoubleDoorDAO",
         "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9970,6 +10327,7 @@ class FurnitureDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FurnitureDAO",
         "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -9988,6 +10346,7 @@ class BedDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BedDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10006,6 +10365,7 @@ class ChairDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ChairDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10024,6 +10384,7 @@ class ArmchairDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ArmchairDAO",
         "inherit_condition": database_id == ChairDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10042,6 +10403,7 @@ class OfficeChairDAO(
     __mapper_args__ = {
         "polymorphic_identity": "OfficeChairDAO",
         "inherit_condition": database_id == ChairDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10060,6 +10422,7 @@ class ShelvingUnitDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ShelvingUnitDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10093,6 +10456,7 @@ class HasRootKinematicStructureEntityDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasRootKinematicStructureEntityDAO",
         "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10113,12 +10477,14 @@ class HasDoorsDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HasDoorsDAO_doors_association.source_hasdoorsdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "HasDoorsDAO",
         "inherit_condition": database_id
         == HasRootKinematicStructureEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10139,12 +10505,14 @@ class HasDrawersDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HasDrawersDAO_drawers_association.source_hasdrawersdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "HasDrawersDAO",
         "inherit_condition": database_id
         == HasRootKinematicStructureEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10164,6 +10532,7 @@ class HasRootBodyDAO(
         "polymorphic_identity": "HasRootBodyDAO",
         "inherit_condition": database_id
         == HasRootKinematicStructureEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10186,11 +10555,13 @@ class AbstractRobotPartDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[AbstractRobotPartDAO_joint_states_association.source_abstractrobotpartdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "AbstractRobotPartDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10230,6 +10601,7 @@ class EndEffectorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "EndEffectorDAO",
         "inherit_condition": database_id == AbstractRobotPartDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10248,6 +10620,7 @@ class Armar7LeftGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7LeftGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10266,6 +10639,7 @@ class Armar7RightGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10284,6 +10658,7 @@ class GarmiLeftGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiLeftGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10302,6 +10677,7 @@ class GarmiRightGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiRightGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10319,6 +10695,7 @@ class HSRBGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10336,6 +10713,7 @@ class ICub3LeftHandDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3LeftHandDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10353,6 +10731,7 @@ class ICub3RightHandDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3RightHandDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10370,6 +10749,7 @@ class JustinLeftHandDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinLeftHandDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10388,6 +10768,7 @@ class JustinRightHandDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinRightHandDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10406,6 +10787,7 @@ class MMPDresdenGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MMPDresdenGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10423,6 +10805,7 @@ class PR2LeftGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2LeftGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10440,6 +10823,7 @@ class PR2RightGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2RightGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10458,6 +10842,7 @@ class StretchGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10476,6 +10861,7 @@ class TiagoLeftGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoLeftGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10494,6 +10880,7 @@ class TiagoMujocoLeftGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoLeftGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10512,6 +10899,7 @@ class TiagoMujocoRightGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoRightGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10530,6 +10918,7 @@ class TiagoRightGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoRightGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10548,6 +10937,7 @@ class TracyLeftGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyLeftGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10566,6 +10956,7 @@ class TracyRightGripperDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyRightGripperDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10584,6 +10975,7 @@ class UnitreeG1LeftHandDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1LeftHandDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10602,6 +10994,7 @@ class UnitreeG1RightHandDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1RightHandDAO",
         "inherit_condition": database_id == EndEffectorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10630,6 +11023,7 @@ class KinematicChainDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KinematicChainDAO",
         "inherit_condition": database_id == AbstractRobotPartDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10647,6 +11041,7 @@ class ArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ArmDAO",
         "inherit_condition": database_id == KinematicChainDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10662,6 +11057,7 @@ class Armar7LeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7LeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10677,6 +11073,7 @@ class Armar7RightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10692,6 +11089,7 @@ class GarmiLeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiLeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10707,6 +11105,7 @@ class GarmiRightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiRightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10722,11 +11121,13 @@ class HSRBArmDAO(ArmDAO, DataAccessObject[semantic_digital_twin.robots.hsrb.HSRB
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HSRBArmDAO_sensors_association.source_hsrbarmdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "HSRBArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10742,6 +11143,7 @@ class ICub3LeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3LeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10757,6 +11159,7 @@ class ICub3RightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3RightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10772,6 +11175,7 @@ class JustinLeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinLeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10787,6 +11191,7 @@ class JustinRightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinRightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10802,6 +11207,7 @@ class MMPDresdenArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MMPDresdenArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10817,6 +11223,7 @@ class PR2LeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2LeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10832,6 +11239,7 @@ class PR2RightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2RightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10847,6 +11255,7 @@ class StretchArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10862,6 +11271,7 @@ class TiagoLeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoLeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10877,6 +11287,7 @@ class TiagoMujocoLeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoLeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10892,6 +11303,7 @@ class TiagoMujocoRightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoRightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10907,6 +11319,7 @@ class TiagoRightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoRightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10922,6 +11335,7 @@ class TracyLeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyLeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10937,6 +11351,7 @@ class TracyRightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyRightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10952,6 +11367,7 @@ class UnitreeG1LeftArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1LeftArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10967,6 +11383,7 @@ class UnitreeG1RightArmDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1RightArmDAO",
         "inherit_condition": database_id == ArmDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -10994,6 +11411,7 @@ class FingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FingerDAO",
         "inherit_condition": database_id == KinematicChainDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11010,6 +11428,7 @@ class Armar7LeftIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7LeftIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11026,6 +11445,7 @@ class Armar7LeftMiddleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7LeftMiddleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11042,6 +11462,7 @@ class Armar7LeftPinkyFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7LeftPinkyFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11058,6 +11479,7 @@ class Armar7LeftRingFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7LeftRingFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11073,6 +11495,7 @@ class Armar7LeftThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7LeftThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11089,6 +11512,7 @@ class Armar7RightIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11105,6 +11529,7 @@ class Armar7RightMiddleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightMiddleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11121,6 +11546,7 @@ class Armar7RightPinkyFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightPinkyFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11137,6 +11563,7 @@ class Armar7RightRingFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightRingFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11152,6 +11579,7 @@ class Armar7RightThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7RightThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11168,6 +11596,7 @@ class GarmiLeftGripperLeftFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiLeftGripperLeftFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11184,6 +11613,7 @@ class GarmiLeftGripperRightFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiLeftGripperRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11200,6 +11630,7 @@ class GarmiRightGripperLeftFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiRightGripperLeftFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11216,6 +11647,7 @@ class GarmiRightGripperRightFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiRightGripperRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11231,6 +11663,7 @@ class HSRBLeftFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBLeftFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11246,6 +11679,7 @@ class HSRBRightFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11261,6 +11695,7 @@ class ICub3LeftIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3LeftIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11277,6 +11712,7 @@ class ICub3LeftLittleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3LeftLittleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11293,6 +11729,7 @@ class ICub3LeftMiddleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3LeftMiddleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11308,6 +11745,7 @@ class ICub3LeftRingFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3LeftRingFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11323,6 +11761,7 @@ class ICub3LeftThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3LeftThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11339,6 +11778,7 @@ class ICub3RightIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3RightIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11355,6 +11795,7 @@ class ICub3RightLittleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3RightLittleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11371,6 +11812,7 @@ class ICub3RightMiddleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3RightMiddleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11386,6 +11828,7 @@ class ICub3RightRingFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3RightRingFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11401,6 +11844,7 @@ class ICub3RightThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3RightThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11417,6 +11861,7 @@ class JustinLeftIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinLeftIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11433,6 +11878,7 @@ class JustinLeftMiddleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinLeftMiddleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11449,6 +11895,7 @@ class JustinLeftRingFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinLeftRingFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11464,6 +11911,7 @@ class JustinLeftThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinLeftThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11480,6 +11928,7 @@ class JustinRightIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinRightIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11496,6 +11945,7 @@ class JustinRightMiddleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinRightMiddleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11512,6 +11962,7 @@ class JustinRightRingFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinRightRingFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11527,6 +11978,7 @@ class JustinRightThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinRightThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11543,6 +11995,7 @@ class MMPDresdenIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MMPDresdenIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11559,6 +12012,7 @@ class MMPDresdenThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MMPDresdenThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11575,6 +12029,7 @@ class PR2LeftGripperLeftFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2LeftGripperLeftFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11591,6 +12046,7 @@ class PR2LeftGripperRightFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2LeftGripperRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11607,6 +12063,7 @@ class PR2RightGripperLeftFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2RightGripperLeftFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11623,6 +12080,7 @@ class PR2RightGripperRightFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2RightGripperRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11638,6 +12096,7 @@ class StretchLeftFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchLeftFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11653,6 +12112,7 @@ class StretchRightFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11668,6 +12128,7 @@ class TiagoLeftIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoLeftIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11683,6 +12144,7 @@ class TiagoLeftThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoLeftThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11699,6 +12161,7 @@ class TiagoMujocoLeftIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoLeftIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11714,6 +12177,7 @@ class TiagoMujocoLeftThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoLeftThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11730,6 +12194,7 @@ class TiagoMujocoRightIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoRightIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11746,6 +12211,7 @@ class TiagoMujocoRightThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoRightThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11762,6 +12228,7 @@ class TiagoRightIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoRightIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11777,6 +12244,7 @@ class TiagoRightThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoRightThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11793,6 +12261,7 @@ class TracyLeftGripperLeftFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyLeftGripperLeftFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11809,6 +12278,7 @@ class TracyLeftGripperRightFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyLeftGripperRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11825,6 +12295,7 @@ class TracyRightGripperLeftFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyRightGripperLeftFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11841,6 +12312,7 @@ class TracyRightGripperRightFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyRightGripperRightFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11857,6 +12329,7 @@ class UnitreeG1LeftIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1LeftIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11873,6 +12346,7 @@ class UnitreeG1LeftMiddleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1LeftMiddleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11889,6 +12363,7 @@ class UnitreeG1LeftThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1LeftThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11905,6 +12380,7 @@ class UnitreeG1RightIndexFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1RightIndexFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11923,6 +12399,7 @@ class UnitreeG1RightMiddleFingerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1RightMiddleFingerDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11939,6 +12416,7 @@ class UnitreeG1RightThumbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1RightThumbDAO",
         "inherit_condition": database_id == FingerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11956,6 +12434,7 @@ class NeckDAO(
     __mapper_args__ = {
         "polymorphic_identity": "NeckDAO",
         "inherit_condition": database_id == KinematicChainDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11973,11 +12452,13 @@ class Armar7NeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[Armar7NeckDAO_sensors_association.source_armar7neckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "Armar7NeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -11995,11 +12476,13 @@ class GarmiNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[GarmiNeckDAO_sensors_association.source_garmineckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "GarmiNeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12017,11 +12500,13 @@ class HSRBNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[HSRBNeckDAO_sensors_association.source_hsrbneckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "HSRBNeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12039,11 +12524,13 @@ class ICub3NeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[ICub3NeckDAO_sensors_association.source_icub3neckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "ICub3NeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12061,11 +12548,13 @@ class JustinNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[JustinNeckDAO_sensors_association.source_justinneckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "JustinNeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12081,11 +12570,13 @@ class PR2NeckDAO(NeckDAO, DataAccessObject[semantic_digital_twin.robots.pr2.PR2N
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[PR2NeckDAO_sensors_association.source_pr2neckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "PR2NeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12103,11 +12594,13 @@ class StretchNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[StretchNeckDAO_sensors_association.source_stretchneckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "StretchNeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12126,12 +12619,14 @@ class TiagoMujocoNeckDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[TiagoMujocoNeckDAO_sensors_association.source_tiagomujoconeckdao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoNeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12149,11 +12644,13 @@ class TiagoNeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[TiagoNeckDAO_sensors_association.source_tiagoneckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "TiagoNeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12171,11 +12668,13 @@ class UnitreeG1NeckDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[UnitreeG1NeckDAO_sensors_association.source_unitreeg1neckdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1NeckDAO",
         "inherit_condition": database_id == NeckDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12193,6 +12692,7 @@ class TorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TorsoDAO",
         "inherit_condition": database_id == KinematicChainDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12208,6 +12708,7 @@ class Armar7TorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7TorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12223,6 +12724,7 @@ class GarmiTorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiTorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12238,6 +12740,7 @@ class HSRBTorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBTorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12253,6 +12756,7 @@ class ICub3TorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3TorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12268,6 +12772,7 @@ class JustinTorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinTorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12286,12 +12791,14 @@ class MMPDresdenTorsoDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[MMPDresdenTorsoDAO_sensors_association.source_mmpdresdentorsodao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "MMPDresdenTorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12307,6 +12814,7 @@ class PR2TorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2TorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12322,6 +12830,7 @@ class StretchTorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchTorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12337,6 +12846,7 @@ class TiagoMujocoTorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoTorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12352,6 +12862,7 @@ class TiagoTorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoTorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12367,6 +12878,7 @@ class UnitreeG1TorsoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1TorsoDAO",
         "inherit_condition": database_id == TorsoDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12402,6 +12914,7 @@ class MobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MobileBaseDAO",
         "inherit_condition": database_id == AbstractRobotPartDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12420,6 +12933,7 @@ class Armar7MobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7MobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12437,6 +12951,7 @@ class GarmiMobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiMobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12454,6 +12969,7 @@ class HSRBMobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBMobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12471,6 +12987,7 @@ class ICub3MobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3MobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12489,6 +13006,7 @@ class JustinMobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinMobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12507,6 +13025,7 @@ class MMPDresdenMobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MMPDresdenMobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12524,6 +13043,7 @@ class PR2MobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2MobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12542,6 +13062,7 @@ class StretchMobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchMobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12559,6 +13080,7 @@ class TiagoMobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12577,6 +13099,7 @@ class TiagoMujocoMobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoMobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12595,6 +13118,7 @@ class UnitreeG1MobileBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1MobileBaseDAO",
         "inherit_condition": database_id == MobileBaseDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12613,6 +13137,7 @@ class SensorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SensorDAO",
         "inherit_condition": database_id == AbstractRobotPartDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12656,6 +13181,7 @@ class CameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CameraDAO",
         "inherit_condition": database_id == SensorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12671,6 +13197,7 @@ class AzureKinectRGBDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AzureKinectRGBDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12686,6 +13213,7 @@ class D435DAO(
     __mapper_args__ = {
         "polymorphic_identity": "D435DAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12701,6 +13229,7 @@ class GarmiCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12716,6 +13245,7 @@ class HSRBHandCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBHandCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12731,6 +13261,7 @@ class HSRBHeadCenterCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBHeadCenterCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12746,6 +13277,7 @@ class HSRBHeadLeftCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBHeadLeftCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12761,6 +13293,7 @@ class HSRBHeadRGBDCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBHeadRGBDCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12776,6 +13309,7 @@ class HSRBHeadRightCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBHeadRightCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12791,6 +13325,7 @@ class ICub3CameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3CameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12806,6 +13341,7 @@ class JustinCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12822,6 +13358,7 @@ class MMPDresdenCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MMPDresdenCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12837,6 +13374,7 @@ class PR2KinectV1DAO(
     __mapper_args__ = {
         "polymorphic_identity": "PR2KinectV1DAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12852,6 +13390,7 @@ class StretchCameraColorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchCameraColorDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12867,6 +13406,7 @@ class StretchCameraDepthDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchCameraDepthDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12883,6 +13423,7 @@ class StretchCameraInfra1DAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchCameraInfra1DAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12899,6 +13440,7 @@ class StretchCameraInfra2DAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchCameraInfra2DAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12914,6 +13456,7 @@ class TiagoCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12929,6 +13472,7 @@ class TracyCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TracyCameraDAO",
         "inherit_condition": database_id == CameraDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12949,6 +13493,7 @@ class AgentDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AgentDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12964,6 +13509,7 @@ class AbstractRobotDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AbstractRobotDAO",
         "inherit_condition": database_id == AgentDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12981,6 +13527,7 @@ class Armar7DAO(
     __mapper_args__ = {
         "polymorphic_identity": "Armar7DAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -12998,6 +13545,7 @@ class GarmiDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarmiDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13015,6 +13563,7 @@ class HSRBDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HSRBDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13045,6 +13594,7 @@ class ICub3DAO(
     __mapper_args__ = {
         "polymorphic_identity": "ICub3DAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13062,6 +13612,7 @@ class JustinDAO(
     __mapper_args__ = {
         "polymorphic_identity": "JustinDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13080,6 +13631,7 @@ class MMPDresdenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MMPDresdenDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13102,11 +13654,13 @@ class MinimalRobotDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[MinimalRobotDAO_bodies_of_branch_association.source_minimalrobotdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "MinimalRobotDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13122,6 +13676,7 @@ class PR2DAO(AbstractRobotDAO, DataAccessObject[semantic_digital_twin.robots.pr2
     __mapper_args__ = {
         "polymorphic_identity": "PR2DAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13139,6 +13694,7 @@ class StretchDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13156,6 +13712,7 @@ class TiagoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13173,6 +13730,7 @@ class TiagoMujocoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TiagoMujocoDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13192,11 +13750,13 @@ class TracyDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[TracyDAO_sensors_association.source_tracydao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "TracyDAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13228,6 +13788,7 @@ class UnitreeG1DAO(
     __mapper_args__ = {
         "polymorphic_identity": "UnitreeG1DAO",
         "inherit_condition": database_id == AbstractRobotDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13246,6 +13807,7 @@ class HumanDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HumanDAO",
         "inherit_condition": database_id == AgentDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13266,6 +13828,7 @@ class BaseballDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BaseballDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13296,6 +13859,7 @@ class BookDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BookDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13316,6 +13880,7 @@ class BookFrontDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BookFrontDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13336,6 +13901,7 @@ class BottleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BottleDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13354,6 +13920,7 @@ class MustardBottleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MustardBottleDAO",
         "inherit_condition": database_id == BottleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13372,6 +13939,7 @@ class SoapBottleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SoapBottleDAO",
         "inherit_condition": database_id == BottleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13390,6 +13958,7 @@ class WineBottleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WineBottleDAO",
         "inherit_condition": database_id == BottleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13410,6 +13979,7 @@ class ClothDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ClothDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13430,6 +14000,7 @@ class CookingContainerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CookingContainerDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13450,6 +14021,7 @@ class KettleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KettleDAO",
         "inherit_condition": database_id == CookingContainerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13470,6 +14042,7 @@ class PanDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PanDAO",
         "inherit_condition": database_id == CookingContainerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13490,6 +14063,7 @@ class PotDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PotDAO",
         "inherit_condition": database_id == CookingContainerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13510,6 +14084,7 @@ class CuttleryDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CuttleryDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13528,6 +14103,7 @@ class ForkDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ForkDAO",
         "inherit_condition": database_id == CuttleryDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13546,6 +14122,7 @@ class KnifeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KnifeDAO",
         "inherit_condition": database_id == CuttleryDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13568,6 +14145,7 @@ class SpoonDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SpoonDAO",
         "inherit_condition": database_id == CuttleryDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13588,6 +14166,7 @@ class DecorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DecorDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13606,6 +14185,7 @@ class WallDecorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WallDecorDAO",
         "inherit_condition": database_id == DecorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13624,6 +14204,7 @@ class PosterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PosterDAO",
         "inherit_condition": database_id == WallDecorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13644,6 +14225,7 @@ class DrinkingContainerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DrinkingContainerDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13668,6 +14250,7 @@ class CupDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CupDAO",
         "inherit_condition": database_id == DrinkingContainerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13688,6 +14271,7 @@ class MugDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MugDAO",
         "inherit_condition": database_id == DrinkingContainerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13708,6 +14292,7 @@ class DroneDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DroneDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13728,6 +14313,7 @@ class FoodDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FoodDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13746,6 +14332,7 @@ class BreadDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BreadDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13768,6 +14355,7 @@ class CandyDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CandyDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13790,6 +14378,7 @@ class CerealDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CerealDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13808,6 +14397,7 @@ class CheezeItDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CheezeItDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13826,6 +14416,7 @@ class GelatinBoxDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GelatinBoxDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13848,6 +14439,7 @@ class MilkDAO(
     __mapper_args__ = {
         "polymorphic_identity": "MilkDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13870,6 +14462,7 @@ class NoodlesDAO(
     __mapper_args__ = {
         "polymorphic_identity": "NoodlesDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13888,6 +14481,7 @@ class PringlesDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PringlesDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13906,6 +14500,7 @@ class ProduceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ProduceDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13924,6 +14519,7 @@ class FruitDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FruitDAO",
         "inherit_condition": database_id == ProduceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13942,6 +14538,7 @@ class AppleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AppleDAO",
         "inherit_condition": database_id == FruitDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13960,6 +14557,7 @@ class BananaDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BananaDAO",
         "inherit_condition": database_id == FruitDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13978,6 +14576,7 @@ class OrangeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "OrangeDAO",
         "inherit_condition": database_id == FruitDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -13996,6 +14595,7 @@ class TomatoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TomatoDAO",
         "inherit_condition": database_id == FruitDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14014,6 +14614,7 @@ class PotatoDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PotatoDAO",
         "inherit_condition": database_id == ProduceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14032,6 +14633,7 @@ class VegetableDAO(
     __mapper_args__ = {
         "polymorphic_identity": "VegetableDAO",
         "inherit_condition": database_id == ProduceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14050,6 +14652,7 @@ class CarrotDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CarrotDAO",
         "inherit_condition": database_id == VegetableDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14068,6 +14671,7 @@ class LettuceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "LettuceDAO",
         "inherit_condition": database_id == VegetableDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14086,6 +14690,7 @@ class SaltDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SaltDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14104,6 +14709,7 @@ class TomatoSoupDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TomatoSoupDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14122,6 +14728,7 @@ class TunaCanDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TunaCanDAO",
         "inherit_condition": database_id == FoodDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14142,6 +14749,7 @@ class GarbageBinDAO(
     __mapper_args__ = {
         "polymorphic_identity": "GarbageBinDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14162,6 +14770,7 @@ class HandleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HandleDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14183,12 +14792,14 @@ class HasAperturesDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[HasAperturesDAO_apertures_association.source_hasaperturesdao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "HasAperturesDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14209,6 +14820,7 @@ class WallDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WallDAO",
         "inherit_condition": database_id == HasAperturesDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14237,6 +14849,7 @@ class HasHandleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasHandleDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14265,6 +14878,7 @@ class HasHingeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasHingeDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14301,6 +14915,7 @@ class DoorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DoorDAO",
         "inherit_condition": database_id == HasHandleDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14323,6 +14938,7 @@ class DoorWithTypeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DoorWithTypeDAO",
         "inherit_condition": database_id == DoorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14344,12 +14960,14 @@ class HasStorageSpaceDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[HasStorageSpaceDAO_objects_association.source_hasstoragespacedao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "HasStorageSpaceDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14383,6 +15001,7 @@ class HasSupportingSurfaceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasSupportingSurfaceDAO",
         "inherit_condition": database_id == HasStorageSpaceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14407,6 +15026,7 @@ class BowlDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BowlDAO",
         "inherit_condition": database_id == HasSupportingSurfaceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14441,6 +15061,7 @@ class CounterTopDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CounterTopDAO_objects_association.source_countertopdao_id]",
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
@@ -14452,6 +15073,7 @@ class CounterTopDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CounterTopDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14472,6 +15094,7 @@ class FloorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "FloorDAO",
         "inherit_condition": database_id == HasSupportingSurfaceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14492,6 +15115,7 @@ class HasCaseAsRootBodyDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HasCaseAsRootBodyDAO",
         "inherit_condition": database_id == HasSupportingSurfaceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14534,6 +15158,7 @@ class CabinetDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CabinetDAO_objects_association.source_cabinetdao_id]",
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
@@ -14545,6 +15170,7 @@ class CabinetDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CabinetDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14565,11 +15191,13 @@ class CupboardDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[CupboardDAO_doors_association.source_cupboarddao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "CupboardDAO",
         "inherit_condition": database_id == CabinetDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14590,17 +15218,20 @@ class DresserDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DresserDAO_doors_association.source_dresserdao_id]",
+        lazy="selectin",
     )
     drawers: Mapped[builtins.list[DresserDAO_drawers_association]] = relationship(
         "DresserDAO_drawers_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DresserDAO_drawers_association.source_dresserdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "DresserDAO",
         "inherit_condition": database_id == CabinetDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14621,17 +15252,20 @@ class FridgeDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[FridgeDAO_drawers_association.source_fridgedao_id]",
+        lazy="selectin",
     )
     doors: Mapped[builtins.list[FridgeDAO_doors_association]] = relationship(
         "FridgeDAO_doors_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[FridgeDAO_doors_association.source_fridgedao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "FridgeDAO",
         "inherit_condition": database_id == CabinetDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14652,17 +15286,20 @@ class WardrobeDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WardrobeDAO_doors_association.source_wardrobedao_id]",
+        lazy="selectin",
     )
     drawers: Mapped[builtins.list[WardrobeDAO_drawers_association]] = relationship(
         "WardrobeDAO_drawers_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WardrobeDAO_drawers_association.source_wardrobedao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "WardrobeDAO",
         "inherit_condition": database_id == CabinetDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14685,17 +15322,20 @@ class DishwasherDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DishwasherDAO_drawers_association.source_dishwasherdao_id]",
+        lazy="selectin",
     )
     doors: Mapped[builtins.list[DishwasherDAO_doors_association]] = relationship(
         "DishwasherDAO_doors_association",
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DishwasherDAO_doors_association.source_dishwasherdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "DishwasherDAO",
         "inherit_condition": database_id == HasCaseAsRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14716,6 +15356,7 @@ class PlateDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PlateDAO",
         "inherit_condition": database_id == HasSupportingSurfaceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14736,6 +15377,7 @@ class ShelfLayerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ShelfLayerDAO",
         "inherit_condition": database_id == HasSupportingSurfaceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14770,6 +15412,7 @@ class SofaDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[SofaDAO_objects_association.source_sofadao_id]",
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
@@ -14781,6 +15424,7 @@ class SofaDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SofaDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14815,6 +15459,7 @@ class TableDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[TableDAO_objects_association.source_tabledao_id]",
+        lazy="selectin",
     )
     supporting_surface: Mapped[RegionDAO] = relationship(
         "RegionDAO",
@@ -14826,6 +15471,7 @@ class TableDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TableDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14844,6 +15490,7 @@ class CoffeeTableDAO(
     __mapper_args__ = {
         "polymorphic_identity": "CoffeeTableDAO",
         "inherit_condition": database_id == TableDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14862,6 +15509,7 @@ class DeskDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DeskDAO",
         "inherit_condition": database_id == TableDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14880,6 +15528,7 @@ class DiningTableDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DiningTableDAO",
         "inherit_condition": database_id == TableDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14898,6 +15547,7 @@ class SideTableDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SideTableDAO",
         "inherit_condition": database_id == TableDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14918,6 +15568,7 @@ class HingeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HingeDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14938,6 +15589,7 @@ class HouseplantDAO(
     __mapper_args__ = {
         "polymorphic_identity": "HouseplantDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14958,6 +15610,7 @@ class LidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "LidDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14976,6 +15629,7 @@ class PanLidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PanLidDAO",
         "inherit_condition": database_id == LidDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -14994,6 +15648,7 @@ class PotLidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PotLidDAO",
         "inherit_condition": database_id == LidDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15014,6 +15669,7 @@ class LiquidCapDAO(
     __mapper_args__ = {
         "polymorphic_identity": "LiquidCapDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15038,6 +15694,7 @@ class NaturalLanguageDescriptionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "NaturalLanguageDescriptionDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15062,6 +15719,7 @@ class NaturalLanguageWithTypeDescriptionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "NaturalLanguageWithTypeDescriptionDAO",
         "inherit_condition": database_id == NaturalLanguageDescriptionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15082,6 +15740,7 @@ class OvenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "OvenDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15102,6 +15761,7 @@ class PartNetLabelDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLabelDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15122,6 +15782,7 @@ class PartNetAlarmRingDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetAlarmRingDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15142,6 +15803,7 @@ class PartNetBallDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetBallDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15162,6 +15824,7 @@ class PartNetBoardDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetBoardDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15182,6 +15845,7 @@ class PartNetBottleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetBottleDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15202,6 +15866,7 @@ class PartNetBoxDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetBoxDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15222,6 +15887,7 @@ class PartNetBucketDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetBucketDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15242,6 +15908,7 @@ class PartNetButtonDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetButtonDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15262,6 +15929,7 @@ class PartNetCameraDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetCameraDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15282,6 +15950,7 @@ class PartNetCapDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetCapDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15302,6 +15971,7 @@ class PartNetCartDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetCartDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15322,6 +15992,7 @@ class PartNetCasterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetCasterDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15342,6 +16013,7 @@ class PartNetChairLegDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetChairLegDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15362,6 +16034,7 @@ class PartNetCircleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetCircleDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15382,6 +16055,7 @@ class PartNetClockDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetClockDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15402,6 +16076,7 @@ class PartNetCoffeeMachineDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetCoffeeMachineDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15422,6 +16097,7 @@ class PartNetConnectorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetConnectorDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15442,6 +16118,7 @@ class PartNetContainerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetContainerDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15462,6 +16139,7 @@ class PartNetCoverLidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetCoverLidDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15482,6 +16160,7 @@ class PartNetDishwasherDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetDishwasherDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15502,6 +16181,7 @@ class PartNetDispenserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetDispenserDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15522,6 +16202,7 @@ class PartNetDisplayBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetDisplayBaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15542,6 +16223,7 @@ class PartNetDoorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetDoorDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15562,6 +16244,7 @@ class PartNetDoorFrameDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetDoorFrameDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15582,6 +16265,7 @@ class PartNetDrawerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetDrawerDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15602,6 +16286,7 @@ class PartNetFanFrameDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetFanFrameDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15622,6 +16307,7 @@ class PartNetFastenerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetFastenerDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15642,6 +16328,7 @@ class PartNetFastenerConnectorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetFastenerConnectorDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15662,6 +16349,7 @@ class PartNetFaucetBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetFaucetBaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15682,6 +16370,7 @@ class PartNetFootPadDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetFootPadDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15702,6 +16391,7 @@ class PartNetFurnitureDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetFurnitureDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15722,6 +16412,7 @@ class PartNetGlassesDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetGlassesDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15742,6 +16433,7 @@ class PartNetGlobeFrameDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetGlobeFrameDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15762,6 +16454,7 @@ class PartNetHandDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetHandDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15782,6 +16475,7 @@ class PartNetHandleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetHandleDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15802,6 +16496,7 @@ class PartNetHeadDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetHeadDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15822,6 +16517,7 @@ class PartNetKettleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetKettleDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15842,6 +16538,7 @@ class PartNetKeyDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetKeyDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15862,6 +16559,7 @@ class PartNetKeyboardBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetKeyboardBaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15882,6 +16580,7 @@ class PartNetKnifeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetKnifeDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15902,6 +16601,7 @@ class PartNetKnobDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetKnobDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15922,6 +16622,7 @@ class PartNetLampBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLampBaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15942,6 +16643,7 @@ class PartNetLaptopBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLaptopBaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15962,6 +16664,7 @@ class PartNetLegDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLegDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -15982,6 +16685,7 @@ class PartNetLensDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLensDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16002,6 +16706,7 @@ class PartNetLeverDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLeverDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16022,6 +16727,7 @@ class PartNetLidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLidDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16042,6 +16748,7 @@ class PartNetLighterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLighterDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16062,6 +16769,7 @@ class PartNetLockDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetLockDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16082,6 +16790,7 @@ class PartNetMicrowaveDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetMicrowaveDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16102,6 +16811,7 @@ class PartNetMouseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetMouseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16122,6 +16832,7 @@ class PartNetNoseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetNoseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16142,6 +16853,7 @@ class PartNetOvenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetOvenDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16162,6 +16874,7 @@ class PartNetPenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetPenDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16182,6 +16895,7 @@ class PartNetPhoneBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetPhoneBaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16202,6 +16916,7 @@ class PartNetPortafilterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetPortafilterDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16222,6 +16937,7 @@ class PartNetPotDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetPotDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16242,6 +16958,7 @@ class PartNetPressingLidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetPressingLidDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16262,6 +16979,7 @@ class PartNetPrinterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetPrinterDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16282,6 +17000,7 @@ class PartNetPumpLidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetPumpLidDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16302,6 +17021,7 @@ class PartNetRefrigeratorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRefrigeratorDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16322,6 +17042,7 @@ class PartNetRemoteBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRemoteBaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16342,6 +17063,7 @@ class PartNetRotationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16362,6 +17084,7 @@ class PartNetRotationBarDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationBarDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16382,6 +17105,7 @@ class PartNetRotationBladeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationBladeDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16402,6 +17126,7 @@ class PartNetRotationButtonDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationButtonDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16422,6 +17147,7 @@ class PartNetRotationContainerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationContainerDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16442,6 +17168,7 @@ class PartNetRotationDoorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationDoorDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16462,6 +17189,7 @@ class PartNetRotationHandleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationHandleDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16482,6 +17210,7 @@ class PartNetRotationLidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationLidDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16502,6 +17231,7 @@ class PartNetRotationScreenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationScreenDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16522,6 +17252,7 @@ class PartNetRotationSliderDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationSliderDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16542,6 +17273,7 @@ class PartNetRotationTrayDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationTrayDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16562,6 +17294,7 @@ class PartNetRotationWindowDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotationWindowDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16582,6 +17315,7 @@ class PartNetRotorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetRotorDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16602,6 +17336,7 @@ class PartNetSafeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSafeDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16622,6 +17357,7 @@ class PartNetScreenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetScreenDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16642,6 +17378,7 @@ class PartNetSeatDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSeatDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16662,6 +17399,7 @@ class PartNetShelfDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetShelfDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16682,6 +17420,7 @@ class PartNetSliderDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSliderDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16702,6 +17441,7 @@ class PartNetSlotDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSlotDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16722,6 +17462,7 @@ class PartNetSphereDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSphereDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16742,6 +17483,7 @@ class PartNetSpoutDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSpoutDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16762,6 +17504,7 @@ class PartNetStaplerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetStaplerDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16782,6 +17525,7 @@ class PartNetStaplerBaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetStaplerBaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16802,6 +17546,7 @@ class PartNetSteeringWheelDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSteeringWheelDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16822,6 +17567,7 @@ class PartNetStemDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetStemDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16842,6 +17588,7 @@ class PartNetSuitcaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSuitcaseDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16862,6 +17609,7 @@ class PartNetSwitchDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSwitchDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16882,6 +17630,7 @@ class PartNetSwitchFrameDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetSwitchFrameDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16902,6 +17651,7 @@ class PartNetTiltLegDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTiltLegDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16922,6 +17672,7 @@ class PartNetToasterDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetToasterDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16942,6 +17693,7 @@ class PartNetToggleButtonDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetToggleButtonDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16962,6 +17714,7 @@ class PartNetToiletDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetToiletDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -16982,6 +17735,7 @@ class PartNetTranslationBarDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTranslationBarDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17002,6 +17756,7 @@ class PartNetTranslationBladeDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTranslationBladeDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17022,6 +17777,7 @@ class PartNetTranslationDoorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTranslationDoorDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17042,6 +17798,7 @@ class PartNetTranslationHandleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTranslationHandleDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17062,6 +17819,7 @@ class PartNetTranslationLidDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTranslationLidDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17082,6 +17840,7 @@ class PartNetTranslationScreenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTranslationScreenDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17102,6 +17861,7 @@ class PartNetTranslationTrayDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTranslationTrayDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17122,6 +17882,7 @@ class PartNetTranslationWindowDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTranslationWindowDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17142,6 +17903,7 @@ class PartNetTrashcanDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetTrashcanDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17162,6 +17924,7 @@ class PartNetUsbDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetUsbDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17182,6 +17945,7 @@ class PartNetUsbRotationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetUsbRotationDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17202,6 +17966,7 @@ class PartNetWashingMachineDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetWashingMachineDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17222,6 +17987,7 @@ class PartNetWheelDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetWheelDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17242,6 +18008,7 @@ class PartNetWindowFrameDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PartNetWindowFrameDAO",
         "inherit_condition": database_id == PartNetLabelDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17262,6 +18029,7 @@ class PenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PenDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17282,6 +18050,7 @@ class PencilDAO(
     __mapper_args__ = {
         "polymorphic_identity": "PencilDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17302,6 +18071,7 @@ class ProcthorBoxDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ProcthorBoxDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17326,6 +18096,7 @@ class SaltContainerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SaltContainerDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17346,6 +18117,7 @@ class SaltPepperShakerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SaltPepperShakerDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17366,6 +18138,7 @@ class SemanticEnvironmentAnnotationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SemanticEnvironmentAnnotationDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17386,6 +18159,7 @@ class SinkDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SinkDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17406,6 +18180,7 @@ class SliderDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SliderDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17426,6 +18201,7 @@ class SprayBottleDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SprayBottleDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17446,6 +18222,7 @@ class StatueDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StatueDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17466,6 +18243,7 @@ class TrashCanDAO(
     __mapper_args__ = {
         "polymorphic_identity": "TrashCanDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17486,6 +18264,7 @@ class VaseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "VaseDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17506,6 +18285,7 @@ class WallPanelDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WallPanelDAO",
         "inherit_condition": database_id == HasRootBodyDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17525,6 +18305,7 @@ class HasRootRegionDAO(
         "polymorphic_identity": "HasRootRegionDAO",
         "inherit_condition": database_id
         == HasRootKinematicStructureEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17545,6 +18326,7 @@ class ApertureDAO(
     __mapper_args__ = {
         "polymorphic_identity": "ApertureDAO",
         "inherit_condition": database_id == HasRootRegionDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17563,6 +18345,7 @@ class EntryWayDAO(
     __mapper_args__ = {
         "polymorphic_identity": "EntryWayDAO",
         "inherit_condition": database_id == ApertureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17592,6 +18375,7 @@ class HasSliderDAO(
         "polymorphic_identity": "HasSliderDAO",
         "inherit_condition": database_id
         == HasRootKinematicStructureEntityDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17636,6 +18420,7 @@ class DrawerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[DrawerDAO_objects_association.source_drawerdao_id]",
+        lazy="selectin",
     )
     slider: Mapped[SliderDAO] = relationship(
         "SliderDAO", uselist=False, foreign_keys=[slider_id], post_update=True
@@ -17653,6 +18438,7 @@ class DrawerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "DrawerDAO",
         "inherit_condition": database_id == FurnitureDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17683,6 +18469,7 @@ class RoomDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RoomDAO",
         "inherit_condition": database_id == SemanticAnnotationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17701,6 +18488,7 @@ class BathroomDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BathroomDAO",
         "inherit_condition": database_id == RoomDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17719,6 +18507,7 @@ class BedroomDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BedroomDAO",
         "inherit_condition": database_id == RoomDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17737,6 +18526,7 @@ class KitchenDAO(
     __mapper_args__ = {
         "polymorphic_identity": "KitchenDAO",
         "inherit_condition": database_id == RoomDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17755,6 +18545,7 @@ class LivingRoomDAO(
     __mapper_args__ = {
         "polymorphic_identity": "LivingRoomDAO",
         "inherit_condition": database_id == RoomDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17780,6 +18571,7 @@ class RoomWithWallsAndDoorsDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[RoomWithWallsAndDoorsDAO_walls_association.source_roomwithwallsanddoorsdao_id]",
+            lazy="selectin",
         )
     )
     doors: Mapped[builtins.list[RoomWithWallsAndDoorsDAO_doors_association]] = (
@@ -17788,12 +18580,14 @@ class RoomWithWallsAndDoorsDAO(
             collection_class=builtins.list,
             cascade="all, delete-orphan",
             foreign_keys="[RoomWithWallsAndDoorsDAO_doors_association.source_roomwithwallsanddoorsdao_id]",
+            lazy="selectin",
         )
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "RoomWithWallsAndDoorsDAO",
         "inherit_condition": database_id == RoomDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17815,6 +18609,7 @@ class WorldModelManagerDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldModelManagerDAO_model_modification_blocks_association.source_worldmodelmanagerdao_id]",
+        lazy="selectin",
     )
 
 
@@ -17837,6 +18632,7 @@ class WorldModelModificationBlockDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldModelModificationBlockDAO_modifications_association.source_worldmodelmodificationblockdao_id]",
+        lazy="selectin",
     )
 
 
@@ -17864,6 +18660,7 @@ class WorldModelSnapshotDAO(
         collection_class=builtins.list,
         cascade="all, delete-orphan",
         foreign_keys="[WorldModelSnapshotDAO_modifications_association.source_worldmodelsnapshotdao_id]",
+        lazy="selectin",
     )
 
 
@@ -17914,6 +18711,7 @@ class AddSemanticAnnotationModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AddSemanticAnnotationModificationDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17941,6 +18739,7 @@ class AttributeUpdateModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "AttributeUpdateModificationDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17965,6 +18764,7 @@ class RemoveActuatorModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RemoveActuatorModificationDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -17992,6 +18792,7 @@ class RemoveConnectionModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RemoveConnectionModificationDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18016,6 +18817,7 @@ class RemoveDegreeOfFreedomModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RemoveDegreeOfFreedomModificationDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18040,6 +18842,7 @@ class RemoveKinematicStructureEntityModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RemoveKinematicStructureEntityModificationDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18064,6 +18867,7 @@ class RemoveSemanticAnnotationModificationDAO(
     __mapper_args__ = {
         "polymorphic_identity": "RemoveSemanticAnnotationModificationDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18090,6 +18894,7 @@ class SetDofHasHardwareInterfaceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "SetDofHasHardwareInterfaceDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18110,6 +18915,7 @@ class WorldModificationWithWorldEntityReferenceDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldModificationWithWorldEntityReferenceDAO",
         "inherit_condition": database_id == WorldModificationDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18145,6 +18951,7 @@ class AddActuatorModificationDAO(
         "polymorphic_identity": "AddActuatorModificationDAO",
         "inherit_condition": database_id
         == WorldModificationWithWorldEntityReferenceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18183,6 +18990,7 @@ class AddConnectionModificationDAO(
         "polymorphic_identity": "AddConnectionModificationDAO",
         "inherit_condition": database_id
         == WorldModificationWithWorldEntityReferenceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18221,6 +19029,7 @@ class AddDegreeOfFreedomModificationDAO(
         "polymorphic_identity": "AddDegreeOfFreedomModificationDAO",
         "inherit_condition": database_id
         == WorldModificationWithWorldEntityReferenceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18261,6 +19070,7 @@ class AddKinematicStructureEntityModificationDAO(
         "polymorphic_identity": "AddKinematicStructureEntityModificationDAO",
         "inherit_condition": database_id
         == WorldModificationWithWorldEntityReferenceDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18385,6 +19195,7 @@ class WorldStateUpdateDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldStateUpdateDAO",
         "inherit_condition": database_id == MessageDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18421,6 +19232,7 @@ class WorldSynchronizerDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldSynchronizerDAO",
         "inherit_condition": database_id == SynchronizerDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18461,6 +19273,7 @@ class WorldUpdateDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldUpdateDAO",
         "inherit_condition": database_id == MessageDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18489,6 +19302,7 @@ class WorldValidationErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldValidationErrorDAO",
         "inherit_condition": database_id == LogicalErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18509,6 +19323,7 @@ class BrokenWorldModificationHistoryErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "BrokenWorldModificationHistoryErrorDAO",
         "inherit_condition": database_id == WorldValidationErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18533,11 +19348,13 @@ class WorldContainsOrphanedDegreeOfFreedomDAO(
         collection_class=builtins.set,
         cascade="all, delete-orphan",
         foreign_keys="[WorldContainsOrphanedDegreeOfFreedomDAO_actual_dofs_association.source_worldcontainsorphaneddegreeoffreedomdao_id]",
+        lazy="selectin",
     )
 
     __mapper_args__ = {
         "polymorphic_identity": "WorldContainsOrphanedDegreeOfFreedomDAO",
         "inherit_condition": database_id == WorldValidationErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18556,6 +19373,7 @@ class WorldIsNotATreeErrorDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WorldIsNotATreeErrorDAO",
         "inherit_condition": database_id == WorldValidationErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18577,6 +19395,7 @@ class WrongWorldModelVersionDAO(
     __mapper_args__ = {
         "polymorphic_identity": "WrongWorldModelVersionDAO",
         "inherit_condition": database_id == LogicalErrorDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18594,6 +19413,7 @@ class XYZParserDAO(
     __mapper_args__ = {
         "polymorphic_identity": "XYZParserDAO",
         "inherit_condition": database_id == MeshParserDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 
@@ -18625,6 +19445,7 @@ class _MultiSimStateCallbackDAO(
     __mapper_args__ = {
         "polymorphic_identity": "_MultiSimStateCallbackDAO",
         "inherit_condition": database_id == StateChangeCallbackDAO.database_id,
+        "polymorphic_load": "selectin",
     }
 
 

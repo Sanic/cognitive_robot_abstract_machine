@@ -1578,7 +1578,7 @@ def test_bidirectional_nested_modify_worlds_no_deadlock(rclpy_node):
     with w1.modify_world():
         w1.add_body(Body(name=PrefixedName("root1")))
 
-    time.sleep(0.3)
+    time.sleep(0.1)
     assert w2.root
 
     # Thread A: w1 -> w2 nested
