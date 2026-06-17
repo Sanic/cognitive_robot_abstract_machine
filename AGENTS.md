@@ -2,7 +2,7 @@
 
 ## Avoid Behaviour
 - Avoid using global variables
-- avoid accessing any ormatic_interface.py files. if there are issues regarding the ormatic interface run the script `cognitive_robot_abstract_machine/scripts/regenerate_all_orm.py`. If it does not fix the issue, consider consulting the developer.
+- avoid accessing any ormatic_interface.py files. if there are issues regarding the ormatic interface run the script `scripts/regenerate_all_orm.py`. If it does not fix the issue, consider consulting the developer.
 - Avoid using mutable objects as default arguments
 
 ## Testing
@@ -27,7 +27,7 @@
 ## Imports
 - Imports should always be absolute
 - Imports should always be global (top of module), except in very special cases (for example ORM interface imports)
-- Use use stdlib type hints where possible, and for others use typing_extensions instead of typing
+- Use stdlib type hints where possible, and for others use typing_extensions instead of typing
 - Use `from __future__ import annotations` for type hints instead of wrapping the types in a string
 - use TYPE_CHECKING guard for type-only imports
 
