@@ -19,7 +19,7 @@ class GroupedByRule(PhraseRule):
     >>> verbalize_expression(
     ...     a(set_of(employee.department, sum(employee.salary)).grouped_by(employee.department))
     ... )
-    'Find sets of (the department of an Employee, the sum of salaries of Employees) grouped by the department of the Employee'
+    'Find (the department of an Employee, the sum of salaries of Employees) grouped by their department'
     """
 
     construct = GroupedBy
@@ -34,7 +34,7 @@ class OrderedByRule(PhraseRule):
 
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(a(set_of(employee).ordered_by(employee.salary, descending=True)))
-    'Find sets of (an Employee) ordered by the salary of the Employee (descending)'
+    'Find (an Employee) ordered by its salary (descending)'
     """
 
     construct = OrderedBy

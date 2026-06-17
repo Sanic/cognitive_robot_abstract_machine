@@ -15,7 +15,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Number,
     Separator,
 )
-from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
+    Assembler,
+)
 from krrood.entity_query_language.verbalization.grammar.clauses.planner import (
     GroupedByPlanner,
     GroupPlan,
@@ -41,7 +43,7 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
     >>> verbalize_expression(
     ...     a(set_of(employee.department, sum(employee.salary)).grouped_by(employee.department))
     ... )
-    'Find sets of (the department of an Employee, the sum of salaries of Employees) grouped by the department of the Employee'
+    'Find (the department of an Employee, the sum of salaries of Employees) grouped by their department'
     """
 
     planner = GroupedByPlanner
@@ -100,7 +102,7 @@ class OrderedByAssembler(Assembler[Union[OrderedBy, OrderedByBuilder], None]):
 
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(a(set_of(employee).ordered_by(employee.salary, descending=True)))
-    'Find sets of (an Employee) ordered by the salary of the Employee (descending)'
+    'Find (an Employee) ordered by its salary (descending)'
     """
 
     def realize(
@@ -149,7 +151,7 @@ class HavingAssembler(Assembler[Query, None]):
     >>> verbalize_expression(
     ...     a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
     ... )
-    'Find sets of (the department of an Employee, the sum of salaries of Employees) grouped by the department of the Employee, having the sum of salaries of Employees greater than 30000'
+    'Find (the department of an Employee, the sum of salaries of Employees) grouped by the department of the Employee, having the sum of salaries of Employees greater than 30000'
     """
 
     def realize(self, node: Query, plan: None = None) -> Fragment:

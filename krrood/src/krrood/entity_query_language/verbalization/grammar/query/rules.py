@@ -55,7 +55,7 @@ class SetOfRule(PhraseRule):
     """SetOf → *"Find (v1, v2, …) such that …"*.
 
     >>> verbalize_expression(an(set_of(variable(Robot, []), variable(Task, []))))
-    'Find sets of (a Robot, a Task)'
+    'Find (a Robot, a Task)'
     """
 
     construct = SetOf

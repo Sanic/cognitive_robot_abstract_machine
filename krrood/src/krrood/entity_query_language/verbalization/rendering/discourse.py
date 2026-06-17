@@ -7,7 +7,9 @@ from typing_extensions import Dict, Optional, Protocol, runtime_checkable
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.query.query import Query
-from krrood.entity_query_language.verbalization.grammar.query.planner import QueryPlanner
+from krrood.entity_query_language.verbalization.grammar.query.planner import (
+    QueryPlanner,
+)
 from krrood.entity_query_language.verbalization.microplanning.microplan import Microplan
 
 
@@ -57,11 +59,15 @@ class DiscourseModel:
     @staticmethod
     def _focus(plan) -> Optional[uuid.UUID]:
         """:return: The focus referent id for a query plan — the aggregation source for an
-        aggregation value-subquery, else the WHERE subject, else ``None`` (no single subject)."""
+        aggregation value-subquery, else the WHERE subject, else the single common chain root (so a
+        subject-less query like a ``set_of`` still pronominalises *"its …"*), else ``None``.
+        """
         if plan.is_aggregation_subquery and plan.aggregation_data is not None:
             source = plan.aggregation_data.source
             return source._id_ if source is not None else None
-        return plan.subject._id_ if plan.subject is not None else None
+        if plan.subject is not None:
+            return plan.subject._id_
+        return plan.discourse_root
 
     def is_scope(self, source: Optional[SymbolicExpression]) -> bool:
         """:return: ``True`` when *source* is a query node that opens a discourse scope."""

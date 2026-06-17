@@ -147,7 +147,6 @@ class Keywords(VocabEnum):
     IF = KeyWord("If")
     THEN = KeyWord("then")
     FIND = KeyWord("Find")
-    FIND_SETS_OF = KeyWord("Find sets of")
     SUCH_THAT = KeyWord("such that")
     GIVEN_THAT = KeyWord("given that")
     WHERE = KeyWord("where")

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
 from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.core.expression_structure import walk_chain
+from krrood.entity_query_language.core.expression_structure import (
+    root_variable_ids,
+    walk_chain,
+)
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.aggregators import Aggregator
@@ -145,6 +149,12 @@ class QueryPlan:
     ranking: Optional[RankingPlan]
     """The ``limit`` (+ ordering) decomposition, or ``None`` when the query has no ``limit``."""
 
+    discourse_root: Optional[uuid.UUID]
+    """The single variable every chain in this query's scope roots at, or ``None`` when the roots
+    are not unique. Used as the pronominalisation focus (*"its …"*) for a query that has no
+    restriction subject (e.g. a ``set_of``); kept separate from :attr:`subject` so it never triggers
+    *"whose"*-folding."""
+
 
 @dataclass
 class QueryPlanner(Planner[Query, QueryPlan]):
@@ -173,6 +183,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             is_aggregation_subquery=is_aggregation_subquery(self.node),
             aggregation_data=self._aggregation_data(),
             ranking=self._ranking(),
+            discourse_root=self._discourse_root(),
         )
 
     # ── selection shape ──────────────────────────────────────────────────────
@@ -273,3 +284,13 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         if selected_id is None or getattr(root, "_id_", None) != selected_id:
             return RankingKeyRelation.OTHER
         return RankingKeyRelation.ATTRIBUTE if chain else RankingKeyRelation.SELF
+
+    # ── discourse focus (pronominalisation) ──────────────────────────────────
+
+    def _discourse_root(self) -> Optional[uuid.UUID]:
+        """:return: The single variable every chain in this query roots at, or ``None`` when the
+        roots are not unique — the pronominalisation focus for a query with no restriction subject
+        (e.g. a ``set_of``), so its chains read *"its …"* instead of restating the full root.
+        """
+        roots = root_variable_ids(self.node._all_expressions_)
+        return next(iter(roots)) if len(roots) == 1 else None

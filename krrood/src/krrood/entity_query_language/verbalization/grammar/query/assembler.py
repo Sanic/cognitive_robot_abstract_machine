@@ -37,6 +37,7 @@ from krrood.entity_query_language.verbalization.grammar.query.ranking import (
     RankingRequest,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Articles,
     FallbackNouns,
     Keywords,
     Punctuation,
@@ -113,7 +114,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
     def assemble_set_of(self, node: SetOf) -> Fragment:
         """
         :param node: The set-of query.
-        :return: *"Find sets of (v1, v2, …) such that …"* for a set-of query.
+        :return: *"Find (v1, v2, …) such that …"* — or *"Find the top three (v1, v2, …) …"* when the
+            set-of is ranked by a ``limit``.
         """
         plan = self.plan(node)
         variable_fragments = [
@@ -135,7 +137,23 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             plan,
             selection,
             where_items=[self._where_clause(plan)],
-            find_header=Keywords.FIND_SETS_OF.as_fragment(),
+            find_header=self._set_of_header(plan),
+        )
+
+    def _set_of_header(self, plan: QueryPlan) -> Fragment:
+        """:return: The set-of find header — *"Find"*, or *"Find the <top three>"* when a ``limit``
+        ranks the tuples (the order key is suppressed; it is a visible tuple element). The literal
+        *"sets of"* is intentionally dropped — the parenthesised tuple carries the set shape.
+        """
+        if plan.ranking is None:
+            return Keywords.FIND.as_fragment()
+        surface = ranking_surface(RankingRequest(plan=plan.ranking))
+        return PhraseFragment(
+            parts=[
+                Keywords.FIND.as_fragment(),
+                Articles.THE.as_fragment(),
+                surface.pre_head,
+            ]
         )
 
     # ── subject selection ──────────────────────────────────────────────────────
@@ -277,7 +295,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         without a ``limit`` keeps the clause; a limited set-of keeps it too (no ranking selection).
         """
         composer = ClauseComposer(self.context)
-        ranked = plan.kind is SelectionKind.SUBJECT and plan.ranking is not None
+        ranked = plan.ranking is not None and plan.kind in (
+            SelectionKind.SUBJECT,
+            SelectionKind.SET_OF,
+        )
         return [
             composer.grouped_by(node),
             composer.having(node),
