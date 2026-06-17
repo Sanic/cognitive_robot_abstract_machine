@@ -103,8 +103,10 @@ class Role(Symbol, SubClassSafeGeneric[T]):
     Base class for the Role design pattern.
 
     A role adds context-specific attributes and behaviour to an existing object (the *role
-    taker*) without altering the role taker's identity. A role and its role taker are
-    considered the same entity — they compare equal and share the same hash (Not same memory address nor python id).
+    taker*) without altering the role taker's identity. A role is an ordinary object with
+    its own identity: it is equal only to itself and is **not** equal to its role taker. To
+    ask whether two objects refer to the same underlying entity, use the :class:`IsSameEntity
+    <krrood.patterns.role_predicates.IsSameEntity>` predicate.
 
     **Pure composition.** A role class must not inherit from its role taker type. Role
     membership is expressed through :meth:`has_role` and :meth:`roles_for`, not through
@@ -119,10 +121,14 @@ class Role(Symbol, SubClassSafeGeneric[T]):
     taker via ``__getattr__`` and ``__setattr__``. Role-native attributes are always
     resolved first.
 
-    **Identity sharing.** The hash and equality of a role are derived from the root
-    non-role entity at the bottom of the taker chain, so any collection or dictionary keyed
-    by the taker automatically reflects the role:
+    **Distinct identity.** A role is a distinct object from its role taker: they do not
+    compare equal and do not share a hash, so multiple roles (even of the same type) on one
+    taker stay distinct in sets and dicts. Semantic equivalence ("same underlying entity")
+    is expressed through the :class:`IsSameEntity
+    <krrood.patterns.role_predicates.IsSameEntity>` predicate, which unwraps roles to their
+    :attr:`root_persistent_entity`:
     >>> from dataclasses import dataclass
+    >>> from krrood.patterns.role_predicates import IsSameEntity
     >>> @dataclass(unsafe_hash=True)
     ... class Person:
     ...     name: str
@@ -135,13 +141,13 @@ class Role(Symbol, SubClassSafeGeneric[T]):
     >>> student.name is person.name
     True
     >>> person == student
-    True
-    >>> hash(person) == hash(student)
-    True
+    False
     >>> person is student
     False
-    >>> id(person) == id(student)
-    False
+    >>> len({person, student})
+    2
+    >>> bool(IsSameEntity(person, student))
+    True
     """
 
     @classmethod
@@ -424,15 +430,23 @@ class Role(Symbol, SubClassSafeGeneric[T]):
             if wrapped_field.name == self.role_taker_field_name()
         )
 
-    def __hash__(self):
-        """
-        A persistent entity and its roles are considered the same entity, so the hash is
-        based on the root persistent entity.
-        """
-        return hash(self.root_persistent_entity)
+    # A role is an ordinary object with identity-based equality and hashing: each role is
+    # equal only to itself and distinct from its role taker. "Do these refer to the same
+    # underlying entity?" is answered explicitly by the ``IsSameEntity`` predicate
+    # (see ``krrood.patterns.role_predicates``) rather than by overloading ``==``/``hash``.
+    #
+    # ``__eq__`` returns a definitive ``False`` (rather than ``NotImplemented`` like
+    # ``object.__eq__``) so that Python does not fall back to the *taker's* equality via the
+    # reflected operand: a role delegates attribute reads to its taker, so a taker with a
+    # lenient (e.g. name-based) ``__eq__`` would otherwise compare equal to its role.
+    #
+    # ``__hash__`` must be set explicitly: ``Role``'s base ``SubClassSafeGeneric`` is a plain
+    # ``@dataclass`` (eq=True, no fields), which would otherwise set ``__hash__ = None``
+    # (unhashable); defining ``__eq__`` here would also reset it to ``None``.
+    def __eq__(self, other: Any) -> bool:
+        return self is other
 
-    def __eq__(self, other):
-        return hash(self) == hash(other)
+    __hash__ = object.__hash__
 
 
 class HasRoleTaker(PredicateClassRelation[Role]): ...

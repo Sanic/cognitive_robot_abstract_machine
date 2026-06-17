@@ -26,8 +26,10 @@ express it because an associated object is a separate entity with its own identi
 
 The design optimises for four properties:
 
-1. **Identity preservation.** A role and its role taker must be equal and share the same hash so
-   that any collection or dictionary keyed by one automatically reflects the other.
+1. **Distinct identity, explicit equivalence.** A role is an ordinary object with its own
+   identity (equal only to itself), so multiple roles — even of the same type — on one taker stay
+   distinct. "Same underlying entity?" is answered explicitly by the `IsSameEntity` predicate
+   rather than by overloading `==`/`hash`.
 2. **Explicit, auditable construction.** The system that creates a role must pass the role taker
    explicitly. There must be no implicit or automatic role creation.
 3. **Pure composition, not inheritance.** A role class must not inherit from its role taker type.
@@ -43,8 +45,8 @@ These goals shape every significant decision in the implementation.
 The implementation centres on three collaborating components:
 
 **`Role[T]`** (`role.py`) is the base dataclass that every role class inherits. It provides
-identity sharing (`__hash__`, `__eq__`), attribute delegation (`__getattr__`, `__setattr__`),
-and all querying class methods. It inherits from `SubClassSafeGeneric[T]` so that the generic
+identity-based equality/hashing (`__hash__`, `__eq__`), attribute delegation (`__getattr__`,
+`__setattr__`), and all querying class methods. It inherits from `SubClassSafeGeneric[T]` so that the generic
 type parameter `T` is resolved to the concrete taker type on each concrete role subclass, and
 from `Symbol` to participate in the Symbol Graph and do reasoning over it (see last point below).
 
@@ -116,16 +118,29 @@ in the presence of complex generic hierarchies (multiple type variables, TypeVar
 chains of partially-bound generics). `SubClassSafeGeneric` resolves all of these at class
 definition time and caches the result.
 
-### Identity via the Root Persistent Entity
+### Distinct Identity and the `IsSameEntity` Predicate
 
-`__hash__` and `__eq__` are defined on `Role` and both delegate to `root_persistent_entity`,
-which walks the taker chain until it finds a non-`Role` object. This means that two roles at
-different levels of a chain (such as a `CEO` role and a `Representative` role whose taker is
-that `CEO`) are also equal to each other and to the root taker.
+A role is an ordinary object: `__eq__` returns `self is other` and `__hash__` is
+`object.__hash__`, so each role is equal only to itself and distinct from its taker and from
+sibling roles. This deliberately separates two concerns that the previous design conflated:
+*object identity* (am I this exact object?) and *semantic equivalence* (do we refer to the same
+underlying entity?). The latter is expressed explicitly by the `IsSameEntity` predicate in
+`krrood/src/krrood/patterns/role_predicates.py`, which unwraps each operand to its
+`root_persistent_entity` (walking the taker chain to the non-`Role` object) and compares the
+roots by identity. Two roles at different levels of a chain, and a role versus its root taker,
+are therefore *not* `==` but *are* `IsSameEntity`. A direct consequence is that multiple roles,
+even of the same type, on one taker stay distinct in sets and dicts.
 
-The consequence is that any collection or dictionary keyed by the root entity automatically
-contains entries for all its roles, and vice versa. This is the intended semantics: all objects
-in a role chain represent the same individual.
+`__eq__` returns a concrete `False` rather than `object.__eq__`'s `NotImplemented`: because a
+role delegates attribute reads to its taker, a taker with a lenient (e.g. name-based) `__eq__`
+would otherwise compare equal to its role through the reflected operand. `__hash__` is set
+explicitly because `Role`'s base `SubClassSafeGeneric` is a plain `@dataclass`, which would
+otherwise set `__hash__ = None` (and defining `__eq__` alone would reset it to `None` too).
+
+The predicate lives in its own module rather than in core EQL (`predicate.py`) or in `role.py`
+so that neither gains a cross-dependency — `predicate.py` never imports `patterns.role` and
+`role.py` never imports EQL. This mirrors how `semantic_digital_twin`'s `reasoning/predicates.py`
+defines the domain predicate `ContainsType(Predicate)` in its own module.
 
 ### SymbolGraph as the Role Registry
 

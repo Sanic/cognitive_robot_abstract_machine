@@ -17,6 +17,7 @@ from krrood.class_diagrams.method_classifier import (
 )
 from krrood.class_diagrams.utils import classes_of_module, T
 from krrood.patterns.role import DelegatedFactoryMethodError, Role, role_taker_field
+from krrood.patterns.role_predicates import IsSameEntity
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from ..dataset.role_and_ontology import (
     university_ontology_like_classes,
@@ -134,16 +135,61 @@ def test_accessing_attribute_of_role_from_role_taker_when_role_does_not_exist_an
     assert hasattr(person, "teacher_of") is False
 
 
-def test_roles_are_equal_and_has_same_hash_as_each_other():
+def test_roles_are_distinct_objects_but_share_same_entity():
     person = PersonInRoleAndOntology(name="Bass")
     ceo = CEOAsFirstRole(person=person)
     representative = RepresentativeAsSecondRole(ceo=ceo)
     professor = ProfessorAsFirstRole(person=person)
-    assert hash(ceo) == hash(person)
-    assert ceo == person
-    assert ceo == representative
-    assert ceo == professor
-    assert len({person, ceo, representative, professor}) == 1
+
+    # A role is an ordinary object: equal only to itself, distinct from its taker and
+    # from sibling roles, so all four stay distinct in a set.
+    assert ceo != person
+    assert ceo != representative
+    assert ceo != professor
+    assert len({person, ceo, representative, professor}) == 4
+
+    # ...yet the IsSameEntity predicate sees through the role chain to the one root entity.
+    assert IsSameEntity(ceo, person)
+    assert IsSameEntity(ceo, representative)
+    assert IsSameEntity(ceo, professor)
+    assert IsSameEntity(representative, professor)
+
+
+def test_multiple_roles_of_same_type_on_same_taker():
+    person = PersonInRoleAndOntology(name="Bass")
+    first = CEOAsFirstRole(person=person, head_of=Company(name="Acme"))
+    second = CEOAsFirstRole(person=person, head_of=Company(name="Globex"))
+
+    # Both same-type roles are retrievable and keep their own role-native state.
+    retrieved = Role.roles_for(person, CEOAsFirstRole)
+    assert len(retrieved) == 2
+    assert {role.head_of.name for role in retrieved} == {"Acme", "Globex"}
+
+    # They are distinct objects (no collapse in a set) but the same underlying entity.
+    assert first is not second
+    assert first != second
+    assert len({first, second}) == 2
+    assert IsSameEntity(first, second)
+
+
+def test_is_same_entity_predicate():
+    person = PersonInRoleAndOntology(name="Bass")
+    ceo = CEOAsFirstRole(person=person)
+    professor = ProfessorAsFirstRole(person=person)
+    representative = RepresentativeAsSecondRole(ceo=ceo)
+    delegate = DelegateAsThirdRole(representative=representative)
+    other_person = PersonInRoleAndOntology(name="Other")
+
+    # Two roles on one taker, and a role versus its taker, are the same entity.
+    assert IsSameEntity(ceo, professor)
+    assert IsSameEntity(ceo, person)
+    # A role chain resolves to its root entity, in either operand order.
+    assert IsSameEntity(delegate, person)
+    assert IsSameEntity(person, delegate)
+    # Unrelated entities are not the same; a plain object is the same as itself.
+    assert not IsSameEntity(ceo, other_person)
+    assert not IsSameEntity(person, other_person)
+    assert IsSameEntity(person, person)
 
 
 def test_mappings_between_roles_and_role_takers():
@@ -154,8 +200,13 @@ def test_mappings_between_roles_and_role_takers():
     delegate = DelegateAsThirdRole(representative=representative)
     roles = [ceo, representative, professor, delegate]
 
-    for role_ in roles:
-        assert all(role in role_.role_taker_roles for role in roles)
+    # Every role in the chain registers an edge to the root taker, so the root taker can
+    # retrieve all of them (by identity), and each role reports the same underlying entity.
+    roles_of_person = Role.roles_for(person)
+    assert all(
+        any(role is retrieved for retrieved in roles_of_person) for role in roles
+    )
+    assert all(IsSameEntity(role, person) for role in roles)
 
     delegate_role_takers = [representative, ceo, person]
     assert len(delegate_role_takers) == len(delegate.all_role_takers)
