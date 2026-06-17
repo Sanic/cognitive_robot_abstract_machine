@@ -6,6 +6,7 @@ import threading
 from abc import ABC
 from dataclasses import field, dataclass, fields
 
+import numpy as np
 from typing_extensions import (
     Dict,
     Any,
@@ -18,11 +19,28 @@ from typing_extensions import (
 )
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
+from krrood.adapters.json_serializer import (
+    SubclassJSONSerializer,
+    JSON_TYPE_NAME,
+    to_json,
+)
+from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
+from krrood.exceptions import DataclassException
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.spatial_types import (
+    Point3,
+    Vector3,
+    Quaternion,
+    RotationMatrix,
+    HomogeneousTransformationMatrix,
+)
+from semantic_digital_twin.world_description.geometry import Color
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
     TransitionKind,
+    DefaultWeights,
 )
 from giskardpy.motion_statechart.exceptions import (
     NotInMotionStatechartError,
@@ -35,21 +53,6 @@ from giskardpy.motion_statechart.exceptions import (
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.utils.utils import string_shortener
-from krrood.adapters.json_serializer import (
-    SubclassJSONSerializer,
-    JSON_TYPE_NAME,
-    to_json,
-)
-from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar, trinary_logic_not
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
-    Point3,
-    Vector3,
-    Quaternion,
-    RotationMatrix,
-    HomogeneousTransformationMatrix,
-)
-from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.motion_statechart import (
@@ -322,6 +325,13 @@ class DebugExpression:
     """
     The color used when this expression is rendered in visualization tools.
     """
+
+    def __repr__(self) -> str:
+        return self.name
+
+    @property
+    def evaluated(self) -> np.ndarray:
+        return self.expression.evaluate()
 
 
 @dataclass
@@ -693,7 +703,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def motion_statechart(self, motion_statechart: MotionStatechart) -> None:
         self._motion_statechart = motion_statechart
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Called exactly once during motion statechart compilation.
         Use this method for any setup steps.
@@ -703,7 +713,9 @@ class MotionStatechartNode(SubclassJSONSerializer):
         """
         return NodeArtifacts()
 
-    def on_tick(self, context: ExecutionContext) -> Optional[ObservationStateValues]:
+    def on_tick(
+        self, context: MotionStatechartContext
+    ) -> Optional[ObservationStateValues]:
         """
         Triggered when the node is ticked.
         .. warning:: This method is called inside a control loop, make sure it is fast.
@@ -712,34 +724,40 @@ class MotionStatechartNode(SubclassJSONSerializer):
         :return: An optional observation state overwrite
         """
 
-    def on_start(self, context: ExecutionContext):
+    def on_start(self, context: MotionStatechartContext):
         """
         Triggered when the node transitions from NOT_STARTED to RUNNING.
         .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
-    def on_pause(self, context: ExecutionContext):
+    def on_pause(self, context: MotionStatechartContext):
         """
         Triggered when the node transitions from RUNNING to PAUSED.
         .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
-    def on_unpause(self, context: ExecutionContext):
+    def on_unpause(self, context: MotionStatechartContext):
         """
         Triggered when the node transitions from PAUSED to RUNNING.
         .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
-    def on_end(self, context: ExecutionContext):
+    def on_end(self, context: MotionStatechartContext):
         """
         Triggered when the node transitions from RUNNING to DONE.
         .. warning:: This method is called inside a control loop, make sure it is fast.
         """
 
-    def on_reset(self, context: ExecutionContext):
+    def on_reset(self, context: MotionStatechartContext):
         """
         Triggered when the node transitions from any state to NOT_STARTED.
         .. warning:: This method is called inside a control loop, make sure it is fast.
+        """
+
+    def cleanup(self, context: MotionStatechartContext):
+        """
+        Triggered after an EndMotion or CancelMotion was triggered.
+        Place code here to clean up after execution.
         """
 
     def __hash__(self):
@@ -870,6 +888,9 @@ class Task(MotionStatechartNode):
     Tasks are MotionStatechartNodes that add motion constraints.
     """
 
+    weight: float = field(default=DefaultWeights.WEIGHT_BELOW_CA.value, kw_only=True)
+    """Task priority relative to other tasks."""
+
     plot_specs: NodePlotSpec = field(
         default_factory=NodePlotSpec.create_task_style, kw_only=True, init=False
     )
@@ -882,7 +903,7 @@ class Goal(MotionStatechartNode):
         default_factory=NodePlotSpec.create_goal_style, kw_only=True, init=False
     )
 
-    def expand(self, context: BuildContext) -> None:
+    def expand(self, context: MotionStatechartContext) -> None:
         """
         Instantiate child nodes, add them to this goal, and wire their life cycle transition conditions.
         ..warning:: Nodes have not been built yet.
@@ -984,7 +1005,7 @@ class EndMotion(MotionStatechartNode):
         default_factory=NodePlotSpec.create_end_style, kw_only=True, init=False
     )
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=Scalar.const_true())
 
     @classmethod
@@ -1030,7 +1051,7 @@ class EndMotion(MotionStatechartNode):
 
 @dataclass(eq=False, repr=False)
 class CancelMotion(MotionStatechartNode):
-    exception: Exception = field(kw_only=True)
+    exception: DataclassException = field(kw_only=True)
     observation_expression: Scalar = field(
         default_factory=Scalar.const_true, init=False
     )
@@ -1039,10 +1060,10 @@ class CancelMotion(MotionStatechartNode):
         default_factory=NodePlotSpec.create_cancel_style, kw_only=True, init=False
     )
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         return NodeArtifacts(observation=Scalar.const_true())
 
-    def on_tick(self, context: ExecutionContext) -> Optional[float]:
+    def on_tick(self, context: MotionStatechartContext) -> Optional[float]:
         raise self.exception
 
     def to_json(self) -> Dict[str, Any]:
@@ -1075,6 +1096,8 @@ class CancelMotion(MotionStatechartNode):
         """
         Factory method for creating an EndMotion node that activates when ALL of the given nodes have a true observation state.
         """
+        if len(nodes) == 1:
+            return cls.when_true(node=nodes[0], exception=exception)
         end = cls(exception=exception)
         end.start_condition = sm.trinary_logic_and(
             *[node.observation_variable for node in nodes]
@@ -1088,6 +1111,8 @@ class CancelMotion(MotionStatechartNode):
         """
         Factory method for creating an EndMotion node that activates when ANY of the given nodes have a true observation state.
         """
+        if len(nodes) == 1:
+            return cls.when_true(node=nodes[0], exception=exception)
         end = cls(exception=exception)
         end.start_condition = sm.trinary_logic_or(
             *[node.observation_variable for node in nodes]

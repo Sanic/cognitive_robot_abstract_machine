@@ -5,14 +5,15 @@ import inspect
 import logging
 import sys
 from collections.abc import Sequence
+from copy import copy
 from dataclasses import dataclass, Field, MISSING
 from datetime import datetime
 from functools import cached_property, lru_cache
+from inspect import isclass
 from types import NoneType
-from copy import copy
+from typing import Generic
 
 from typing_extensions import (
-    get_type_hints,
     get_origin,
     get_args,
     ClassVar,
@@ -23,13 +24,19 @@ from typing_extensions import (
     Union,
 )
 
-from .failures import MissingContainedTypeOfContainer
-from .utils import behaves_like_a_built_in_class
-from ..ormatic.utils import module_and_class_name
+from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
+from krrood.class_diagrams.utils import (
+    behaves_like_a_built_in_class,
+    common_base_class,
+    get_type_hints_of_object,
+)
+from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
-    from .class_diagram import WrappedClass
-    from ..ontomatic.property_descriptor import PropertyDescriptor
+    from krrood.class_diagrams.class_diagram import WrappedClass
+    from krrood.ontomatic.property_descriptor.property_descriptor import (
+        PropertyDescriptor,
+    )
 
 
 @dataclass
@@ -99,20 +106,26 @@ class WrappedField:
         """
         Resolve the type hint for this field.
 
-        Handles forward references by iteratively building a namespace with
-        classes from the class diagram and sys.modules until all references
-        are resolved.
+        :return: The resolved type hint.
+        :raises CouldNotResolveType: If the type cannot be resolved.
         """
+        # Fast path: already-resolved type (e.g., provided by specialized generic introspector)
+        if not isinstance(self.field.type, str):
+            return self.field.type
+
         local_namespace = self._build_initial_namespace()
 
-        while True:
-            try:
-                return get_type_hints(self.clazz.clazz, localns=local_namespace)[
-                    self.field.name
-                ]
-            except NameError as e:
-                found_class = self._find_class_by_name(e.name)
-                local_namespace[e.name] = found_class
+        # If it's a specialized generic, use its origin for get_type_hints
+        clazz = self.clazz.clazz
+        # If the class itself is a specialized generic (typing.GenericAlias),
+        # get_type_hints will fail. We use the origin class instead.
+        origin = get_origin(clazz)
+        if origin is not None and not isinstance(clazz, type):
+            clazz = origin
+
+        return get_type_hints_of_object(
+            clazz, namespace=tuple(local_namespace.items())
+        )[self.field.name]
 
     def _build_initial_namespace(self) -> dict:
         """
@@ -131,12 +144,14 @@ class WrappedField:
         if class_diagram is not None:
             for wrapped_class in class_diagram.wrapped_classes:
                 if wrapped_class.clazz.__name__ == class_name:
-                    return wrapped_class.clazz
+                    return wrapped_class.clazzs
         return manually_search_for_class_name(class_name)
 
     @cached_property
     def is_builtin_type(self) -> bool:
-        return self.type_endpoint in [int, float, str, bool, datetime, NoneType]
+        return is_builtin_type(self.type_endpoint) or (
+            self.type_endpoint in [datetime, NoneType]
+        )
 
     @cached_property
     def is_container(self) -> bool:
@@ -188,12 +203,7 @@ class WrappedField:
 
     @cached_property
     def is_enum(self) -> bool:
-        if self.is_container or not inspect.isclass(self.resolved_type):
-            return False
-        if self.is_optional:
-            return issubclass(self.contained_type, enum.Enum)
-
-        return issubclass(self.resolved_type, enum.Enum)
+        return issubclass(self.type_endpoint, enum.Enum)
 
     @cached_property
     def is_one_to_one_relationship(self) -> bool:
@@ -213,8 +223,13 @@ class WrappedField:
     def type_endpoint(self) -> Type:
         if self.is_container or self.is_optional:
             return self.contained_type
-        else:
-            return self.resolved_type
+        resolved = self.resolved_type
+        if get_origin(resolved) is Union:
+            non_none = [arg for arg in get_args(resolved) if arg is not NoneType]
+            lowest_common_ancestor = common_base_class(non_none)
+            if lowest_common_ancestor is not None:
+                return lowest_common_ancestor
+        return resolved
 
     @cached_property
     def is_role_taker(self) -> bool:
@@ -224,6 +239,43 @@ class WrappedField:
             and self.field.default == MISSING
             and self.field.default_factory == MISSING
         )
+
+    @cached_property
+    def is_instantiation_of_generic_class(self) -> bool:
+        """
+        Check if a type hint is a full parameterization of a generic class.
+        For example, `GenericClass[int]` is a full parameterization, but `GenericClass` is not.
+
+        :return: True if the type hint is a full parameterization of a generic class.
+        """
+        origin = get_origin(self.type_endpoint)
+        if origin is None:
+            return False
+        if not isclass(origin) or not issubclass(origin, Generic):
+            return False
+        return len(get_args(self.type_endpoint)) > 0
+
+    @cached_property
+    def is_underspecified_generic(self) -> bool:
+        """
+        Check if a type hint is an underspecified generic class.
+        For example, `GenericClass` is underspecified, but `GenericClass[int]` is not.
+
+        :return: True if the type hint is an underspecified generic class.
+        """
+        # If it's a class and it inherits from Generic but has no arguments
+        if inspect.isclass(self.type_endpoint) and issubclass(
+            self.type_endpoint, Generic
+        ):
+            return True
+
+        # Also check if it's a GenericAlias with empty args (though usually origin is used then)
+        origin = get_origin(self.type_endpoint)
+
+        if origin is None or not isclass(origin):
+            return False
+
+        return issubclass(origin, Generic) and len(get_args(self.type_endpoint)) == 0
 
 
 @lru_cache(maxsize=None)

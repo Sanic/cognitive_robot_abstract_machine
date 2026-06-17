@@ -1,36 +1,46 @@
 from __future__ import annotations
 
-import copy
 import itertools
+import logging
 import os
+import shutil
 import tempfile
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
-from functools import cached_property, lru_cache
+from functools import cached_property
 
+from plyfile import PlyData
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from PIL import Image
-from random_events.interval import SimpleInterval, Bound, closed
-from random_events.product_algebra import SimpleEvent
 from trimesh.visual.texture import TextureVisuals, SimpleMaterial
 from typing_extensions import Optional, List, Dict, Any, Self, Tuple, TYPE_CHECKING
 
-from krrood.adapters.exceptions import JSON_TYPE_NAME
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
-from ..datastructures.variables import SpatialVariables
-from ..spatial_types import HomogeneousTransformationMatrix, Point3, Vector3
-from ..utils import IDGenerator
+from random_events.interval import SimpleInterval, Bound, closed
+from random_events.product_algebra import SimpleEvent
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.mixin import HasSimulatorProperties
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Vector3,
+)
+from semantic_digital_twin.utils import IDGenerator
 
 if TYPE_CHECKING:
-    from .world_entity import KinematicStructureEntity
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
+    )
 
 if TYPE_CHECKING:
-    from ..world import World
+    from semantic_digital_twin.world import World
 
 id_generator = IDGenerator()
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -73,6 +83,125 @@ class Color:
     def to_rgba(self) -> Tuple[float, float, float, float]:
         return (self.R, self.G, self.B, self.A)
 
+    def to_rgb(self) -> Tuple[float, float, float]:
+        return (self.R, self.G, self.B)
+
+    @classmethod
+    def RED(self):
+        return Color(1, 0, 0)
+
+    @classmethod
+    def YELLOW(self):
+        return Color(1, 1, 0)
+
+    @classmethod
+    def GREEN(self):
+        return Color(0, 1, 0)
+
+    @classmethod
+    def CYAN(self):
+        return Color(0, 1, 1)
+
+    @classmethod
+    def BLUE(self):
+        return Color(0, 0, 1)
+
+    @classmethod
+    def MAGENTA(self):
+        return Color(1, 0, 1)
+
+    @classmethod
+    def WHITE(self):
+        return Color(1, 1, 1)
+
+    @classmethod
+    def BLACK(self):
+        return Color(0, 0, 0)
+
+    @classmethod
+    def GRAY(self):
+        return Color(0.498, 0.498, 0.498)
+
+    @classmethod
+    def BEIGE(self):
+        return Color(1, 0.827, 0.6078)
+
+    @classmethod
+    def ORANGE(self):
+        return Color(1, 0.647, 0)
+
+    @classmethod
+    def from_list(cls, color: List[float]):
+        """
+        Set the rgba_color from a list of RGBA values.
+
+        :param color: The list of RGBA values
+        """
+        if len(color) == 3:
+            return cls.from_rgb(color)
+        elif len(color) == 4:
+            return cls.from_rgba(color)
+        else:
+            raise ValueError("Color list must have 3 or 4 elements")
+
+    @classmethod
+    def from_rgb(cls, rgb: List[float]):
+        """
+        Set the rgba_color from a list of RGB values.
+
+        :param rgb: The list of RGB values
+        """
+        return cls(*rgb, 1)
+
+    @classmethod
+    def from_rgba(cls, rgba: List[float]):
+        """
+        Set the rgba_color from a list of RGBA values.
+
+        :param rgba: The list of RGBA values
+        """
+        return cls(*rgba)
+
+    @classmethod
+    def PINK(cls) -> Self:
+        return cls(1, 0, 1, 1)
+
+    @classmethod
+    def BLACK(cls) -> Self:
+        return cls(0, 0, 0, 1)
+
+    @classmethod
+    def WHITE(cls) -> Self:
+        return cls(1, 1, 1, 1)
+
+    @classmethod
+    def RED(cls) -> Self:
+        return cls(1, 0, 0, 1)
+
+    @classmethod
+    def GREEN(cls) -> Self:
+        return cls(0, 1, 0, 1)
+
+    @classmethod
+    def BLUE(cls) -> Self:
+        return cls(0, 0, 1, 1)
+
+    @classmethod
+    def YELLOW(cls) -> Self:
+        return cls(1, 1, 0, 1)
+
+    @classmethod
+    def CYAN(cls) -> Self:
+        return cls(0, 1, 1, 1)
+
+    @classmethod
+    def MAGENTA(cls) -> Self:
+        return cls(1, 0, 1, 1)
+
+    @classmethod
+    def GREY(cls) -> Self:
+        return cls(0.5, 0.5, 0.5, 1)
+
 
 @dataclass
 class Scale:
@@ -111,7 +240,7 @@ class Scale:
         extend_result_in_direction: Optional[Vector3] = None,
         amount: float = 0.0,
     ) -> SimpleEvent:
-        simple_event = SimpleEvent(
+        simple_event = SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: closed(-self.x / 2, self.x / 2),
                 SpatialVariables.y.value: closed(-self.y / 2, self.y / 2),
@@ -166,11 +295,14 @@ class Scale:
     def to_bounding_box(self) -> BoundingBox:
         min_point = Point3(-self.x / 2, -self.y / 2, -self.z / 2)
         max_point = Point3(self.x / 2, self.y / 2, self.z / 2)
-        return BoundingBox.from_min_max(min_point, max_point)
+        return BoundingBox.from_min_max(min_point, max_point, None)
+
+    def to_np(self) -> np.ndarray:
+        return np.array([self.x, self.y, self.z])
 
 
 @dataclass
-class Shape(ABC, SubclassJSONSerializer):
+class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     """
     Base class for all shapes in the world.
     """
@@ -231,9 +363,6 @@ class Shape(ABC, SubclassJSONSerializer):
         """
         new_origin = HomogeneousTransformationMatrix(
             self.origin.to_np(),
-            reference_frame=world.get_kinematic_structure_entity_by_name(
-                self.origin.reference_frame.name
-            ),
         )
         shape_props = fields(self)
         new_props = {
@@ -245,7 +374,7 @@ class Shape(ABC, SubclassJSONSerializer):
 
 
 @dataclass(eq=False)
-class Mesh(Shape, ABC):
+class Mesh(Shape):
     """
     Abstract mesh class.
     Subclasses must provide a `mesh` property returning a trimesh.Trimesh.
@@ -256,11 +385,10 @@ class Mesh(Shape, ABC):
     Scale of the mesh.
     """
 
-    @property
-    @abstractmethod
-    def mesh(self) -> trimesh.Trimesh:
-        """Return the loaded mesh object."""
-        raise NotImplementedError
+    filename: str = ""
+    """
+    Filename of the mesh.
+    """
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -271,15 +399,33 @@ class Mesh(Shape, ABC):
         return BoundingBox.from_mesh(self.mesh, self.origin)
 
     def to_json(self) -> Dict[str, Any]:
+        # Serialize the raw (unscaled, unprocessed) mesh geometry and the scale separately
+        base_mesh = trimesh.load_mesh(self.filename, process=False)
+        file_type = self.filename.split(".")[-1]
         return {
             **super().to_json(),
-            "mesh": self.mesh.to_dict(),
+            "mesh": base_mesh.to_dict(),
             "scale": to_json(self.scale),
+            "file_type": file_type,
         }
 
     @classmethod
-    @abstractmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self: ...
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Mesh:
+        # Recreate the trimesh without processing to preserve exact topology
+        mesh = trimesh.Trimesh(
+            vertices=data["mesh"]["vertices"],
+            faces=data["mesh"]["faces"],
+            process=False,
+        )
+        origin = from_json(data["origin"], **kwargs)
+        scale = from_json(data["scale"], **kwargs)
+        file_type = data["file_type"]
+        color = from_json(data["color"], **kwargs)
+        instance = cls.from_trimesh(
+            mesh=mesh, origin=origin, scale=scale, file_type=file_type
+        )
+        instance.color = color
+        return instance
 
     @classmethod
     def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
@@ -306,17 +452,16 @@ class Mesh(Shape, ABC):
         mesh.visual.material = SimpleMaterial(name=material_name, image=image)
         return mesh
 
+    def scale_mesh(self, scale: Scale) -> trimesh.Trimesh:
+        """
+        Scales the mesh according to the given scale.
 
-@dataclass(eq=False)
-class FileMesh(Mesh):
-    """
-    A mesh shape defined by a file.
-    """
-
-    filename: str = ""
-    """
-    Filename of the mesh.
-    """
+        :param scale: The scale of the mesh.
+        :return: A scaled mesh object.
+        """
+        copy_mesh = deepcopy(self.mesh)
+        copy_mesh.apply_scale(scale.to_np())
+        return copy_mesh
 
     @cached_property
     def mesh(self) -> trimesh.Trimesh:
@@ -324,40 +469,21 @@ class FileMesh(Mesh):
         The mesh object.
         """
         mesh = trimesh.load_mesh(self.filename)
-        mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
+        mesh.apply_scale(self.scale.to_np())
+        if not isinstance(mesh.visual, TextureVisuals):
+            mesh.visual.vertex_colors = trimesh.visual.color.to_rgba(self.color.to_rgba())
         return mesh
-
-    def to_triangle_mesh(self) -> TriangleMesh:
-        return TriangleMesh(
-            mesh=self.mesh, origin=self.origin, color=self.color, scale=self.scale
-        )
-
-    def to_json(self) -> Dict[str, Any]:
-        json = {
-            **super().to_json(),
-            "mesh": self.mesh.to_dict(),
-            "scale": to_json(self.scale),
-        }
-        json[JSON_TYPE_NAME] = json[JSON_TYPE_NAME].replace("FileMesh", "TriangleMesh")
-        return json
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        raise NotImplementedError(
-            f"{cls} does not support loading from JSON due to filenames across different systems."
-            f" Use TriangleMesh instead."
-        )
 
     @classmethod
     def from_file(
         cls, file_path: str, texture_file_path: Optional[str] = None, **kwargs
-    ) -> FileMesh:
+    ) -> Mesh:
         """
-        Create a FileMesh from a file path.
+        Create a Mesh from a file path.
 
         :param file_path: Path to the mesh file.
         :param texture_file_path: Optional path to the texture file.
-        :return: FileMesh object.
+        :return: Mesh object.
         """
         file_mesh = cls(filename=file_path, **kwargs)
         if texture_file_path is not None:
@@ -366,45 +492,124 @@ class FileMesh(Mesh):
             )
         return file_mesh
 
+    @classmethod
+    def from_ply_file(
+        cls,
+        ply_file_path: str,
+        texture_file_path: Optional[str] = None,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+    ) -> Mesh:
+        """
+        Create a Mesh from a PLY file path and an optional texture file path.
+        Ply files are not supported by RViz2, so we need to convert them to OBJ files with the textures intact.
+        """
+        texture_image = Image.open(texture_file_path)
+        ply_file = PlyData.read(ply_file_path)
+        # Raw data
+        vertices = np.stack(
+            [ply_file["vertex"]["x"], ply_file["vertex"]["y"], ply_file["vertex"]["z"]],
+            axis=-1,
+        )
 
-@dataclass(eq=False)
-class TriangleMesh(Mesh):
-    """
-    A mesh shape defined by vertices and faces.
-    """
+        texture_coordinates = np.stack(
+            [ply_file["texcoord"]["s"], ply_file["texcoord"]["t"]], axis=-1
+        )
 
-    mesh: Optional[trimesh.Trimesh] = None
-    """
-    The loaded mesh object.
-    """
+        faces = np.stack([np.array(f["vertex_indices"]) for f in ply_file["face"]])
+        texture_coordinate_indices = np.stack(
+            [np.array(f["texcoord_indices"]) for f in ply_file["face"]]
+        )
 
-    @property
-    def file_name(self) -> str:
-        return self.file.name
+        # Build per-vertex UV by unpacking face-corner UVs
+        # texture_coordinate_indices[f, c] -> index into texture_coordinates for face f, corner c
+        uv_per_corner = texture_coordinates[texture_coordinate_indices]
 
-    @cached_property
-    def file(
-        self, dirname: str = "/tmp", file_type: str = "obj"
-    ) -> tempfile._TemporaryFileWrapper:
-        f = tempfile.NamedTemporaryFile(dir=dirname, delete=False)
-        if file_type == "obj":
-            self.mesh.export(f.name, file_type="obj")
-            old_mtl_file = "material.mtl"
-            new_mtl_file = f"{os.path.basename(f.name)}.mtl"
-            old_mtl = os.path.join(dirname, old_mtl_file)
-            new_mtl = os.path.join(dirname, new_mtl_file)
-            if os.path.exists(old_mtl):
-                os.rename(old_mtl, new_mtl)
-            with open(f.name) as f:
-                text = f.read()
-            text = text.replace(old_mtl_file, new_mtl_file)
-            with open(f.name, "w") as f:
-                f.write(text)
-        elif file_type == "stl":
-            self.mesh.export(f.name, file_type="stl")
-        else:
-            raise ValueError(f"Unsupported file type: {file_type}")
-        return f
+        vertices_unindexed = vertices[faces.reshape(-1)]
+        uv_unindexed = uv_per_corner.reshape(-1, 2)
+        faces_new = np.arange(len(vertices_unindexed)).reshape(-1, 3)
+
+        mesh = trimesh.Trimesh(
+            vertices=vertices_unindexed,
+            faces=faces_new,
+            visual=trimesh.visual.TextureVisuals(uv=uv_unindexed, image=texture_image),
+        )
+
+        return Mesh.from_trimesh(mesh=mesh, origin=origin, scale=scale, file_type="obj", texture_file_path=texture_file_path)
+
+    @classmethod
+    def from_trimesh(
+        cls,
+        mesh: trimesh.Trimesh,
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+        uv: Optional[np.ndarray] = None,
+        texture_file_path: Optional[str] = None,
+        dirname: str = "/tmp",
+        file_type: str = "obj",
+    ) -> "Mesh":
+        file_type = file_type.lower()
+        if origin is None:
+            origin = HomogeneousTransformationMatrix()
+        if scale is None:
+            scale = Scale()
+        if uv is not None:
+            mesh = cls.add_uv(mesh=mesh, uv=uv)
+        if texture_file_path is not None:
+            mesh = cls.add_texture(mesh=mesh, texture_file_path=texture_file_path)
+
+        # Each export gets its own subdir so material.mtl files never collide
+        subdir = tempfile.mkdtemp(dir=dirname)
+        tmp_path = os.path.join(subdir, f"{os.path.basename(subdir)}.{file_type}")
+
+        try:
+            mesh.export(tmp_path, file_type=file_type)
+        except Exception:
+            shutil.rmtree(subdir, ignore_errors=True)
+            raise
+
+        instance = cls(
+            origin=origin,
+            scale=scale,
+            filename=tmp_path,
+        )
+
+        # # Tie file lifetime to the Mesh instance TODO luca wants to find a way for this to work with rviz (atexit)
+        # weakref.finalize(instance, cls._cleanup_temp_dir, subdir)
+
+        return instance
+
+    @staticmethod
+    def _cleanup_temp_dir(subdir: str) -> None:
+        """
+        Clean up the temporary subdirectory created for the mesh.
+        """
+        logger.debug(f"Cleaning up temporary directory: {subdir}")
+        try:
+            shutil.rmtree(subdir, ignore_errors=True)
+        except OSError:
+            pass
+
+    @classmethod
+    def box(
+        cls,
+        extents: Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        origin: Optional[HomogeneousTransformationMatrix] = None,
+        scale: Optional[Scale] = None,
+    ) -> "Mesh":
+        """
+        Create a box-shaped Mesh.
+
+        :param extents: Side lengths of the box along x, y, z.
+        :param origin: Origin of the mesh.
+        :param scale: Scale of the mesh.
+        :return: Mesh wrapping a box trimesh.
+        """
+        return cls.from_trimesh(
+            mesh=trimesh.creation.box(extents=extents),
+            origin=origin,
+            scale=scale,
+        )
 
     @classmethod
     def from_vertices_and_faces(
@@ -415,35 +620,25 @@ class TriangleMesh(Mesh):
         scale: np.ndarray,
         uv: Optional[np.ndarray] = None,
         texture_file_path: Optional[str] = None,
-    ) -> TriangleMesh:
+    ) -> Mesh:
         """
-        Create a triangle mesh from vertices, faces, origin, and scale.
+        Create a mesh from vertices, faces, origin, and scale.
 
         :param vertices: Vertices of the mesh.
         :param faces: Faces of the mesh.
         :param origin: Origin of the mesh.
         :param scale: Scale of the mesh.
         :param uv: Optional UV coordinates.
-        :return: TriangleMesh object.
+        :return: Mesh object.
         """
         mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-        if uv is not None:
-            mesh = cls.add_uv(mesh=mesh, uv=uv)
-        if texture_file_path is not None:
-            mesh = cls.add_texture(mesh=mesh, texture_file_path=texture_file_path)
-
-        origin = HomogeneousTransformationMatrix(data=origin)
-        scale = Scale(x=scale[0], y=scale[1], z=scale[2])
-        return cls(mesh=mesh, origin=origin, scale=scale)
-
-    @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> TriangleMesh:
-        mesh = trimesh.Trimesh(
-            vertices=data["mesh"]["vertices"], faces=data["mesh"]["faces"]
+        return cls.from_trimesh(
+            mesh=mesh,
+            origin=origin,
+            scale=scale,
+            uv=uv,
+            texture_file_path=texture_file_path,
         )
-        origin = from_json(data["origin"], **kwargs)
-        scale = from_json(data["scale"], **kwargs)
-        return cls(mesh=mesh, origin=origin, scale=scale)
 
     @classmethod
     def from_3d_points(
@@ -502,22 +697,57 @@ class TriangleMesh(Mesh):
         if thickness_padding > 0:
             P_aug = np.vstack(
                 [
-                    points + thickness_padding * unit_vector_normal,
-                    points - thickness_padding * unit_vector_normal,
+                    centered_points + thickness_padding * unit_vector_normal,
+                    centered_points - thickness_padding * unit_vector_normal,
                 ]
             )
         else:
-            P_aug = points
+            P_aug = centered_points
 
         hull = trimesh.points.PointCloud(P_aug).convex_hull
         hull.remove_unreferenced_vertices()
         hull.update_faces(hull.nondegenerate_faces())
         hull.process()
 
-        return cls(
+        return cls.from_trimesh(
             mesh=hull,
             origin=HomogeneousTransformationMatrix(reference_frame=reference_frame),
         )
+
+    @classmethod
+    def project_texture_coordinates(
+        cls,
+        mesh: trimesh.Trimesh,
+        projection_axis: np.ndarray,
+        scale: np.ndarray,
+    ) -> trimesh.Trimesh:
+        """
+        Generate texture coordinates by projecting vertices along an axis and normalizing by scale.
+        This prepares the mesh for rendering with a texture map using
+        `UV mapping <https://en.wikipedia.org/wiki/UV_mapping>`_.
+
+        :param mesh: The mesh to apply UVs to.
+        :param projection_axis: A (3,) array representing the axis to project along (e.g., [0, 0, 1] for Z).
+        :param scale: A (3,) array for normalizing the UV coordinates (e.g., dimensions of the box).
+        :return: A new mesh with UV coordinates and expanded vertices.
+        """
+        # Expand vertices for each face corner
+        faces = mesh.faces.reshape(-1)
+        vertices = mesh.vertices[faces]
+
+        # Identify the two axes perpendicular to the projection axis
+        # This is a simplified version for axis-aligned projections (X, Y, or Z)
+        axes = np.where(projection_axis == 0)[0]
+        if len(axes) != 2:
+            # Fallback or more complex logic for non-axis-aligned projections could go here
+            axes = [0, 1] if projection_axis[2] != 0 else [0, 2]
+
+        # Calculate UVs by projecting and normalizing
+        uv = np.zeros((len(vertices), 2))
+        uv[:, 0] = (vertices[:, axes[0]] / scale[axes[0]]) + 0.5
+        uv[:, 1] = (vertices[:, axes[1]] / scale[axes[1]]) + 0.5
+
+        return cls.add_uv(mesh=mesh, uv=uv)
 
 
 @dataclass(eq=False)
@@ -671,32 +901,32 @@ class Box(Shape):
 class BoundingBox:
     min_x: float
     """
-    The minimum x-coordinate of the bounding box.
+    The minimum x-coordinate of the bounding box, relative to the origin.
     """
 
     min_y: float
     """
-    The minimum y-coordinate of the bounding box.
+    The minimum y-coordinate of the bounding box, relative to the origin.
     """
 
     min_z: float
     """
-    The minimum z-coordinate of the bounding box.
+    The minimum z-coordinate of the bounding box, relative to the origin.
     """
 
     max_x: float
     """
-    The maximum x-coordinate of the bounding box.
+    The maximum x-coordinate of the bounding box, relative to the origin.
     """
 
     max_y: float
     """
-    The maximum y-coordinate of the bounding box.
+    The maximum y-coordinate of the bounding box, relative to the origin.
     """
 
     max_z: float
     """
-    The maximum z-coordinate of the bounding box.
+    The maximum z-coordinate of the bounding box, relative to the origin.
     """
 
     origin: HomogeneousTransformationMatrix
@@ -715,21 +945,36 @@ class BoundingBox:
         """
         :return: The x interval of the bounding box.
         """
-        return SimpleInterval(self.min_x, self.max_x, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            float(self.origin.x + self.min_x),
+            float(self.origin.x + self.max_x),
+            Bound.CLOSED,
+            Bound.CLOSED,
+        )
 
     @property
     def y_interval(self) -> SimpleInterval:
         """
         :return: The y interval of the bounding box.
         """
-        return SimpleInterval(self.min_y, self.max_y, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            float(self.origin.y + self.min_y),
+            float(self.origin.y + self.max_y),
+            Bound.CLOSED,
+            Bound.CLOSED,
+        )
 
     @property
     def z_interval(self) -> SimpleInterval:
         """
         :return: The z interval of the bounding box.
         """
-        return SimpleInterval(self.min_z, self.max_z, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            float(self.origin.z + self.min_z),
+            float(self.origin.z + self.max_z),
+            Bound.CLOSED,
+            Bound.CLOSED,
+        )
 
     @property
     def scale(self) -> Scale:
@@ -755,7 +1000,7 @@ class BoundingBox:
         """
         :return: The bounding box as a random event.
         """
-        return SimpleEvent(
+        return SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: self.x_interval,
                 SpatialVariables.y.value: self.y_interval,
@@ -795,15 +1040,21 @@ class BoundingBox:
         """
         Check if the bounding box contains a point.
         """
-        x, y, z = (float(point.x), float(point.y), float(point.z))
+        point_in_bb = point.reference_frame._world.transform(
+            point, self.origin.reference_frame
+        )
+        x, y, z = (float(point_in_bb.x), float(point_in_bb.y), float(point_in_bb.z))
         return self.simple_event.contains((x, y, z))
 
     @classmethod
-    def from_simple_event(cls, simple_event: SimpleEvent):
+    def from_simple_event(
+        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+    ) -> List[Self]:
         """
         Create a list of bounding boxes from a simple random event.
 
         :param simple_event: The random event.
+        :param origin: The origin of the intersection.
         :return: The list of bounding boxes.
         """
         result = []
@@ -812,7 +1063,9 @@ class BoundingBox:
             simple_event[SpatialVariables.y.value].simple_sets,
             simple_event[SpatialVariables.z.value].simple_sets,
         ):
-            result.append(cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper))
+            result.append(
+                cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper, origin)
+            )
         return result
 
     def intersection_with(self, other: BoundingBox) -> Optional[BoundingBox]:
@@ -822,10 +1075,11 @@ class BoundingBox:
         :param other: The other bounding box.
         :return: The intersection of the two bounding boxes or None if they do not intersect.
         """
-        result = self.simple_event.intersection_with(other.simple_event)
+        other_in_same_frame = other.transform_to_origin(self.origin)
+        result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
         if result.is_empty():
             return None
-        return self.__class__.from_simple_event(result)[0]
+        return self.__class__.from_simple_event(result, self.origin)[0]
 
     def enlarge(
         self,
@@ -862,7 +1116,9 @@ class BoundingBox:
 
     @classmethod
     def from_mesh(
-        cls, mesh: trimesh.Trimesh, origin: HomogeneousTransformationMatrix
+        cls,
+        mesh: trimesh.Trimesh,
+        origin: HomogeneousTransformationMatrix,
     ) -> Self:
         """
         Create a bounding box from a trimesh object.
@@ -870,6 +1126,7 @@ class BoundingBox:
         :param origin: The origin of the bounding box.
         :return: The bounding box.
         """
+
         bounds = mesh.bounds
         return cls(
             bounds[0][0],
@@ -895,7 +1152,12 @@ class BoundingBox:
         ]
 
     @classmethod
-    def from_min_max(cls, min_point: Point3, max_point: Point3) -> Self:
+    def from_min_max(
+        cls,
+        min_point: Point3,
+        max_point: Point3,
+        origin: HomogeneousTransformationMatrix,
+    ) -> Self:
         """
         Set the axis-aligned bounding box from a minimum and maximum point.
 
@@ -905,13 +1167,7 @@ class BoundingBox:
         assert (
             min_point.reference_frame == max_point.reference_frame
         ), "The reference frames of the minimum and maximum points must be the same."
-        return cls(
-            *min_point.to_np()[:3],
-            *max_point.to_np()[:3],
-            origin=HomogeneousTransformationMatrix(
-                reference_frame=min_point.reference_frame
-            ),
-        )
+        return cls(*min_point.to_np()[:3], *max_point.to_np()[:3], origin=origin)
 
     def as_shape(self) -> Box:
         scale = Scale(
@@ -919,9 +1175,9 @@ class BoundingBox:
             y=self.max_y - self.min_y,
             z=self.max_z - self.min_z,
         )
-        x = (self.max_x + self.min_x) / 2
-        y = (self.max_y + self.min_y) / 2
-        z = (self.max_z + self.min_z) / 2
+        x = (self.max_x + self.min_x) / 2 + float(self.origin.x)
+        y = (self.max_y + self.min_y) / 2 + float(self.origin.y)
+        z = (self.max_z + self.min_z) / 2 + float(self.origin.z)
         origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x, y, z, 0, 0, 0, self.origin.reference_frame
         )
@@ -933,34 +1189,35 @@ class BoundingBox:
         """
         Transform the bounding box to a different reference frame.
         """
-        origin_T_self = self.origin
-        origin_frame = origin_T_self.reference_frame
-        world = origin_frame._world
-
-        reference_T_origin = world.compute_forward_kinematics(
-            reference_T_new_origin.reference_frame, origin_frame
+        reference_T_new_origin = HomogeneousTransformationMatrix(
+            data=reference_T_new_origin.to_np(),
+            reference_frame=reference_T_new_origin.reference_frame,
         )
 
-        reference_T_self: HomogeneousTransformationMatrix = (
-            reference_T_origin @ origin_T_self
+        new_origin_reference_T_self = self.origin.reference_frame._world.transform(
+            self.origin, reference_T_new_origin.reference_frame
         )
+
+        self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
 
         # Get all 8 corners of the BB in link-local space
         list_self_T_corner = [
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(self_T_corner)
+            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                self_T_corner
+            ).to_np()
             for self_T_corner in self.get_points()
         ]  # shape (8, 3)
 
         list_reference_T_corner = [
-            reference_T_self @ self_T_corner for self_T_corner in list_self_T_corner
+            self_T_new_pose.to_np() @ self_T_corner
+            for self_T_corner in list_self_T_corner
         ]
 
         list_reference_P_corner = [
-            reference_T_corner.to_position().to_np()[:3]
-            for reference_T_corner in list_reference_T_corner
+            reference_T_corner[:3, 3:] for reference_T_corner in list_reference_T_corner
         ]
 
-        # Compute world-space bounding box from transformed corners
+        # Compute new corner points
         min_corner = np.min(list_reference_P_corner, axis=0)
         max_corner = np.max(list_reference_P_corner, axis=0)
 
@@ -971,6 +1228,7 @@ class BoundingBox:
             Point3.from_iterable(
                 max_corner, reference_frame=reference_T_new_origin.reference_frame
             ),
+            reference_T_new_origin,
         )
 
         return world_bb

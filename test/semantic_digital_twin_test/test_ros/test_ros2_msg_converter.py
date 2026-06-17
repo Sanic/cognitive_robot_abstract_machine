@@ -1,4 +1,8 @@
+import os
+
 import geometry_msgs.msg as geometry_msgs
+from importlib.resources import files
+from pathlib import Path
 
 from semantic_digital_twin.adapters.ros.msg_converter import (
     Ros2ToSemDTConverter,
@@ -20,7 +24,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     Cylinder,
     Sphere,
-    FileMesh,
+    Mesh,
 )
 
 
@@ -243,8 +247,14 @@ def test_convert_sphere_shape(cylinder_bot_world):
 
 
 def test_convert_mesh_shape(cylinder_bot_world):
-    mesh = FileMesh(
-        filename="test_mesh.obj",
+    stl_file = os.path.join(
+        Path(files("semantic_digital_twin")).parent.parent,
+        "resources",
+        "stl",
+        "jeroen_cup.stl",
+    )
+    mesh = Mesh(
+        filename=stl_file,
         color=Color(0.0, 0.0, 0.0, 0.0),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             1, 2, 3, reference_frame=cylinder_bot_world.get_body_by_name("map")

@@ -4,7 +4,8 @@ import unittest
 from dataclasses import dataclass
 
 import numpy as np
-from pkg_resources import resource_filename
+from importlib.resources import files
+from pathlib import Path
 
 from semantic_digital_twin.adapters.fbx import FBXParser
 from semantic_digital_twin.adapters.procthor.procthor_pipelines import (
@@ -43,7 +44,7 @@ class PipelineTestCase(unittest.TestCase):
             cls.dummy_world.add_connection(c1)
 
         cls.fbx_path = os.path.join(
-            resource_filename("semantic_digital_twin", "../../"),
+            Path(files("semantic_digital_twin")).parent.parent,
             "resources",
             "fbx",
             "test_dressers.fbx",
@@ -88,11 +89,11 @@ class PipelineTestCase(unittest.TestCase):
             body.collision.as_bounding_box_collection_at_origin(
                 HomogeneousTransformationMatrix(reference_frame=world.root)
             ).bounding_boxes[0]
-            for body in world.bodies_with_enabled_collision
+            for body in world.bodies_with_collision
         ]
 
         original_global_poses = [
-            body.global_pose.to_np() for body in world.bodies_with_enabled_collision
+            body.global_transform.to_np() for body in world.bodies_with_collision
         ]
         for pose in original_global_poses:
             np.testing.assert_almost_equal(pose, np.eye(4))
@@ -102,8 +103,8 @@ class PipelineTestCase(unittest.TestCase):
         centered_world = pipeline.apply(world)
 
         centered_global_poses = [
-            body.global_pose.to_np()
-            for body in centered_world.bodies_with_enabled_collision
+            body.global_transform.to_np()
+            for body in centered_world.bodies_with_collision
         ]
         for original, centered in zip(original_global_poses, centered_global_poses):
             assert not np.allclose(original, centered)
@@ -112,7 +113,7 @@ class PipelineTestCase(unittest.TestCase):
             body.collision.as_bounding_box_collection_at_origin(
                 HomogeneousTransformationMatrix(reference_frame=centered_world.root)
             ).bounding_boxes[0]
-            for body in centered_world.bodies_with_enabled_collision
+            for body in centered_world.bodies_with_collision
         ]
 
         self.assertEqual(original_bounding_boxes, new_bounding_boxes)

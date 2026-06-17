@@ -11,6 +11,7 @@ from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
+    ShapeSource,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -18,7 +19,7 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     FixedConnection,
 )
-from semantic_digital_twin.world_description.geometry import FileMesh
+from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -32,9 +33,11 @@ class Callback:
 
 def test_visualization_marker(rclpy_node, cylinder_bot_world):
     tf_wrapper = TFWrapper(node=rclpy_node)
-    tf_publisher = TFPublisher(node=rclpy_node, world=cylinder_bot_world)
+    tf_publisher = TFPublisher(node=rclpy_node, _world=cylinder_bot_world)
     viz = VizMarkerPublisher(
-        world=cylinder_bot_world, node=rclpy_node, use_visuals=False
+        _world=cylinder_bot_world,
+        node=rclpy_node,
+        shape_source=ShapeSource.COLLISION_ONLY,
     )
     tf_wrapper.wait_for_transform(
         "map",
@@ -57,7 +60,7 @@ def test_visualization_marker(rclpy_node, cylinder_bot_world):
         sleep(0.1)
     else:
         assert False, "Callback timed out"
-    assert len(callback.last_msg.markers) == 2
+    assert len(callback.last_msg.markers) == 3
     assert callback.last_msg.markers[0].ns == "environment"
     assert callback.last_msg.markers[0].type == Marker.CYLINDER
 
@@ -82,9 +85,11 @@ def test_visualization_marker(rclpy_node, cylinder_bot_world):
 
 def test_visualization_marker_pr2(rclpy_node, pr2_world_state_reset):
     tf_wrapper = TFWrapper(node=rclpy_node)
-    tf_publisher = TFPublisher(node=rclpy_node, world=pr2_world_state_reset)
+    tf_publisher = TFPublisher(node=rclpy_node, _world=pr2_world_state_reset)
     viz = VizMarkerPublisher(
-        world=pr2_world_state_reset, node=rclpy_node, use_visuals=False
+        _world=pr2_world_state_reset,
+        node=rclpy_node,
+        shape_source=ShapeSource.COLLISION_ONLY,
     )
     tf_wrapper.wait_for_transform(
         "odom_combined",
@@ -107,7 +112,50 @@ def test_visualization_marker_pr2(rclpy_node, pr2_world_state_reset):
         sleep(0.1)
     else:
         assert False, "Callback timed out"
-    assert len(callback.last_msg.markers) == 54
+    assert len(callback.last_msg.markers) == 53
+
+
+def test_visualization_marker_tracy(rclpy_node, tracy_world):
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(node=rclpy_node, _world=tracy_world)
+    viz = VizMarkerPublisher(_world=tracy_world, node=rclpy_node)
+
+    callback = Callback()
+
+    sub = rclpy_node.create_subscription(
+        msg_type=MarkerArray,
+        topic=viz.topic_name,
+        callback=callback,
+        qos_profile=viz.qos_profile,
+    )
+    for i in range(30):
+        if callback.last_msg is not None:
+            break
+        sleep(0.1)
+    else:
+        assert False, "Callback timed out"
+
+    # table has no texture, so white should be used
+    for marker in callback.last_msg.markers:
+        if marker.ns == str(tracy_world.get_body_by_name("table").name):
+            assert marker.color.r == 1.0
+            assert marker.color.g == 1.0
+            assert marker.color.b == 1.0
+            assert marker.color.a == 1.0
+            break
+    else:
+        assert False, "Marker not found"
+
+    # ur5 has texture, 0,0,0,0 must be used for correct visualization
+    for marker in callback.last_msg.markers:
+        if marker.ns == str(tracy_world.get_body_by_name("left_forearm_link").name):
+            assert marker.color.r == 0.0
+            assert marker.color.g == 0.0
+            assert marker.color.b == 0.0
+            assert marker.color.a == 0.0
+            break
+    else:
+        assert False, "Marker not found"
 
 
 def test_trimesh(rclpy_node):
@@ -123,15 +171,15 @@ def test_trimesh(rclpy_node):
             "milk.stl",
         )
     ).parse()
-    visual: FileMesh = world.root.visual.shapes[0]
-    world.root.visual.shapes[0] = visual.to_triangle_mesh()
+    visual: Mesh = world.root.visual.shapes[0]
+    world.root.visual.shapes[0] = visual
     with world.modify_world():
         body2 = Body(name=PrefixedName("body2"))
         body_C_body2 = FixedConnection(parent=world.root, child=body2)
         world.add_connection(body_C_body2)
     tf_wrapper = TFWrapper(node=rclpy_node)
-    tf_publisher = TFPublisher(node=rclpy_node, world=world)
-    viz = VizMarkerPublisher(world=world, node=rclpy_node, use_visuals=True)
+    tf_publisher = TFPublisher(node=rclpy_node, _world=world)
+    viz = VizMarkerPublisher(_world=world, node=rclpy_node)
 
     assert tf_wrapper.wait_for_transform(
         str(world.root.name),

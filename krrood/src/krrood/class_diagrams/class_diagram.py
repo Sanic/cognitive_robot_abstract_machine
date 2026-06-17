@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from abc import ABC
 from copy import copy
-from dataclasses import dataclass
-from dataclasses import field, InitVar
-from functools import cached_property, lru_cache
+from dataclasses import dataclass, is_dataclass
+from dataclasses import field as dataclass_field, InitVar
+from functools import cached_property
+from typing import _GenericAlias
 
 import rustworkx as rx
+from typing_extensions import get_args, get_origin
+
+from krrood.utils import module_and_class_name, memoize, get_generic_type_params
 
 try:
-    from rustworkx_utils import RWXNode
+    from krrood.rustworkx_utils import RWXNode
 except ImportError:
     RWXNode = None
 from typing_extensions import (
@@ -23,20 +28,28 @@ from typing_extensions import (
     Iterable,
     Type,
     TYPE_CHECKING,
+    TypeVar,
+    get_type_hints,
 )
 
 
-from .attribute_introspector import (
+from krrood.class_diagrams.attribute_introspector import (
     AttributeIntrospector,
     DataclassOnlyIntrospector,
 )
-from .utils import Role, get_generic_type_param
-from .wrapped_field import WrappedField
+from krrood.class_diagrams.utils import Role, resolve_type
+from krrood.class_diagrams.wrapped_field import WrappedField
 
-from .failures import ClassIsUnMappedInClassDiagram
+from krrood.class_diagrams.exceptions import (
+    ClassIsUnMappedInClassDiagram,
+    CouldNotResolveType,
+)
 
 if TYPE_CHECKING:
-    from ..entity_query_language.predicate import PropertyDescriptor
+    from krrood.entity_query_language.predicate import PropertyDescriptor
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -127,14 +140,28 @@ class ParseError(TypeError):
 class WrappedClass:
     """A node wrapper around a Python class used in the class diagram graph."""
 
-    index: Optional[int] = field(init=False, default=None)
+    index: Optional[int] = dataclass_field(init=False, default=None)
     clazz: Type
-    _class_diagram: Optional[ClassDiagram] = field(
+    _class_diagram: Optional[ClassDiagram] = dataclass_field(
         init=False, hash=False, default=None, repr=False
     )
-    _wrapped_field_name_map_: Dict[str, WrappedField] = field(
+    _wrapped_field_name_map_: Dict[str, WrappedField] = dataclass_field(
         init=False, hash=False, default_factory=dict, repr=False
     )
+
+    def _get_introspector(self) -> AttributeIntrospector:
+        if self._class_diagram is None:
+            introspector = DataclassOnlyIntrospector()
+        else:
+            introspector = self._class_diagram.introspector
+        return introspector
+
+    @cached_property
+    def class_to_introspect(self) -> Type:
+        """
+        :return: The class where the introspector should be called on.
+        """
+        return self.clazz
 
     @cached_property
     def fields(self) -> List[WrappedField]:
@@ -142,13 +169,11 @@ class WrappedClass:
 
         Public names from the introspector are used to index `_wrapped_field_name_map_`.
         """
+
+        wrapped_fields: list[WrappedField] = []
+        introspector = self._get_introspector()
         try:
-            wrapped_fields: list[WrappedField] = []
-            if self._class_diagram is None:
-                introspector = DataclassOnlyIntrospector()
-            else:
-                introspector = self._class_diagram.introspector
-            discovered = introspector.discover(self.clazz)
+            discovered = introspector.discover(self.class_to_introspect)
             for item in discovered:
                 wf = WrappedField(
                     self,
@@ -165,36 +190,75 @@ class WrappedClass:
             raise ParseError(e) from e
 
     @property
-    def name(self):
-        """Return a unique display name composed of class name and node index."""
-        return self.clazz.__name__ + str(self.index)
+    def name(self) -> str:
+        """
+        :return: The name of the class that is wrapped.
+        """
+        return self.clazz.__name__
 
     def __hash__(self):
         return hash((self.index, self.clazz))
+
+    @property
+    def name_with_entire_path(self) -> str:
+        return module_and_class_name(self.clazz)
+
+
+@dataclass(unsafe_hash=True)
+class WrappedSpecializedGeneric(WrappedClass):
+    """
+    Specialization of WrappedClass for completely parameterized generic types, e.g. Generic[float].
+    """
+
+    @property
+    def name_with_entire_path(self) -> str:
+        return str(self.clazz)
+
+    @cached_property
+    def class_to_introspect(self):
+        return make_specialized_dataclass(self.clazz)
+
+    @property
+    def name(self):
+        return self.class_to_introspect.__name__
 
 
 @dataclass
 class ClassDiagram:
     """A graph of classes and their relations discovered via attribute introspection."""
 
-    classes: InitVar[List[Type]]
+    classes: List[Type]
+    """
+    A list of classes to be represented in the diagram.
+    """
 
-    introspector: AttributeIntrospector = field(
+    introspector: AttributeIntrospector = dataclass_field(
         default_factory=DataclassOnlyIntrospector, init=True, repr=False
     )
+    """
+    The attribute introspector used to discover class attributes.
+    """
 
-    _dependency_graph: rx.PyDiGraph[WrappedClass, ClassRelation] = field(
+    _dependency_graph: rx.PyDiGraph[WrappedClass, ClassRelation] = dataclass_field(
         default_factory=rx.PyDiGraph, init=False
     )
-    _cls_wrapped_cls_map: Dict[Type, WrappedClass] = field(
+    """
+    A directed graph representing class relationships.
+    """
+
+    _cls_wrapped_cls_map: Dict[Type, WrappedClass] = dataclass_field(
         default_factory=dict, init=False, repr=False
     )
+    """
+    A mapping of class types to their corresponding wrapped class instances.
+    """
 
-    def __post_init__(self, classes: List[Type]):
+    def __post_init__(self):
         """Initialize the diagram with the provided classes and build relations."""
         self._dependency_graph = rx.PyDiGraph()
-        for clazz in classes:
+        for clazz in self.classes:
             self.add_node(WrappedClass(clazz=clazz))
+        self._create_nodes_for_specialized_generic_type_hints()
         self._create_all_relations()
 
     def get_associations_with_condition(
@@ -224,7 +288,7 @@ class ClassDiagram:
         wrapped_cls = self.get_wrapped_class(clazz)
         yield from self.get_out_edges(wrapped_cls)
 
-    @lru_cache(maxsize=None)
+    @memoize
     def get_common_role_taker_associations(
         self, cls1: Union[Type, WrappedClass], cls2: Union[Type, WrappedClass]
     ) -> Tuple[Optional[HasRoleTaker], Optional[HasRoleTaker]]:
@@ -248,7 +312,7 @@ class ClassDiagram:
                 return assoc1, assoc2
         return None, None
 
-    @lru_cache(maxsize=None)
+    @memoize
     def get_role_taker_associations_of_cls(
         self, cls: Union[Type, WrappedClass]
     ) -> Optional[HasRoleTaker]:
@@ -262,7 +326,7 @@ class ClassDiagram:
                 return assoc
         return None
 
-    @lru_cache(maxsize=None)
+    @memoize
     def get_neighbors_with_relation_type(
         self,
         cls: Union[Type, WrappedClass],
@@ -283,7 +347,7 @@ class ClassDiagram:
         ]
         return tuple(filtered_neighbors)
 
-    @lru_cache(maxsize=None)
+    @memoize
     def get_outgoing_neighbors_with_relation_type(
         self,
         cls: Union[Type, WrappedClass],
@@ -303,7 +367,7 @@ class ClassDiagram:
         find_successors_by_edge = self._dependency_graph.find_successors_by_edge
         return tuple(find_successors_by_edge(wrapped_cls.index, edge_filter_func))
 
-    @lru_cache(maxsize=None)
+    @memoize
     def get_incoming_neighbors_with_relation_type(
         self,
         cls: Union[Type, WrappedClass],
@@ -314,7 +378,7 @@ class ClassDiagram:
         find_predecessors_by_edge = self._dependency_graph.find_predecessors_by_edge
         return tuple(find_predecessors_by_edge(wrapped_cls.index, edge_filter_func))
 
-    @lru_cache(maxsize=None)
+    @memoize
     def get_out_edges(
         self, cls: Union[Type, WrappedClass]
     ) -> Tuple[ClassRelation, ...]:
@@ -517,7 +581,17 @@ class ClassDiagram:
         added to the relations list.
         """
         for clazz in self.wrapped_classes:
-            for superclass in clazz.clazz.__bases__:
+            # Handle GenericAlias which doesn't have __bases__
+            origin = get_origin(clazz.clazz)
+            if origin is not None and not isinstance(clazz.clazz, type):
+                bases = origin.__bases__
+            else:
+                try:
+                    bases = clazz.clazz.__bases__
+                except AttributeError:
+                    continue
+
+            for superclass in bases:
                 try:
                     source = self.get_wrapped_class(superclass)
                 except ClassIsUnMappedInClassDiagram:
@@ -548,15 +622,31 @@ class ClassDiagram:
         for clazz in self.wrapped_classes:
             for wrapped_field in clazz.fields:
                 target_type = wrapped_field.type_endpoint
-
                 try:
+                    if isinstance(target_type, TypeVar):
+                        target_type = target_type.__bound__
+                    if target_type is None:
+                        continue
                     wrapped_target_class = self.get_wrapped_class(target_type)
                 except ClassIsUnMappedInClassDiagram:
                     continue
 
                 association_type = Association
-                if wrapped_field.is_role_taker and issubclass(clazz.clazz, Role):
-                    role_taker_type = get_generic_type_param(clazz.clazz, Role)[0]
+                # Handle GenericAlias in issubclass
+                origin = get_origin(clazz.clazz)
+                actual_cls = (
+                    origin
+                    if (origin is not None and not isinstance(clazz.clazz, type))
+                    else clazz.clazz
+                )
+
+                try:
+                    is_role_subclass = issubclass(actual_cls, Role)
+                except TypeError:
+                    is_role_subclass = False
+
+                if wrapped_field.is_role_taker and is_role_subclass:
+                    role_taker_type = get_generic_type_params(actual_cls, Role)[0]
                     if role_taker_type is target_type:
                         association_type = HasRoleTaker
 
@@ -665,3 +755,160 @@ class ClassDiagram:
 
     def __eq__(self, other):
         return self is other
+
+    def _create_nodes_for_specialized_generic_type_hints(self):
+        """
+        Creates nodes for specialized generic type hints utilized in the wrapped classes. This process involves
+        analyzing fields for references to specialized generic types, creating corresponding nodes, and establishing
+        inheritance relations as appropriate. The method ensures that all unique specialized generics referenced
+        are represented as nodes. This is similar to C++ template resolving.
+
+        :raises ClassIsUnMappedInClassDiagram: If a class referenced by a field or origin type is not mapped
+            in the class diagram, it will skip further processing for that type.
+        """
+        # Phase 1: Collect all unique specialized generic types referenced in fields
+        to_process = set()
+
+        for wrapped_class in self.wrapped_classes:
+            for wrapped_field in wrapped_class.fields:
+                try:
+                    to_process.add(wrapped_field.type_endpoint)
+                except CouldNotResolveType as e:
+                    logger.warning(e)
+                    continue
+
+        # Phase 2: Add nodes for discovered types that do not already exists
+        while to_process:
+            next_type = to_process.pop()
+
+            # skip existing nodes
+            try:
+                self.get_wrapped_class(next_type)
+                # Already wrapped
+                continue
+            except ClassIsUnMappedInClassDiagram:
+                pass
+
+            # skip non dataclass generics
+            if not is_dataclass(get_origin(next_type)):
+                continue
+
+            origin = get_origin(next_type)
+            if origin:
+                if not next_type.__parameters__ or all(
+                    isinstance(p, TypeVar) and p.__bound__ is not None
+                    for p in next_type.__parameters__
+                ):
+                    bindings = [p.__bound__ for p in next_type.__parameters__]
+                    if bindings:
+                        subscript_param = (
+                            bindings[0] if len(bindings) == 1 else tuple(bindings)
+                        )
+                        next_type = next_type[subscript_param]
+                else:
+                    continue
+
+            node = WrappedSpecializedGeneric(next_type)
+            self.add_node(node)
+
+            # Add explicit inheritance from the origin class
+            if origin:
+                try:
+                    source_node = self.get_wrapped_class(origin)
+                    self.add_relation(Inheritance(source=source_node, target=node))
+                except ClassIsUnMappedInClassDiagram:
+                    pass
+
+            # Check if the new node has fields that point to other specialized generics
+            for wrapped_field in node.fields:
+                if wrapped_field.is_instantiation_of_generic_class:
+                    try:
+                        self.get_wrapped_class(wrapped_field.type_endpoint)
+                    except ClassIsUnMappedInClassDiagram:
+                        to_process.add(wrapped_field.type_endpoint)
+
+
+@memoize
+def make_specialized_dataclass(alias: _GenericAlias) -> Type:
+    """
+    Build a concrete dataclass for a fully specialized generic alias, e.g., GenericClass[float].
+
+    The resulting class is intended for internal use only and should never be used directly.
+
+    :param alias: The fully specialized generic alias to build a dataclass for.
+    :return: A concrete dataclass corresponding to the provided alias.
+    """
+
+    # get the template class
+    template_class = get_origin(alias)
+    if template_class is None:
+        raise TypeError(f"{alias!r} is not a specialized generic alias")
+    if not dataclasses.is_dataclass(template_class):
+        raise TypeError(f"Origin {template_class!r} is not a dataclass")
+
+    # Map TypeVar -> concrete argument
+    args = get_args(alias)
+    params: Tuple[TypeVar, ...] = template_class.__parameters__
+    substitution = dict(zip(params, args))
+
+    # Preserve dataclass parameters
+    params_obj = template_class.__dataclass_params__
+
+    # Build field specs by copying defaults/metadata and substituting types
+    new_fields = []
+    # Use get_type_hints to resolve any postponed annotations (strings)
+    # This is important for GenericClass[T] where fields might be strings.
+    try:
+        resolved_hints = get_type_hints(template_class, include_extras=True)
+    except Exception:
+        resolved_hints = {f.name: f.type for f in dataclasses.fields(template_class)}
+
+    for f in dataclasses.fields(template_class):
+        # Use the resolved hint if available, else fallback to the raw field type
+        raw_type = resolved_hints.get(f.name, f.type)
+        type_resolution = resolve_type(raw_type, substitution)
+        # Copy defaults and flags
+        kwargs = dict(
+            default=f.default,
+            default_factory=f.default_factory,
+            init=f.init,
+            repr=f.repr,
+            hash=f.hash,
+            compare=f.compare,
+            kw_only=getattr(f, "kw_only", False),
+            metadata=(f.metadata or {}) | {"__origin_field__": f},
+        )
+        # Remove MISSING to satisfy make_dataclass
+        if kwargs["default"] is dataclasses.MISSING:
+            kwargs.pop("default")
+        if kwargs["default_factory"] is dataclasses.MISSING:
+            kwargs.pop("default_factory")
+        new_fields.append(
+            (f.name, type_resolution.resolved_type, dataclass_field(**kwargs))
+        )
+
+    # Name and namespace
+    arg_names = [getattr(a, "__name__", repr(a)) for a in args]
+    name = f"{template_class.__name__}_{'_'.join(arg_names)}"
+    namespace = {
+        "__origin__": template_class,
+        "__args__": args,
+        "__alias__": alias,
+        "__module__": template_class.__module__,  # better pickling/story in repr
+    }
+
+    # create the specialized concrete class
+    specialized_class = dataclasses.make_dataclass(
+        name,
+        fields=new_fields,
+        bases=(template_class,),
+        namespace=namespace,
+        frozen=params_obj.frozen,
+        eq=params_obj.eq,
+        order=params_obj.order,
+        unsafe_hash=params_obj.unsafe_hash,
+        kw_only=params_obj.kw_only if hasattr(params_obj, "kw_only") else False,
+        slots=getattr(template_class, "__slots__", None) is not None,
+    )
+
+    return specialized_class

@@ -6,48 +6,56 @@ import mujoco
 import numpy
 from scipy.spatial.transform import Rotation
 from typing_extensions import Optional, Dict
+from xml.etree import ElementTree as ET
 
-from .multi_sim import (
+from semantic_digital_twin.adapters.multi_sim import (
     MujocoActuator,
     GeomVisibilityAndCollisionType,
     MujocoCamera,
     MujocoEquality,
-    MujocoMocapBody,
+    MujocoGeom,
+    MujocoBody,
+    MujocoJoint,
+    MujocoTendon,
 )
-from ..datastructures.prefixed_name import PrefixedName
-from ..exceptions import WorldEntityNotFoundError
-from ..spatial_types import (
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import WorldEntityNotFoundError
+from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Point3,
     Vector3,
 )
-from ..spatial_types.derivatives import DerivativeMap
-from ..world import World, Body
-from ..world_description.connection_properties import JointDynamics
-from ..world_description.connections import (
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world import World, Body
+from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
     FixedConnection,
     Connection6DoF,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedom, DegreeOfFreedomLimits
-from ..world_description.geometry import (
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.geometry import (
     Box,
     Sphere,
     Cylinder,
     Scale,
     Shape,
     Color,
-    FileMesh,
+    Mesh,
 )
-from ..world_description.inertial_properties import (
+from semantic_digital_twin.world_description.inertial_properties import (
     Inertial,
     InertiaTensor,
     PrincipalMoments,
     PrincipalAxes,
 )
-from ..world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Actuator
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +85,15 @@ class MJCFParser:
         if self.prefix is None:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
         self.spec: mujoco.MjSpec = mujoco.MjSpec.from_file(self.file_path)
+        self.tree = ET.fromstring(self.spec.to_xml())
         self.world = World()
+
+    @classmethod
+    def from_xml_string(cls, xml_string: str) -> "MJCFParser":
+        file_path = "/tmp/scene.xml"
+        with open(file_path, "w") as f:
+            f.write(xml_string)
+        return cls(file_path)
 
     def parse(self) -> World:
         """
@@ -89,6 +105,7 @@ class MJCFParser:
         worldbody: mujoco.MjsBody = self.spec.worldbody
         with self.world.modify_world():
             self.parse_equalities()
+            self.parse_tendons()
 
             root = Body(name=PrefixedName(worldbody.name))
             self.world.add_body(root)
@@ -118,6 +135,13 @@ class MJCFParser:
         collisions = []
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
+            shape.origin.reference_frame = body
+            shape.simulator_additional_properties.append(
+                MujocoGeom(
+                    solver_impedance=mujoco_geom.solimp.tolist(),
+                    solver_reference=mujoco_geom.solref.tolist(),
+                )
+            )
             if mujoco_geom.contype != 0 or mujoco_geom.conaffinity != 0:
                 collisions.append(shape)
             if mujoco_geom.group in [
@@ -129,9 +153,13 @@ class MJCFParser:
         body.inertial = self.parse_inertial(mujoco_body=mujoco_body)
         body.visual = ShapeCollection(shapes=visuals, reference_frame=body)
         body.collision = ShapeCollection(shapes=collisions, reference_frame=body)
+        body.simulator_additional_properties.append(
+            MujocoBody(
+                gravitation_compensation_factor=mujoco_body.gravcomp,
+                motion_capture=mujoco_body.mocap,
+            )
+        )
         self.world.add_kinematic_structure_entity(body)
-        if mujoco_body.mocap:
-            self.world.add_semantic_annotation(MujocoMocapBody(body=body))
         for mujoco_child_body in mujoco_body.bodies:
             self.parse_body(mujoco_body=mujoco_child_body)
 
@@ -281,7 +309,7 @@ class MJCFParser:
                 )
                 meshscale = Scale(*mujoco_mesh.scale)
                 if mujoco_material is None:
-                    return FileMesh(
+                    return Mesh(
                         filename=filename,
                         origin=origin_transform,
                         color=color,
@@ -292,7 +320,7 @@ class MJCFParser:
                     mujoco_texture: mujoco.MjsTexture = self.spec.texture(texture_name)
                     if mujoco_texture is None:
                         color = Color(*mujoco_material.rgba)
-                        return FileMesh(
+                        return Mesh(
                             filename=filename,
                             origin=origin_transform,
                             color=color,
@@ -303,7 +331,7 @@ class MJCFParser:
                     )
                     texture_file_path = os.path.join(texturedir, mujoco_texture.file)
                     if os.path.isfile(texture_file_path):
-                        return FileMesh.from_file(
+                        return Mesh.from_file(
                             file_path=filename,
                             origin=origin_transform,
                             color=color,
@@ -311,7 +339,7 @@ class MJCFParser:
                             scale=meshscale,
                         )
                     else:
-                        return FileMesh(
+                        return Mesh(
                             filename=filename,
                             origin=origin_transform,
                             color=color,
@@ -382,7 +410,11 @@ class MJCFParser:
                 joint_dynamics = JointDynamics(
                     armature=mujoco_joint.armature,
                     dry_friction=mujoco_joint.frictionloss,
-                    damping=mujoco_joint.damping,
+                    damping=(
+                        mujoco_joint.damping
+                        if mujoco.mj_version() < 3007000
+                        else mujoco_joint.damping[0]
+                    ),
                 )
                 if mujoco_joint.type == mujoco.mjtJoint.mjJNT_HINGE:
                     connection = RevoluteConnection(
@@ -410,6 +442,16 @@ class MJCFParser:
                     raise NotImplementedError(
                         f"Joint type {mujoco_joint.type} not implemented yet."
                     )
+                connection.simulator_additional_properties.append(
+                    MujocoJoint(
+                        stiffness=(
+                            [mujoco_joint.stiffness]
+                            if mujoco.mj_version() < 3007000
+                            else mujoco_joint.stiffness.tolist()
+                        ),
+                        actuator_force_range=mujoco_joint.actfrcrange.tolist(),
+                    )
+                )
         self.world.add_connection(connection)
 
     def parse_dof(self, mujoco_joint: mujoco.MjsJoint) -> DegreeOfFreedom:
@@ -454,40 +496,47 @@ class MJCFParser:
         :param mujoco_actuator: The Mujoco actuator to parse.
         """
         actuator_name = mujoco_actuator.name
-        if mujoco_actuator.trntype != mujoco.mjtTrn.mjTRN_JOINT:
+        if mujoco_actuator.trntype not in [
+            mujoco.mjtTrn.mjTRN_JOINT,
+            mujoco.mjtTrn.mjTRN_TENDON,
+        ]:
             print(
                 f"Warning: Actuator {actuator_name} has trntype {mujoco_actuator.trntype}, which is not supported. Skipping actuator."
             )
             return
-        joint_name = mujoco_actuator.target
-        connection = self.world.get_connection_by_name(joint_name)
-        dofs = list(connection.dofs)
-        assert (
-            len(dofs) == 1
-        ), f"Actuator {actuator_name} is associated with joint {joint_name} which has {len(connection.dofs)} DOFs, but only single-DOF joints are supported for actuators."
-        dof = dofs[0]
-        actuator = MujocoActuator(
-            name=PrefixedName(actuator_name),
-            activation_limited=mujoco_actuator.actlimited,
-            activation_range=[*mujoco_actuator.actrange],
-            ctrl_limited=mujoco_actuator.ctrllimited,
-            ctrl_range=[*mujoco_actuator.ctrlrange],
-            force_limited=mujoco_actuator.forcelimited,
-            force_range=[*mujoco_actuator.forcerange],
-            bias_parameters=[*mujoco_actuator.biasprm],
-            bias_type=mujoco_actuator.biastype,
-            dynamics_parameters=[*mujoco_actuator.dynprm],
-            dynamics_type=mujoco_actuator.dyntype,
-            gain_parameters=[*mujoco_actuator.gainprm],
-            gain_type=mujoco_actuator.gaintype,
+        actuator = Actuator(name=PrefixedName(actuator_name))
+        if mujoco_actuator.trntype == mujoco.mjtTrn.mjTRN_JOINT:
+            joint_name = mujoco_actuator.target
+            connection = self.world.get_connection_by_name(joint_name)
+            dofs = list(connection.dofs)
+            assert (
+                len(dofs) == 1
+            ), f"Actuator {actuator_name} is associated with joint {joint_name} which has {len(connection.dofs)} DOFs, but only single-DOF joints are supported for actuators."
+            actuator.add_dof(dofs[0])
+        else:
+            actuator.add_dof(
+                self.world.get_degree_of_freedom_by_name(mujoco_actuator.target)
+            )
+        actuator.simulator_additional_properties.append(
+            MujocoActuator(
+                activation_limited=mujoco_actuator.actlimited,
+                activation_range=[*mujoco_actuator.actrange],
+                control_limited=mujoco_actuator.ctrllimited,
+                control_range=[*mujoco_actuator.ctrlrange],
+                force_limited=mujoco_actuator.forcelimited,
+                force_range=[*mujoco_actuator.forcerange],
+                bias_parameters=[*mujoco_actuator.biasprm],
+                bias_type=mujoco_actuator.biastype,
+                dynamics_parameters=[*mujoco_actuator.dynprm],
+                dynamics_type=mujoco_actuator.dyntype,
+                gain_parameters=[*mujoco_actuator.gainprm],
+                gain_type=mujoco_actuator.gaintype,
+            )
         )
-        actuator.add_dof(dof)
         self.world.add_actuator(actuator)
 
     def parse_camera(self, mujoco_camera: mujoco.MjsCamera):
-        camera_name = PrefixedName(mujoco_camera.name)
-        body_name = mujoco_camera.parent.name
-        body = self.world.get_body_by_name(body_name)
+        camera_name = mujoco_camera.name
         resolution = (
             [1, 1]
             if numpy.isnan(mujoco_camera.resolution).any()
@@ -529,23 +578,30 @@ class MJCFParser:
             else mujoco_camera.quat.tolist()
         )
 
-        camera = MujocoCamera(
-            name=camera_name,
-            body=body,
-            mode=mujoco_camera.mode,
-            orthographic=mujoco_camera.orthographic,
-            fovy=mujoco_camera.fovy,
-            resolution=resolution,
-            focal_length=focal_length,
-            focal_pixel=focal_pixel,
-            principal_length=principal_length,
-            principal_pixel=principal_pixel,
-            sensor_size=sensor_size,
-            ipd=mujoco_camera.ipd,
-            pos=pos,
-            quat=quat,
+        body_name = mujoco_camera.parent.name
+        body = self.world.get_body_by_name(body_name)
+        body.simulator_additional_properties.append(
+            MujocoCamera(
+                body=body,
+                name=camera_name,
+                mode=mujoco_camera.mode,
+                orthographic=(
+                    mujoco_camera.orthographic
+                    if mujoco.mj_version() < 3005000
+                    else False
+                ),
+                fovy=mujoco_camera.fovy,
+                resolution=resolution,
+                focal_length=focal_length,
+                focal_pixel=focal_pixel,
+                principal_length=principal_length,
+                principal_pixel=principal_pixel,
+                sensor_size=sensor_size,
+                inter_pupilary_distance=mujoco_camera.ipd,
+                position=pos,
+                quaternion=quat,
+            )
         )
-        self.world.add_semantic_annotation(camera)
 
     def parse_equalities(self):
         self.mimic_joints = {}
@@ -555,16 +611,74 @@ class MJCFParser:
                 case mujoco.mjtEq.mjEQ_JOINT:
                     self.mimic_joints[equality.name2] = equality.name1
                 case mujoco.mjtEq.mjEQ_WELD:
-                    self.world.add_semantic_annotation(
+                    self.world.simulator_additional_properties.append(
                         MujocoEquality(
                             type=mujoco.mjtEq.mjEQ_WELD,
-                            obj_type=mujoco.mjtObj.mjOBJ_BODY,
+                            object_type=mujoco.mjtObj.mjOBJ_BODY,
                             name_1=equality.name1,
                             name_2=equality.name2,
-                            data=equality.data,
+                            data=equality.data.tolist(),
+                        )
+                    )
+                case mujoco.mjtEq.mjEQ_CONNECT:
+                    self.world.simulator_additional_properties.append(
+                        MujocoEquality(
+                            type=mujoco.mjtEq.mjEQ_CONNECT,
+                            object_type=mujoco.mjtObj.mjOBJ_BODY,
+                            name_1=equality.name1,
+                            name_2=equality.name2,
+                            data=equality.data.tolist(),
                         )
                     )
                 case _:
                     logger.warning(
                         f"Equality of type {equality.type} not supported yet. Skipping."
                     )
+
+    def parse_tendons(self):
+        tendon: mujoco.MjsTendon
+        for tendon in self.spec.tendons:
+            joints = {}
+            for joint in self.tree.findall(
+                f".//tendon/fixed[@name='{tendon.name}']/joint"
+            ):
+                name = joint.get("joint")
+                coef = float(joint.get("coef"))
+                assert coef is not None and coef is not None
+                joints[name] = coef
+            dof = DegreeOfFreedom(
+                name=PrefixedName(tendon.name),
+            )
+            self.world.add_degree_of_freedom(dof)
+            self.world.simulator_additional_properties.append(
+                MujocoTendon(
+                    name=tendon.name,
+                    actuator_force_limited=tendon.actfrclimited,
+                    actuator_force_range=tendon.actfrcrange.tolist(),
+                    armature=tendon.armature,
+                    damping=(
+                        [tendon.damping]
+                        if mujoco.mj_version() < 3007000
+                        else tendon.damping.tolist()
+                    ),
+                    frictionloss=tendon.frictionloss,
+                    group=tendon.group,
+                    limited=tendon.limited,
+                    margin=tendon.margin,
+                    material=tendon.material,
+                    range=tendon.range.tolist(),
+                    rgba=Color(*tendon.rgba),
+                    solver_impedance_friction=tendon.solimp_friction.tolist(),
+                    solver_impedance_limit=tendon.solimp_limit.tolist(),
+                    solver_reference_friction=tendon.solref_friction.tolist(),
+                    solver_reference_limit=tendon.solref_limit.tolist(),
+                    spring_length=tendon.springlength.tolist(),
+                    stiffness=(
+                        [tendon.stiffness]
+                        if mujoco.mj_version() < 3007000
+                        else tendon.stiffness.tolist()
+                    ),
+                    width=tendon.width,
+                    joints=joints,
+                )
+            )

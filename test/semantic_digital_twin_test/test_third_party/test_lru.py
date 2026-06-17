@@ -1,5 +1,7 @@
 from functools import lru_cache
 
+from krrood.utils import memoize
+
 
 def test_automatic_lru_clearing():
 
@@ -12,7 +14,7 @@ def test_automatic_lru_clearing():
             return hash(self.current_contract)
 
         @property
-        @lru_cache()
+        @lru_cache
         def multiplier(self):
             return self.futures[self.current_contract]["multiplier"]
 

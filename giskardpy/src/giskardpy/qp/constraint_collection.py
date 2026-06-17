@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import List, Optional, Union, TYPE_CHECKING, Set
+from typing_extensions import Optional, Union, TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.data_types.exceptions import (
@@ -11,7 +11,7 @@ from giskardpy.data_types.exceptions import (
 )
 from giskardpy.motion_statechart.data_types import LifeCycleValues, DefaultWeights
 from giskardpy.motion_statechart.exceptions import (
-    MotionStatechartError,
+    InvalidConstraintExpressionShapeError,
 )
 from giskardpy.qp.constraint import (
     EqualityConstraint,
@@ -20,7 +20,6 @@ from giskardpy.qp.constraint import (
     DerivativeEqualityConstraint,
     BaseConstraint,
 )
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 
@@ -32,29 +31,55 @@ Large_Number = 1e4
 
 @dataclass
 class ConstraintCollection:
-    _constraints: List[BaseConstraint] = field(default_factory=list, init=False)
+    _constraints: list[BaseConstraint] = field(default_factory=list, init=False)
 
     @property
-    def eq_constraints(self) -> List[EqualityConstraint]:
+    def equality_constraints(self) -> list[EqualityConstraint]:
         return [c for c in self._constraints if isinstance(c, EqualityConstraint)]
 
     @property
-    def neq_constraints(self) -> List[InequalityConstraint]:
+    def derivative_equality_constraints(self) -> list[DerivativeEqualityConstraint]:
+        return [
+            c for c in self._constraints if isinstance(c, DerivativeEqualityConstraint)
+        ]
+
+    def get_equality_constraints_by_derivative(
+        self, derivative: Derivatives
+    ) -> list[DerivativeEqualityConstraint]:
+        return [
+            c
+            for c in self.derivative_equality_constraints
+            if c.derivative == derivative
+        ]
+
+    @property
+    def velocity_equality_constraints(self) -> list[DerivativeEqualityConstraint]:
+        return self.get_equality_constraints_by_derivative(Derivatives.velocity)
+
+    @property
+    def inequality_constraints(self) -> list[InequalityConstraint]:
         return [c for c in self._constraints if isinstance(c, InequalityConstraint)]
 
     @property
-    def derivative_constraints(self) -> List[DerivativeInequalityConstraint]:
+    def derivative_inequality_constraints(self) -> list[DerivativeInequalityConstraint]:
         return [
             c
             for c in self._constraints
             if isinstance(c, DerivativeInequalityConstraint)
         ]
 
-    @property
-    def eq_derivative_constraints(self) -> List[DerivativeEqualityConstraint]:
+    def get_inequality_constraints_by_derivative(
+        self, derivative: Derivatives
+    ) -> list[DerivativeInequalityConstraint]:
         return [
-            c for c in self._constraints if isinstance(c, DerivativeEqualityConstraint)
+            c
+            for c in self.derivative_inequality_constraints
+            if c.derivative == derivative
         ]
+
+    @property
+    def velocity_inequality_constraints(self) -> list[DerivativeInequalityConstraint]:
+        return self.get_inequality_constraints_by_derivative(Derivatives.velocity)
 
     def merge(self, name_prefix: str, other: ConstraintCollection):
         for constraint in other._constraints:
@@ -80,7 +105,7 @@ class ConstraintCollection:
                 )
             names.add(c.name)
 
-    def get_all_float_variable_names(self) -> Set[PrefixedName]:
+    def get_all_float_variable_names(self) -> set[str]:
         return {
             v.name for c in self._constraints for v in c.expression.free_variables()
         }
@@ -99,7 +124,7 @@ class ConstraintCollection:
         self,
         task_expression: sm.SymbolicScalar,
         equality_bound: sm.ScalarData,
-        weight: sm.ScalarData,
+        quadratic_weight: sm.ScalarData,
         reference_velocity: sm.ScalarData,
         name: Optional[str] = None,
         lower_slack_limit: sm.ScalarData = -Large_Number,
@@ -119,9 +144,7 @@ class ConstraintCollection:
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise MotionStatechartError(
-                f"expression must have shape (1, 1), has {task_expression.shape}"
-            )
+            raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
 
         lower_slack_limit = (
             lower_slack_limit if lower_slack_limit is not None else -float("inf")
@@ -134,7 +157,7 @@ class ConstraintCollection:
             expression=task_expression,
             bound=equality_bound,
             normalization_factor=reference_velocity,
-            quadratic_weight=weight,
+            quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
@@ -146,9 +169,10 @@ class ConstraintCollection:
         reference_velocity: sm.ScalarData,
         lower_error: sm.ScalarData,
         upper_error: sm.ScalarData,
-        weight: sm.ScalarData,
+        quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
         name: Optional[str] = None,
+        linear_weight: sm.ScalarData = 0,
         lower_slack_limit: sm.ScalarData = -Large_Number,
         upper_slack_limit: sm.ScalarData = Large_Number,
     ):
@@ -160,16 +184,14 @@ class ConstraintCollection:
                                     enforced.
         :param lower_error: lower bound for the error of expression
         :param upper_error: upper bound for the error of expression
-        :param weight:
+        :param quadratic_weight:
         :param task_expression: defines the task function
         :param name: give this constraint a name, required if you add more than one in the same goal
         :param lower_slack_limit: how much the lower error can be violated, don't use unless you know what you are doing
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise MotionStatechartError(
-                f"expression must have shape (1,1), has {task_expression.shape}"
-            )
+            raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
         name = name or ""
         lower_slack_limit = (
             lower_slack_limit if lower_slack_limit is not None else -float("inf")
@@ -183,10 +205,10 @@ class ConstraintCollection:
             lower_error=lower_error,
             upper_error=upper_error,
             normalization_factor=reference_velocity,
-            quadratic_weight=weight,
+            quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
-            linear_weight=0,
+            linear_weight=linear_weight,
         )
         self.add_constraint(constraint)
 
@@ -195,7 +217,7 @@ class ConstraintCollection:
         frame_P_current: Point3,
         frame_P_goal: Point3,
         reference_velocity: sm.ScalarData,
-        weight: sm.ScalarData,
+        quadratic_weight: sm.ScalarData,
         name: Optional[str] = None,
     ):
         """
@@ -204,7 +226,7 @@ class ConstraintCollection:
         :param frame_P_current: a vector describing a 3D point
         :param frame_P_goal: a vector describing a 3D point
         :param reference_velocity: m/s
-        :param weight:
+        :param quadratic_weight:
         :param name:
         """
 
@@ -213,7 +235,7 @@ class ConstraintCollection:
             self.add_equality_constraint(
                 task_expression=frame_P_current[i],
                 equality_bound=frame_V_error[i],
-                weight=weight,
+                quadratic_weight=quadratic_weight,
                 reference_velocity=reference_velocity,
                 name=f"{name}/{i}",
             )
@@ -223,7 +245,7 @@ class ConstraintCollection:
         expr_current: sm.SymbolicScalar,
         expr_goal: sm.ScalarData,
         reference_velocity: sm.ScalarData,
-        weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_CA,
         name: Optional[str] = None,
     ):
         """
@@ -234,7 +256,7 @@ class ConstraintCollection:
         self.add_equality_constraint(
             reference_velocity=reference_velocity,
             equality_bound=error,
-            weight=weight,
+            quadratic_weight=quadratic_weight,
             task_expression=expr_current,
             name=name,
         )
@@ -245,7 +267,7 @@ class ConstraintCollection:
         expr_min: sm.ScalarData,
         expr_max: sm.ScalarData,
         reference_velocity: sm.ScalarData,
-        weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_CA,
         name: Optional[str] = None,
     ):
         """
@@ -258,7 +280,7 @@ class ConstraintCollection:
             reference_velocity=reference_velocity,
             lower_error=error_min,
             upper_error=error_max,
-            weight=weight,
+            quadratic_weight=quadratic_weight,
             task_expression=expr_current,
             name=name,
         )
@@ -268,7 +290,7 @@ class ConstraintCollection:
         frame_V_current: Vector3,
         frame_V_goal: Vector3,
         reference_velocity: sm.ScalarData,
-        weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_CA,
+        quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_CA,
         name: Optional[str] = None,
     ):
         """
@@ -277,7 +299,7 @@ class ConstraintCollection:
         :param frame_V_current: a vector describing a 3D vector
         :param frame_V_goal: a vector describing a 3D vector
         :param reference_velocity: rad/s
-        :param weight:
+        :param quadratic_weight:
         :param name:
         """
 
@@ -295,7 +317,7 @@ class ConstraintCollection:
                 task_expression=frame_V_current[i],
                 equality_bound=error[i],
                 reference_velocity=reference_velocity,
-                weight=weight,
+                quadratic_weight=quadratic_weight,
                 name=f"{name}/{i}",
             )
 
@@ -304,7 +326,7 @@ class ConstraintCollection:
         frame_R_current: RotationMatrix,
         frame_R_goal: RotationMatrix,
         reference_velocity: sm.ScalarData,
-        weight: sm.ScalarData,
+        quadratic_weight: sm.ScalarData,
         name: Optional[str] = None,
     ):
         """
@@ -313,7 +335,7 @@ class ConstraintCollection:
         :param frame_R_current: current rotation as rotation matrix
         :param frame_R_goal: goal rotation as rotation matrix
         :param reference_velocity: rad/s
-        :param weight:
+        :param quadratic_weight:
         :param name:
         """
 
@@ -332,28 +354,28 @@ class ConstraintCollection:
             self.add_equality_constraint(
                 task_expression=q_error[i],
                 equality_bound=-q_error[i],
-                weight=weight,
+                quadratic_weight=quadratic_weight,
                 reference_velocity=reference_velocity,
                 name=f"{name}/{i}",
             )
 
     def add_velocity_constraint(
         self,
-        lower_velocity_limit: Union[sm.ScalarData, List[sm.ScalarData]],
-        upper_velocity_limit: Union[sm.ScalarData, List[sm.ScalarData]],
-        weight: sm.ScalarData,
+        lower_velocity_limit: Union[sm.ScalarData, list[sm.ScalarData]],
+        upper_velocity_limit: Union[sm.ScalarData, list[sm.ScalarData]],
+        quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
         velocity_limit: sm.ScalarData,
         name: Optional[str] = None,
-        lower_slack_limit: Union[sm.ScalarData, List[sm.ScalarData]] = -Large_Number,
-        upper_slack_limit: Union[sm.ScalarData, List[sm.ScalarData]] = Large_Number,
+        lower_slack_limit: Union[sm.ScalarData, list[sm.ScalarData]] = -Large_Number,
+        upper_slack_limit: Union[sm.ScalarData, list[sm.ScalarData]] = Large_Number,
     ):
         """
         Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the
         velocity stays within the given bounds.
         :param lower_velocity_limit:
         :param upper_velocity_limit:
-        :param weight:
+        :param quadratic_weight:
         :param task_expression:
         :param velocity_limit: Used for normalizing the expression, like reference_velocity, must be positive
         :param name:
@@ -367,7 +389,7 @@ class ConstraintCollection:
             expression=task_expression,
             lower_limit=lower_velocity_limit,
             upper_limit=upper_velocity_limit,
-            quadratic_weight=weight,
+            quadratic_weight=quadratic_weight,
             normalization_factor=velocity_limit,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
@@ -377,19 +399,19 @@ class ConstraintCollection:
 
     def add_velocity_eq_constraint(
         self,
-        velocity_goal: Union[sm.ScalarData, List[sm.ScalarData]],
-        weight: sm.ScalarData,
+        velocity_goal: Union[sm.ScalarData, list[sm.ScalarData]],
+        quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
         velocity_limit: sm.ScalarData,
         name: Optional[str] = None,
-        lower_slack_limit: Union[sm.ScalarData, List[sm.ScalarData]] = -Large_Number,
-        upper_slack_limit: Union[sm.ScalarData, List[sm.ScalarData]] = Large_Number,
+        lower_slack_limit: Union[sm.ScalarData, list[sm.ScalarData]] = -Large_Number,
+        upper_slack_limit: Union[sm.ScalarData, list[sm.ScalarData]] = Large_Number,
     ):
         """
         Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the
         velocity stays within the given bounds.
         :param velocity_goal:
-        :param weight:
+        :param quadratic_weight:
         :param task_expression:
         :param velocity_limit: Used for normalizing the expression, like reference_velocity, must be positive
         :param name:
@@ -402,7 +424,7 @@ class ConstraintCollection:
             derivative=Derivatives.velocity,
             expression=task_expression,
             bound=velocity_goal,
-            quadratic_weight=weight,
+            quadratic_weight=quadratic_weight,
             normalization_factor=velocity_limit,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
@@ -412,19 +434,17 @@ class ConstraintCollection:
 
     def add_velocity_eq_constraint_vector(
         self,
-        velocity_goals: Union[sm.ScalarScalar, Vector3, Point3, List[sm.ScalarData]],
-        reference_velocities: Union[
-            sm.ScalarScalar, Vector3, Point3, List[sm.ScalarData]
-        ],
-        weights: Union[sm.ScalarScalar, Vector3, Point3, List[sm.ScalarData]],
-        task_expression: Union[sm.Scalar, Vector3, Point3, List[sm.SymbolicScalar]],
-        names: List[str],
+        velocity_goals: Union[sm.Scalar, Vector3, Point3, list[sm.ScalarData]],
+        reference_velocities: Union[sm.Scalar, Vector3, Point3, list[sm.ScalarData]],
+        quadratic_weight: Union[sm.Scalar, Vector3, Point3, list[sm.ScalarData]],
+        task_expression: Union[sm.Scalar, Vector3, Point3, list[sm.SymbolicScalar]],
+        names: list[str],
     ):
         for i in range(len(velocity_goals)):
             name_suffix = names[i] if names else None
             self.add_velocity_eq_constraint(
                 velocity_goal=velocity_goals[i],
-                weight=weights[i],
+                quadratic_weight=quadratic_weight[i],
                 velocity_limit=reference_velocities[i],
                 task_expression=task_expression[i],
                 name=name_suffix,
@@ -436,7 +456,7 @@ class ConstraintCollection:
         self,
         frame_P_current: Point3,
         max_velocity: sm.ScalarData,
-        weight: sm.ScalarData,
+        quadratic_weight: sm.ScalarData,
         max_violation: sm.ScalarData = np.inf,
         name: Optional[str] = None,
     ):
@@ -445,7 +465,7 @@ class ConstraintCollection:
         to frame.
         :param frame_P_current: a vector describing a 3D point
         :param max_velocity:
-        :param weight:
+        :param quadratic_weight:
         :param max_violation: m/s
         :param name:
         """
@@ -455,7 +475,7 @@ class ConstraintCollection:
         self.add_velocity_constraint(
             upper_velocity_limit=max_velocity,
             lower_velocity_limit=-max_velocity,
-            weight=weight,
+            quadratic_weight=quadratic_weight,
             task_expression=trans_error,
             lower_slack_limit=-max_violation,
             upper_slack_limit=max_violation,
@@ -467,7 +487,7 @@ class ConstraintCollection:
         self,
         frame_R_current: RotationMatrix,
         max_velocity: sm.ScalarData,
-        weight: sm.ScalarData,
+        quadratic_weight: sm.ScalarData,
         max_violation: sm.ScalarData = Large_Number,
         name: Optional[str] = None,
     ):
@@ -476,7 +496,7 @@ class ConstraintCollection:
         frame.
         :param frame_R_current: Rotation matrix describing the current rotation.
         :param max_velocity: rad/s
-        :param weight:
+        :param quadratic_weight:
         :param max_violation:
         :param name:
         """
@@ -486,7 +506,7 @@ class ConstraintCollection:
         self.add_velocity_constraint(
             upper_velocity_limit=max_velocity,
             lower_velocity_limit=-max_velocity,
-            weight=weight,
+            quadratic_weight=quadratic_weight,
             task_expression=angle_error,
             lower_slack_limit=-max_violation,
             upper_slack_limit=max_violation,

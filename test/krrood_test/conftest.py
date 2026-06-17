@@ -1,30 +1,32 @@
 import logging
 import os
 import traceback
-import uuid
 from dataclasses import is_dataclass
 
 import pytest
-import sqlalchemy
-from sqlalchemy import JSON
-from sqlalchemy.orm import Session, configure_mappers
+from sqlalchemy.orm import configure_mappers, sessionmaker
 
 import krrood.entity_query_language.orm.model
-import krrood.entity_query_language.symbol_graph
+import krrood.symbol_graph.symbol_graph
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.entity_query_language.predicate import (
     HasTypes,
     HasType,
 )
-from krrood.entity_query_language.symbol_graph import SymbolGraph
-from krrood.ormatic.alternative_mappings import *  # type: ignore
+from krrood.ormatic.data_access_objects.alternative_mappings import *  # type: ignore
 from krrood.ormatic.ormatic import ORMatic
+from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_module, create_engine
 from krrood.ormatic.utils import drop_database
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.utils import recursive_subclasses
-from .dataset import example_classes, semantic_world_like_classes
+from .dataset import (
+    example_classes,
+    semantic_world_like_classes,
+    alternative_mappings_construction_order,
+)
 from .dataset.example_classes import (
-    PhysicalObject,
+    KRROODPhysicalObject,
     NotMappedParent,
     ChildNotMapped,
     ConceptType,
@@ -34,6 +36,7 @@ from .dataset.semantic_world_like_classes import *
 from .test_eql.conf.world.doors_and_drawers import DoorsAndDrawersWorld
 from .test_eql.conf.world.handles_and_containers import (
     HandlesAndContainersWorld,
+    InferredCabinetsWorld,
 )
 
 
@@ -54,9 +57,10 @@ def generate_sqlalchemy_interface():
         alternative_mapping.original_class()
         for alternative_mapping in recursive_subclasses(AlternativeMapping)
     }
-    all_classes |= set(classes_of_module(krrood.entity_query_language.symbol_graph))
+    all_classes |= set(classes_of_module(krrood.symbol_graph.symbol_graph))
     all_classes |= set(classes_of_module(example_classes))
     all_classes |= set(classes_of_module(semantic_world_like_classes))
+    all_classes |= set(classes_of_module(alternative_mappings_construction_order))
     all_classes |= {Symbol}
 
     # remove classes that don't need persistence
@@ -71,18 +75,15 @@ def generate_sqlalchemy_interface():
     }
 
     all_classes |= {FunctionType}
-
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger("krrood").setLevel(logging.DEBUG)
     class_diagram = ClassDiagram(
         list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
     )
 
     instance = ORMatic(
         class_dependency_graph=class_diagram,
-        type_mappings={
-            PhysicalObject: ConceptType,
-            uuid.UUID: sqlalchemy.UUID,
-            JSONSerializableClass: JSON,
-        },
+        type_mappings=TypeDict({KRROODPhysicalObject: ConceptType}),
         alternative_mappings=recursive_subclasses(AlternativeMapping),
     )
 
@@ -100,29 +101,29 @@ def generate_sqlalchemy_interface():
 
 def pytest_configure(config):
     """
-    Generate ormatic_interface.py before krrood_test collection.
-
-    This hook runs before pytest collects tests and imports modules,
-    ensuring the generated file exists before any module-level imports.
+    Set log levels before krrood_test collection.
     """
+
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
     logging.getLogger("numpy").setLevel(logging.WARNING)
 
 
-def pytest_sessionstart(session):
-    try:
-        generate_sqlalchemy_interface()
-    except Exception as e:
-        import warnings
+# Generate ormatic_interface.py at module level, before the star import below.
+# This must happen here (not in a pytest hook) because hooks run after the
+# conftest module is fully imported, which means the import on the next line
+# would fail if the generated file is stale or missing.
+try:
+    generate_sqlalchemy_interface()
+except Exception as e:
+    traceback.print_exc()
+    import warnings
 
-        traceback.print_exc()
-        warnings.warn(
-            f"Failed to generate ormatic_interface.py. "
-            "The Tests may fail or behave inconsistent if the file was not generated correctly."
-            f"Error: {e}",
-            RuntimeWarning,
-        )
-
+    warnings.warn(
+        f"Failed to generate ormatic_interface.py. "
+        "Tests may fail or behave inconsistently if the file was not generated correctly. "
+        f"Error: {e}",
+        RuntimeWarning,
+    )
 
 from .dataset.ormatic_interface import *
 
@@ -130,6 +131,12 @@ from .dataset.ormatic_interface import *
 @pytest.fixture
 def handles_and_containers_world() -> World:
     world = HandlesAndContainersWorld().create()
+    return world
+
+
+@pytest.fixture
+def inferred_cabinets_world() -> World:
+    world = InferredCabinetsWorld().create()
     return world
 
 
@@ -158,7 +165,8 @@ def engine():
 
 @pytest.fixture(scope="session")
 def session(engine):
-    session = Session(engine)
+    session_maker = sessionmaker(engine)
+    session = session_maker()
     yield session
     session.close()
 

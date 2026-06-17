@@ -1,3 +1,4 @@
+from copy import deepcopy
 from unittest.mock import MagicMock, patch
 import pytest
 from rclpy.duration import Duration
@@ -13,20 +14,20 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.abstract_robot import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     Connection6DoF,
 )
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import Body, Region
 
 
 def test_tf_publisher(rclpy_node, pr2_world_state_reset):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=pr2_world_state_reset,
+        _world=pr2_world_state_reset,
     )
 
     assert tf_wrapper.wait_for_transform(
@@ -49,15 +50,52 @@ def test_tf_publisher(rclpy_node, pr2_world_state_reset):
     tf_wrapper.lookup_transform("odom_combined", "pr2/r_gripper_tool_frame")
 
 
-def test_tf_publisher_ignore_robot(rclpy_node, pr2_world_setup):
-    with pr2_world_setup.modify_world():
+def test_clear(rclpy_node, pr2_world_copy):
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(
+        node=rclpy_node,
+        _world=pr2_world_copy,
+    )
+
+    assert tf_wrapper.wait_for_transform(
+        "odom_combined",
+        "pr2/base_footprint",
+        timeout=Duration(seconds=1.0),
+        time=Time(),
+    )
+
+    world_copy = deepcopy(pr2_world_copy)
+    with pr2_world_copy.modify_world():
+        pr2_world_copy.clear()
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(
+        node=rclpy_node,
+        _world=pr2_world_copy,
+    )
+
+    with pr2_world_copy.modify_world():
+        pr2_world_copy.merge_world(world_copy)
+
+    tf_wrapper.tf_buffer.clear()
+    pr2_world_copy.notify_state_change()
+
+    assert tf_wrapper.wait_for_transform(
+        "odom_combined",
+        "pr2/base_footprint",
+        timeout=Duration(seconds=1.0),
+        time=Time(),
+    )
+
+
+def test_tf_publisher_ignore_robot(rclpy_node, pr2_world_copy):
+    with pr2_world_copy.modify_world():
         box = Body(name=PrefixedName("box"))
-        c = FixedConnection(parent=pr2_world_setup.root, child=box)
-        pr2_world_setup.add_connection(c)
+        c = FixedConnection(parent=pr2_world_copy.root, child=box)
+        pr2_world_copy.add_connection(c)
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher.create_with_ignore_robot(
         node=rclpy_node,
-        robot=pr2_world_setup.get_semantic_annotations_by_type(AbstractRobot)[0],
+        robot=pr2_world_copy.get_semantic_annotations_by_type(AbstractRobot)[0],
     )
 
     assert not tf_wrapper.wait_for_transform(
@@ -75,11 +113,11 @@ def test_tf_publisher_ignore_robot(rclpy_node, pr2_world_setup):
     )
     transform = tf_wrapper.lookup_transform("odom_combined", "box")
 
-    odom_combined = pr2_world_setup.get_kinematic_structure_entities_by_name(
+    odom_combined = pr2_world_copy.get_kinematic_structure_entities_by_name(
         "odom_combined"
     )[0]
-    base_footprint = pr2_world_setup.get_kinematic_structure_entities_by_name("box")[0]
-    fk = pr2_world_setup.compute_forward_kinematics(odom_combined, base_footprint)
+    base_footprint = pr2_world_copy.get_kinematic_structure_entities_by_name("box")[0]
+    fk = pr2_world_copy.compute_forward_kinematics(odom_combined, base_footprint)
     transform2 = HomogeneousTransformationMatrixToRos2Converter.convert(fk)
     assert transform.transform == transform2.transform
 
@@ -88,9 +126,9 @@ def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=pr2_apartment_world,
+        _world=pr2_apartment_world,
     )
-    VizMarkerPublisher(world=pr2_apartment_world, node=rclpy_node)
+    VizMarkerPublisher(_world=pr2_apartment_world, node=rclpy_node)
 
     milk = pr2_apartment_world.get_kinematic_structure_entities_by_name("milk.stl")[0]
 
@@ -171,13 +209,33 @@ def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world):
     )
 
 
+def test_tf_publisher_with_Regions(rclpy_node, pr2_world_state_reset):
+    tf_wrapper = TFWrapper(node=rclpy_node)
+    tf_publisher = TFPublisher(
+        node=rclpy_node,
+        _world=pr2_world_state_reset,
+    )
+
+    assert tf_wrapper.wait_for_transform(
+        "odom_combined",
+        "pr2/base_footprint",
+        timeout=Duration(seconds=1.0),
+        time=Time(),
+    )
+    region = Region(name=PrefixedName("region"))
+    connection = FixedConnection(parent=pr2_world_state_reset.root, child=region)
+    with pr2_world_state_reset.modify_world():
+        pr2_world_state_reset.add_region(region)
+        pr2_world_state_reset.add_connection(connection)
+
+
 def test_empty_world(rclpy_node):
     world = World()
 
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=world,
+        _world=world,
     )
     assert not tf_wrapper.wait_for_transform(
         "muh1",
@@ -209,7 +267,7 @@ def test_static_world(rclpy_node):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=world,
+        _world=world,
         ignored_kinematic_structure_entities={body2, body3, body5},
     )
 
@@ -258,7 +316,7 @@ def test_static_world2(rclpy_node):
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
         node=rclpy_node,
-        world=world,
+        _world=world,
         ignored_kinematic_structure_entities={body2},
     )
 

@@ -1,23 +1,6 @@
-from enum import Enum, auto
+from __future__ import annotations
 
-
-class RDREdge(Enum):
-    Refinement = "except if"
-    """
-    Refinement edge, the edge that represents the refinement of an incorrectly fired rule.
-    """
-    Alternative = "else if"
-    """
-    Alternative edge, the edge that represents the alternative to the rule that has not fired.
-    """
-    Next = "also if"
-    """
-    Next edge, the edge that represents the next rule to be evaluated.
-    """
-    Then = "then"
-    """
-    Then edge, the edge that represents the connection to the conclusion.
-    """
+from enum import Enum, auto, StrEnum
 
 
 class InferMode(Enum):
@@ -54,16 +37,46 @@ class EQLMode(Enum):
     """
 
 
-class PredicateType(Enum):
+class DomainSource(Enum):
     """
-    The type of a predicate.
+    The domain source of a variable.
     """
 
-    SubClassOfPredicate = auto()
+    EXPLICIT = auto()
     """
-    The predicate is an instance of Predicate class.
+    Explicitly provided domain.
     """
-    DecoratedMethod = auto()
+    DEDUCTION = auto()
     """
-    The predicate is a method decorated with @predicate decorator.
+    Inferred using deductive reasoning.
+    """
+    GROUPING = auto()
+    """
+    Derived from grouping operations.
+    """
+
+
+class EvaluationContextKey(StrEnum):
+    """
+    Enumeration of keys used in the evaluation context's data dictionary.
+    """
+
+    SATISFIED_IDS_KEY = "satisfied_condition_ids"
+    """
+    A reserved key in the evaluation context's data dictionary for tracking the set of satisfied condition expression IDs
+    during the current evaluation iteration.
+    """
+
+    EVALUATED_IDS_KEY = "evaluated_expression_ids"
+    """
+    A reserved key in the evaluation context's data dictionary for tracking the cumulative set of all expression IDs
+    evaluated so far during the current evaluation.
+    """
+
+    EVALUATED_SNAPSHOT_KEY = "evaluated_expression_ids_snapshot"
+    """
+    A reserved key caching the most recent immutable snapshot of the evaluated-id set as a
+    ``(length, snapshot)`` pair. Because the evaluated-id set only grows, its length is a valid
+    version key: results yielded while the set has a given length share one snapshot instead of
+    each copying the whole set.
     """

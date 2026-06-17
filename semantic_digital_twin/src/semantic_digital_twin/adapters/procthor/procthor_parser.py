@@ -12,15 +12,15 @@ from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
 from typing_extensions import assert_never
 
-from ...datastructures.prefixed_name import PrefixedName
-from ...datastructures.variables import SpatialVariables
-from ...orm.ormatic_interface import *
-from ...semantic_annotations.position_descriptions import (
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+
+from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticPositionDescription,
     HorizontalSemanticDirection,
     VerticalSemanticDirection,
 )
-from ...semantic_annotations.semantic_annotations import (
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Room,
     Floor,
     Handle,
@@ -28,16 +28,20 @@ from ...semantic_annotations.semantic_annotations import (
     Hinge,
     DoubleDoor,
     Wall,
+    Kitchen,
+    Bedroom,
+    Bathroom,
+    LivingRoom,
 )
-from ...spatial_types.spatial_types import (
+from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
 )
-from ...world import World
-from ...world_description.connections import FixedConnection
-from ...world_description.geometry import Scale
-from ...world_description.world_entity import Body
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass
@@ -503,7 +507,17 @@ class ProcthorRoom:
                 floor_polytope=self.centered_polytope,
                 world_root_T_self=self.world_T_room,
             )
-        room = Room(name=self.name, floor=floor)
+        if "Bedroom" in self.name.name:
+            room = Bedroom(name=self.name, floor=floor)
+        elif "LivingRoom" in self.name.name:
+            room = LivingRoom(name=self.name, floor=floor)
+        elif "Kitchen" in self.name.name:
+            room = Kitchen(name=self.name, floor=floor)
+        elif "Bathroom" in self.name.name:
+            room = Bathroom(name=self.name, floor=floor)
+        else:
+            assert_never(self.name.name)
+
         with world.modify_world():
             world.add_semantic_annotation(room)
 
@@ -808,6 +822,8 @@ def get_world_by_asset_id(session: Session, asset_id: str) -> Optional[World]:
     """
     Queries the database for a WorldMapping with the given asset_id provided by the procthor file.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     asset_id = asset_id.lower()
     other_possible_name = "_".join(asset_id.split("_")[:-1])
 

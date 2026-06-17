@@ -1,17 +1,25 @@
+from __future__ import annotations
+
 import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Callable
+from typing import List, Callable, TYPE_CHECKING
 
 import numpy as np
 
-from ..semantic_annotations.mixins import HasRootKinematicStructureEntity
-from ..spatial_types import Point3
-from ..spatial_types.spatial_types import HomogeneousTransformationMatrix
-from ..world import World
-from ..world_description.geometry import TriangleMesh, FileMesh
-from ..world_description.world_entity import Body
+from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.spatial_types.spatial_types import (
+    HomogeneousTransformationMatrix,
+)
+from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.world_entity import Body
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.semantic_annotations.mixins import (
+        HasRootKinematicStructureEntity,
+    )
+    from semantic_digital_twin.world import World
 
 
 @dataclass
@@ -78,7 +86,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
             vertices = []
 
             for coll in body.collision:
-                if isinstance(coll, (FileMesh, TriangleMesh)):
+                if isinstance(coll, Mesh):
                     mesh = coll.mesh
                     if mesh.vertices.shape[0] > 0:
                         vertices.append(mesh.vertices.copy())
@@ -96,7 +104,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
             center = (mins + maxs) / 2.0
 
             for coll in body.collision:
-                if isinstance(coll, (FileMesh, TriangleMesh)):
+                if isinstance(coll, Mesh):
                     m = coll.mesh
                     if m.vertices.shape[0] > 0:
                         m.vertices -= center

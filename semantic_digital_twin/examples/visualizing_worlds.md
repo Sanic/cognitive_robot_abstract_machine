@@ -23,20 +23,22 @@ Let's load a world first to get started.
 import logging
 import os
 
+from pkg_resources import resource_filename
+
 from semantic_digital_twin.adapters.urdf import URDFParser 
-from semantic_digital_twin.utils import get_semantic_digital_twin_directory_root
 
 logging.disable(logging.CRITICAL)
-apartment = os.path.join(get_semantic_digital_twin_directory_root(os.getcwd()), "resources", "urdf", "apartment.urdf")
+apartment = os.path.join(resource_filename("semantic_digital_twin", "../../"), "resources", "urdf", "apartment.urdf")
 world = URDFParser.from_file(apartment).parse()
 
 ```
 
-For the RVIZ2 way, ROS2 is needed. A caveat of this approach is that you have to manage the lifecycle of a ROS2 node yourself.
+For the RVIZ2 way, ROS2 and the TFPublisher is needed. A caveat of this approach is that you have to manage the lifecycle of a ROS2 node yourself.
 We recommend to put the spinning into sperate threads and just shutdown the thread when exiting the system.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.adapters.viz_marker import VizMarkerPublisher
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 import threading
 import rclpy
 rclpy.init()
@@ -45,7 +47,8 @@ node = rclpy.create_node("semantic_digital_twin")
 thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
 thread.start()
 
-viz = VizMarkerPublisher(world=world, node=node)
+tf_publisher = TFPublisher(_world=world, node=node)
+viz = VizMarkerPublisher(_world=world, node=node)
 ```
 
 When you want to stop visualizing, you have to stop the visualizer and afterwards clean up ROS2.
@@ -55,7 +58,10 @@ node.destroy_node()
 rclpy.shutdown()
 ```
 
-The multiverse way relies on multiverse and is WIP. Do it faster giang.
+The world can also be visualized directly through a running simulation.
+Although this approach is computationally heavier, it provides the important advantage of enabling interaction with the environment. 
+In addition to visualization, the physics engine can be used to simulate dynamics, contacts, and collisions.
+Further details are provided in the [physics simulators](physics-simulators) section.
 
 If you have followed the guide until here, you have probably noticed that we have used the RayTracer to visualize the world 
 a few times. This is a convenient way of visualizing a world inside a notebook, like in these guides, but it is not recommended 

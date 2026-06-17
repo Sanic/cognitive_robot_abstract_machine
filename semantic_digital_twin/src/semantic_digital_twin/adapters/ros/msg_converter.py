@@ -6,8 +6,9 @@ from typing import Type
 
 from typing_extensions import Generic, TypeVar, Any, get_args
 
-from krrood.utils import recursive_subclasses, DataclassException
-from ...world import World
+from krrood.utils import recursive_subclasses
+from krrood.exceptions import DataclassException
+from semantic_digital_twin.world import World
 
 InputType = TypeVar("InputType")
 OutputType = TypeVar("OutputType")
@@ -17,8 +18,6 @@ OutputType = TypeVar("OutputType")
 class ROS2ConversionError(DataclassException):
     """Base class for errors that occur during ROS2 message conversion."""
 
-    message: str = field(kw_only=True, default=None, init=False)
-
 
 @dataclass
 class CannotConvertSemDTToRos2Error(ROS2ConversionError):
@@ -26,8 +25,11 @@ class CannotConvertSemDTToRos2Error(ROS2ConversionError):
 
     data_type: Type = field(kw_only=True)
 
-    def __post_init__(self):
-        self.message = f"Cannot convert {self.data_type.__name__} to ROS2 message."
+    def error_message(self) -> str:
+        return f"Cannot convert {self.data_type.__name__} to ROS2 message."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -36,8 +38,11 @@ class CannotConvertRos2ToSemDTError(ROS2ConversionError):
 
     data_type: Type = field(kw_only=True)
 
-    def __post_init__(self):
-        self.message = f"Cannot convert {self.data_type.__name__} to our semDT type."
+    def error_message(self) -> str:
+        return f"Cannot convert {self.data_type.__name__} to our semDT type."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass

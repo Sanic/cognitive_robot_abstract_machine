@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import trimesh.boolean
 
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -14,6 +15,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     SpatialTypeNotJsonSerializable,
     WorldEntityWithIDNotInKwargs,
+    MissingWorldError,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -27,6 +29,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Box
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -39,10 +42,6 @@ def test_body_json_serialization():
         Box(origin=HomogeneousTransformationMatrix.from_xyz_rpy(0, 1, 0, 0, 0, 1, body))
     ]
     body.collision = ShapeCollection(collision, reference_frame=body)
-    body.collision_config.max_avoided_bodies = 69
-    body.collision_config.disabled = False
-    body.collision_config.buffer_zone_distance = 1.227
-    body.collision_config.violated_distance = 0.23
 
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
@@ -76,7 +75,13 @@ def test_body_json_serialization():
 
     assert body == body2
 
-    assert body.collision_config == body2.collision_config
+
+def test_dof_hardware_interface_serialization():
+    dof = DegreeOfFreedom(has_hardware_interface=True)
+    rebuilt_dof = from_json(to_json(dof))
+
+    assert dof.has_hardware_interface == rebuilt_dof.has_hardware_interface
+    assert dof == rebuilt_dof
 
 
 def test_transformation_matrix_json_serialization():
@@ -111,7 +116,7 @@ def test_point3_json_serialization():
 
 def test_point3_json_serialization_with_expression():
     body = Body(name=PrefixedName("body"))
-    point = Point3(FloatVariable(name="muh"), reference_frame=body)
+    point = Point3(f := FloatVariable(name="muh"), reference_frame=body)
     with pytest.raises(SpatialTypeNotJsonSerializable):
         point.to_json()
 
@@ -121,7 +126,7 @@ def test_KinematicStructureEntityNotInKwargs():
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
-    with pytest.raises(WorldEntityWithIDNotInKwargs):
+    with pytest.raises(MissingWorldError):
         Point3.from_json(json_data, **kwargs)
 
 
@@ -136,23 +141,22 @@ def test_KinematicStructureEntityNotInKwargs2():
 
 def test_vector3_json_serialization_with_expression():
     body = Body(name=PrefixedName("body"))
-    vector = Vector3(FloatVariable(name="muh"), reference_frame=body)
+    vector = Vector3(f := FloatVariable(name="muh"), reference_frame=body)
     with pytest.raises(SpatialTypeNotJsonSerializable):
         vector.to_json()
 
 
 def test_quaternion_json_serialization_with_expression():
     body = Body(name=PrefixedName("body"))
-    quaternion = Quaternion(FloatVariable(name="muh"), reference_frame=body)
+    quaternion = Quaternion(f := FloatVariable(name="muh"), reference_frame=body)
     with pytest.raises(SpatialTypeNotJsonSerializable):
         quaternion.to_json()
 
 
 def test_rotation_matrix_json_serialization_with_expression():
     body = Body(name=PrefixedName("body"))
-    rotation = RotationMatrix.from_rpy(
-        roll=FloatVariable(name="muh"), reference_frame=body
-    )
+    f = FloatVariable(name="muh")
+    rotation = RotationMatrix.from_rpy(roll=f, reference_frame=body)
     with pytest.raises(SpatialTypeNotJsonSerializable):
         rotation.to_json()
 
@@ -160,7 +164,7 @@ def test_rotation_matrix_json_serialization_with_expression():
 def test_transformation_matrix_json_serialization_with_expression():
     body = Body(name=PrefixedName("body"))
     transform = HomogeneousTransformationMatrix.from_xyz_rpy(
-        FloatVariable(name="muh"), reference_frame=body
+        f := FloatVariable(name="muh"), reference_frame=body
     )
     with pytest.raises(SpatialTypeNotJsonSerializable):
         transform.to_json()
@@ -310,8 +314,8 @@ def test_json_serialization_with_mesh():
         .root
     )
 
-    json_data = body.to_json()
-    body2 = Body.from_json(json_data)
+    json_data = to_json(body)
+    body2 = from_json(json_data)
 
     for c1 in body.collision:
         for c2 in body2.collision:

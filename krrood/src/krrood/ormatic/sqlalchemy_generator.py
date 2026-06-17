@@ -10,7 +10,7 @@ from typing_extensions import TextIO, TYPE_CHECKING
 import jinja2
 
 if TYPE_CHECKING:
-    from .ormatic import ORMatic
+    from krrood.ormatic.ormatic import ORMatic
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class SQLAlchemyGenerator:
     """
 
     def __post_init__(self):
-        template_dir = os.path.join(os.path.dirname(__file__), "templates")
+        template_dir = os.path.join(os.path.dirname(__file__), "..", "jinja_templates")
         self.env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(template_dir),
             trim_blocks=True,
@@ -47,17 +47,14 @@ class SQLAlchemyGenerator:
 
         :param file: The file to write to
         """
-        # Load the template
         template = self.env.get_template("sqlalchemy_model.py.jinja")
 
-        # Render the template
-        output = template.render(
-            ormatic=self.ormatic,
+        output = template.render(ormatic=self.ormatic)
+
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", "format", "--stdin-filename", "output.py", "-"],
+            input=output, capture_output=True, text=True, check=True,
         )
+        output = result.stdout
 
-        # Write the output to the file
         file.write(output)
-
-        # format the output with black
-        command = [sys.executable, "-m", "black", str(file.name)]
-        subprocess.run(command, capture_output=True, text=True, check=True)

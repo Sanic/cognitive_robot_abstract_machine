@@ -9,26 +9,68 @@ requires-python = ">=3.10,<3.13"
 description = "Meta-package that wires local subprojects together"
 readme = "README.md"
 authors = [{ name = "AICOR Institute", email = "you@example.com" }]
-# IMPORTANT: Use absolute file URLs for portability
-# The names must match each subproject’s [project.name]
-#dependencies = [
-#  "pycram-robotics @ file:///home/jonas/workspace/cognitive_robot_abstract_machine/pycram",
-#  "giskardpy @ file:///home/jonas/workspace/cognitive_robot_abstract_machine/giskardpy",
-#  "semantic_digital_twin @ file:///home/jonas/workspace/cognitive_robot_abstract_machine/semantic_digital_twin",
-#]
+
+# Add dependencies on all workspace members by their distribution names
+# uv will resolve these to editable installs via [tool.uv.sources]
+dependencies = [
+  "coraplex",
+  "giskardpy",
+  "semantic_digital_twin",
+  "krrood",
+  "random-events",
+  "probabilistic_model",
+  "robokudo",
+  "physics_simulators",
+  "experiments",
+  "ipykernel>=7.2.0",
+  "lark-parser>=0.12.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+    "pytest-asyncio>=0.23.0,<0.24.0",
+    "pytest-xdist"
+
+]
+
+[tool.uv.workspace]
+members = [
+  "coraplex",
+  "giskardpy",
+  "semantic_digital_twin",
+  "krrood",
+  "random_events",
+  "probabilistic_model",
+  "physics_simulators",
+  "robokudo",
+  "experiments"
+]
+
+[tool.uv.sources]
+coraplex       = { workspace = true }
+giskardpy             = { workspace = true }
+semantic_digital_twin = { workspace = true }
+krrood                = { workspace = true }
+probabilistic_model   = { workspace = true }
+random_events         = { workspace = true }
+robokudo              = { workspace = true }
+physics_simulators    = { workspace = true }
+experiments           = { workspace = true }
 
 [tool.poetry]
 package-mode = false
 
 [tool.poetry.dependencies]
-pycram-robotics = { path = "pycram", develop = true }
+coraplex = { path = "coraplex", develop = true }
 giskardpy = { path = "giskardpy", develop = true }
 semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }
 random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
-
+robokudo = { path = "robokudo", develop = true }
+physics_simulators = { path = "physics_simulators", develop = true }
+experiments = { path = "experiments", develop = true }
 
 [tool.setuptools]
-# Make the root distribution package-less (no auto-discovery)
 packages = []

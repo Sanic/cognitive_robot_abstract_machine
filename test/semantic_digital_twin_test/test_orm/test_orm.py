@@ -1,15 +1,24 @@
 import os
-import unittest
+import time
+from copy import deepcopy
 
 import numpy as np
-import sqlalchemy
 from krrood.ormatic.utils import create_engine
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from semantic_digital_twin.adapters.ros.world_fetcher import (
+    FetchWorldServer,
+    fetch_world_from_service,
+)
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
+from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.spatial_types import (
@@ -18,31 +27,15 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.orm.ormatic_interface import *
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 
 
 import pytest
-
-urdf_dir = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..",
-    "..",
-    "..",
-    "semantic_digital_twin",
-    "resources",
-    "urdf",
-)
-table_path = os.path.join(urdf_dir, "table.urdf")
 
 
 @pytest.fixture
 def engine():
     return create_engine("sqlite:///:memory:")
-
-
-@pytest.fixture
-def table_world():
-    return URDFParser.from_file(file_path=table_path).parse()
 
 
 @pytest.fixture
@@ -68,7 +61,7 @@ def test_table_world(session, table_world):
     session.add(world_dao)
     session.commit()
 
-    bodies_from_db = session.scalars(select(BodyDAO)).all()
+    bodies_from_db = session.scalars(select(KinematicStructureEntityDAO)).all()
     assert len(bodies_from_db) == len(table_world.kinematic_structure_entities)
 
     queried_world = session.scalar(select(WorldMappingDAO))
@@ -95,15 +88,72 @@ def test_insert(session):
     b1 = Body(name=PrefixedName("b1"), collision=ShapeCollection([shape1]))
 
     dao: BodyDAO = to_dao(b1)
-    assert dao.collision.shapes[0].origin is not None
+    assert dao.collision.shapes[0].target.origin is not None
 
     session.add(dao)
     session.commit()
     queried_body = session.scalar(select(BodyDAO))
-    assert queried_body.collision.shapes[0].origin is not None
+    assert queried_body.collision.shapes[0].target.origin is not None
     reconstructed_body = queried_body.from_dao()
     assert reconstructed_body is reconstructed_body.collision[0].origin.reference_frame
 
     result = session.scalar(select(ShapeDAO))
     assert isinstance(result, BoxDAO)
     box = result.from_dao()
+
+
+@pytest.mark.skipif(
+    os.getenv("SEMANTIC_DIGITAL_TWIN_DATABASE_URI") is None,
+    reason="Permanent Database not available",
+)
+def test_sessionmaker():
+    s = semantic_digital_twin_sessionmaker()()
+    assert s is not None
+
+
+def test_degree_of_freedom_limits(session):
+    lower = DerivativeMap()
+    lower.position = -2.0
+    lower.jerk = 1.0
+
+    upper = DerivativeMap()
+    upper.position = 2.0
+    upper.velocity = 3.0
+    obj = DegreeOfFreedomLimits(lower=lower, upper=upper)
+    dao: DegreeOfFreedomLimitsDAO = to_dao(obj)
+    reconstructed = dao.from_dao()
+
+    assert obj == reconstructed
+
+
+def test_pr2_world(pr2_world_state_reset, session):
+    dao: WorldMappingDAO = to_dao(pr2_world_state_reset)
+    session.add(dao)
+    session.commit()
+
+    to_dao(pr2_world_state_reset).from_dao()
+
+    queried_world = session.scalar(select(WorldMappingDAO))
+    reconstructed: World = queried_world.from_dao()
+
+    # confirm the modification history
+    deepcopy(reconstructed)
+
+    q = select(RevoluteConnectionDAO)
+    r = session.scalars(q).all()
+    assert len(r) > 0
+
+
+def test_pr2_semantic_annotation_and_safe_to_db(
+    rclpy_node, pr2_world_state_reset, session
+):
+    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
+
+    pr2_world_copy = fetch_world_from_service(
+        rclpy_node,
+    )
+
+    dao = to_dao(pr2_world_copy)
+
+    session.add(dao)
+    session.commit()

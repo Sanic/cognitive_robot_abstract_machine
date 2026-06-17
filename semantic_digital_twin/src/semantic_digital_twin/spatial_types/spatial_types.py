@@ -26,19 +26,23 @@ from krrood.symbolic_math.exceptions import (
     UnsupportedOperationError,
 )
 from krrood.symbolic_math.symbolic_math import Matrix, to_sx
-from ..adapters.world_entity_kwargs_tracker import (
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from ..exceptions import (
+from semantic_digital_twin.exceptions import (
+    InsufficientVectorsError,
+    ReferenceFrameMismatchError,
     SpatialTypesError,
     SpatialTypeNotJsonSerializable,
 )
 
 if TYPE_CHECKING:
-    from ..world_description.world_entity import KinematicStructureEntity
+    from semantic_digital_twin.world_description.world_entity import (
+        KinematicStructureEntity,
+    )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class SpatialType:
     """
     Provides functionality to associate a reference frame with an object.
@@ -112,8 +116,10 @@ class SpatialType:
                     reference_frame = spatial_object.reference_frame
                     continue
                 if reference_frame != spatial_object.reference_frame:
-                    raise SpatialTypesError(
-                        message=f"Reference frames of input parameters don't match ({reference_frame} != {spatial_object.reference_frame})."
+                    raise ReferenceFrameMismatchError(
+                        expected_frame=reference_frame,
+                        actual_frame=spatial_object.reference_frame,
+                        context=f"input parameter of type {type(spatial_object).__name__}",
                     )
         return reference_frame
 
@@ -140,7 +146,7 @@ class SpatialType:
         return result
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, repr=False)
 class HomogeneousTransformationMatrix(
     sm.SymbolicMathType, SpatialType, SubclassJSONSerializer
 ):
@@ -179,6 +185,7 @@ class HomogeneousTransformationMatrix(
         else:
             casadi_sx = sm.to_sx(data)
         self.casadi_sx = casadi_sx
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape != (4, 4):
@@ -204,6 +211,30 @@ class HomogeneousTransformationMatrix(
             reference_frame=reference_frame,
             child_frame=child_frame,
         )
+
+    @classmethod
+    def create_with_variables(
+        cls, name: str, resolver: Callable[[], np.ndarray] | None = None
+    ) -> Self:
+        """
+        Creates a TransformationMatrix object with float variables variables in all relevant entries.
+        :param name: Name for the variables.
+        :param resolver: Callable that returns the actual transformation matrix when called.
+        :return: TransformationMatrix object with float variables.
+        """
+        transformation_matrix = []
+        for row in range(3):
+            column_variables = []
+            for column in range(4):
+                variable = sm.FloatVariable(
+                    name=f"{cls.__name__}_{name}[{row},{column}]",
+                )
+                column_variables.append(variable)
+                if resolver is not None:
+                    variable.resolve = lambda: resolver()[row, column]
+            transformation_matrix.append(column_variables)
+        transformation_matrix.append([0, 0, 0, 1])
+        return cls(transformation_matrix)
 
     def to_json(self) -> Dict[str, Any]:
         if not self.is_constant():
@@ -323,7 +354,7 @@ class HomogeneousTransformationMatrix(
         """
         p = Point3(x=pos_x, y=pos_y, z=pos_z)
         r = RotationMatrix.from_quaternion(
-            q=Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)
+            quaternion=Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)
         )
         return cls.from_point_rotation_matrix(
             p, r, reference_frame=reference_frame, child_frame=child_frame
@@ -459,8 +490,19 @@ class HomogeneousTransformationMatrix(
             child_frame=self.child_frame,
         )
 
+    def __hash__(self):
+        if self.is_constant():
+            return hash(
+                (
+                    *self.to_position().to_np().tolist(),
+                    *self.to_quaternion().to_np().tolist(),
+                    self.reference_frame,
+                )
+            )
+        return super().__hash__()
 
-@dataclass(eq=False, init=False)
+
+@dataclass(eq=False, init=False, repr=False)
 class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
     Class to represent a 4x4 symbolic rotation matrix tied to kinematic references.
@@ -488,6 +530,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         empty_data = to_sx(Matrix.eye(4))
         empty_data[:3, :3] = sm.to_sx(data)[:3, :3]
         self._casadi_sx = empty_data
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape != (4, 4):
@@ -556,15 +599,44 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return cls(s, reference_frame=reference_frame)
 
     @classmethod
-    def from_quaternion(cls, q: Quaternion) -> RotationMatrix:
+    def _from_constant_quaternion(cls, quaternion: Quaternion) -> RotationMatrix:
+        """
+        Build a rotation matrix from a constant (fully numeric) quaternion.
+
+        Uses numpy arithmetic instead of the symbolic CasADi path.  The
+        symbolic path in :meth:`from_quaternion` constructs ~36 CasADi
+        sub-expressions even for constant inputs; evaluating them in numpy is
+        an order of magnitude faster and covers the common case for values
+        loaded from a database.
+
+        :param quaternion: Quaternion whose underlying CasADi expression satisfies
+                  ``quaternion.is_constant()``.
+        :return: The corresponding rotation matrix.
+        """
+        x, y, z, w = quaternion.to_np().ravel()
+        x2, y2, z2, w2 = x * x, y * y, z * z, w * w
+        data = np.array(
+            [
+                [w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+                [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+                [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+                [0, 0, 0, 1],
+            ]
+        )
+        return cls(data=data, reference_frame=quaternion.reference_frame)
+
+    @classmethod
+    def from_quaternion(cls, quaternion: Quaternion) -> RotationMatrix:
         """
         Unit quaternion to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
         """
-        x = q[0]
-        y = q[1]
-        z = q[2]
-        w = q[3]
+        if quaternion.is_constant():
+            return cls._from_constant_quaternion(quaternion)
+        x = quaternion[0]
+        y = quaternion[1]
+        z = quaternion[2]
+        w = quaternion[3]
         x2 = x * x
         y2 = y * y
         z2 = z * z
@@ -591,7 +663,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
                 ],
                 [0, 0, 0, 1],
             ],
-            reference_frame=q.reference_frame,
+            reference_frame=quaternion.reference_frame,
         )
 
     def x_vector(self) -> Vector3:
@@ -673,9 +745,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         - x, y, and z provided: all three used directly
         """
         if x is None and y is None and z is None:
-            raise SpatialTypesError(
-                message="from_vectors requires at least two vectors"
-            )
+            raise InsufficientVectorsError(x=x, y=y, z=z)
         if x is not None and y is not None and z is None:
             z = x.cross(y)
         elif x is not None and y is None and z is not None:
@@ -789,7 +859,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return r_distance.to_angle()
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, repr=False)
 class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
     Represents a 3D point with reference frame handling.
@@ -818,6 +888,7 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         self.casadi_sx = sm.to_sx([x, y, z, 1])
         self.reference_frame = reference_frame
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape == (3, 1):
@@ -869,6 +940,31 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             data["data"][:3],
             reference_frame=reference_frame,
         )
+
+    @classmethod
+    def create_with_variables(
+        cls, name: str, resolver: Callable[[], List[float] | np.ndarray] | None = None
+    ) -> Self:
+        """
+        Creates a Vector3 object with float variables in all relevant entries.
+        :param name: Name for the variables.
+        :param resolver: Callable that returns the actual vector when called.
+        :return: Vector3 object with float variables.
+        """
+        x = sm.FloatVariable(name=f"{name}.x")
+        y = sm.FloatVariable(name=f"{name}.y")
+        z = sm.FloatVariable(name=f"{name}.z")
+        result = cls(
+            x=x,
+            y=y,
+            z=z,
+            reference_frame=None,
+        )
+        if resolver is not None:
+            x.resolve = lambda: resolver()[0]
+            y.resolve = lambda: resolver()[1]
+            z.resolve = lambda: resolver()[2]
+        return result
 
     def to_json(self) -> Dict[str, Any]:
         if not self.is_constant():
@@ -1008,7 +1104,7 @@ class Point3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return self.to_generic_vector().euclidean_distance(other.to_generic_vector())
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, repr=False)
 class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
     Representation of a 3D vector with reference frame support for homogenous transformations.
@@ -1045,6 +1141,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self.casadi_sx = sm.to_sx([x, y, z, 0])
         self.reference_frame = reference_frame
         self.visualisation_frame = visualisation_frame
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape == (3, 1):
@@ -1153,6 +1250,31 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         v = cls(x=x, y=y, z=z, reference_frame=reference_frame)
         v.scale(1, unsafe=True)
         return v
+
+    @classmethod
+    def create_with_variables(
+        cls, name: str, resolver: Callable[[], List[float] | np.ndarray] | None = None
+    ) -> Self:
+        """
+        Creates a Vector3 object with float variables in all relevant entries.
+        :param name: Name for the variables.
+        :param resolver: Callable that returns the actual vector when called.
+        :return: Vector3 object with float variables.
+        """
+        x = sm.FloatVariable(name=f"{name}.x")
+        y = sm.FloatVariable(name=f"{name}.y")
+        z = sm.FloatVariable(name=f"{name}.z")
+        result = cls(
+            x=x,
+            y=y,
+            z=z,
+            reference_frame=None,
+        )
+        if resolver is not None:
+            x.resolve = lambda: resolver()[0]
+            y.resolve = lambda: resolver()[1]
+            z.resolve = lambda: resolver()[2]
+        return result
 
     @property
     def x(self) -> sm.Scalar:
@@ -1345,7 +1467,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return result
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, repr=False)
 class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
     Represents a quaternion, which is a mathematical entity used to encode
@@ -1378,6 +1500,9 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         self.casadi_sx = sm.to_sx([x, y, z, w])
         self.reference_frame = reference_frame
+        super().__post_init__()
+        if self.is_constant():
+            self.normalize()
 
     def _verify_type(self):
         if self.shape != (4, 1):
@@ -1597,7 +1722,21 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         return self.conjugate().multiply(q)
 
+    def _normalize_numerically(self) -> None:
+        """
+        Normalize this quaternion in-place using numpy arithmetic.
+
+        Called by :meth:`normalize` when the quaternion is constant.  Using
+        numpy avoids constructing symbolic CasADi expressions, which is
+        substantially faster for values loaded from a database.
+        """
+        values = self.to_np().ravel()
+        self._casadi_sx = ca.SX(ca.DM(values / np.linalg.norm(values)))
+
     def normalize(self) -> None:
+        if self._casadi_sx.is_constant():
+            self._normalize_numerically()
+            return
         norm_ = self.to_generic_vector().norm()
         self.x /= norm_
         self.y /= norm_
@@ -1673,7 +1812,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, repr=False)
 class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __init__(
@@ -1704,6 +1843,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
         self._casadi_sx = transformation_matrix._casadi_sx
         self.reference_frame = reference_frame
+        super().__post_init__()
 
     def _verify_type(self):
         if self.shape != (4, 4):
@@ -1845,6 +1985,18 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def y(self) -> sm.Scalar:
         return self[1, 3]
 
+    @property
+    def roll(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[0]
+
+    @property
+    def pitch(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[1]
+
+    @property
+    def yaw(self) -> sm.Scalar:
+        return self.to_rotation_matrix().to_rpy()[2]
+
     @y.setter
     def y(self, value: sm.ScalarData):
         self[1, 3] = value
@@ -1856,6 +2008,14 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     @z.setter
     def z(self, value: sm.ScalarData):
         self[2, 3] = value
+
+    @property
+    def position(self) -> Point3:
+        return self.to_position()
+
+    @property
+    def orientation(self) -> Quaternion:
+        return self.to_quaternion()
 
     def to_position(self) -> Point3:
         result = Point3.from_iterable(
@@ -1873,6 +2033,171 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return HomogeneousTransformationMatrix(
             data=self, reference_frame=self.reference_frame
         )
+
+    def __hash__(self):
+        if self.is_constant():
+            return hash(
+                (
+                    *self.to_position().to_np().tolist(),
+                    *self.to_quaternion().to_np().tolist(),
+                    self.reference_frame,
+                )
+            )
+        return super().__hash__()
+
+
+@dataclass(eq=False, init=False, repr=False)
+class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+    """
+    Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
+
+    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``.
+    Behaves similarly to :class:`Pose`, but lives in the 2D plane (z=0, roll=0, pitch=0).
+    Whenever 3D calculations are required, use :meth:`to_pose` to obtain the equivalent
+    3D :class:`Pose`.
+    """
+
+    def __init__(
+        self,
+        x: sm.ScalarData = 0,
+        y: sm.ScalarData = 0,
+        yaw: sm.ScalarData = 0,
+        reference_frame: Optional[KinematicStructureEntity] = None,
+    ):
+        self.casadi_sx = sm.to_sx([x, y, yaw])
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    def _verify_type(self):
+        if self.shape != (3, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(3, 1), actual_dimensions=self.shape
+            )
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def x(self) -> sm.Scalar:
+        return self[0]
+
+    @x.setter
+    def x(self, value: sm.ScalarData):
+        self[0] = value
+
+    @property
+    def y(self) -> sm.Scalar:
+        return self[1]
+
+    @y.setter
+    def y(self, value: sm.ScalarData):
+        self[1] = value
+
+    @property
+    def yaw(self) -> sm.Scalar:
+        return self[2]
+
+    @yaw.setter
+    def yaw(self, value: sm.ScalarData):
+        self[2] = value
+
+    @property
+    def z(self) -> float:
+        return 0
+
+    @property
+    def roll(self) -> float:
+        return 0
+
+    @property
+    def pitch(self) -> float:
+        return 0
+
+    # ------------------------------------------------------------------
+    # Conversion to 3D
+    # ------------------------------------------------------------------
+
+    def to_pose(self) -> Pose:
+        """Convert to a 3D :class:`Pose` with z=0, roll=0, pitch=0."""
+        return Pose.from_xyz_rpy(
+            x=self.x,
+            y=self.y,
+            z=0,
+            roll=0,
+            pitch=0,
+            yaw=self.yaw,
+            reference_frame=self.reference_frame,
+        )
+
+    # ------------------------------------------------------------------
+    # Pose-like interface (delegates to to_pose())
+    # ------------------------------------------------------------------
+
+    @property
+    def position(self) -> Point3:
+        return self.to_pose().to_position()
+
+    @property
+    def orientation(self) -> Quaternion:
+        return self.to_pose().to_quaternion()
+
+    def to_position(self) -> Point3:
+        return self.to_pose().to_position()
+
+    def to_quaternion(self) -> Quaternion:
+        return self.to_pose().to_quaternion()
+
+    def to_rotation_matrix(self) -> RotationMatrix:
+        return self.to_pose().to_rotation_matrix()
+
+    def to_homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
+        return self.to_pose().to_homogeneous_matrix()
+
+    # ------------------------------------------------------------------
+    # Factory methods
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_pose(
+        cls,
+        pose: Pose,
+        reference_frame: Optional[KinematicStructureEntity] = None,
+    ) -> Pose2D:
+        """Extract a Pose2D from a 3D Pose by dropping z, roll, pitch."""
+        _, _, yaw = pose.to_rotation_matrix().to_rpy()
+        frame = reference_frame if reference_frame is not None else pose.reference_frame
+        return cls(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
+
+    # ------------------------------------------------------------------
+    # JSON serialization
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, key="reference_frame_id", **kwargs
+        )
+        return cls(
+            x=data["data"][0],
+            y=data["data"][1],
+            yaw=data["data"][2],
+            reference_frame=reference_frame,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        if not self.is_constant():
+            raise SpatialTypeNotJsonSerializable(self)
+        result = super().to_json()
+        if self.reference_frame is not None:
+            result["reference_frame_id"] = to_json(self.reference_frame.id)
+        result["data"] = self.to_np().tolist()
+        return result
+
+    def __hash__(self):
+        if self.is_constant():
+            return hash((*self.to_np().tolist(), self.reference_frame))
+        return super().__hash__()
 
 
 @sm.substitution_cache

@@ -2,47 +2,72 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Tuple
 
 import numpy as np
 import trimesh
-from probabilistic_model.probabilistic_circuit.rx.helper import (
-    uniform_measure_of_event,
-)
+from krrood.entity_query_language.factories import variable_from, entity, variable, an
+from polytope import bounding_box
+from probabilistic_model.distributions.gaussian import GaussianDistribution
 from random_events.product_algebra import Event
+from random_events.set import Set as EventSet
+from random_events.variable import Symbolic
+from semantic_digital_twin.reasoning.predicates import is_supported_by
 from typing_extensions import (
     TYPE_CHECKING,
     List,
     Optional,
     Self,
+    Set,
     Iterable,
     Type,
 )
 
 from krrood.ormatic.utils import classproperty
-from ..datastructures.prefixed_name import PrefixedName
-from ..datastructures.variables import SpatialVariables
-from ..exceptions import (
+from probabilistic_model.distributions.helper import make_dirac
+from probabilistic_model.probabilistic_circuit.rx.helper import (
+    uniform_measure_of_event,
+)
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProbabilisticCircuit,
+    ProductUnit,
+    SumUnit,
+    leaf,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.variables import SpatialVariables
+from semantic_digital_twin.exceptions import (
     MismatchingWorld,
 )
-from ..spatial_types import Point3, HomogeneousTransformationMatrix, Vector3
-from ..world import World
-from ..world_description.connections import (
+from semantic_digital_twin.spatial_types import (
+    Point3,
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
-from ..world_description.degree_of_freedom import DegreeOfFreedomLimits
-from ..world_description.geometry import Scale
-from ..world_description.shape_collection import BoundingBoxCollection
-from ..world_description.world_entity import (
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedomLimits,
+)
+from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
+from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     Body,
     Region,
     KinematicStructureEntity,
     Connection,
 )
-from ..world_description.world_modification import synchronized_attribute_modification
+from semantic_digital_twin.world_description.world_modification import (
+    synchronized_attribute_modification,
+)
 
 if TYPE_CHECKING:
-    from .semantic_annotations import (
+    from semantic_digital_twin.world import World
+    from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Drawer,
         Door,
         Handle,
@@ -50,6 +75,7 @@ if TYPE_CHECKING:
         Slider,
         Aperture,
     )
+    from semantic_digital_twin.world import World
 
 
 @dataclass(eq=False)
@@ -74,6 +100,21 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
     """
     The root kinematic structure entity of the semantic annotation.
     """
+
+    @property
+    def scale(self) -> Scale:
+        return Scale(
+            *(self.root.combined_mesh.bounds[1] - self.root.combined_mesh.bounds[0])
+        )
+
+    @property
+    def min_max_points(self) -> Tuple[Point3, Point3]:
+        min = Point3.from_iterable(self.root.combined_mesh.bounds[0])
+        max = Point3.from_iterable(self.root.combined_mesh.bounds[1])
+        return min, max
+
+    def __hash__(self):
+        return hash((self.__class__, self.root))
 
     @classproperty
     def _parent_connection_type(self) -> Type[Connection]:
@@ -251,6 +292,22 @@ class HasRootKinematicStructureEntity(SemanticAnnotation, ABC):
             parent_entity = parent_entity.parent_kinematic_structure_entity
         return future_root_T_self
 
+    @property
+    def global_transform(self) -> HomogeneousTransformationMatrix:
+        return self.root.global_transform
+
+    @property
+    def connections(self) -> list[Connection]:
+        return self._world.get_connections_of_branch(self.root)
+
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
+        return self._world.get_kinematic_structure_entities_of_branch(self.root)
+
 
 @dataclass(eq=False)
 class HasRootBody(HasRootKinematicStructureEntity, ABC):
@@ -266,13 +323,6 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
     The root body of the semantic annotation.
     """
 
-    @property
-    def bodies(self) -> Iterable[Body]:
-        """
-        The bodies that are part of the semantic annotation.
-        """
-        return [self.root]
-
     @classmethod
     def create_with_new_body_in_world(
         cls,
@@ -283,6 +333,7 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
+        scale: Scale = None,
         **kwargs,
     ) -> Self:
         """
@@ -295,9 +346,17 @@ class HasRootBody(HasRootKinematicStructureEntity, ABC):
         :param active_axis: The active axis for the connection.
         :param connection_multiplier: The multiplier for the connection.
         :param connection_offset: The offset for the connection.
+        :param scale: The scale used to generate the geometry of the body.
         :return: The created semantic annotation instance.
         """
         body = Body(name=name)
+
+        if scale is not None:
+            collision_shapes = BoundingBoxCollection.from_event(
+                body, scale.to_simple_event().as_composite_set()
+            ).as_shapes()
+            body.collision = collision_shapes
+            body.visual = collision_shapes
 
         return cls._create_with_connection_in_world(
             name=name,
@@ -321,13 +380,6 @@ class HasRootRegion(HasRootKinematicStructureEntity, ABC):
     """
     The root region of the semantic annotation.
     """
-
-    @property
-    def regions(self) -> Iterable[Region]:
-        """
-        The regions that are part of the semantic annotation.
-        """
-        return [self.root]
 
     @classmethod
     def create_with_new_region_in_world(
@@ -395,6 +447,7 @@ class HasApertures(HasRootBody, ABC):
 
         :param aperture: The aperture whose geometry should be removed.
         """
+
         world = self._world
         world.update_forward_kinematics()
         hole_event = aperture.root.area.as_bounding_box_collection_in_frame(
@@ -407,6 +460,7 @@ class HasApertures(HasRootBody, ABC):
         new_bounding_box_collection = BoundingBoxCollection.from_event(
             self.root, new_wall_event
         ).as_shapes()
+
         self.root.collision = new_bounding_box_collection
         self.root.visual = new_bounding_box_collection
 
@@ -437,6 +491,19 @@ class HasHinge(HasRootBody, ABC):
         )
         self.hinge = hinge
 
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
+        kinematic_structure_entities = (
+            self._world.get_kinematic_structure_entities_of_branch(self.root)
+        )
+        if self.hinge is not None:
+            kinematic_structure_entities.append(self.hinge.root)
+        return kinematic_structure_entities
+
 
 @dataclass(eq=False)
 class HasSlider(HasRootKinematicStructureEntity, ABC):
@@ -463,6 +530,19 @@ class HasSlider(HasRootKinematicStructureEntity, ABC):
             slider.root,
         )
         self.slider = slider
+
+    def _kinematic_structure_entities(
+        self, visited: Set[int]
+    ) -> list[KinematicStructureEntity]:
+        if id(self) in visited:
+            return []
+        visited.add(id(self))
+        kinematic_structure_entities = (
+            self._world.get_kinematic_structure_entities_of_branch(self.root)
+        )
+        if self.slider is not None:
+            kinematic_structure_entities.append(self.slider.root)
+        return kinematic_structure_entities
 
 
 @dataclass(eq=False)
@@ -561,6 +641,22 @@ class HasStorageSpace(HasRootBody, ABC):
         self._attach_child_entity_in_kinematic_structure(object.root)
         self.objects.append(object)
 
+    def get_objects_of_type(
+        self, object_type: Type[SemanticAnnotation]
+    ) -> List[HasRootBody]:
+        """
+        Returns all objects of a given type in the semantic annotation.
+
+        ..warning:: object_type does not have to be a subclass of HasRootBody, as some semantic concepts, for example
+        Food may not necessarily inherit from HasRootBody, but some objects stored in here may inherit from Food as well
+        as HasRootBody.
+
+        :param object_type: The type of the semantic annotations to return.
+
+        :return: A list of HasRootBody objects of the given type.
+        """
+        return [obj for obj in self.objects if isinstance(obj, object_type)]
+
 
 @dataclass(eq=False)
 class HasSupportingSurface(HasStorageSpace, ABC):
@@ -573,29 +669,31 @@ class HasSupportingSurface(HasStorageSpace, ABC):
     The supporting surface region of the semantic annotation.
     """
 
-    @synchronized_attribute_modification
     def calculate_supporting_surface(
         self,
         upward_threshold: float = 0.95,
         clearance_threshold: float = 0.5,
         min_surface_area: float = 0.0225,  # 15cm x 15cm
-    ):
+    ) -> Optional[Region]:
         """
-        Calculate and set the supporting surface region for the semantic annotation.
+        Calculate the supporting surface region for the semantic annotation, add it to the world, and set
+        it as the supporting surface of self
 
         :param upward_threshold: The threshold for the face normal to be considered upward-facing.
         :param clearance_threshold: The threshold for the vertical clearance above the surface.
         :param min_surface_area: The minimum area for a surface to be considered a supporting surface.
+
+        :return: The supporting surface region, or None if no suitable region could be found.
         """
         mesh = self.root.combined_mesh
         if mesh is None:
-            return
+            return None
         # --- Find upward-facing faces ---
         normals = mesh.face_normals
         upward_mask = normals[:, 2] > upward_threshold
 
         if not upward_mask.any():
-            return
+            return None
 
         # --- Find connected upward-facing regions ---
         upward_face_indices = np.nonzero(upward_mask)[0]
@@ -606,7 +704,7 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         large_groups = [g for g in face_groups if g.area >= min_surface_area]
 
         if not large_groups:
-            return
+            return None
 
         # --- Merge qualifying upward-facing submeshes ---
         candidates = trimesh.util.concatenate(large_groups)
@@ -630,9 +728,7 @@ class HasSupportingSurface(HasStorageSpace, ABC):
         clear_mask = (distances > clearance_threshold) | np.isinf(distances)
 
         if not clear_mask.any():
-            raise ValueError(
-                "No upward-facing surfaces with sufficient clearance found."
-            )
+            return None
 
         candidates_filtered = candidates.submesh([clear_mask], append=True)
 
@@ -653,32 +749,234 @@ class HasSupportingSurface(HasStorageSpace, ABC):
             ),
             points_3d=points_3d,
         )
+
+        supporting_surface_z_position = self.root.collision.scale.z / 2
         self_C_supporting_surface = FixedConnection(
-            parent=self.root, child=supporting_surface
+            parent=self.root,
+            child=supporting_surface,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                z=supporting_surface_z_position, reference_frame=self.root
+            ),
         )
-        with self._world.modify_world():
-            self._world.add_region(supporting_surface)
-            self._world.add_connection(self_C_supporting_surface)
-        self.supporting_surface = supporting_surface
+        self._world.add_region(supporting_surface)
+        self._world.add_connection(self_C_supporting_surface)
+        self.add_supporting_surface(supporting_surface)
         return supporting_surface
 
-    def points_on_supporting_surface(self, amount: int = 100) -> List[Point3]:
+    def infer_objects_on_surface(self):
         """
-        Get points that are on the surface.
+        Infer and add objects that are supported by this surface to the storage space.
 
-        :param amount: The number of points to return.
-        :return: A list of points that are on the surface.
+        This method queries the world for bodies that are supported by this annotation's root body,
+        finds their corresponding semantic annotations, and adds them to the objects list if they
+        are not already present.
         """
-        area_of_table = BoundingBoxCollection.from_shapes(self.root.collision)
-        event = area_of_table.event
-        p = uniform_measure_of_event(event)
-        p = p.marginal(SpatialVariables.xy)
-        samples = p.sample(amount)
-        z_coordinate = np.full(
-            (amount, 1), max([b.max_z for b in area_of_table]) + 0.01
+        bodies = variable_from(self._world.bodies_with_collision)
+        body = entity(bodies).where(
+            is_supported_by(
+                supported_body=bodies,
+                supporting_body=self.root,
+            )
         )
+        objects = an(
+            entity(
+                semantic_annotation := variable(
+                    HasRootBody, domain=self._world.semantic_annotations
+                )
+            ).where(semantic_annotation.root == body)
+        ).evaluate()
+        for obj in objects:
+            if obj in self.objects:
+                continue
+            self.add_object(obj)
+
+    @synchronized_attribute_modification
+    def add_supporting_surface(self, region: Region):
+        self._attach_child_entity_in_kinematic_structure(region)
+        self.supporting_surface = region
+
+    def sample_points_from_surface(
+        self,
+        body_to_sample_for: Optional[HasRootBody] = None,
+        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
+        amount: int = 100,
+    ) -> List[Point3]:
+        """
+        Samples points from a surface around the semantic annotation. The surface is determined by the supporting
+        surface of the semantic annotation and is truncated by the objects on the surface. The points are sampled
+        using a Gaussian mixture model.
+
+        ..warning:: Calling this method when the self.supporting_surface is None will cause the method to calculate the
+            surface and add it to the world, resulting in model updates being published if the synchronizer is running.
+
+        :param body_to_sample_for: The physical object to sample points for.
+        :param category_of_interest: The type of object sample points around.
+        :param amount: The number of points to sample.
+
+        :return: A list of sampled points, sorted by distance to the around_object.
+        """
+        if self.supporting_surface is None:
+            with self._world.modify_world():
+                supporting_surface = self.calculate_supporting_surface()
+            if supporting_surface is None:
+                return []
+
+        largest_xy_object_dimension = 0.1
+        z_object_dimension = 0.0
+        if body_to_sample_for:
+            largest_xy_object_dimension = body_to_sample_for.root.combined_mesh.extents[
+                :2
+            ].max()
+            z_object_dimension = body_to_sample_for.root.combined_mesh.extents[2]
+
+        self_max_z = self.supporting_surface.area.max_point.z
+        z_coordinate = np.full(
+            (amount, 1),
+            self_max_z + (z_object_dimension / 2),
+        )
+
+        surface_circuit = self._build_surface_sampler(
+            category_of_interest=category_of_interest,
+            object_bloat=largest_xy_object_dimension,
+        )
+
+        if surface_circuit is None:
+            return []
+
+        samples = surface_circuit.sample(amount)
+        samples = samples[np.argsort(surface_circuit.log_likelihood(samples))[::-1]]
         samples = np.concatenate((samples, z_coordinate), axis=1)
-        return [Point3(*s, reference_frame=self.root) for s in samples]
+
+        if category_of_interest:
+            return [
+                Point3(*s[1:], reference_frame=self.supporting_surface) for s in samples
+            ]
+        return [Point3(*s, reference_frame=self.supporting_surface) for s in samples]
+
+    def _build_surface_sampler(
+        self,
+        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
+        object_bloat: float = 0.1,
+    ):
+        """
+        Build a probabilistic circuit representing the supporting surface, truncated by the objects on the surface,
+        and with Gaussian mixtures around the objects of interest.
+
+        :param category_of_interest: The type of object sample points around.
+        :param object_bloat: The amount of bloat to apply to the object event.
+        """
+        truncated_event_2d = self._2d_surface_sample_space_excluding_objects(
+            object_bloat
+        )
+
+        objects_of_interest = (
+            self.get_objects_of_type(category_of_interest)
+            if category_of_interest
+            else []
+        )
+        if objects_of_interest:
+            return self._2d_gaussian_sampler_from_2d_sample_space(
+                objects_of_interest=objects_of_interest,
+                # using values too low makes sampling from truncated gaussians very unstable
+                variance=1,
+                sample_space=truncated_event_2d,
+            )
+        else:
+            return uniform_measure_of_event(truncated_event_2d)
+
+    def _2d_surface_sample_space_excluding_objects(self, object_bloat: float) -> Event:
+        """
+        Compute a 2D event representing the supporting surface, truncated by the objects on the surface.
+
+        :param object_bloat: The amount of bloat to apply to the object events.
+        """
+        area_of_self = BoundingBoxCollection.from_shapes(self.supporting_surface.area)
+        area_of_self.transform_all_shapes_to_own_frame()
+        event = area_of_self.event
+
+        event_2d = event.marginal(SpatialVariables.xy)
+        for obj in self.objects:
+            bounding_box = obj.root.collision.as_bounding_box_collection_in_frame(
+                self.supporting_surface
+            ).bounding_box()
+            bounding_box.enlarge_all(object_bloat)
+            object_event = bounding_box.simple_event.as_composite_set()
+            object_event_2d = object_event.marginal(SpatialVariables.xy)
+            event_2d = event_2d - object_event_2d
+        return event_2d
+
+    def _2d_gaussian_sampler_from_2d_sample_space(
+        self,
+        objects_of_interest: List[HasRootBody],
+        variance: float,
+        sample_space: Event,
+    ) -> Optional[ProbabilisticCircuit]:
+        """
+        Create a Gaussian mixture model from a list of points, truncated by an event.
+
+        :param objects_of_interest: Objects of interest to sample around. The Gaussian mixtures will be centered around
+           the positions of these objects on the surface.
+        :param variance: The standard deviation to use for the Gaussian mixtures.
+        :param sample_space: The event to truncate the Gaussian mixture model with.
+
+        :return: A probabilistic circuit representing the Gaussian mixture model truncated by the event, or None if the event has zero measure.
+        """
+
+        surface_circuit = self._untruncated_2d_gaussian_sampler(
+            objects_of_interest=objects_of_interest,
+            variance=variance,
+        )
+        sample_space.fill_missing_variables(surface_circuit.variables)
+        surface_circuit.log_truncated_in_place(sample_space)
+
+        return surface_circuit
+
+    def _untruncated_2d_gaussian_sampler(
+        self,
+        objects_of_interest: List[HasRootBody],
+        variance: float,
+    ) -> ProbabilisticCircuit:
+        """
+        Create a Gaussian mixture model from a list of points, without truncation.
+        This method is extracted from the `_2d_gaussian_sampler_from_2d_sample_space` method so that the generated
+        distribution can be tested properly, which cannot be done after truncation.
+        """
+        surface_circuit = ProbabilisticCircuit()
+        surface_circuit_root = SumUnit(probabilistic_circuit=surface_circuit)
+
+        objects_of_interest_variable = Symbolic(
+            name="objects_of_interest",
+            domain=EventSet.from_iterable(objects_of_interest),
+        )
+
+        for object_of_interest in objects_of_interest:
+            surface_P_obj = self._world.transform(
+                object_of_interest.root.global_transform, self.supporting_surface
+            )
+
+            p_object_root = ProductUnit(probabilistic_circuit=surface_circuit)
+            surface_circuit_root.add_subcircuit(p_object_root, 1.0)
+
+            object_of_interest_p = make_dirac(
+                objects_of_interest_variable, object_of_interest
+            )
+
+            x_p = GaussianDistribution(
+                variable=SpatialVariables.x.value,
+                location=float(surface_P_obj.x),
+                scale=variance,
+            )
+            y_p = GaussianDistribution(
+                variable=SpatialVariables.y.value,
+                location=float(surface_P_obj.y),
+                scale=variance,
+            )
+
+            p_object_root.add_subcircuit(leaf(object_of_interest_p, surface_circuit))
+            p_object_root.add_subcircuit(leaf(x_p, surface_circuit))
+            p_object_root.add_subcircuit(leaf(y_p, surface_circuit))
+
+        return surface_circuit
 
 
 @dataclass(eq=False)
@@ -708,8 +1006,8 @@ class HasCaseAsRootBody(HasSupportingSurface, ABC):
         active_axis: Optional[Vector3] = None,
         connection_multiplier: float = 1.0,
         connection_offset: float = 0.0,
-        *,
         scale: Scale = Scale(),
+        *,
         wall_thickness: float = 0.01,
     ) -> Self:
         """

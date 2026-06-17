@@ -1,13 +1,16 @@
 import time
 import unittest
 from dataclasses import dataclass
+
+from random_events.product_algebra import Event, SimpleEvent
+
 from semantic_digital_twin.orm.ormatic_interface import *
 
 import numpy as np
 import pytest
 
 from krrood.adapters.json_serializer import to_json
-from krrood.ormatic.dao import to_dao
+from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,
@@ -34,6 +37,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Table,
     Cup,
     Cabinet,
+    Milk,
+    Cereal,
 )
 from semantic_digital_twin.spatial_types import (
     Vector3,
@@ -436,7 +441,8 @@ class TestFactories(unittest.TestCase):
         # handle is at y=0.4, door width is 1.0. Hinge should be at opposite side: y=-0.5
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
         expected_T_hinge = (
-            door.root.global_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.5)
+            door.root.global_transform
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.5)
         )
         self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
@@ -452,7 +458,8 @@ class TestFactories(unittest.TestCase):
 
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
         expected_T_hinge = (
-            door.root.global_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+            door.root.global_transform
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
         )
         self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
@@ -473,7 +480,8 @@ class TestFactories(unittest.TestCase):
         # handle z=0. Hinge should be at z=1.0 (opposite of default sign 1 if z=0)
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Y())
         expected_T_hinge = (
-            door.root.global_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0)
+            door.root.global_transform
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0)
         )
         self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
@@ -495,7 +503,8 @@ class TestFactories(unittest.TestCase):
         )
         world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Y())
         expected_T_hinge = (
-            door.root.global_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(z=-1.0)
+            door.root.global_transform
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(z=-1.0)
         )
         self.assertTrue(np.allclose(world_T_hinge.to_np(), expected_T_hinge.to_np()))
 
@@ -529,29 +538,218 @@ class TestFactories(unittest.TestCase):
             surface = table.calculate_supporting_surface()
 
         self.assertIsNotNone(surface)
+        self.assertEqual(surface, table.supporting_surface)
         self.assertEqual(len(world.regions), 1)
-        self.assertEqual(table.supporting_surface, surface)
         self.assertTrue(len(surface.area.combined_mesh.vertices) > 0)
 
-    def test_points_on_surface(self):
+    def test_supporting_surface_position_on_top_of_table(self):
         world = World()
         root = Body(name=PrefixedName("root"))
         with world.modify_world():
             world.add_body(root)
         with world.modify_world():
             table = Table.create_with_new_body_in_world(
-                name=PrefixedName("table"), world=world
+                name=PrefixedName("table"),
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=1.5),
             )
-        table_scale = Scale(1.0, 1.0, 0.1)
+        table_scale = Scale(1.0, 1.0, 0.5)
         table.root.collision = BoundingBoxCollection.from_event(
             table.root, table_scale.to_simple_event().as_composite_set()
         ).as_shapes()
+        table.root.visual = table.root.collision
 
-        points = table.points_on_supporting_surface(amount=10)
+        with world.modify_world():
+            surface = table.calculate_supporting_surface()
+
+        _, max_point = table.min_max_points
+        # supporting surface should be at the height of the table's global z + the max z of the table's bounding box (since the table's origin is at its center)
+        expected_z = table.root.global_transform.z + max_point.z
+
+        self.assertIsNotNone(surface)
+        self.assertEqual(surface, table.supporting_surface)
+        self.assertEqual(expected_z, surface.global_transform.z)
+
+    def test_sample_points_from_surface(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            milk = Milk.create_with_new_body_in_world(
+                name=PrefixedName("milk"),
+                world=world,
+                scale=Scale(0.03, 0.03, 0.1),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
+            )
+            cereal = Cereal.create_with_new_body_in_world(
+                name=PrefixedName("cereal"),
+                world=world,
+                scale=Scale(0.1, 0.03, 0.2),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
+            )
+            table = Table.create_with_new_body_in_world(
+                name=PrefixedName("table"), world=world, scale=Scale(1.0, 1.0, 0.1)
+            )
+            table.add_object(milk)
+            table.add_object(cereal)
+
+            cereal_to_place = Cereal.create_with_new_body_in_world(
+                name=PrefixedName("cereal_to_place"),
+                world=world,
+                scale=Scale(0.1, 0.03, 0.2),
+            )
+
+        points = table.sample_points_from_surface(
+            amount=10,
+        )
         self.assertEqual(len(points), 10)
-        for p in points:
-            self.assertEqual(p.reference_frame, table.root)
-            self.assertAlmostEqual(float(p.z), 0.05 + 0.01)
+
+        min_point, max_point = table.min_max_points
+        assert all(p.reference_frame == table.supporting_surface for p in points)
+        assert all(p.x >= min_point.x for p in points)
+        assert all(p.x <= max_point.x for p in points)
+        assert all(p.y >= min_point.y for p in points)
+        assert all(p.y <= max_point.y for p in points)
+        assert np.allclose([p.z for p in points], 0.0025)
+
+    def test_sample_points_from_surface_with_category_of_interest(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            milk = Milk.create_with_new_body_in_world(
+                name=PrefixedName("milk"),
+                world=world,
+                scale=Scale(0.03, 0.03, 0.1),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
+            )
+            cereal = Cereal.create_with_new_body_in_world(
+                name=PrefixedName("cereal"),
+                world=world,
+                scale=Scale(0.1, 0.03, 0.2),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
+            )
+            cereal2 = Cereal.create_with_new_body_in_world(
+                name=PrefixedName("cereal"),
+                world=world,
+                scale=Scale(0.1, 0.03, 0.2),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.2),
+            )
+            table = Table.create_with_new_body_in_world(
+                name=PrefixedName("table"), world=world, scale=Scale(1.0, 1.0, 0.1)
+            )
+            table.add_object(milk)
+            table.add_object(cereal)
+            table.add_object(cereal2)
+
+        with world.modify_world():
+            table.calculate_supporting_surface()
+        objects_of_interest = [cereal, cereal2]
+        sampler = table._untruncated_2d_gaussian_sampler(
+            objects_of_interest=objects_of_interest, variance=1
+        )
+        [object_variable, x_variable, y_variable] = sampler.variables
+        for object in objects_of_interest:
+            conditional, _ = sampler.conditional({object_variable: object})
+            expectation = conditional.expectation([x_variable, y_variable])
+            surface_T_object = world.transform(
+                object.global_transform, table.supporting_surface
+            )
+            assert expectation[x_variable] == surface_T_object.x
+            assert expectation[y_variable] == surface_T_object.y
+
+    def test_remove_objects_from_sampling_event(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            milk = Milk.create_with_new_body_in_world(
+                name=PrefixedName("milk"),
+                world=world,
+                scale=Scale(0.03, 0.03, 0.1),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
+            )
+            cereal = Cereal.create_with_new_body_in_world(
+                name=PrefixedName("cereal"),
+                world=world,
+                scale=Scale(0.1, 0.03, 0.2),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
+            )
+            table = Table.create_with_new_body_in_world(
+                name=PrefixedName("table"), world=world, scale=Scale(1.0, 1.0, 0.1)
+            )
+            table.add_object(milk)
+            table.add_object(cereal)
+
+        with world.modify_world():
+            table.calculate_supporting_surface()
+
+        surface_event: Event = table._2d_surface_sample_space_excluding_objects(0)
+
+        surface_P_milk = world.transform(
+            milk.root.global_transform, table.supporting_surface
+        ).to_position()
+        surface_P_cereal = world.transform(
+            cereal.root.global_transform, table.supporting_surface
+        ).to_position()
+
+        assert not surface_event.contains(surface_P_milk[:2])
+        assert not surface_event.contains(surface_P_cereal[:2])
+
+    def test_sample_points_from_surface_with_object_and_category_of_interest(self):
+        world = World()
+        root = Body(name=PrefixedName("root"))
+        with world.modify_world():
+            world.add_body(root)
+        with world.modify_world():
+            milk = Milk.create_with_new_body_in_world(
+                name=PrefixedName("milk"),
+                world=world,
+                scale=Scale(0.03, 0.03, 0.1),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
+            )
+            cereal = Cereal.create_with_new_body_in_world(
+                name=PrefixedName("cereal"),
+                world=world,
+                scale=Scale(0.1, 0.03, 0.2),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
+            )
+            cereal2 = Cereal.create_with_new_body_in_world(
+                name=PrefixedName("cereal"),
+                world=world,
+                scale=Scale(0.1, 0.03, 0.2),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.2),
+            )
+            table = Table.create_with_new_body_in_world(
+                name=PrefixedName("table"), world=world, scale=Scale(1.0, 1.0, 0.1)
+            )
+            table.add_object(milk)
+            table.add_object(cereal)
+            table.add_object(cereal2)
+
+            cereal_to_place = Cereal.create_with_new_body_in_world(
+                name=PrefixedName("cereal_to_place"),
+                world=world,
+                scale=Scale(0.1, 0.03, 0.2),
+            )
+
+        points = table.sample_points_from_surface(
+            cereal_to_place,
+            type(cereal),
+            amount=100,
+        )
+        self.assertEqual(len(points), 100)
+
+        min_point, max_point = table.min_max_points
+        assert all(p.reference_frame == table.supporting_surface for p in points)
+        assert all(p.x >= min_point.x for p in points)
+        assert all(p.x <= max_point.x for p in points)
+        assert all(p.y >= min_point.y for p in points)
+        assert all(p.y <= max_point.y for p in points)
+        assert np.allclose([p.z for p in points], 0.1025)
 
     def test_floor_polytope(self):
         world = World()
@@ -631,10 +829,10 @@ class TestFactories(unittest.TestCase):
         with world.modify_world():
             world.add_semantic_annotation(slider)
 
-        parent_T_self = root.global_pose.inverse() @ slider.root.global_pose
+        parent_T_self = root.global_transform.inverse() @ slider.root.global_transform
         self.assertAlmostEqual(parent_T_self[0, 3], 2.0)
 
-        self_T_child = slider.root.global_pose.inverse() @ root.global_pose
+        self_T_child = slider.root.global_transform.inverse() @ root.global_transform
         self.assertAlmostEqual(self_T_child[0, 3], -2.0)
 
         self.assertEqual(slider.get_new_grandparent(mid), root)

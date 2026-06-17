@@ -4,7 +4,8 @@ import unittest
 from dataclasses import asdict
 
 import numpy as np
-from pkg_resources import resource_filename
+from importlib.resources import files
+from pathlib import Path
 from sqlalchemy.orm import Session
 
 from krrood.ormatic.utils import create_engine
@@ -39,7 +40,7 @@ class ProcTHORTestCase(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         json_dir = os.path.join(
-            resource_filename("semantic_digital_twin", "../../"),
+            Path(files("semantic_digital_twin")).parent.parent,
             "resources",
             "procthor_json",
         )
@@ -78,7 +79,7 @@ class ProcTHORTestCase(unittest.TestCase):
         result = unity_to_semantic_digital_twin_transform(
             HomogeneousTransformationMatrix(data=m)
         )
-        self.assertAlmostEqual(result.to_position().to_np()[0], 2.0, places=6)
+        self.assertAlmostEqual(float(result.to_position().x), 2.0, places=6)
         np.testing.assert_allclose(
             result.to_rotation_matrix().to_np()[:3, :3], np.eye(3)
         )
@@ -361,10 +362,10 @@ class ProcTHORTestCase(unittest.TestCase):
     def test_parse_full_world(self):
         world = ProcTHORParser.from_file(
             os.path.join(
-                resource_filename("semantic_digital_twin", "../../"),
+                Path(files("semantic_digital_twin")).parent.parent,
                 "resources",
                 "procthor_json",
-                "house_987654321.json",
+                "house_0.json",
             )
         ).parse()
 

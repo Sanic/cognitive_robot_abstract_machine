@@ -4,7 +4,12 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+from geometry_msgs.msg import (
+    PoseStamped as ROSPoseStamped,
+    Pose as ROSPose,
+    Point as ROSPoint,
+    Quaternion as ROSQuaternion,
+)
 
 try:
     from nav2_msgs.action import NavigateToPose
@@ -15,14 +20,11 @@ from std_msgs.msg import Header
 from typing_extensions import Type, TypeVar, Generic
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.context import ExecutionContext, BuildContext
+from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import ObservationStateValues
-from giskardpy.motion_statechart.graph_node import (
-    MotionStatechartNode,
-    NodeArtifacts,
-)
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
@@ -70,13 +72,13 @@ class ActionServerTask(
     """
 
     @abstractmethod
-    def build_msg(self, context: BuildContext):
+    def build_msg(self, context: MotionStatechartContext):
         """
         Build the action server message and returns it.
         """
         ...
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Creates the action client.
         """
@@ -89,7 +91,7 @@ class ActionServerTask(
         self._action_client.wait_for_server()
         return NodeArtifacts()
 
-    def on_start(self, context: ExecutionContext):
+    def on_start(self, context: MotionStatechartContext):
         """
         Creates a goal and sends it to the action server asynchronously.
         """
@@ -116,7 +118,7 @@ class NavigateActionServerTask(
     Node for calling a Navigation2 ROS2 action server to navigate to a given pose.1
     """
 
-    target_pose: HomogeneousTransformationMatrix
+    target_pose: Pose
     """
     Target pose to which the robot should navigate.
     """
@@ -131,17 +133,17 @@ class NavigateActionServerTask(
     Topic name for the navigation action server.
     """
 
-    def build_msg(self, context: BuildContext):
+    def build_msg(self, context: MotionStatechartContext):
         root_p_goal = context.world.transform(
             target_frame=context.world.root, spatial_object=self.target_pose
         )
         position = root_p_goal.to_position().to_np()
         orientation = root_p_goal.to_quaternion().to_np()
-        pose_stamped = PoseStamped(
+        pose_stamped = ROSPoseStamped(
             header=Header(frame_id="map"),
-            pose=Pose(
-                position=Point(x=position[0], y=position[1], z=position[2]),
-                orientation=Quaternion(
+            pose=ROSPose(
+                position=ROSPoint(x=position[0], y=position[1], z=position[2]),
+                orientation=ROSQuaternion(
                     x=orientation[0],
                     y=orientation[1],
                     z=orientation[2],
@@ -151,7 +153,7 @@ class NavigateActionServerTask(
         )
         self._msg = NavigateToPose.Goal(pose=pose_stamped)
 
-    def build(self, context: BuildContext) -> NodeArtifacts:
+    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
         Builds the motion state node this includes creating the action client and setting the observation expression.
         The observation is true if the robot is within 1cm of the target pose.
@@ -181,7 +183,7 @@ class NavigateActionServerTask(
 
         return artifacts
 
-    def on_tick(self, context: ExecutionContext) -> ObservationStateValues:
+    def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
         if self._result:
             return (
                 ObservationStateValues.TRUE

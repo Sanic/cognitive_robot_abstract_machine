@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing_extensions import List, Optional, Type, Iterable
 
 from krrood.entity_query_language.predicate import Symbol, Predicate
+from semantic_digital_twin.mixin import HasSimulatorProperties
 
 
 @dataclass(unsafe_hash=True)
@@ -114,7 +115,7 @@ class Wardrobe(View):
     container: Container
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Apple(Body): ...
 
 
@@ -142,3 +143,25 @@ class ContainsType(Predicate):
 
     def __call__(self) -> bool:
         return any(isinstance(obj, self.obj_type) for obj in self.iterable)
+
+@dataclass(unsafe_hash=True)
+class GraspConfig(WorldEntity):
+    """
+    Simulates GraspDescription from coraplex with fields like rotate_gripper.
+    Used to test set_of() with transitive attributes like MoveToReachDAO.grasp_description.rotate_gripper.
+    """
+    rotate_gripper: float = field(default=0.0)
+    approach_direction: float = field(default=0.0)
+    manipulation_offset: float = field(default=0.0)
+
+
+@dataclass(unsafe_hash=True)
+class MoveAction(WorldEntity):
+    """
+    Simulates MoveToReachDAO from coraplex with direct fields and a relationship.
+    Used to test set_of() with both direct and transitive attributes.
+    """
+    robot_x: float = field(default=0.0)
+    robot_y: float = field(default=0.0)
+    hip_rotation: float = field(default=0.0)
+    grasp_config: GraspConfig = field(default=None)
