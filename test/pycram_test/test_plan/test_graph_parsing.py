@@ -11,9 +11,9 @@ from pycram.plans.factories import execute_single, sequential
 from pycram.robot_plans.actions.core.pick_up import ReachAction, PickUpAction
 from pycram.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from pycram.robot_plans.motions.gripper import MoveToolCenterPointMotion
-from robot_plans.actions.composite.transporting import TransportAction
-from robot_plans.actions.core.placing import PlaceAction
-from robot_plans.actions.core.robot_body import SetGripperAction
+from pycram.robot_plans.actions.composite.transporting import TransportAction
+from pycram.robot_plans.actions.core.placing import PlaceAction
+from pycram.robot_plans.actions.core.robot_body import SetGripperAction
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )

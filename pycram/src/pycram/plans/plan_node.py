@@ -366,27 +366,68 @@ class UnderspecifiedNode(PlanNode):
     )
     """
     The iterator that is used to generate the actions.
-    Only available after the first call to _perform.
+    Only available after the first call to notify.
+    """
+
+    _current_candidate: Optional[ActionNode] = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The action candidate this node currently resolves to. `parse` delegates to it,
+    so from the outside the node behaves like the action it generated. On failure,
+    `advance` replaces it with the next candidate without re-running expansion logic.
     """
 
     @property
     def designator_type(self) -> Type:
         return self.underspecified_action.type
 
-    def notify(self):
+    def _next_candidate(self) -> Optional[ActionNode]:
+        """
+        Pull the next grounded action from the iterator and make it the current
+        candidate.
+
+        :return: The new candidate node, or None if the iterator is exhausted.
+        """
         if self._action_iterator is None:
             self._action_iterator = self.plan.context.query_backend.evaluate(
                 self.underspecified_action
             )
 
-        for grounded_action in self._action_iterator:
-            new_child = ActionNode(designator=grounded_action)
-            self.add_child(new_child)
-            try:
-                new_child.perform()
-            except PlanFailure:
-                continue
+        grounded_action = next(self._action_iterator, None)
+        if grounded_action is None:
+            return None
+
+        candidate = ActionNode(designator=grounded_action)
+        self.add_child(candidate)
+        self._current_candidate = candidate
+        return candidate
+
+    def notify(self):
+        # Resolve the first candidate if not already done. An empty iterator leaves
+        # the node unresolved; detecting exhaustion as a failure is the job of the
+        # execution / failure-handling layer (via `advance`), not of expansion.
+        if self._current_candidate is None and self._next_candidate() is None:
             return
+        # Expand only; execution is deferred to parse().execute() on the outermost action.
+        self._current_candidate.notify()
+
+    def advance(self) -> bool:
+        """
+        Resolve the next candidate and expand it. Used by failure handling to retry
+        the remaining plan with a freshly generated action.
+
+        :return: True if a new candidate was generated, False if the iterator is exhausted.
+        """
+        if self._next_candidate() is None:
+            return False
+        self._current_candidate.notify()
+        return True
+
+    def parse(self) -> Executable:
+        if self._current_candidate is None:
+            return None
+        return self._current_candidate.parse()
 
     def __repr__(self):
         return f"{self.designator_type.__name__}"
