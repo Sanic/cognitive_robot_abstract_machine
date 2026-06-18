@@ -26,7 +26,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     Number,
 )
-from krrood.entity_query_language.verbalization.grammar.framework.assembler import Assembler
+from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
+    Assembler,
+)
 from krrood.entity_query_language.verbalization.grammar.chain.planner import (
     ChainPlan,
     ChainPlanner,
@@ -39,7 +41,9 @@ from krrood.entity_query_language.verbalization.microplanning.possessive import 
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
+    Conjunctions,
     Copulas,
+    Logicals,
     Prepositions,
 )
 
@@ -231,21 +235,39 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         :param negated: Whether to negate the predicative.
         :return: The predicative *"<navigation> is [not] <attribute>"*.
         """
-        chain = plan.chain
-        root_fragment = self._chain_root(plan.root)
-        navigation_chain = chain[:-1]
-
-        navigation_form = NavigationForm.most_applicable(navigation_chain)
-        navigation_fragment = navigation_form.render(navigation_chain, root_fragment)
-
+        navigation_fragment, attribute_fragment = self._boolean_parts(plan)
         copula = Copulas.IS_NOT.as_fragment() if negated else Copulas.IS.as_fragment()
-        terminal = chain[-1]
+        return PhraseFragment(parts=[navigation_fragment, copula, attribute_fragment])
+
+    def boolean_alternative(self, plan: ChainPlan) -> Fragment:
+        """
+        :param plan: The analysed boolean-terminal chain.
+        :return: The unconstrained-boolean predicative *"<navigation> is either <attribute> or not"* —
+            for a boolean attribute compared to a domain holding both ``True`` and ``False`` (the
+            value is left open, so neither polarity is asserted).
+        """
+        navigation_fragment, attribute_fragment = self._boolean_parts(plan)
         return PhraseFragment(
             parts=[
                 navigation_fragment,
-                copula,
-                RoleFragment.for_attribute(
-                    terminal._owner_class_, terminal._attribute_name_
-                ),
+                Copulas.IS.as_fragment(),
+                Logicals.EITHER.as_fragment(),
+                attribute_fragment,
+                Conjunctions.OR.as_fragment(),
+                Logicals.NOT.as_fragment(),
             ]
+        )
+
+    def _boolean_parts(self, plan: ChainPlan) -> tuple:
+        """:return: ``(navigation_fragment, attribute_fragment)`` for a boolean-terminal chain — the
+        navigation prefix (rendered by its :class:`NavigationForm`) and the terminal attribute noun,
+        shared by the predicative and the open-alternative forms."""
+        chain = plan.chain
+        root_fragment = self._chain_root(plan.root)
+        navigation_chain = chain[:-1]
+        navigation_form = NavigationForm.most_applicable(navigation_chain)
+        navigation_fragment = navigation_form.render(navigation_chain, root_fragment)
+        terminal = chain[-1]
+        return navigation_fragment, RoleFragment.for_attribute(
+            terminal._owner_class_, terminal._attribute_name_
         )

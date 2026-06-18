@@ -252,3 +252,83 @@ def test_concrete_object_reads_as_a_specific_type():
     )
     assert "a specific Position" in text
     assert "Position(" not in text  # no repr leak
+
+
+# ── object identity: identifying field qualifies "a specific <Type>" ──────────
+
+
+@dataclass
+class _NamedThing:
+    name: str
+    payload: object
+
+
+@dataclass
+class _Coded:
+    serial: int
+    name: str
+
+    @classmethod
+    def _identifying_attributes_(cls):
+        return ("serial",)
+
+
+def test_concrete_object_qualified_by_conventional_name_field():
+    """A concrete object with a conventional ``name`` field reads *"a specific X with name '…'"*."""
+    text = verbalize_expression(
+        underspecified(_Widget)(owner=_NamedThing(name="door", payload=object()))
+    )
+    assert "a specific _NamedThing with name 'door'" in text
+
+
+def test_concrete_object_uses_declared_identifying_attributes():
+    """A class declaring ``_identifying_attributes_`` controls which field identifies it."""
+    text = verbalize_expression(
+        underspecified(_Widget)(owner=_Coded(serial=7, name="x"))
+    )
+    assert "a specific _Coded with serial 7" in text
+    assert (
+        "name" not in text.split("specific _Coded")[1]
+    )  # declared field wins over 'name'
+
+
+# ── "respectively" grouping: atomic scalars only, capped ─────────────────────
+
+
+@dataclass
+class _Trio:
+    a: float
+    b: float
+    c: float
+
+
+@dataclass
+class _Quint:
+    a: int
+    b: int
+    c: int
+    d: int
+    e: int
+
+
+def test_atomic_scalars_group_under_respectively():
+    """Up to three atomic scalar values coordinate under one *"… respectively"* point."""
+    text = verbalize_expression(underspecified(_Trio)(a=1.0, b=2.0, c=3.0))
+    assert "a, b, and c of the _Trio are 1.0, 2.0, and 3.0 respectively" in text
+
+
+def test_over_cap_scalars_are_said_separately():
+    """Beyond the cap, each assignment is its own point — no unreadable many-way zip."""
+    text = verbalize_expression(underspecified(_Quint)(a=1, b=2, c=3, d=4, e=5))
+    assert "respectively" not in text
+    assert "a of the _Quint is 1" in text
+    assert "e of the _Quint is 5" in text
+
+
+def test_compound_value_pulled_out_of_respectively_group():
+    """A phrase-valued assignment (*"one of …"*) is said on its own; atomic ones still group."""
+    text = verbalize_expression(
+        underspecified(_Trio)(a=1.0, b=2.0, c=variable(float, [7.0, 8.0]))
+    )
+    assert "a, and b of the _Trio are 1.0, and 2.0 respectively" in text
+    assert "c of the _Trio is one of 7.0 or 8.0" in text

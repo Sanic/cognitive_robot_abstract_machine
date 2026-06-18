@@ -19,9 +19,12 @@ from krrood.entity_query_language.factories import (
     set_of,
     variable,
 )
+from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     attribute_names,
+    is_atomic_value,
     is_boolean_attribute_chain,
+    is_concrete_object_literal,
     is_none_literal,
     references,
     single_hop_attribute,
@@ -51,6 +54,34 @@ def test_single_hop_attr_rejects_multi_hop_and_other_subject():
     other = variable(_Robot, [])
     assert single_hop_attribute(r.tasks[0].completed, r) is None  # multi-hop
     assert single_hop_attribute(r.battery, other) is None  # different subject
+
+
+def test_is_concrete_object_literal_recognizer():
+    """A dataclass-instance literal is a concrete object; a primitive / class / ``None`` is not."""
+
+    @dataclass
+    class _Obj:
+        x: int
+
+    assert is_concrete_object_literal(Literal(_value_=_Obj(1))) is True
+    assert is_concrete_object_literal(Literal(_value_=5)) is False
+    assert (
+        is_concrete_object_literal(Literal(_value_=_Obj)) is False
+    )  # the class itself
+    assert is_concrete_object_literal(Literal(_value_=None)) is False
+
+
+def test_is_atomic_value_recognizer():
+    """A plain scalar literal is atomic (groupable); a concrete object / ``None`` is not."""
+
+    @dataclass
+    class _Obj:
+        x: int
+
+    assert is_atomic_value(Literal(_value_=5)) is True
+    assert is_atomic_value(Literal(_value_="x")) is True
+    assert is_atomic_value(Literal(_value_=_Obj(1))) is False
+    assert is_atomic_value(Literal(_value_=None)) is False
 
 
 def test_is_boolean_attribute_chain_only_for_boolean_terminal():
@@ -129,6 +160,48 @@ def test_primitive_domain_variable_lists_in_value_position():
 def test_entity_domain_variable_not_listed():
     """An entity-type variable's domain is the population and is never listed."""
     assert verbalize_expression(variable(_Robot, [])) == "a _Robot"
+
+
+def test_two_value_domain_drops_the_serial_comma():
+    """A two-candidate domain reads *"one of X or Y"* (no comma); three keep the serial comma."""
+    r = variable(_Robot, [])
+    assert "one of 1 or 2" in verbalize_expression(r.battery == variable(int, [1, 2]))
+    assert "one of 1, 2, or 3" in verbalize_expression(
+        r.battery == variable(int, [1, 2, 3])
+    )
+
+
+# ── Boolean attribute compared to a boolean: polarity, never "is True" ───────
+
+
+@dataclass
+class _Coffee:
+    decaf: bool
+
+
+def test_boolean_attribute_eq_true_is_predicative():
+    """``bool_attr == True`` folds into the predicate — *"is decaf"*, not *"is decaf is True"*."""
+    c = variable(_Coffee, [])
+    text = verbalize_expression(c.decaf == True)
+    assert "is decaf" in text
+    assert "True" not in text
+    assert "is decaf is" not in text  # no double copula
+
+
+def test_boolean_attribute_eq_false_is_negated_predicative():
+    """``bool_attr == False`` (and ``!= True``) read *"is not decaf"*."""
+    c = variable(_Coffee, [])
+    assert "is not decaf" in verbalize_expression(c.decaf == False)
+    assert "is not decaf" in verbalize_expression(c.decaf != True)
+    assert "False" not in verbalize_expression(c.decaf == False)
+
+
+def test_boolean_attribute_open_domain_is_either_or_not():
+    """A bool attribute constrained to a domain holding both values leaves the value open."""
+    c = variable(_Coffee, [])
+    text = verbalize_expression(c.decaf == variable(bool, [True, False]))
+    assert "is either decaf or not" in text
+    assert "True" not in text and "False" not in text
 
 
 # ── Co-indexed comparator factoring ──────────────────────────────────────────

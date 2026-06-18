@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import operator
+from itertools import islice
 
 from krrood.entity_query_language.core.mapped_variable import Attribute
-from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.core.variable import Literal, Variable
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
@@ -20,7 +21,14 @@ from krrood.entity_query_language.verbalization.grammar.framework.assembler impo
 from krrood.entity_query_language.verbalization.grammar.conditions.operator_phrase import (
     comparator_operator,
 )
+from krrood.entity_query_language.verbalization.grammar.chain.assembler import (
+    ChainAssembler,
+)
+from krrood.entity_query_language.verbalization.grammar.chain.planner import (
+    ChainPlanner,
+)
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
+    is_boolean_attribute_chain,
     is_none_literal,
     single_hop_attribute,
     superlative_aggregation,
@@ -30,7 +38,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     RangeFold,
     build_between,
 )
-from typing_extensions import List
+from typing_extensions import List, Optional
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Absence,
@@ -77,6 +85,9 @@ class ConditionAssembler(Assembler[Comparator, None]):
             and is_none_literal(comparator.right)
         ):
             return self.absence(comparator)
+        boolean = self._boolean_predicate(comparator, negated=negated)
+        if boolean is not None:
+            return boolean
         return PhraseFragment(
             parts=[
                 self.context.child(comparator.left),
@@ -84,6 +95,52 @@ class ConditionAssembler(Assembler[Comparator, None]):
                 self.context.child(comparator.right, as_value=True),
             ]
         )
+
+    def _boolean_predicate(
+        self, comparator: Comparator, *, negated: bool
+    ) -> Optional[Fragment]:
+        """
+        Render a boolean attribute compared to a boolean as a predicative that folds the value into
+        the verb's polarity, never an awkward *"is <attr> is True"* — *"a Coffee is decaf"* (``==
+        True``), *"a Coffee is not decaf"* (``== False`` / ``!= True``), or *"a Coffee is either
+        decaf or not"* (a domain holding both, leaving the value open).
+
+        :param comparator: The candidate comparator.
+        :param negated: Whether an outer negation applies (composed with the value's polarity).
+        :return: The predicative fragment, or ``None`` when this is not a boolean-attribute /
+            boolean-value comparison (so the caller renders the generic *"<left> <op> <right>"*).
+        """
+        if comparator.operation not in (operator.eq, operator.ne):
+            return None
+        if not is_boolean_attribute_chain(comparator.left):
+            return None
+        constraint = self._boolean_constraint(comparator.right)
+        if constraint is None:
+            return None
+        plan = self.context.microplan.plan_for(comparator.left, ChainPlanner)
+        chain = ChainAssembler(self.context)
+        if constraint == {True, False}:
+            return chain.boolean_alternative(plan)
+        positive = True in constraint
+        if comparator.operation is operator.ne:
+            positive = not positive
+        if negated:
+            positive = not positive
+        return chain.boolean_predicative(plan, negated=not positive)
+
+    @staticmethod
+    def _boolean_constraint(right: SymbolicExpression) -> Optional[set]:
+        """:return: The set of boolean values *right* constrains a boolean attribute to — ``{True}`` /
+        ``{False}`` for a boolean literal or singleton domain, ``{True, False}`` for an open domain —
+        or ``None`` when *right* is not a boolean literal / bounded boolean-domain variable.
+        """
+        if isinstance(right, Literal) and isinstance(right._value_, bool):
+            return {right._value_}
+        if isinstance(right, Variable) and getattr(right, "_type_", None) is bool:
+            values = list(islice(right._re_enterable_domain_generator_, 3))
+            if values and len(values) <= 2 and all(isinstance(v, bool) for v in values):
+                return set(values)
+        return None
 
     def absence(
         self, comparator: Comparator, *, number: Number = Number.SINGULAR

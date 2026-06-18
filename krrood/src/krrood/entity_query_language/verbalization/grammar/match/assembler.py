@@ -16,6 +16,7 @@ from krrood.entity_query_language.verbalization.grammar.conditions.assembler imp
     ConditionAssembler,
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
+    is_atomic_value,
     is_none_literal,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
@@ -35,6 +36,10 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Prepositions,
     Pronouns,
 )
+
+#: The most attribute values coordinated under one *"… are 1, 2, and 3 respectively"* point before
+#: each is said separately — beyond this the reader can no longer reliably zip attributes to values.
+_MAX_RESPECTIVELY = 3
 
 
 class MatchAssembler(Assembler[Match, MatchPlan]):
@@ -155,18 +160,35 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         return BlockFragment(header=Keywords.GIVEN_THAT.as_fragment(), items=points)
 
     def _concrete_points(self, group: AttributeGroup) -> List[Fragment]:
-        """:return: The given-that points for a group's concrete assignments — a value point for the
-        present attributes (*"x of the <object> is 1"*) and a separate absence point for any set to
-        ``None`` (*"the <object> has no <attrs>"*), since an absence flips subject/object and cannot
-        fold into the *"… respectively"* coordination."""
+        """:return: The given-that points for a group's concrete assignments. Atomic scalar values
+        coordinate under one *"x, y, and z of the <object> are 1, 2, and 3 respectively"* point — but
+        only up to :data:`_MAX_RESPECTIVELY` of them, since the reader must zip attributes to values
+        in order. A value that renders as a phrase (*"one of …"*, *"a specific …"*, a sub-query), or
+        any assignment once the cap is exceeded, gets its own *"x of the <object> is …"* point; and
+        ``None`` assignments their own *"the <object> has no <attrs>"* point (an absence flips
+        subject/object and cannot fold into the coordination)."""
         present = [a for a in group.concrete if not is_none_literal(a.value)]
         absent = [a for a in group.concrete if is_none_literal(a.value)]
+        grouped, singles = self._split_groupable(present)
         points: List[Fragment] = []
-        if present:
-            points.append(self._group_point(group, present))
+        if grouped:
+            points.append(self._group_point(group, grouped))
+        points += [self._group_point(group, [a]) for a in singles]
         if absent:
             points.append(self._absence_point(group, absent))
         return points
+
+    @staticmethod
+    def _split_groupable(present: List) -> tuple:
+        """:return: ``(grouped, singles)`` — the atomic-scalar assignments to coordinate under one
+        *"respectively"* point, and the assignments to say each on their own. Grouping applies only
+        when 2..:data:`_MAX_RESPECTIVELY` atomic values are present; otherwise every assignment stands
+        alone (a lone value needs no *"respectively"*, and too many would be unreadable to zip).
+        """
+        atomic = [a for a in present if is_atomic_value(a.value)]
+        if 2 <= len(atomic) <= _MAX_RESPECTIVELY:
+            return atomic, [a for a in present if not is_atomic_value(a.value)]
+        return [], present
 
     def _absence_point(self, group: AttributeGroup, absent: List) -> Fragment:
         """:return: *"the <object> has no <attrs>"* for attributes assigned ``None``."""

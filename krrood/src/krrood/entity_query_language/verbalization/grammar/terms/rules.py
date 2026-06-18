@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import dataclasses
 import enum
 import itertools
 
 from typing_extensions import Any, List, Optional
 
-from krrood.symbol_graph.symbol_graph import Symbol
 from krrood.entity_query_language.core.mapped_variable import FlatVariable
 from krrood.entity_query_language.core.variable import (
     ExternallySetVariable,
@@ -25,6 +23,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Number,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
+from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
+    is_concrete_object_literal,
+)
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     PhraseRule,
     RuleContext,
@@ -32,9 +33,19 @@ from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule im
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
     FallbackNouns,
+    Prepositions,
     SetMembership,
     Specificity,
 )
+
+#: Field names tried, in order, to identify a concrete object when its class declares no
+#: ``_identifying_attributes_`` — the first one present names it (*"a specific Body with name
+#: 'door'"*). Conventional identity fields, so the heuristic is deterministic, not a guess.
+_CONVENTIONAL_ID_FIELDS = ("name", "id", "label", "key", "uuid")
+
+#: Only scalar identifying values are shown — a nested object would re-open the very ``repr`` blow-up
+#: that *"a specific <Type>"* exists to avoid.
+_SCALAR_ID_TYPES = (str, int, float, bool, enum.Enum)
 
 #: The most domain values a value-type variable lists before falling back to its type name — a
 #: bounded peek keeps the rendering cheap and never enumerates a large (or entity) domain.
@@ -104,7 +115,9 @@ class VariableRule(PhraseRule):
         return PhraseFragment(
             parts=[
                 SetMembership.ONE_OF.as_fragment(),
-                oxford_comma(fragments, Conjunctions.OR.as_fragment()),
+                oxford_comma(
+                    fragments, Conjunctions.OR.as_fragment(), pair_comma=False
+                ),
             ]
         )
 
@@ -136,27 +149,70 @@ class LiteralRule(PhraseRule):
     name = "literal"
 
     def build(self, node: Literal, context: RuleContext) -> Fragment:
-        value = node._value_
-        if self._is_concrete_object(value):
-            # Identity, not the (possibly huge) repr: "a specific Body".
-            return NounPhrase(
-                head=RoleFragment.for_variable(type(value).__name__, node),
-                definiteness=Definiteness.INDEFINITE,
-                pre_head=Specificity.SPECIFIC.as_fragment(),
-            )
+        if is_concrete_object_literal(node):
+            return self._concrete_object(node, context)
         return RoleFragment(
-            text=context.services.type_name_of_value(value),
+            text=context.services.type_name_of_value(node._value_),
             role=SemanticRole.LITERAL,
         )
 
+    def _concrete_object(self, node: Literal, context: RuleContext) -> Fragment:
+        """:return: *"a specific <Type>"* for a concrete object literal — identity, not its (possibly
+        huge) repr — qualified by its identifying field(s) when any are known (*"a specific Body with
+        name 'door'"*). The fields come from the class's ``_identifying_attributes_`` if it declares
+        any, else the first present :data:`conventional identity field <_CONVENTIONAL_ID_FIELDS>`.
+        """
+        value = node._value_
+        details = [
+            PhraseFragment(
+                parts=[
+                    RoleFragment(text=name, role=SemanticRole.ATTRIBUTE),
+                    RoleFragment(
+                        text=context.services.type_name_of_value(field_value),
+                        role=SemanticRole.LITERAL,
+                    ),
+                ]
+            )
+            for name, field_value in self._identifying_fields(value)
+        ]
+        modifiers: List[Fragment] = (
+            [
+                Prepositions.WITH.as_fragment(),
+                oxford_comma(details, Conjunctions.AND.as_fragment(), pair_comma=False),
+            ]
+            if details
+            else []
+        )
+        return NounPhrase(
+            head=RoleFragment.for_variable(type(value).__name__, node),
+            definiteness=Definiteness.INDEFINITE,
+            pre_head=Specificity.SPECIFIC.as_fragment(),
+            modifiers=modifiers,
+        )
+
     @staticmethod
-    def _is_concrete_object(value: Any) -> bool:
-        """:return: ``True`` when *value* is a concrete domain-object instance (a dataclass or
-        :class:`Symbol` instance) — rendered by identity (*"a specific Body"*) rather than its repr.
-        A class object, primitive, ``enum`` member, ``datetime``, or ``None`` is not."""
-        if isinstance(value, type):
-            return False
-        return dataclasses.is_dataclass(value) or isinstance(value, Symbol)
+    def _identifying_fields(value: Any) -> List[tuple]:
+        """:return: The ``(name, value)`` pairs that identify *value* for display — the class's
+        declared ``_identifying_attributes_`` (a name or iterable of names) if present, else the first
+        present conventional identity field — keeping only scalar values."""
+        declared = getattr(type(value), "_identifying_attributes_", None)
+        if callable(declared):
+            try:
+                declared = declared()
+            except TypeError:
+                declared = None
+        if isinstance(declared, str):
+            names: List[str] = [declared]
+        elif declared:
+            names = list(declared)
+        else:
+            names = [f for f in _CONVENTIONAL_ID_FIELDS if hasattr(value, f)][:1]
+        return [
+            (name, getattr(value, name))
+            for name in names
+            if hasattr(value, name)
+            and isinstance(getattr(value, name), _SCALAR_ID_TYPES)
+        ]
 
 
 class ExternalVariableRule(PhraseRule):
