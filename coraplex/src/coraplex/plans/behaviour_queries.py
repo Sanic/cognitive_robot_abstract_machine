@@ -1,329 +1,293 @@
 """
 Queries about a robot's past execution behaviour, expressed in the KRROOD Entity Query Language.
 
-The module builds a representative example plan — a sequential pick-and-place task wrapped
-in a TryInOrderNode with a MonitorNode — then executes every query against it.
-Each query is prefixed with a comment that states the plain-English question it answers.
+The plan is taken directly from the bullet-world demo (coraplex/demos/coraplex_bullet_world_demo/demo.py):
+a PR2 parks its arms, raises its torso, then transports three objects (milk, bowl, spoon) to a table.
+After execution the plan graph is queried with EQL.
+
+Each query is wrapped in a BehaviourQuery that pairs the natural-language question with the
+EQL object so both can be inspected, logged, or evaluated together.
 """
 
 from __future__ import annotations
 
-import datetime
-from dataclasses import dataclass, field
-from typing import Optional
+import os
+from dataclasses import dataclass
+from typing import Any
 
 import krrood.entity_query_language.factories as eql
-from coraplex.datastructures.enums import TaskStatus
-from coraplex.language import MonitorNode, SequentialNode, TryInOrderNode
-from coraplex.plans.plan import Plan
+from coraplex.datastructures.dataclasses import Context
+from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment, TaskStatus
+from coraplex.datastructures.grasp import GraspDescription
+from coraplex.motion_executor import simulated_robot
+from coraplex.plans.factories import sequential
 from coraplex.plans.plan_node import ActionNode, PlanNode
+from coraplex.robot_plans.actions.composite.transporting import TransportAction
+from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
+from coraplex.testing import setup_world
+from semantic_digital_twin.adapters.mesh import STLParser
+from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Bowl, Spoon, Drawer, Handle,
+)
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.connections import FixedConnection
 
 
 # ---------------------------------------------------------------------------
-# Minimal stub objects so the plan can be built without a live robot / world
+# BehaviourQuery — bundles a natural-language question with its EQL object
 # ---------------------------------------------------------------------------
 
-@dataclass(eq=False)
-class _StubNode(PlanNode):
-    """A concrete PlanNode that records a fake execution trace when performed."""
+@dataclass
+class BehaviourQuery:
+    """A natural-language question paired with the EQL query that answers it."""
 
-    label: str = ""
-    _forced_status: TaskStatus = TaskStatus.SUCCEEDED
-    _duration_seconds: float = 1.0
-    _failure: Optional[Exception] = field(default=None, repr=False)
+    question: str
+    query: Any  # krrood SymbolicExpression / Query / Quantifier
 
-    def _perform(self):
-        pass  # execution is pre-filled below
+    def evaluate(self):
+        """Evaluate the query and return results."""
+        return self.query.evaluate()
 
-
-def _stamp(node: PlanNode, status: TaskStatus, start_offset: float, duration: float,
-           reason=None) -> None:
-    """Back-fill timing and status fields to simulate a completed execution."""
-    t0 = datetime.datetime(2026, 6, 18, 10, 0, 0) + datetime.timedelta(seconds=start_offset)
-    node.start_time = t0
-    node.end_time = t0 + datetime.timedelta(seconds=duration)
-    node.status = status
-    node.reason = reason
+    def __repr__(self) -> str:
+        return f"BehaviourQuery({self.question!r})"
 
 
 # ---------------------------------------------------------------------------
-# Build a representative plan
-#
-# Task: navigate → pick up object → place object
-# Wrapped in a TryInOrderNode so a fallback is available.
-# A MonitorNode watches for collisions and interrupts if triggered.
-#
-# Simulated outcome:
-#   - First navigate attempt FAILED (NavigationGoalNotReachedError)
-#   - TryInOrderNode fell through to a second navigate attempt (SUCCEEDED)
-#   - PickUp SUCCEEDED
-#   - Place SUCCEEDED
-#   - MonitorNode fired once (INTERRUPTED) before the second navigate
+# World and plan setup — verbatim from the bullet-world demo
 # ---------------------------------------------------------------------------
 
-from coraplex.plans.failures import NavigationGoalNotReachedError
+_resources = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "resources")
 
-plan = Plan()
+world = setup_world()
 
-# --- Root: TryInOrderNode -------------------------------------------------
-root = TryInOrderNode()
-plan.add_node(root)
-_stamp(root, TaskStatus.SUCCEEDED, start_offset=0.0, duration=12.5)
+spoon = STLParser(os.path.join(_resources, "objects", "spoon.stl")).parse()
+bowl = STLParser(os.path.join(_resources, "objects", "bowl.stl")).parse()
 
-# --- MonitorNode (collision watch) ----------------------------------------
-monitor = MonitorNode(condition=lambda: False, behavior=None)  # type: ignore[arg-type]
-plan.add_edge(root, monitor)
-_stamp(monitor, TaskStatus.INTERRUPTED, start_offset=0.0, duration=2.1)
+with world.modify_world():
+    world.merge_world_at_pose(
+        bowl,
+        HomogeneousTransformationMatrix.from_xyz_quaternion(2.4, 2.2, 1, reference_frame=world.root),
+    )
+    connection = FixedConnection(
+        parent=world.get_body_by_name("cabinet10_drawer_top"),
+        child=spoon.root,
+        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(-0.05, -0.05, 0),
+    )
+    world.merge_world(spoon, connection)
 
-# --- First navigate attempt (FAILED) --------------------------------------
-nav_fail = _StubNode(label="NavigateAction[attempt=1]")
-plan.add_edge(root, nav_fail)
-_stamp(nav_fail, TaskStatus.FAILED, start_offset=0.2, duration=3.0,
-       reason=NavigationGoalNotReachedError("goal unreachable"))
+pr2 = PR2.from_world(world)
+context = Context(world=world, robot=pr2, _debug=False, ros_node=None)
 
-# --- Second navigate attempt (SUCCEEDED) ----------------------------------
-nav_ok = _StubNode(label="NavigateAction[attempt=2]")
-plan.add_edge(root, nav_ok)
-_stamp(nav_ok, TaskStatus.SUCCEEDED, start_offset=3.5, duration=4.0)
+with world.modify_world():
+    WorldReasoner(world).reason()
+    world.add_semantic_annotations([
+        Bowl(root=world.get_body_by_name("bowl.stl")),
+        Spoon(root=world.get_body_by_name("spoon.stl")),
+    ])
+    world.add_semantic_annotation_recursively(
+        Drawer(
+            root=world.get_body_by_name("cabinet10_drawer_top"),
+            handle=Handle(root=world.get_body_by_name("handle_cab10_t")),
+        )
+    )
 
-# --- Sequential: pick then place ------------------------------------------
-seq = SequentialNode()
-plan.add_edge(root, seq)
-_stamp(seq, TaskStatus.SUCCEEDED, start_offset=7.5, duration=5.0)
+context.evaluate_conditions = False
 
-pick = _StubNode(label="PickUpAction")
-plan.add_edge(seq, pick)
-_stamp(pick, TaskStatus.SUCCEEDED, start_offset=7.5, duration=2.5)
+plan = sequential(
+    [
+        ParkArmsAction(Arms.BOTH),
+        MoveTorsoAction(TorsoState.HIGH),
+        TransportAction(
+            world.get_body_by_name("milk.stl"),
+            Pose.from_xyz_rpy(4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root),
+            Arms.LEFT,
+        ),
+        TransportAction(
+            world.get_body_by_name("bowl.stl"),
+            Pose.from_xyz_rpy(5, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
+            Arms.LEFT,
+        ),
+        TransportAction(
+            world.get_body_by_name("spoon.stl"),
+            Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
+            Arms.LEFT,
+            GraspDescription(
+                ApproachDirection.FRONT,
+                VerticalAlignment.TOP,
+                pr2.left_arm.end_effector,
+            ),
+        ),
+    ],
+    context=context,
+).plan
 
-place = _StubNode(label="PlaceAction")
-plan.add_edge(seq, place)
-_stamp(place, TaskStatus.SUCCEEDED, start_offset=10.0, duration=2.5)
+with simulated_robot:
+    plan.perform()
 
 
 # ---------------------------------------------------------------------------
-# Helper: a variable ranging over every node in the plan
+# EQL variable — all nodes in the executed plan
 # ---------------------------------------------------------------------------
 
-def _all_nodes():
+def _nodes():
     return eql.variable(PlanNode, domain=plan.plan_graph.nodes())
 
 
-# ===========================================================================
-# QUERIES
-# ===========================================================================
-
-# ---------------------------------------------------------------------------
-# "What did you just do?" — leaf nodes that finished successfully
-# ---------------------------------------------------------------------------
-def what_did_you_do():
-    n = _all_nodes()
-    return eql.an(eql.entity(n).where(n.is_leaf, n.status == TaskStatus.SUCCEEDED))
+def _action_nodes():
+    return eql.variable(ActionNode, domain=plan.plan_graph.nodes())
 
 
 # ---------------------------------------------------------------------------
-# "Walk me through what you did in order."
+# Queries
 # ---------------------------------------------------------------------------
-def walk_through_in_order():
-    n = _all_nodes()
-    return (
-        eql.an(eql.entity(n).where(n.status == TaskStatus.SUCCEEDED))
-        .ordered_by(n.start_time)
-    )
+
+queries: list[BehaviourQuery] = [
+
+    BehaviourQuery(
+        question="What did you just do?",
+        query=eql.an(
+            eql.entity(_nodes()).where(
+                _nodes().is_leaf,
+                _nodes().status == TaskStatus.SUCCEEDED,
+            )
+        ).ordered_by(_nodes().start_time),
+    ),
+
+    BehaviourQuery(
+        question="Walk me through what you did in order.",
+        query=eql.an(
+            eql.entity(_nodes()).where(_nodes().status == TaskStatus.SUCCEEDED)
+        ).ordered_by(_nodes().start_time),
+    ),
+
+    BehaviourQuery(
+        question="How long did the whole task take?",
+        query=eql.the(eql.entity(_nodes()).where(_nodes().parent == None)),  # noqa: E711
+    ),
+
+    BehaviourQuery(
+        question="How long did each step take?",
+        query=(
+            eql.set_of(_nodes(), duration := _nodes().end_time - _nodes().start_time)
+            .where(_nodes().end_time != None)  # noqa: E711
+            .ordered_by(_nodes().start_time)
+        ),
+    ),
+
+    BehaviourQuery(
+        question="Did anything go wrong?",
+        query=eql.an(eql.entity(_nodes()).where(_nodes().status == TaskStatus.FAILED)),
+    ),
+
+    BehaviourQuery(
+        question="Why did you fail at that step?",
+        query=eql.an(eql.entity(_nodes().reason).where(_nodes().status == TaskStatus.FAILED)),
+    ),
+
+    BehaviourQuery(
+        question="How many times did you retry before giving up?",
+        query=eql.count(_nodes()).where(_nodes().status == TaskStatus.FAILED),
+    ),
+
+    BehaviourQuery(
+        question="Which fallback did you end up using?",
+        query=eql.an(
+            eql.entity(_nodes()).where(
+                _nodes().status == TaskStatus.SUCCEEDED,
+                eql.exists(
+                    eql.variable(PlanNode, domain=_nodes().left_siblings),
+                    lambda s: s.status == TaskStatus.FAILED,
+                ),
+            )
+        ),
+    ),
+
+    BehaviourQuery(
+        question="Were you ever interrupted? What caused it?",
+        query=eql.an(eql.entity(_nodes()).where(_nodes().status == TaskStatus.INTERRUPTED)),
+    ),
+
+    BehaviourQuery(
+        question="Was there a point where you were paused?",
+        query=eql.an(eql.entity(_nodes()).where(_nodes().status == TaskStatus.PAUSE)),
+    ),
+
+    BehaviourQuery(
+        question="Which step took the longest?",
+        query=eql.max(
+            _nodes(),
+            key=lambda node: (node.end_time - node.start_time).total_seconds()
+            if node.end_time is not None else 0.0,
+        ),
+    ),
+
+    BehaviourQuery(
+        question="Were all subtasks successful, or did some fail?",
+        query=(
+            eql.set_of(_nodes().status, c := eql.count(_nodes()))
+            .grouped_by(_nodes().status)
+            .ordered_by(c, descending=True)
+        ),
+    ),
+
+    BehaviourQuery(
+        question="What world modifications did you make?",
+        query=eql.an(
+            eql.entity(_action_nodes().execution_data.added_world_modifications)
+            .where(
+                _action_nodes().status == TaskStatus.SUCCEEDED,
+                _action_nodes().execution_data != None,  # noqa: E711
+            )
+        ),
+    ),
+
+    BehaviourQuery(
+        question="What was the state of the world when you started the task?",
+        query=eql.the(
+            eql.entity(_action_nodes().execution_data.execution_start_world_state)
+            .where(
+                _action_nodes().parent == None,  # noqa: E711
+                _action_nodes().execution_data != None,  # noqa: E711
+            )
+        ),
+    ),
+
+    BehaviourQuery(
+        question="What was the state of the world when you finished?",
+        query=eql.the(
+            eql.entity(_action_nodes().execution_data.execution_end_world_state)
+            .where(
+                _action_nodes().parent == None,  # noqa: E711
+                _action_nodes().execution_data != None,  # noqa: E711
+            )
+        ),
+    ),
+]
 
 
 # ---------------------------------------------------------------------------
-# "How long did the whole task take?"
+# Demo: print each question and evaluate
 # ---------------------------------------------------------------------------
-def total_task_duration():
-    n = _all_nodes()
-    return eql.the(eql.entity(n).where(n.parent == None))  # noqa: E711 — EQL uses ==
 
-
-# ---------------------------------------------------------------------------
-# "How long did each step take?"
-# ---------------------------------------------------------------------------
-def duration_per_step():
-    n = _all_nodes()
-    duration = n.end_time - n.start_time
-    return (
-        eql.set_of(n, duration)
-        .where(n.end_time != None)  # noqa: E711
-        .ordered_by(n.start_time)
-    )
-
-
-# ---------------------------------------------------------------------------
-# "Did anything go wrong?"
-# ---------------------------------------------------------------------------
-def did_anything_go_wrong():
-    n = _all_nodes()
-    return eql.an(eql.entity(n).where(n.status == TaskStatus.FAILED))
-
-
-# ---------------------------------------------------------------------------
-# "Why did you fail at that step?"
-# ---------------------------------------------------------------------------
-def why_did_you_fail():
-    n = _all_nodes()
-    return eql.an(eql.entity(n.reason).where(n.status == TaskStatus.FAILED))
-
-
-# ---------------------------------------------------------------------------
-# "How many times did you retry before giving up?"
-# ---------------------------------------------------------------------------
-def how_many_retries():
-    n = _all_nodes()
-    return eql.count(n).where(n.status == TaskStatus.FAILED)
-
-
-# ---------------------------------------------------------------------------
-# "Which fallback did you end up using?"
-# ---------------------------------------------------------------------------
-def which_fallback_was_used():
-    n = _all_nodes()
-    return eql.an(
-        eql.entity(n).where(
-            n.status == TaskStatus.SUCCEEDED,
-            n.parent.status == TaskStatus.SUCCEEDED,
-            # The node's left siblings all failed — it is therefore a fallback that ran
-            eql.for_all(
-                eql.variable(PlanNode, domain=n.left_siblings),
-                lambda s: s.status == TaskStatus.FAILED,
-            ),
-        )
-    )
-
-
-# ---------------------------------------------------------------------------
-# "Were you ever interrupted? What caused it?"
-# ---------------------------------------------------------------------------
-def were_you_interrupted():
-    n = _all_nodes()
-    return eql.an(eql.entity(n).where(n.status == TaskStatus.INTERRUPTED))
-
-
-# ---------------------------------------------------------------------------
-# "Was there a point where you were paused?"
-# ---------------------------------------------------------------------------
-def were_you_ever_paused():
-    n = _all_nodes()
-    return eql.an(eql.entity(n).where(n.status == TaskStatus.PAUSE))
-
-
-# ---------------------------------------------------------------------------
-# "Which step took the longest?"
-# ---------------------------------------------------------------------------
-def which_step_took_longest():
-    n = _all_nodes()
-    return eql.max(
-        n,
-        key=lambda node: (node.end_time - node.start_time).total_seconds()
-        if node.end_time is not None else 0.0,
-    )
-
-
-# ---------------------------------------------------------------------------
-# "Were all subtasks successful, or did some fail?"
-# — returns a breakdown of node counts per status
-# ---------------------------------------------------------------------------
-def status_breakdown():
-    n = _all_nodes()
-    return (
-        eql.set_of(n.status, c := eql.count(n))
-        .grouped_by(n.status)
-        .ordered_by(c, descending=True)
-    )
-
-
-# ---------------------------------------------------------------------------
-# "Did any monitored condition trigger during execution?"
-# ---------------------------------------------------------------------------
-def did_monitor_trigger():
-    m = eql.variable(MonitorNode, domain=plan.plan_graph.nodes())
-    return eql.an(eql.entity(m).where(m.status == TaskStatus.INTERRUPTED))
-
-
-# ---------------------------------------------------------------------------
-# "What world modifications did you make?"
-# — ActionNodes carry execution_data with added_world_modifications
-# ---------------------------------------------------------------------------
-def what_world_modifications_were_made():
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
-    return eql.an(
-        eql.entity(n.execution_data.added_world_modifications)
-        .where(
-            n.status == TaskStatus.SUCCEEDED,
-            n.execution_data != None,  # noqa: E711
-        )
-    )
-
-
-# ---------------------------------------------------------------------------
-# Demo: evaluate every query and print results
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    def _sep(title: str):
+    for bq in queries:
         print(f"\n{'=' * 60}")
-        print(f"  {title}")
-        print('=' * 60)
-
-    _sep("What did you just do?")
-    for node in what_did_you_do().evaluate():
-        print(f"  {node.label!r}  [{node.status.name}]")
-
-    _sep("Walk me through what you did in order")
-    for node in walk_through_in_order().evaluate():
-        print(f"  {node.start_time:%H:%M:%S}  {node.label!r}")
-
-    _sep("How long did the whole task take?")
-    root_node = total_task_duration().evaluate()
-    print(f"  {(root_node.end_time - root_node.start_time).total_seconds():.1f}s")
-
-    _sep("How long did each step take?")
-    for result in duration_per_step().evaluate():
-        node = result[eql.variable(PlanNode)]
-        print(f"  {node.label!r}: {result}")
-
-    _sep("Did anything go wrong?")
-    failed = list(did_anything_go_wrong().evaluate())
-    if failed:
-        for node in failed:
-            print(f"  {node.label!r} — reason: {node.reason}")
-    else:
-        print("  Nothing failed.")
-
-    _sep("Why did you fail at that step?")
-    for reason in why_did_you_fail().evaluate():
-        print(f"  {reason}")
-
-    _sep("How many times did you retry?")
-    print(f"  {how_many_retries().evaluate()}")
-
-    _sep("Which fallback did you end up using?")
-    for node in which_fallback_was_used().evaluate():
-        print(f"  {node.label!r}")
-
-    _sep("Were you ever interrupted?")
-    for node in were_you_interrupted().evaluate():
-        print(f"  {type(node).__name__} was interrupted")
-
-    _sep("Were you ever paused?")
-    paused = list(were_you_ever_paused().evaluate())
-    print(f"  {'Yes' if paused else 'No'}")
-
-    _sep("Which step took the longest?")
-    longest = which_step_took_longest().evaluate()
-    print(f"  {longest.label!r}: "
-          f"{(longest.end_time - longest.start_time).total_seconds():.1f}s")
-
-    _sep("Status breakdown")
-    for result in status_breakdown().evaluate():
-        print(f"  {result}")
-
-    _sep("Did any monitor trigger?")
-    monitors = list(did_monitor_trigger().evaluate())
-    print(f"  {'Yes — ' + str(len(monitors)) + ' monitor(s) fired' if monitors else 'No'}")
-
-    _sep("What world modifications were made?")
-    for mod in what_world_modifications_were_made().evaluate():
-        print(f"  {mod}")
+        print(f"  Q: {bq.question}")
+        print(f"  {'─' * 56}")
+        try:
+            result = bq.evaluate()
+            if hasattr(result, "__iter__"):
+                items = list(result)
+                if items:
+                    for item in items:
+                        print(f"    {item}")
+                else:
+                    print("    (no results)")
+            else:
+                print(f"    {result}")
+        except Exception as exc:
+            print(f"    ERROR: {exc}")
