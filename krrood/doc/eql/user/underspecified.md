@@ -243,31 +243,24 @@ independent (fully-factorized) model over the free variables.  For realistic rob
 usually want a **learned** model that captures correlations between fields — for example a
 *Joint Probability Tree* (JPT) trained on recorded execution data.
 
-You can inject any {py:class}`~probabilistic_model.probabilistic_model.ProbabilisticModel` via a
-{py:class}`~krrood.parametrization.model_registries.DictRegistry`, which maps each target class to
-its own model:
+You can inject a pre-trained
+{py:class}`~probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit.ProbabilisticCircuit`
+via a {py:class}`~krrood.parametrization.model_registries.DictRegistry`, which maps each target
+class to its own model:
 
 ```python
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import underspecified
-from krrood.parametrization.feature_extractor import FeatureExtractor
 from krrood.parametrization.model_registries import DictRegistry
-from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from krrood.ormatic.data_access_objects.helper import to_dao
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.probabilistic_circuit.relational.learn_rspn import learn_probabilistic_circuit
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit
 
-# 1. Collect training data as DAOs
-training_actions = [...]   # list of NestedAction instances recorded from the robot
-training_daos = [to_dao(a) for a in training_actions]
+# Load a pre-trained circuit (e.g. a JPT saved to disk)
+learned_model: ProbabilisticCircuit = ProbabilisticCircuit.from_json("nested_action_model.json")
 
-# 2. Learn a circuit from the data
-learned_model = learn_probabilistic_circuit(training_daos)
-
-# 3. Register the model for the target class
+# Register the model for the target class
 registry = DictRegistry({NestedAction: learned_model})
 
-# 4. Build the underspecified query as usual
+# Build the underspecified query as usual
 query = underspecified(NestedAction)(
     obj=Body(name="mug"),
     pose=underspecified(KRROODPose)(
@@ -276,7 +269,7 @@ query = underspecified(NestedAction)(
     ),
 )
 
-# 5. Pass the registry to the backend
+# Pass the registry to the backend
 backend = ProbabilisticBackend(registry, number_of_samples=10)
 samples = list(backend.evaluate(query))
 ```
