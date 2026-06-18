@@ -103,17 +103,22 @@ class ActionServerTask(
         logger.info(f"Action server {self.action_topic} done.")
 
 
+_NavGoal = getattr(NavigateToPose, "Goal", object)
+_NavResult = getattr(NavigateToPose, "Result", object)
+_NavFeedback = getattr(NavigateToPose, "Feedback", object)
+
+
 @dataclass(eq=False, repr=False)
 class NavigateActionServerTask(
     ActionServerTask[
         NavigateToPose,
-        NavigateToPose.Goal,
-        NavigateToPose.Result,
-        NavigateToPose.Feedback,
+        _NavGoal,
+        _NavResult,
+        _NavFeedback,
     ]
 ):
     """
-    Node for calling a Navigation2 ROS2 action server to navigate to a given pose.1
+    Node for calling a Navigation2 ROS2 action server to navigate to a given pose.
     """
 
     target_pose: Pose
@@ -124,11 +129,6 @@ class NavigateActionServerTask(
     base_link: Body
     """
     Base link of the robot, used for estimating the distance to the goal
-    """
-
-    action_topic: str
-    """
-    Topic name for the navigation action server.
     """
 
     def build_msg(self, context: MotionStatechartContext):
@@ -176,9 +176,6 @@ class NavigateActionServerTask(
             position_error < 0.01, sm.abs(rotation_error) < 0.01
         )
 
-        logger.info(f"Waiting for action server {self.action_topic}")
-        self._action_client.wait_for_server()
-
         return artifacts
 
     def on_start(self, context: MotionStatechartContext):
@@ -189,9 +186,18 @@ class NavigateActionServerTask(
         future.add_done_callback(self.goal_response_callback)
 
     def goal_response_callback(self, future):
+        """
+        Handles the server's response to the goal submission.
+
+        On rejection a failure sentinel is stored so that :meth:`on_tick` can
+        return :attr:`~ObservationStateValues.FALSE` immediately.
+        """
         goal_handle = future.result()
         if not goal_handle.accepted:
             logger.error("Goal rejected by navigation server")
+            rejected_result = NavigateToPose.Result()
+            rejected_result.error_code = NavigateToPose.Result.UNKNOWN_ERROR
+            self._result = rejected_result
             return
 
         logger.info("Sent query to navigate_to_pose")
@@ -200,6 +206,9 @@ class NavigateActionServerTask(
         result_future.add_done_callback(self.result_callback)
 
     def result_callback(self, future):
+        """
+        Stores the navigation result returned by the action server.
+        """
         result_response = future.result()
         self._result = result_response.result
         logger.info(

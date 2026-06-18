@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from copy import deepcopy
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
@@ -5,7 +7,6 @@ from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.goals.cartesian_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.open_close import Close
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
@@ -72,27 +73,22 @@ class StretchMoveSim(MoveMotion, AlternativeMotion[Stretch]):
         world_T_target.z = 0
         return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.01)
 
-    class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
-        """
-        Uses a Nav2 action server to move the base of the real HSRB
-        """
 
-        execution_type = ExecutionType.REAL
+class StretchMoveReal(MoveMotion, AlternativeMotion[Stretch]):
+    """
+    Uses a Giskard differential drive goal to move the Stretch base during real execution.
+    """
 
-        def perform(self):
-            return
+    execution_type = ExecutionType.REAL
 
-        def _motion_chart(self) -> NavigateActionServerTask:
-            world_T_target = self.world.transform(self.target, self.world.root)
-            world_T_target.z = 0
-            return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.1)
-            # Commented out for now since we use the giskard goal which also works for smaller distances
-            # return NavigateActionServerTask(
-            #     target_pose=self.target,
-            #     base_link=self.robot.root,
-            #     action_topic="/navigate_to_pose",
-            #     message_type=NavigateToPose,
-            # )
+    def perform(self):
+        return
+
+    @property
+    def _motion_chart(self) -> DifferentialDriveBaseGoal:
+        world_T_target = self.world.transform(self.target, self.world.root)
+        world_T_target.z = 0
+        return DifferentialDriveBaseGoal(goal_pose=world_T_target, threshold=0.1)
 
 
 class StretchClose(ClosingMotion, AlternativeMotion[Stretch]):

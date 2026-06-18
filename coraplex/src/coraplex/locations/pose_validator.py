@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 
@@ -180,6 +182,10 @@ class AreReachableBy(PoseValidator):
                     == ViewManager.get_end_effector_view(arm, self.robot).tool_frame
                 ):
                     correct_arm = arm
+            if correct_arm is None:
+                raise ValueError(
+                    f"tip_link {self.tip_link} does not match any arm of {self.robot}"
+                )
             sequence = []
             for pose in self.pose_sequence:
 
@@ -255,6 +261,8 @@ class AreReachableBy(PoseValidator):
             executor.compile(msc)
 
             try:
+                # TimeoutError from tick_until_end is an expected outcome (planner
+                # cannot find a path), not an illegal state — no non-raising API exists.
                 executor.tick_until_end()
             except TimeoutError:
                 logger.debug(

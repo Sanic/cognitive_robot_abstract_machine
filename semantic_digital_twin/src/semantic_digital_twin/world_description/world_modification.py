@@ -4,6 +4,10 @@ from functools import wraps
 
 from typing_extensions import (
     List,
+    Dict,
+    Any,
+    Self,
+    Optional,
     TYPE_CHECKING,
 )
 
@@ -13,11 +17,12 @@ from krrood.adapters.json_serializer import (
     JSONAttributeDiff,
     list_like_classes,
     JSONData,
+    to_json,
+    from_json,
 )
 from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingIDsInWorldModification,
-    WorldEntityWithIDNotFoundError,
 )
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithID,
@@ -30,10 +35,8 @@ if TYPE_CHECKING:
 
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from typing import Dict, Any, Self, TYPE_CHECKING, Optional
 from uuid import UUID
 
-from krrood.adapters.json_serializer import to_json, from_json
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -43,9 +46,6 @@ from semantic_digital_twin.world_description.world_entity import (
     Connection,
     Actuator,
 )
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.world import World
 
 
 @dataclass
@@ -478,10 +478,16 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
                 setattr(entity, diff.attribute_name, obj)
         world._model_manager.current_model_modification_block.append(self)
 
-    def update_world_references_in_updated_kwargs(self, world: World):
+    def update_world_references_in_updated_kwargs(self, world: World) -> List[JSONAttributeDiff]:
+        """
+        Resolves world entity references in the updated kwargs against the given world.
+
+        :param world: World to resolve entity references against
+        :return: Updated kwargs with world entity references resolved
+        """
         tracker = WorldEntityWithIDKwargsTracker.from_world(world)
         kwargs = tracker.create_kwargs()
-        return from_json(to_json(self.updated_kwargs), **kwargs)
+        return from_json(to_json(self.updated_kwargs_json_list), **kwargs)
 
     def _apply_to_list(
         self, current_value: List[Any], diff: JSONAttributeDiff, **kwargs

@@ -4,9 +4,7 @@ import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from inspect import signature
-from typing import Optional
-
-from typing_extensions import TypeVar, Type
+from typing_extensions import TypeVar, Type, Optional
 
 from giskardpy.motion_statechart.graph_node import Task
 from coraplex.plans.designator import Designator

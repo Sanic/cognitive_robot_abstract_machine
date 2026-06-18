@@ -3,9 +3,8 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import List, Any, ClassVar
 
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import List, Any, ClassVar, TYPE_CHECKING
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import LifeCycleValues

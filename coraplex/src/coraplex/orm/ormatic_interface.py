@@ -10623,22 +10623,14 @@ class PoseValidatorDAO(Base, DataAccessObject[coraplex.locations.base.PoseValida
         String(255), nullable=False, use_existing_column=True
     )
 
-    world_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-    robot_id: Mapped[int] = mapped_column(
-        ForeignKey("AbstractRobotDAO.database_id", use_alter=True),
+    context_id: Mapped[int] = mapped_column(
+        ForeignKey("ContextDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
     )
 
-    world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
-    )
-    robot: Mapped[AbstractRobotDAO] = relationship(
-        "AbstractRobotDAO", uselist=False, foreign_keys=[robot_id], post_update=True
+    context: Mapped[ContextDAO] = relationship(
+        "ContextDAO", uselist=False, foreign_keys=[context_id], post_update=True
     )
 
     __mapper_args__ = {
@@ -13449,6 +13441,7 @@ class DifferentialDriveBaseGoalDAO(
     )
 
     weight: Mapped[builtins.float] = mapped_column(use_existing_column=True)
+    threshold: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
     goal_pose_id: Mapped[int] = mapped_column(
         ForeignKey("PoseMappingDAO.database_id", use_alter=True),
@@ -15154,6 +15147,27 @@ class StretchCloseDAO(
     __mapper_args__ = {
         "polymorphic_identity": "StretchCloseDAO",
         "inherit_condition": database_id == ClosingMotionDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class StretchMoveRealDAO(
+    MoveMotionDAO,
+    DataAccessObject[
+        coraplex.alternative_motion_mappings.stretch_motion_mapping.StretchMoveReal
+    ],
+):
+    __tablename__ = "StretchMoveRealDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(MoveMotionDAO.database_id),
+        primary_key=True,
+        use_existing_column=True,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "StretchMoveRealDAO",
+        "inherit_condition": database_id == MoveMotionDAO.database_id,
         "polymorphic_load": "selectin",
     }
 

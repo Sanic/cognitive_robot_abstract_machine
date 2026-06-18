@@ -8,6 +8,7 @@ from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMot
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
     StretchMoveToolCenterPoint,
     StretchMoveSim,
+    StretchMoveReal,
     StretchClose,
 )
 from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
@@ -54,7 +55,7 @@ ALTERNATIVE_MOTION_MAPPINGS = [
     HSRBMoveMotion,
     StretchMoveToolCenterPoint,
     StretchMoveSim,
-    StretchMoveSim.StretchMoveReal,
+    StretchMoveReal,
     StretchClose,
     TiagoMoveSim,
 ]
@@ -305,8 +306,8 @@ def test_visibility_reachability_merge(
         context,
     )
 
-    context.debug_mode = True
     context.ros_node = rclpy_node
+    context.debug = True
 
     with simulated_robot:
         plan.perform()

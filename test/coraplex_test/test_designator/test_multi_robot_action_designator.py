@@ -10,6 +10,7 @@ from coraplex.alternative_motion_mappings.hsrb_motion_mapping import HSRBMoveMot
 from coraplex.alternative_motion_mappings.stretch_motion_mapping import (
     StretchMoveToolCenterPoint,
     StretchMoveSim,
+    StretchMoveReal,
     StretchClose,
 )
 from coraplex.alternative_motion_mappings.tiago_motion_mapping import TiagoMoveSim
@@ -87,7 +88,7 @@ ALTERNATIVE_MOTION_MAPPINGS = [
     HSRBMoveMotion,
     StretchMoveToolCenterPoint,
     StretchMoveSim,
-    StretchMoveSim.StretchMoveReal,
+    StretchMoveReal,
     StretchClose,
     TiagoMoveSim,
 ]

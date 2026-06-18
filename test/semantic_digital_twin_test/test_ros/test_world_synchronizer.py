@@ -1073,6 +1073,25 @@ def test_attribute_update_modification_apply_direct():
     assert b1 not in anno.entities
 
 
+def test_update_world_references_in_updated_kwargs():
+    world = World()
+    body = Body(name=PrefixedName("ref_body"))
+    anno = TestAnnotation(name=PrefixedName("anno"))
+    with world.modify_world():
+        world.add_body(body)
+        world.add_semantic_annotation(anno)
+
+    mod = AttributeUpdateModification(
+        entity_id=anno.id,
+        updated_kwargs_json_list=[
+            JSONAttributeDiff(attribute_name="entity", added_values=[to_json(body.id)])
+        ],
+    )
+    resolved = mod.update_world_references_in_updated_kwargs(world)
+    assert isinstance(resolved, list)
+    assert len(resolved) == 1
+
+
 def test_skipping_incorrect_message(rclpy_node):
     w1 = World(name="w1")
     w2 = World(name="w2")
