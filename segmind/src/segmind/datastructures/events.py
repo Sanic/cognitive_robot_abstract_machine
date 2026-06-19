@@ -1,18 +1,24 @@
+from __future__ import annotations
+
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import cached_property
 
 from geometry_msgs.msg import PoseStamped
+from krrood.ormatic.data_access_objects.dao import DataAccessObject
+from krrood.ormatic.data_access_objects.helper import to_dao
+from typing_extensions import Optional, List, TYPE_CHECKING
 
-from typing_extensions import Optional, List
-
-from segmind.datastructures.mixins import HasPrimaryTrackedObject, HasPrimaryAndSecondaryTrackedObjects
-from segmind.datastructures.object_tracker import ObjectTrackerFactory
+from segmind.datastructures.object_tracker import ObjectEventTracker, ObjectTrackerFactory
 from semantic_digital_twin.orm.ormatic_interface import BodyDAO
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.geometry import BoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
+
+if TYPE_CHECKING:
+    from test.krrood_test.dataset.ormatic_interface import WorldDAO
 
 
 @dataclass
@@ -38,96 +44,86 @@ class DetectionEvent(ABC):
         return self.__str__()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EventWithTrackedObjects(DetectionEvent, ABC):
     """
-    An abstract class that represents an event that involves one or more tracked objects.
+    An abstract event involving one or more tracked objects.
+
+    Provides the primary :attr:`tracked_object` and an optional :attr:`with_object`,
+    along with ORM frozen copies and per-object tracker access.
     """
 
-    @property
-    @abstractmethod
-    def tracked_objects(self) -> List[Body]:
-        """
-        The tracked objects involved in the event.
-        """
-        pass
+    tracked_object: Body
+    """The primary object involved in this event."""
 
+    with_object: Optional[Body] = None
+    """The secondary object involved in this event, if any."""
 
+    tracked_object_frozen_copy: Optional[BodyDAO] = field(init=False, default=None, repr=False, hash=False)
+    """Frozen DAO copy of :attr:`tracked_object`, used by ORMatic and the NEEMInterface."""
 
-    @abstractmethod
-    def update_object_trackers_with_event(self, factory: ObjectTrackerFactory) -> None:
-        """
-        Update the object trackers of the involved objects with the event.
-        """
-        pass
+    world_frozen_copy: Optional[WorldDAO] = field(init=False, default=None, repr=False, hash=False)
+    """Frozen DAO copy of the world, used by ORMatic and the NEEMInterface."""
 
+    with_object_frozen_copy: Optional[DataAccessObject[Body]] = field(init=False, default=None, repr=False, hash=False)
+    """Frozen DAO copy of :attr:`with_object`, used by ORMatic and the NEEMInterface."""
 
-@dataclass(kw_only=True)
-class EventWithOneTrackedObject(EventWithTrackedObjects, HasPrimaryTrackedObject, ABC):
-    """
-    An abstract class that represents an event that involves one tracked object.
-    """
-
-    @property
-    def tracked_objects(self) -> List[Body]:
-        return [self.tracked_object]
-
-    def update_object_trackers_with_event(self, factory: ObjectTrackerFactory) -> None:
-        factory.get_tracker(self.tracked_object).add_event(self)
-
-    def __str__(self):
-        return f"{self.__class__.__name__}: {self.tracked_object.name} - {self.timestamp}"
-
-    def __eq__(self, other):
-        return (other.__class__ == self.__class__
-                and self.tracked_object == other
-                and round(self.timestamp, 1) == round(other.timestamp, 1))
-
-    def __hash__(self):
-        return hash((self.__class__, self.tracked_object, round(self.timestamp, 1)))
-
-
-@dataclass(kw_only=True)
-class EventWithTwoTrackedObjects(EventWithTrackedObjects, HasPrimaryAndSecondaryTrackedObjects, ABC):
-    """
-    An abstract class that represents an event that involves two tracked objects.
-    """
-
-    @property
-    def tracked_objects(self) -> List[Body]:
-        return [self.tracked_object, self.with_object] if self.with_object is not None else [self.tracked_object]
-
-    def update_object_trackers_with_event(self, factory: ObjectTrackerFactory) -> None:
-        factory.get_tracker(self.tracked_object).add_event(self)
+    def __post_init__(self):
         if self.with_object is not None:
-            factory.get_tracker(self.with_object).add_event(self)
+            self.with_object_frozen_copy = to_dao(self.with_object)
 
-    def __str__(self):
-        with_object_name = f" - {self.with_object.name}" if self.with_object is not None else ""
-        return f"{self.__class__.__name__}: {self.tracked_object.name}{with_object_name} - {self.timestamp}"
+    @property
+    def tracked_objects(self) -> List[Body]:
+        """
+        :return: the primary object, plus the secondary object when present.
+        """
+        return [self.tracked_object] if self.with_object is None else [self.tracked_object, self.with_object]
 
-    def __eq__(self, other):
+    @cached_property
+    def object_tracker(self) -> ObjectEventTracker:
+        """
+        :return: the event tracker for :attr:`tracked_object`.
+        """
+        return ObjectTrackerFactory.get_tracker(self.tracked_object)
+
+    @cached_property
+    def with_object_tracker(self) -> Optional[ObjectEventTracker]:
+        """
+        :return: the event tracker for :attr:`with_object`, or ``None`` if absent.
+        """
+        return ObjectTrackerFactory.get_tracker(self.with_object) if self.with_object is not None else None
+
+    def update_object_trackers_with_event(self, factory: ObjectTrackerFactory) -> None:
+        """
+        Register this event with the tracker of every involved object.
+
+        :param factory: factory used to look up per-object trackers.
+        """
+        for obj in self.tracked_objects:
+            factory.get_tracker(obj).add_event(self)
+
+    def __str__(self) -> str:
+        names = " - ".join(str(obj.name) for obj in self.tracked_objects)
+        return f"{self.__class__.__name__}: {names} - {self.timestamp}"
+
+    def __eq__(self, other) -> bool:
         return (other.__class__ == self.__class__
-                and self.tracked_object == other.tracked_object
-                and self.with_object == other.with_object
-                and round(self.timestamp, 1) == round(other.timestamp, 1))
+                and self.tracked_objects == other.tracked_objects
+                and self.timestamp == other.timestamp)
 
-    def __hash__(self):
-        hash_tuple = (self.__class__, self.tracked_object, round(self.timestamp, 1))
-        if self.with_object is not None:
-            hash_tuple += (self.with_object,)
-        return hash(hash_tuple)
+    def __hash__(self) -> int:
+        return hash((self.__class__, tuple(self.tracked_objects), self.timestamp))
 
 
 @dataclass(unsafe_hash=True)
-class SupportEvent(EventWithTwoTrackedObjects):
+class SupportEvent(EventWithTrackedObjects):
     """
     The SupportEvent class is used to represent an event that involves an object that is supported by another object.
     """
 
 
 @dataclass(unsafe_hash=True)
-class LossOfSupportEvent(EventWithTwoTrackedObjects):
+class LossOfSupportEvent(EventWithTrackedObjects):
     """
     The LossOfSupportEvent class is used to represent an event that involves an object that was supported by another
     object and then lost support.
@@ -135,7 +131,7 @@ class LossOfSupportEvent(EventWithTwoTrackedObjects):
 
 
 @dataclass(unsafe_hash=True)
-class MotionEvent(EventWithOneTrackedObject, ABC):
+class MotionEvent(EventWithTrackedObjects, ABC):
     """
     Used to represent an event that involves an object that was stationary and then moved or
     vice versa.
@@ -185,7 +181,7 @@ class StopRotationEvent(MotionEvent):
 
 
 @dataclass(unsafe_hash=True)
-class AbstractContactEvent(EventWithTwoTrackedObjects, ABC):
+class AbstractContactEvent(EventWithTrackedObjects, ABC):
     """
     Represents an event where two objects are in contact with each other.
     """
@@ -256,7 +252,7 @@ class LossOfContactEvent(AbstractContactEvent):
 
 
 @dataclass(unsafe_hash=True)
-class PickUpEvent(EventWithOneTrackedObject):
+class PickUpEvent(EventWithTrackedObjects):
     """
     Represents an event where an object is picked up by another object.
     """
@@ -264,7 +260,7 @@ class PickUpEvent(EventWithOneTrackedObject):
 
 
 @dataclass(unsafe_hash=True)
-class PlacingEvent(EventWithTwoTrackedObjects):
+class PlacingEvent(EventWithTrackedObjects):
     """
     Represents an event where an object is placed on another object.
     """
@@ -273,7 +269,7 @@ class PlacingEvent(EventWithTwoTrackedObjects):
 
 
 @dataclass(unsafe_hash=True)
-class InsertionEvent(EventWithTwoTrackedObjects):
+class InsertionEvent(EventWithTrackedObjects):
     """
     Represents an event where an object is inserted into another object.
     """
@@ -306,14 +302,14 @@ class InsertionEvent(EventWithTwoTrackedObjects):
         return f"{self.__class__.__name__}: {self.tracked_object.name.name}{with_object_name} - {self.timestamp}"
 
 @dataclass(unsafe_hash=True)
-class ContainmentEvent(EventWithTwoTrackedObjects):
+class ContainmentEvent(EventWithTrackedObjects):
     """
     Represents an event where an object is contained in another object.
     """
     ...
 
 @dataclass(unsafe_hash=True)
-class LossOfContainmentEvent(EventWithTwoTrackedObjects):
+class LossOfContainmentEvent(EventWithTrackedObjects):
     """
     Represents an event where an object is no longer contained in another object.
     """
