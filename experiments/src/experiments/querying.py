@@ -369,24 +369,6 @@ def _q_status_breakdown(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_world_modifications(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
-    m = eql.variable(
-        WorldModelModificationBlock,
-        domain=plan.world._model_manager.model_modification_blocks,
-    )
-    return BehaviourQuery(
-        question="What world modifications did you make?",
-        query=eql.an(
-            eql.entity(m).where(
-                n.status == TaskStatus.SUCCEEDED,
-                n.execution_data != None,  # noqa: E711
-                eql.contains(n.execution_data.added_world_modifications, m),
-            )
-        ),
-    )
-
-
 def _q_world_state_at_start(plan: Plan) -> BehaviourQuery:
     n = eql.variable(Plan, domain=[plan])
     return BehaviourQuery(

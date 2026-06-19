@@ -270,11 +270,13 @@ class WrappedField:
 
         :return: True if the type hint is an underspecified generic class.
         """
-        # If it's a class and it inherits from Generic but has no arguments
+        # A class is underspecified only if it still has free TypeVar parameters.
+        # Concrete subclasses of generic parents (e.g. HSRBMobileBase(MobileBase, HasTorso[HSRBTorso]))
+        # are subclasses of Generic but have __parameters__ == (), so they must not be skipped.
         if inspect.isclass(self.type_endpoint) and issubclass(
             self.type_endpoint, Generic
         ):
-            return True
+            return len(getattr(self.type_endpoint, "__parameters__", ())) > 0
 
         # Also check if it's a GenericAlias with empty args (though usually origin is used then)
         origin = get_origin(self.type_endpoint)

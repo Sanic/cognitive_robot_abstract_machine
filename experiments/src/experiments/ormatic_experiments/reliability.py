@@ -1,6 +1,6 @@
 """
-This module provides functionality to build a PR2 robot world, create random
-robot action plans, execute plans in a simulated environment, and measure the
+This module provides functionality to build an HSRB robot world, create robot
+action plans, execute plans in a simulated environment, and measure the
 performance of data operations, such as serialization and database storage.
 
 It includes tools for running experiments to evaluate the reliability
@@ -8,7 +8,6 @@ and performance of robotic action plans and data operations.
 """
 
 import pathlib
-import random
 import time
 from copy import deepcopy
 from dataclasses import dataclass
@@ -25,7 +24,6 @@ from coraplex.motion_executor import simulated_robot
 from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
-from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from experiments.experiment_definitions import (
     ExperimentResult,
     ExperimentsTable,
@@ -39,7 +37,7 @@ from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world import World
@@ -53,10 +51,10 @@ _REPO_ROOT = pathlib.Path(__file__).parents[4]
 _APARTMENT_URDF = _REPO_ROOT / "coraplex" / "resources" / "worlds" / "apartment.urdf"
 
 
-def _build_pr2_world() -> World:
-    urdf_parser = URDFParser.from_file(file_path=PR2.get_ros_file_path())
+def _build_hsrb_world() -> World:
+    urdf_parser = URDFParser.from_file(file_path=HSRB.get_ros_file_path())
     world = urdf_parser.parse()
-    PR2.from_world(world)
+    HSRB.from_world(world)
 
     with world.modify_world():
         old_root = world.root
@@ -73,53 +71,50 @@ def _build_pr2_world() -> World:
 
 def build_cram_world():
     """
-    Build a PR2+apartment world and return ``(world, pr2, context)``.
+    Build an HSRB+apartment world and return ``(world, hsrb, context)``.
     """
-    pr2_world = _build_pr2_world()
+    hsrb_world = _build_hsrb_world()
     apartment = URDFParser.from_file(str(_APARTMENT_URDF)).parse()
-    pr2_world.merge_world(apartment)
-    pr2_world.get_body_by_name("base_footprint").parent_connection.origin = (
+    hsrb_world.merge_world(apartment)
+    hsrb_world.get_body_by_name("base_footprint").parent_connection.origin = (
         HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
     )
-    pr2 = pr2_world.get_semantic_annotations_by_type(PR2)[0]
+    hsrb = hsrb_world.get_semantic_annotations_by_type(HSRB)[0]
     ctx = Context(
-        pr2_world, pr2, evaluate_conditions=False, query_backend=ProbabilisticBackend()
+        hsrb_world,
+        hsrb,
+        evaluate_conditions=False,
+        query_backend=ProbabilisticBackend(),
     )
-    return pr2_world, pr2, ctx
+    return hsrb_world, hsrb, ctx
 
 
-def _random_underspecified_action(world: World):
+def _random_navigate_action(world: World):
     """
-    Return a random underspecified action limited to at most attempts.
+    Return an underspecified :class:`NavigateAction` with randomised pose.
     """
-    choice = random.randint(0, 2)
-    if choice == 0:
-        action = underspecified(NavigateAction)(
-            target_location=underspecified(Pose.from_xyz_rpy)(
-                x=...,
-                y=...,
-                z=0.0,
-                roll=0.0,
-                pitch=0.0,
-                yaw=...,
-                reference_frame=world.root,
-            ),
-            keep_joint_states=True,
-        )
-    elif choice == 1:
-        action = underspecified(MoveTorsoAction)(torso_state=...)
-    else:
-        action = underspecified(ParkArmsAction)(arm=...)
+    action = underspecified(NavigateAction)(
+        target_location=underspecified(Pose.from_xyz_rpy)(
+            x=...,
+            y=...,
+            z=0.0,
+            roll=0.0,
+            pitch=0.0,
+            yaw=...,
+            reference_frame=world.root,
+        ),
+        keep_joint_states=True,
+    )
     action.expression.limit(10)
     return action
 
 
-def create_random_plan(world: World, ctx: Context, n_actions: int):
+def create_plan(world: World, ctx: Context, n_actions: int):
     """
-    Create a sequential plan with *n_actions* randomly chosen underspecified
-    actions.
+    Create a sequential plan with *n_actions* random :class:`NavigateAction`
+    instances.
     """
-    actions = [_random_underspecified_action(world) for _ in range(n_actions)]
+    actions = [_random_navigate_action(world) for _ in range(n_actions)]
     return sequential(actions, context=ctx).plan
 
 
@@ -186,20 +181,24 @@ class ORMaticReliabilityAggregateResult(ExperimentResult):
     Mean and standard deviation of plan execution time under simulated_robot
     (seconds).
     """
+
     to_data_access_object_duration: MeanAndStandardDeviation
     """
     Mean and standard deviation of to_dao() serialisation time (seconds).
     """
+
     writing_to_database_duration: MeanAndStandardDeviation
     """
     Mean and standard deviation of session.add() + session.commit() time
     (seconds).
     """
+
     reading_from_database_duration: MeanAndStandardDeviation
     """
     Mean and standard deviation of
     session.scalars(select(PlanMappingDAO)).one() time (seconds).
     """
+
     reconstruction_duration: MeanAndStandardDeviation
     """
     Mean and standard deviation of from_dao() reconstruction time (seconds).
@@ -223,7 +222,7 @@ def reliability_experiment(
         (s).
     :return: Timing breakdown for this single run.
     """
-    plan = create_random_plan(world, context, plan_size)
+    plan = create_plan(world, context, plan_size)
 
     t0 = time.perf_counter()
     with simulated_robot:
@@ -360,8 +359,13 @@ def plot_reliability(
 def main():
     aggregate_results = []
     all_raw: List[ORMaticReliabilityExperimentResult] = []
-    for plan_size in tqdm.tqdm([10, 50, 100]):
-        aggregate, raw = run_reliability_experiment(plan_size, iterations=1)
+    for plan_size in tqdm.tqdm(
+        [
+            1,
+            3,
+        ]
+    ):
+        aggregate, raw = run_reliability_experiment(plan_size, iterations=10)
         aggregate_results.append(aggregate)
         all_raw.extend(raw)
 
