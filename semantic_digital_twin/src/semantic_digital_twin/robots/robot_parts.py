@@ -204,6 +204,21 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     Common joint states for the current robot part.
     """
 
+    @property
+    def bodies(self) -> list[Body]:
+        """
+        Returns all bodies that make up this robot part.
+
+        Overrides :meth:`HasRootBody.bodies`, which only returns the root body. A robot part such as
+        an arm, gripper or mobile base spans multiple bodies, so its bodies are derived from its
+        kinematic structure entities instead of being limited to the root.
+        """
+        return [
+            entity
+            for entity in self.kinematic_structure_entities
+            if isinstance(entity, Body)
+        ]
+
     @classmethod
     @abstractmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -548,6 +563,21 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     Call the ``validate()`` method to confirm that all fields are plausibly
     filled and that the robot can be synchronized without issues.
     """
+
+    @property
+    def bodies(self) -> list[Body]:
+        """
+        Returns all bodies that make up this robot.
+
+        Overrides :meth:`HasRootBody.bodies`, which only returns the root body. A robot spans the
+        whole kinematic branch below its root, so its bodies are derived from its kinematic structure
+        entities instead of being limited to the root.
+        """
+        return [
+            entity
+            for entity in self.kinematic_structure_entities
+            if isinstance(entity, Body)
+        ]
 
     @classmethod
     @abstractmethod
