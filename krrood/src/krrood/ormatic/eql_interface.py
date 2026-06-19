@@ -412,37 +412,36 @@ class EQLTranslator:
 
     def _translate_entity_from_attribute(self, attribute: Attribute) -> None:
         """
-        Translate ``entity(n.attr)`` when the selected variable is an attribute access.
+        Translate ``entity(n.attr1.attr2...)`` when the selected variable is an attribute chain.
 
-        Resolves the owner DAO and the relationship target DAO, then builds a SELECT
-        from the target joined back to the owner so that WHERE clauses referencing
-        owner columns remain valid.
+        Walks every hop in the chain from the root DAO outward, building JOIN clauses
+        via :meth:`_apply_relationship_join` so that path tracking is consistent with
+        subsequent WHERE clause translations that traverse the same chain.
 
         :param attribute: The outermost :class:`Attribute` node used as selected variable.
+        :raises NoDAOFoundError: When the root variable type has no DAO.
+        :raises AttributeResolutionError: When any hop in the chain is not a relationship.
         """
-        resolver = AttributeChainResolver()
-        rel_resolver = RelationshipResolver()
-
-        owner_dao = resolver.extract_base_dao(attribute)
-        if owner_dao is None:
+        attribute_names = self._collect_attribute_chain(attribute)
+        base_class = self._extract_base_class(attribute)
+        current_dao = get_dao_class(base_class)
+        if current_dao is None:
             raise NoDAOFoundError("No DAO class found for attribute chain root.")
 
-        attr_name = attribute._attribute_name_
-        mapper = sqlalchemy.inspection.inspect(owner_dao)
-        relationship = rel_resolver._find_relationship(mapper, attr_name)
-        if relationship is None:
-            raise AttributeResolutionError(
-                f"No relationship '{attr_name}' found on {owner_dao.__name__}."
-            )
+        rel_resolver = RelationshipResolver()
+        self.sql_query = select(current_dao)
 
-        target_dao = relationship.entity.class_
-        local_col = next(iter(relationship.local_columns))
-        fk_attr = getattr(owner_dao, local_col.key)
+        for attr_name in attribute_names:
+            mapper = sqlalchemy.inspection.inspect(current_dao)
+            relationship = rel_resolver._find_relationship(mapper, attr_name)
+            if relationship is None:
+                raise AttributeResolutionError(
+                    f"No relationship '{attr_name}' found on {current_dao.__name__}."
+                )
+            alias = self._apply_relationship_join(current_dao, attr_name, relationship)
+            current_dao = alias or relationship.entity.class_
 
-        self.sql_query = select(target_dao).join(
-            owner_dao, fk_attr == target_dao.database_id
-        )
-        self.join_manager.add_table_join(owner_dao)
+        self.sql_query = self.sql_query.with_only_columns(current_dao)
 
     def _translate_set_of(self) -> None:
         """
@@ -579,9 +578,11 @@ class EQLTranslator:
                 self.sql_query = self.sql_query.having(having)
 
         if self.eql_query._ordered_by_builder_ is not None:
-            col = self.translate_attribute(
-                self.eql_query._ordered_by_builder_.variable
-            )
+            ordered_by_variable = self.eql_query._ordered_by_builder_.variable
+            if isinstance(ordered_by_variable, Attribute):
+                col = self.translate_attribute(ordered_by_variable)
+            else:
+                col = self._translate_comparator_operand(ordered_by_variable)
             if self.eql_query._ordered_by_builder_.descending:
                 col = col.desc()
             self.sql_query = self.sql_query.order_by(col)

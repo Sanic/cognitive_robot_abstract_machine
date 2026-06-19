@@ -5,7 +5,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.dialects import postgresql
 
 from krrood.entity_query_language.exceptions import MultipleSolutionFound
-from ..dataset.example_classes import KRROODPosition, KRROODPose
+from ..dataset.example_classes import KRROODPosition, KRROODPose, NestedAction
 from ..dataset.semantic_world_like_classes import (
     World,
     Body,
@@ -27,6 +27,7 @@ from ..dataset.ormatic_interface import (
     GraspConfigDAO,
     ContainerDAO,
     HandleDAO,
+    NestedActionDAO,
     SymbolDAO,
     WorldEntityDAO,
 )
@@ -39,6 +40,7 @@ from krrood.entity_query_language.factories import (
     in_,
     an,
     the,
+    count,
     count_all,
     not_,
     max,
@@ -1294,6 +1296,41 @@ def test_case_when_with_max(session):
     assert str(translator.sql_query) == str(expected)
 
 
+def test_entity_from_multi_hop_attribute(session, database):
+    """
+    Prove bug: entity(a.pose.position) where the chain is two hops deep
+    (NestedAction → pose → KRROODPose → position → KRROODPosition) raises
+    AttributeResolutionError because _translate_entity_from_attribute looks up the
+    outermost attribute name ('position') directly on the leaf DAO (NestedActionDAO)
+    instead of walking the full chain.
+
+    After the fix the translator must join through KRROODPoseDAO and return
+    KRROODPositionDAO instances for all linked actions.
+    """
+    orientation = KRROODOrientationDAO(x=0.0, y=0.0, z=0.0, w=1.0)
+    position_low = KRROODPositionDAO(x=0.0, y=0.0, z=3.0)
+    position_high = KRROODPositionDAO(x=0.0, y=0.0, z=30.0)
+    pose_low = KRROODPoseDAO(position=position_low, orientation=orientation)
+    pose_high = KRROODPoseDAO(position=position_high, orientation=orientation)
+    body = BodyDAO(name="TestBody", size=1)
+    session.add_all([
+        NestedActionDAO(obj=body, pose=pose_low),
+        NestedActionDAO(obj=body, pose=pose_high),
+    ])
+    session.commit()
+
+    a = variable(NestedAction, domain=[])
+    query = an(entity(a.pose.position))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    assert len(results) == 2
+    assert all(isinstance(r, KRROODPositionDAO) for r in results)
+    z_values = sorted(r.z for r in results)
+    assert z_values == pytest.approx([3.0, 30.0])
+
+
 def test_entity_with_relationship_selected_variable(session, database):
     """
     Prove bug: entity(m.grasp_config).where(m.robot_x > 0.5) produces a cross-join
@@ -1350,6 +1387,38 @@ def test_count_all_derives_dao_from_where_clause(session, database):
 
     assert len(results) == 1
     assert results[0][c] == 2
+
+
+def test_order_by_aggregate(session, database):
+    """
+    Prove bug: set_of(b.size, c).grouped_by(b.size).ordered_by(c, descending=True)
+    raises an error because _apply_clauses calls translate_attribute() on a Count
+    aggregator instead of _translate_comparator_operand().
+
+    After the fix, the translator must emit:
+    SELECT size, COUNT(*) FROM BodyDAO GROUP BY size ORDER BY COUNT(*) DESC
+    and return rows ordered with the most-frequent size first.
+    """
+    session.add_all([
+        BodyDAO(name="Body1", size=10),
+        BodyDAO(name="Body2", size=10),
+        BodyDAO(name="Body3", size=10),
+        BodyDAO(name="Body4", size=20),
+        BodyDAO(name="Body5", size=20),
+    ])
+    session.commit()
+
+    b = variable(type_=Body, domain=[])
+    c = count(b)
+    query = an(set_of(b.size, c).grouped_by(b.size).ordered_by(c, descending=True))
+
+    translator = eql_to_sql(query, session)
+    results = translator.evaluate()
+
+    assert len(results) == 2
+    sizes = [list(row.values())[0] for row in results]
+    assert sizes[0] == 10  # appears 3 times → largest count, comes first
+    assert sizes[1] == 20  # appears 2 times
 
 
 def test_exists_in_where_clause(session, database):

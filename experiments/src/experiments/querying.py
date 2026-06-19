@@ -39,7 +39,8 @@ from coraplex.datastructures.enums import (
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.motion_executor import simulated_robot
 from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
-from coraplex.plans.factories import sequential
+from coraplex.plans.factories import sequential, try_in_order, code
+from coraplex.plans.failures import PlanFailure
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import ActionNode, PlanNode
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
@@ -63,6 +64,9 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
 )
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.world_modification import (
+    WorldModelModificationBlock,
+)
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -83,10 +87,14 @@ class BehaviourQuery:
     """
 
     question: str
-    """The natural-language question posed to the robot."""
+    """
+    The natural-language question posed to the robot.
+    """
 
     query: Any
-    """The EQL expression whose evaluation answers the question."""
+    """
+    The EQL expression whose evaluation answers the question.
+    """
 
     def evaluate(self) -> Any:
         """
@@ -105,28 +113,42 @@ class BehaviourQueryResult(ExperimentResult):
     """
     One row of the behaviour-query experiment table.
 
-    Each row evaluates one query both via in-memory EQL and via SQL so the two
-    approaches can be compared side-by-side.  Untranslatable SQL queries report
-    ``-1`` / ``-1.0`` sentinel values.
+    Each row evaluates one query both via in-memory EQL and via SQL so
+    the two approaches can be compared side-by-side.  Untranslatable SQL
+    queries report ``-1`` / ``-1.0`` sentinel values.
     """
 
     question: str
-    """The natural-language question posed to the robot."""
+    """
+    The natural-language question posed to the robot.
+    """
 
     eql_number_of_results: int
-    """Number of results from in-memory EQL evaluation, or -1 on error."""
+    """
+    Number of results from in-memory EQL evaluation, or -1 on error.
+    """
 
     eql_duration_ms: float
-    """Wall-clock time in milliseconds for in-memory EQL evaluation."""
+    """
+    Wall-clock time in milliseconds for in-memory EQL evaluation.
+    """
 
     sql_translation_duration_ms: float
-    """Wall-clock time in milliseconds for EQL-to-SQL translation, or -1.0 on failure."""
+    """
+    Wall-clock time in milliseconds for EQL-to-SQL translation, or -1.0 on
+    failure.
+    """
 
     sql_number_of_results: int
-    """Number of results returned by the SQL query, or -1 on error."""
+    """
+    Number of results returned by the SQL query, or -1 on error.
+    """
 
     sql_execution_duration_ms: float
-    """Wall-clock time in milliseconds for SQL execution against the database, or -1.0 on failure."""
+    """
+    Wall-clock time in milliseconds for SQL execution against the database, or
+    -1.0 on failure.
+    """
 
 
 def build_plan() -> Plan:
@@ -196,14 +218,25 @@ def build_plan() -> Plan:
 
     context.evaluate_conditions = False
 
+    def _failing_step():
+        raise PlanFailure()
+
     root = sequential(
         [
             ParkArmsAction(Arms.BOTH),
             MoveTorsoAction(TorsoState.HIGH),
-            TransportAction(
-                world.get_body_by_name("milk.stl"),
-                Pose.from_xyz_rpy(4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root),
-                Arms.LEFT,
+            try_in_order(
+                [
+                    code(_failing_step),
+                    TransportAction(
+                        world.get_body_by_name("milk.stl"),
+                        Pose.from_xyz_rpy(
+                            4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root
+                        ),
+                        Arms.LEFT,
+                    ),
+                ],
+                context=context,
             ),
             TransportAction(
                 world.get_body_by_name("bowl.stl"),
@@ -236,7 +269,8 @@ def _q_what_did_you_do(plan: Plan) -> BehaviourQuery:
     return BehaviourQuery(
         question="What did you just do?",
         query=eql.an(eql.entity(n).where(n.status == TaskStatus.SUCCEEDED)).ordered_by(
-            n.start_time
+            n.start_time,
+            descending=False,
         ),
     )
 
@@ -252,10 +286,15 @@ def _q_walk_through_in_order(plan: Plan) -> BehaviourQuery:
 
 
 def _q_total_duration(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
+    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
     return BehaviourQuery(
         question="How long did the whole task take?",
-        query=eql.the(eql.entity(n).where(n.parent == None)),  # noqa: E711
+        query=eql.set_of(
+            min_start := eql.min(n.start_time),
+            max_end := eql.max(n.end_time),
+        ).where(
+            n.start_time != None, n.end_time != None
+        ),  # noqa: E711
     )
 
 
@@ -307,24 +346,9 @@ def _q_which_fallback(plan: Plan) -> BehaviourQuery:
     )
 
 
-def _q_were_you_interrupted(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
-    return BehaviourQuery(
-        question="Were you ever interrupted? What caused it?",
-        query=eql.an(eql.entity(n).where(n.status == TaskStatus.INTERRUPTED)),
-    )
-
-
-def _q_were_you_paused(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(PlanNode, domain=plan.plan_graph.nodes())
-    return BehaviourQuery(
-        question="Was there a point where you were paused?",
-        query=eql.an(eql.entity(n).where(n.status == TaskStatus.PAUSE)),
-    )
-
-
 def _q_longest_step(plan: Plan) -> BehaviourQuery:
     n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+
     return BehaviourQuery(
         question="Which step took the longest?",
         query=eql.an(eql.entity(n).where(n.end_time != None))  # noqa: E711
@@ -347,37 +371,35 @@ def _q_status_breakdown(plan: Plan) -> BehaviourQuery:
 
 def _q_world_modifications(plan: Plan) -> BehaviourQuery:
     n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+    m = eql.variable(
+        WorldModelModificationBlock,
+        domain=plan.world._model_manager.model_modification_blocks,
+    )
     return BehaviourQuery(
         question="What world modifications did you make?",
         query=eql.an(
-            eql.entity(n.execution_data.added_world_modifications).where(
-                n.status == TaskStatus.SUCCEEDED, n.execution_data != None
-            )  # noqa: E711
+            eql.entity(m).where(
+                n.status == TaskStatus.SUCCEEDED,
+                n.execution_data != None,  # noqa: E711
+                eql.contains(n.execution_data.added_world_modifications, m),
+            )
         ),
     )
 
 
 def _q_world_state_at_start(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+    n = eql.variable(Plan, domain=[plan])
     return BehaviourQuery(
         question="What was the state of the world when you started the task?",
-        query=eql.an(
-            eql.entity(n.execution_data.execution_start_world_state).where(
-                n.parent == None, n.execution_data != None
-            )  # noqa: E711
-        ),
+        query=eql.an(eql.entity(n.initial_world.state)),
     )
 
 
 def _q_world_state_at_end(plan: Plan) -> BehaviourQuery:
-    n = eql.variable(ActionNode, domain=plan.plan_graph.nodes())
+    n = eql.variable(Plan, domain=[plan])
     return BehaviourQuery(
         question="What was the state of the world when you finished?",
-        query=eql.an(
-            eql.entity(n.execution_data.execution_end_world_state).where(
-                n.parent == None, n.execution_data != None
-            )  # noqa: E711
-        ),
+        query=eql.an(eql.entity(n.context.world.state)),
     )
 
 
@@ -385,7 +407,8 @@ def build_queries(plan: Plan) -> List[BehaviourQuery]:
     """
     Construct all behaviour queries for a completed plan execution.
 
-    :param plan: The plan whose execution history the queries will inspect.
+    :param plan: The plan whose execution history the queries will
+        inspect.
     :return: All behaviour queries, in presentation order.
     """
     return [
@@ -397,8 +420,6 @@ def build_queries(plan: Plan) -> List[BehaviourQuery]:
         _q_why_did_you_fail(plan),
         _q_how_many_retries(plan),
         _q_which_fallback(plan),
-        _q_were_you_interrupted(plan),
-        _q_were_you_paused(plan),
         _q_longest_step(plan),
         _q_status_breakdown(plan),
         _q_world_modifications(plan),
@@ -417,7 +438,8 @@ def _count_results(raw: Any) -> int:
     Count the number of results returned by an EQL evaluation.
 
     :param raw: The raw value returned by ``BehaviourQuery.evaluate()``.
-    :return: Number of items for iterable results, 1 for a single value, 0 for ``None``.
+    :return: Number of items for iterable results, 1 for a single value,
+        0 for ``None``.
     """
     if raw is None:
         return 0
@@ -428,15 +450,18 @@ def _count_results(raw: Any) -> int:
 
 def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
     """
-    Evaluate all behaviour queries both via in-memory EQL and via SQL, collecting
-    timings and result counts for each approach in a single row per query.
+    Evaluate all behaviour queries both via in-memory EQL and via SQL,
+    collecting timings and result counts for each approach in a single row per
+    query.
 
-    EQL or SQL failures are recorded as ``-1`` / ``-1.0`` sentinels so a single
-    failing query does not abort the experiment.
+    EQL or SQL failures are recorded as ``-1`` / ``-1.0`` sentinels so a
+    single failing query does not abort the experiment.
 
     :param plan: The fully executed plan to query.
-    :param session: An open SQLAlchemy session connected to the persisted plan database.
-    :return: A table with one :class:`BehaviourQueryResult` row per query.
+    :param session: An open SQLAlchemy session connected to the
+        persisted plan database.
+    :return: A table with one :class:`BehaviourQueryResult` row per
+        query.
     """
     rows: List[BehaviourQueryResult] = []
     for query in build_queries(plan):
@@ -494,14 +519,16 @@ def run_experiment(plan: Plan, session: Session) -> ExperimentsTable:
 
 def persist_plan(plan: Plan) -> tuple[Session, Engine]:
     """
-    Serialise *plan* to a SQLite database at :data:`_DATABASE_PATH` via ORMatic.
+    Serialise *plan* to a SQLite database at :data:`_DATABASE_PATH` via
+    ORMatic.
 
-    Any pre-existing database is dropped first so each run starts from a clean
-    slate.  Returns the open session and engine so the caller can run SQL queries
-    against the same database and close them when done.
+    Any pre-existing database is dropped first so each run starts from a
+    clean slate.  Returns the open session and engine so the caller can
+    run SQL queries against the same database and close them when done.
 
     :param plan: The fully executed plan to persist.
-    :return: Tuple of ``(session, engine)`` pointing at the populated database.
+    :return: Tuple of ``(session, engine)`` pointing at the populated
+        database.
     """
     engine = create_engine(f"sqlite:///{_DATABASE_PATH}")
     drop_database(engine)
