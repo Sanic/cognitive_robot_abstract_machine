@@ -14,10 +14,10 @@ kernelspec:
 # Role Pattern — User Guide
 
 The Role pattern lets an existing object take on a new semantic context — adding context-specific
-attributes and behaviour — while leaving the original object untouched. A role is an **ordinary
-object with its own identity**: it is equal only to itself, never to its role taker. When you need
-to ask whether two objects refer to the same underlying entity, use the `IsSameEntity` predicate,
-which sees through role chains to the root entity.
+attributes and behaviour — without changing the original object's type or identity. A role is an
+**ordinary object with its own identity**: it is equal only to itself, never to its role taker. When
+you need to ask whether two objects refer to the same underlying entity, use the `IsSameEntity`
+predicate, which sees through role chains to the root entity.
 
 This guide uses a university ontology as its running example. A `Person` is a persistent entity
 with a name. Over time that person may become a `CEO` or a `Professor`. These are roles: they
@@ -316,8 +316,8 @@ print("new_ceo:", new_ceo)
 
 ## When Not to Use the Role Pattern
 
-- The new class changes the permanent, identifying properties of the original. If a `Fruit`
-  cannot exist without being an `Apple`, subclassing `Apple` from `Fruit` is the right choice.
+- The new class changes the permanent, identifying properties of the original. If an `Apple`
+  cannot exist without being a `Fruit`, subclassing `Apple` from `Fruit` is the right choice.
 - The new class has its own independent persistent identity.
 - You never need to relate the two objects back to a shared underlying entity.
 
