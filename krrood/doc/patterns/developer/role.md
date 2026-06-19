@@ -46,9 +46,10 @@ The implementation centres on three collaborating components:
 
 **`Role[T]`** (`role.py`) is the base dataclass that every role class inherits. It provides
 identity-based equality/hashing (`__hash__`, `__eq__`), attribute delegation (`__getattr__`,
-`__setattr__`), and all querying class methods. It inherits from `SubClassSafeGeneric[T]` so that the generic
-type parameter `T` is resolved to the concrete taker type on each concrete role subclass, and
-from `Symbol` to participate in the Symbol Graph and do reasoning over it (see last point below).
+`__setattr__`), and all querying class methods. It inherits from `SubClassSafeGeneric[T]` so that
+fields whose annotation uses the generic parameter are rewritten to the bound concrete type on each
+role subclass (keeping generic roles introspectable by the class diagram), and from `Symbol` to
+participate in the Symbol Graph and do reasoning over it (see last point below).
 
 **`role_taker_field()`** is a thin wrapper around `dataclasses.field()` that tags the field in
 its metadata with `ROLE_TAKER_METADATA_KEY`. This tag is the single source of truth that the
@@ -106,17 +107,21 @@ taker field `taker`). The tag-based approach was chosen because it allows role s
 choose semantically meaningful field names (`person`, `ceo`, `representative`) that convey the
 domain relationship, which aids readability in both code and generated documentation.
 
-### `SubClassSafeGeneric[T]` for Type-Level Resolution
+### Resolving the Role-Taker Type
 
-`Role[T]` inherits from `SubClassSafeGeneric[T]`. When a concrete role class binds `T` to a
-specific type — for example `CEO(Role[Person])` — `SubClassSafeGeneric` propagates that binding
-through the class's field annotations before the class is fully constructed. This means
-`CEO.get_role_taker_type()` returns `Person` without any runtime inspection of field values.
+`get_role_taker_type()` reads the declared type of the role-taker field directly: it finds the
+field marked with `role_taker_field()` and returns its annotation. A forward-reference string (the
+usual case under `from __future__ import annotations`) is resolved against the defining module's
+namespace, and a `TypeVar` annotation is resolved to its bound. Only when the class declares no
+role-taker field does it fall back to the `Role[...]` generic argument, read from `__orig_bases__`.
+`get_root_role_taker_type()` then walks this resolution down a taker chain until it reaches a
+non-`Role` type, caching the result with `@lru_cache`.
 
-The alternative of inspecting `__orig_bases__` at query time would be slower and less reliable
-in the presence of complex generic hierarchies (multiple type variables, TypeVarTuples, and
-chains of partially-bound generics). `SubClassSafeGeneric` resolves all of these at class
-definition time and caches the result.
+This resolution is independent of `SubClassSafeGeneric`: `get_role_taker_type` returns the correct
+type even when `SubClassSafeGeneric` cannot resolve a class's hints. What `SubClassSafeGeneric[T]`
+contributes is separate — it rewrites fields whose annotation *uses* the generic parameter (for
+example a `taker: T` field) to the concrete bound type on each subclass, so roles with generic
+fields stay introspectable by the class diagram and the downstream ORM/EQL machinery.
 
 ### Distinct Identity and the `IsSameEntity` Predicate
 

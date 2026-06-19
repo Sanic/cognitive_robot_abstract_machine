@@ -195,7 +195,7 @@ its own identity, but all of them resolve to the same underlying entity.
 
 ```{code-cell} ipython3
 @dataclass(eq=False)
-class Professor(Role[Person], Symbol):
+class Professor(Role[Person]):
     """The role of being an academic who teaches courses."""
 
     person: Person = role_taker_field()
