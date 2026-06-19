@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing_extensions import TYPE_CHECKING, Callable, ClassVar, Optional, Sequence
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -28,21 +28,15 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
-class RuleContext:
+@dataclass(frozen=True)
+class RenderOptions:
+    """The per-recursion render flags, bundled so a new one is a single field here rather than a
+    new positional parameter threaded through every recursion site.
+
+    Each flag is *per-fold*: it applies to the node being folded and resets for its children (so
+    :meth:`RuleContext.child` builds a fresh ``RenderOptions`` from its keyword overrides, never
+    inheriting the parent's).
     """
-    Per-node context handed to a rule's ``build``.
-
-    Bundles the recursion entry (``child``, the fold continuation) with the microplanning
-    services, so a rule never recurses by hand nor reaches for cross-cutting state directly.
-    """
-
-    child: Callable[..., Fragment]
-    """Recurse on a sub-expression — the fold continuation.  Accepts an optional ``number=`` to
-    request a plural realisation of the child."""
-
-    services: MicroplanningServices
-    """The owning microplanning services."""
 
     number: Number = Number.SINGULAR
     """Grammatical number requested for this node.  A number-aware rule reads it to build a
@@ -50,14 +44,69 @@ class RuleContext:
 
     inline: bool = False
     """``True`` when this node is being folded in chain-root position, so an ``Entity`` renders as
-    an inline noun rather than a *"Find …"* / nested phrase.  Per-fold (like ``number``): it
-    applies to this node only, resetting for its children."""
+    an inline noun rather than a *"Find …"* / nested phrase."""
 
     as_value: bool = False
     """``True`` when this node is being folded in *value* position (a comparator's right side, a
     match assignment's value), so a domain-constrained value-type ``Variable`` renders as its
-    candidate set (*"one of A, B, or C"*) rather than as a subject noun (*"an int"*).  Per-fold
-    (like ``inline``): it applies to this node only, resetting for its children."""
+    candidate set (*"one of A, B, or C"*) rather than as a subject noun (*"an int"*)."""
+
+
+@dataclass
+class RuleContext:
+    """
+    Per-node context handed to a rule's ``build``.
+
+    Bundles the recursion entry (:meth:`child`, the fold continuation) with the microplanning
+    services and the per-node :class:`RenderOptions`, so a rule never recurses by hand nor reaches
+    for cross-cutting state directly.
+    """
+
+    recurse: Callable[[SymbolicExpression, "RenderOptions"], Fragment]
+    """The fold continuation — given a sub-expression and its render options, returns its fragment.
+    Rules do not call this directly; they call :meth:`child`."""
+
+    services: MicroplanningServices
+    """The owning microplanning services."""
+
+    options: RenderOptions = field(default_factory=RenderOptions)
+    """The render flags for *this* node (number / inline / value position)."""
+
+    def child(
+        self,
+        node: SymbolicExpression,
+        *,
+        number: Number = Number.SINGULAR,
+        inline: bool = False,
+        as_value: bool = False,
+    ) -> Fragment:
+        """Recurse on a sub-expression, requesting its render flags (all reset by default — they do
+        not inherit from this node).
+
+        :param node: The sub-expression to fold.
+        :param number: Grammatical number to build the child under.
+        :param inline: Fold the child in chain-root (inline-noun) position.
+        :param as_value: Fold the child in value position (domain variables list their candidates).
+        :return: The child's fragment.
+        """
+        return self.recurse(
+            node, RenderOptions(number=number, inline=inline, as_value=as_value)
+        )
+
+    @property
+    def number(self) -> Number:
+        """:return: The grammatical number requested for this node."""
+        return self.options.number
+
+    @property
+    def inline(self) -> bool:
+        """:return: Whether this node is folded in inline-noun position."""
+        return self.options.inline
+
+    @property
+    def as_value(self) -> bool:
+        """:return: Whether this node is folded in value position."""
+        return self.options.as_value
 
     @property
     def refer(self) -> ReferringExpressions:

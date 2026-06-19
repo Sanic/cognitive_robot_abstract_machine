@@ -6,8 +6,8 @@ from typing_extensions import TYPE_CHECKING, Optional, Sequence
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.fragments.base import Fragment
-from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
+    RenderOptions,
     RuleContext,
     PhraseRule,
     select,
@@ -21,13 +21,35 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import MicroplanningServices
 
 
+def root_context(
+    services: MicroplanningServices,
+    rules: Sequence[PhraseRule],
+    options: Optional[RenderOptions] = None,
+) -> RuleContext:
+    """
+    Build the :class:`RuleContext` for one node — the **single** definition of the fold
+    continuation (``recurse``), shared by :func:`fold` and the match assembler's root context, so a
+    new render flag is one field on :class:`RenderOptions` rather than two duplicated lambdas.
+
+    :param services: The pass-wide microplanning services.
+    :param rules: The grammar to dispatch over.
+    :param options: The render flags for this node (defaults to all reset).
+    :return: The context whose ``child`` re-enters :func:`fold`.
+    """
+    return RuleContext(
+        recurse=lambda child_node, child_options: fold(
+            child_node, services, rules, child_options
+        ),
+        services=services,
+        options=options if options is not None else RenderOptions(),
+    )
+
+
 def fold(
     node: SymbolicExpression,
     services: MicroplanningServices,
     rules: Optional[Sequence[PhraseRule]] = None,
-    number: Number = Number.SINGULAR,
-    inline: bool = False,
-    as_value: bool = False,
+    options: Optional[RenderOptions] = None,
 ) -> Fragment:
     """
     Verbalize *node* by dispatching it to its matching grammar rule and recursing — the single
@@ -44,7 +66,7 @@ def fold(
     :param node: Any EQL expression.
     :param services: The pass-wide microplanning services (and render configuration).
     :param rules: Grammar to dispatch over; defaults to the standard rule set.
-    :param number: Grammatical number to build *node* under.
+    :param options: The render flags to build *node* under (defaults to all reset).
     :return: The fragment for *node*.
     :raises UnverbalizableExpressionError: when no grammar rule covers *node*.
     """
@@ -56,15 +78,7 @@ def fold(
         if override is not None:
             return override
 
-    context = RuleContext(
-        child=lambda child_node, number=Number.SINGULAR, inline=False, as_value=False: fold(
-            child_node, services, rules, number=number, inline=inline, as_value=as_value
-        ),
-        services=services,
-        number=number,
-        inline=inline,
-        as_value=as_value,
-    )
+    context = root_context(services, rules, options)
 
     rule = select(node, rules, context)
     if rule is None:

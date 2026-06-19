@@ -46,7 +46,9 @@ class Other:
 
 def _rule_context():
     """A RuleContext for dispatch tests (no recursion needed by select)."""
-    return RuleContext(child=lambda node: node, services=MicroplanningServices())
+    return RuleContext(
+        recurse=lambda node, options: node, services=MicroplanningServices()
+    )
 
 
 def _custom(construct, name, build_fn, *, guard=None, base=PhraseRule):
