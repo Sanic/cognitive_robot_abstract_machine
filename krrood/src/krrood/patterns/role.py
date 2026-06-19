@@ -400,4 +400,8 @@ class Role(Symbol, SubClassSafeGeneric[T]):
     __hash__ = object.__hash__
 
 
-class HasRoleTaker(PredicateClassRelation[Role]): ...
+class HasRoleTaker(PredicateClassRelation[Role]):
+    """
+    A predicate class relation that indicates that a class has a field that points to a role taker.
+    """
+    ...

@@ -15,11 +15,11 @@ kernelspec:
 
 The Role pattern lets an existing object take on a new semantic context — adding context-specific
 attributes and behaviour — without changing the original object's type or identity. A role is an
-**ordinary object with its own identity**: it is equal only to itself, never to its role taker. When
+**ordinary object with its own identity**: it is equal only to itself. When
 you need to ask whether two objects refer to the same underlying entity, use the `IsSameEntity`
 predicate, which sees through role chains to the root entity.
 
-This guide uses a university ontology as its running example. A `Person` is a persistent entity
+This guide uses a university domain as its running example. A `Person` is a persistent entity
 with a name. Over time that person may become a `CEO` or a `Professor`. These are roles: they
 add context-specific data, but the person's identity never changes.
 
@@ -324,13 +324,14 @@ print("new_ceo:", new_ceo)
 - The same entity can play multiple semantic roles simultaneously.
 - Any part of the system must be able to ask "does this entity have role X?" without scanning
   all instances.
-- The role and the original object should be recognisable as the same underlying entity (via
+- The role and the original object should be recognizable as the same underlying entity (via
   `IsSameEntity`) while remaining distinct objects.
 
 ## When Not to Use the Role Pattern
 
-- The new class changes the permanent, identifying properties of the original. If an `Apple`
-  cannot exist without being a `Fruit`, subclassing `Apple` from `Fruit` is the right choice.
+- The new class changes the permanent, identifying properties of the original. A `Room` that becomes a `Kitchen` does
+not affect any of the things that makes it a `Room`, such as its size or location. But an `egg` that is boiled, changes
+its original properties like its state of matter from liquid to solid.
 - The new class has its own independent persistent identity.
 - You never need to relate the two objects back to a shared underlying entity.
 
@@ -341,8 +342,8 @@ print("new_ceo:", new_ceo)
 ```{mermaid}
 %%{init: {'theme': 'base', 'themeVariables': {'fontSize': '20px', 'lineColor': '#333333', 'primaryColor': '#ddeeff', 'primaryTextColor': '#111111', 'primaryBorderColor': '#3a7abf', 'edgeLabelBackground': '#ffffff'}, 'flowchart': {'nodeSpacing': 60, 'rankSpacing': 80, 'padding': 20}}}%%
 flowchart TD
-    Q1{"Should the wrapper and<br/>the original object be<br/>the same entity?"}
-    Q2{"Is this a temporary<br/>contextual role, or does it<br/>change persistent identity?"}
+    Q1{"Should the wrapper and<br/>the original object represent<br/>the same underlying persistent entity?"}
+    Q2{"Is this a temporary<br/>contextual situation, or does it<br/>change persistent identity or properites?"}
     ROLE["<b>Role[T]</b><br/>Same-entity via IsSameEntity, role registry,<br/>optional chaining."]
     SUBCLASS["<b>Subclass</b><br/>The new class has its own<br/>persistent identifying properties."]
     ASSOCIATION["<b>Association</b><br/>The new class is a different kind<br/>of thing from the original."]

@@ -77,9 +77,7 @@ would silently accept a `CEO`. This causes hidden coupling between systems that 
 to know about each other's roles. Role membership must be queried explicitly through
 `Role.has_role` or `Role.roles_for`, which makes the dependency visible.
 
-Pure composition also keeps the role independent of the taker's construction logic: because a role
-does not inherit from its taker, it never has to replicate, forward, or suppress whatever logic the
-taker's constructor runs, however non-trivial it is.
+Pure composition also keeps the role independent of the taker's construction logic.
 
 ### No `__init__` Manipulation
 
@@ -95,9 +93,7 @@ transformations.
 ### Explicit Construction Only
 
 A role is only created when calling code explicitly passes a role taker instance to the role
-constructor (or to `from_role_taker`). The `__post_init__` hook never creates further roles
-automatically. This makes construction auditable: you can find every role creation by searching
-for calls to the role class's constructor or to `from_role_taker`.
+constructor (or to `from_role_taker`).
 
 ### Field-Tag Discovery of the Role Taker
 
@@ -105,31 +101,9 @@ The role taker field is identified at runtime by inspecting field metadata for
 `ROLE_TAKER_METADATA_KEY`. The name of that field is cached per class via `@lru_cache` on
 `role_taker_field_name()`.
 
-An alternative would have been to require a fixed field name (for example, always name the
-taker field `taker`). The tag-based approach was chosen because it allows role subclasses to
-choose semantically meaningful field names (`person`, `ceo`, `representative`) that convey the
-domain relationship, which aids readability in both code and generated documentation.
-
-### Resolving the Role-Taker Type
-
-`get_role_taker_type()` reads the declared type of the role-taker field directly: it finds the
-field marked with `role_taker_field()` and returns its annotation. A forward-reference string (the
-usual case under `from __future__ import annotations`) is resolved against the defining module's
-namespace, and a `TypeVar` annotation is resolved to its bound. Only when the class declares no
-role-taker field does it fall back to the `Role[...]` generic argument, read from `__orig_bases__`.
-`get_root_role_taker_type()` then walks this resolution down a taker chain until it reaches a
-non-`Role` type, caching the result with `@lru_cache`.
-
-This resolution is independent of `SubClassSafeGeneric`: `get_role_taker_type` returns the correct
-type even when `SubClassSafeGeneric` cannot resolve a class's hints. What `SubClassSafeGeneric[T]`
-contributes is separate — it rewrites fields whose annotation *uses* the generic parameter (for
-example a `taker: T` field) to the concrete bound type on each subclass, so roles with generic
-fields stay introspectable by the class diagram and the downstream ORM/EQL machinery.
-
 ### Distinct Identity and the `IsSameEntity` Predicate
 
-A role is an ordinary object: `__eq__` returns `self is other` and `__hash__` is
-`object.__hash__`, so each role is equal only to itself and distinct from its taker and from
+Each role is equal only to itself and distinct from its taker and from
 sibling roles. This keeps two concerns separate: *object identity* (am I this exact object?) and
 *semantic equivalence* (do we refer to the same underlying entity?). The latter is expressed explicitly by the `IsSameEntity` predicate in
 `krrood/src/krrood/patterns/role_predicates.py`, which unwraps each operand to its
@@ -137,17 +111,6 @@ sibling roles. This keeps two concerns separate: *object identity* (am I this ex
 roots by identity. Two roles at different levels of a chain, and a role versus its root taker,
 are therefore *not* `==` but *are* `IsSameEntity`. A direct consequence is that multiple roles,
 even of the same type, on one taker stay distinct in sets and dicts.
-
-`__eq__` returns a concrete `False` rather than `object.__eq__`'s `NotImplemented`: because a
-role delegates attribute reads to its taker, a taker with a lenient (e.g. name-based) `__eq__`
-would otherwise compare equal to its role through the reflected operand. `__hash__` is set
-explicitly because `Role`'s base `SubClassSafeGeneric` is a plain `@dataclass`, which would
-otherwise set `__hash__ = None` (and defining `__eq__` alone would reset it to `None` too).
-
-The predicate lives in its own module rather than in core EQL (`predicate.py`) or in `role.py`
-so that neither gains a cross-dependency — `predicate.py` never imports `patterns.role` and
-`role.py` never imports EQL. This mirrors how `semantic_digital_twin`'s `reasoning/predicates.py`
-defines the domain predicate `ContainsType(Predicate)` in its own module.
 
 ### SymbolGraph as the Role Registry
 
@@ -159,15 +122,6 @@ When the taker is itself a role, `_update_mapping_between_roles_and_role_takers`
 adds transitive `HasRoleTaker` edges from the new role to every entity that the taker's taker
 already points to. This ensures that querying from any point in the chain resolves to all roles
 and takers in the chain.
-
-The class diagram is built lazily on first use, so a role class defined afterwards (for example in
-a notebook cell or a test) would otherwise be absent from it. `_update_mapping_between_roles_and_role_takers`
-calls `SymbolGraph.ensure_class_in_class_diagram` for the role and any role-taker class first, which
-rebuilds the class diagram to include a missing class on demand. This keeps the role registry working
-regardless of the order in which role classes are defined relative to the first graph use. A class
-that still cannot be mapped (for example one whose module is not importable) is handled gracefully:
-`ClassIsUnMappedInClassDiagram` is caught and registration is skipped, leaving the role functional as
-a plain dataclass without graph integration.
 
 ## Attribute Access
 
