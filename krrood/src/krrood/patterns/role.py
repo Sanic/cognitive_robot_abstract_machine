@@ -15,7 +15,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.method_classifier import factory_method, is_factory_method
-from krrood.class_diagrams.utils import ROLE_TAKER_METADATA_KEY, T
+from krrood.class_diagrams.utils import RoleTakerField, T
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.patterns.exceptions import (
     DelegatedFactoryMethodError,
@@ -35,15 +35,20 @@ def role_taker_field(*, kw_only: bool = True, **kwargs: Any) -> Any:
     """
     Declare the dataclass field that stores a role's role taker.
 
-    A thin wrapper around :func:`dataclasses.field` that tags the field in its metadata so
-    both the role pattern and the class diagram recognise it as the role taker.
+    A thin wrapper around :func:`dataclasses.field` that produces a :class:`RoleTakerField
+    <krrood.class_diagrams.utils.RoleTakerField>` so both the role pattern and the class diagram
+    recognise it as the role taker.
 
     :param kw_only: Whether the role-taker field is keyword-only in the generated constructor.
     :param kwargs: Any other keyword arguments accepted by :func:`dataclasses.field`.
     :return: A dataclass field marked as the role taker.
     """
-    metadata = {**kwargs.pop("metadata", {}), ROLE_TAKER_METADATA_KEY: True}
-    return field(kw_only=kw_only, metadata=metadata, **kwargs)
+    declared_field = field(kw_only=kw_only, **kwargs)
+    # Reassign __class__ instead of constructing RoleTakerField directly: this delegates all
+    # argument handling and validation to dataclasses.field(). RoleTakerField declares
+    # __slots__ = (), so its memory layout matches Field and the reassignment is safe.
+    declared_field.__class__ = RoleTakerField
+    return declared_field
 
 
 @dataclass(eq=False)
@@ -110,7 +115,7 @@ class Role(Symbol, SubClassSafeGeneric[T]):
         :return: The name of the field that holds the role taker instance.
         """
         for declared_field in fields(cls):
-            if declared_field.metadata.get(ROLE_TAKER_METADATA_KEY, False):
+            if isinstance(declared_field, RoleTakerField):
                 return declared_field.name
         raise RoleTakerFieldNotFound(role_type=cls)
 

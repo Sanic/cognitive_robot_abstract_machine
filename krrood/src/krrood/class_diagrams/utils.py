@@ -4,7 +4,7 @@ import inspect
 import os
 import sys
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, Field
 from enum import Enum
 from functools import lru_cache
 from typing import get_args, get_origin
@@ -150,14 +150,23 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
 T = TypeVar("T")
 
 
-ROLE_TAKER_METADATA_KEY = "krrood_role_taker"
-"""
-Dataclass field-metadata key that marks a field as the role taker of a role.
+class RoleTakerField(Field):
+    """
+    Dataclass field that marks the role taker of a role.
 
-Defined here, in a low-level module imported by both :mod:`krrood.patterns.role` and
-:mod:`krrood.class_diagrams.wrapped_field`, so the role pattern and the class-diagram
-detection share a single source of truth without importing each other.
-"""
+    Subclasses :class:`dataclasses.Field` as a type-level marker: the role pattern and the
+    class-diagram detection identify the role taker by ``isinstance`` against this type rather
+    than by inspecting field metadata. It adds no state, so it declares empty ``__slots__`` to
+    keep its memory layout identical to :class:`dataclasses.Field`; this lets
+    :func:`krrood.patterns.role.role_taker_field` produce one by reassigning the ``__class__``
+    of a field built by :func:`dataclasses.field`.
+
+    Defined here, in a low-level module imported by both :mod:`krrood.patterns.role` and
+    :mod:`krrood.class_diagrams.wrapped_field`, so the role pattern and the class-diagram
+    detection share a single source of truth without importing each other.
+    """
+
+    __slots__ = ()
 
 
 def _trace_generic_params(cls: type, generic_base: type):
