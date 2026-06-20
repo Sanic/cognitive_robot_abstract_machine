@@ -52,7 +52,11 @@ identity-based equality/hashing (`__hash__`, `__eq__`), attribute delegation (`_
 `__setattr__`), and all querying class methods. It inherits from `SubClassSafeGeneric[T]` so that
 fields whose annotation uses the generic parameter are rewritten to the bound concrete type on each
 role subclass (keeping generic roles introspectable by the class diagram), and from `Symbol` so a
-role participates in the class diagram and ORM like any other entity.
+role participates in the class diagram and ORM like any other entity. A role sets
+`_cache_instances_ = False`, so role *instances* are not registered as nodes in the `SymbolGraph`:
+membership uses the `RoleRegistry` and persistence uses the role's own ORM mapping, so a role never
+needs to be a graph node. Role *classes* still take part in the class diagram, which is built from
+`Symbol` subclasses, not from cached instances.
 
 **`role_taker_field()`** is a thin wrapper around `dataclasses.field()` that produces a
 `RoleTakerField` (a `dataclasses.Field` subclass) by building a field and reassigning its
