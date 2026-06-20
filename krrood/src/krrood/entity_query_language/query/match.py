@@ -7,6 +7,7 @@ from concise, readable matching syntax.
 
 from __future__ import annotations
 
+import enum
 import uuid
 from abc import ABC, abstractmethod
 from collections import deque
@@ -21,6 +22,7 @@ from typing_extensions import (
     Optional,
     Type,
     List,
+    Dict,
     Union,
     Generic,
     TYPE_CHECKING,
@@ -44,10 +46,12 @@ from krrood.entity_query_language.core.mapped_variable import (
     Index,
 )
 from krrood.entity_query_language.core.variable import Literal, DomainType, Variable
+from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     NoKwargsInMatchVar,
     CalledMatchMultipleTimes,
     MatchTypeCannotBeDetermined,
+    UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration,
 )
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
@@ -198,7 +202,7 @@ class AbstractMatchExpression(Generic[T], ABC):
 
 
 @dataclass(eq=False)
-class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
+class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
     """
     Construct a query that looks for the pattern provided by the type and the keyword arguments.
     Example usage where we look for an object of type Drawer with body of type Body that has the name"drawer_1":
@@ -393,20 +397,92 @@ class Match(AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
         self.variable = variable(self.type, domain=None)
 
-    def evaluate(self, backend=None):
+    def _evaluate_natively_(self) -> Iterator:
         """
-        Evaluate the match expression and return the result.
+        Generate instances that satisfy this underspecified match in the current python
+        process, by treating its unspecified leaves as variables and constructing instances
+        from every combination, then filtering by the match's ``where`` conditions.
 
-        :param backend: The query backend to evaluate with. Defaults to the
-            ``EntityQueryLanguageBackend`` (native python evaluation / generation).
+        :return: An iterator over the generated instances.
         """
-        if backend is None:
-            from krrood.entity_query_language.backends import (
-                EntityQueryLanguageBackend,
+        from krrood.entity_query_language.factories import entity
+
+        variables: Dict[str, Variable] = {}
+        for attribute_match in self.matches_with_variables:
+            self._check_attribute_match_is_suitable_for_generation(attribute_match)
+            variables[attribute_match.name_from_variable_access_path] = (
+                self._convert_attribute_match_to_variable(attribute_match)
             )
 
-            backend = EntityQueryLanguageBackend()
-        return backend.evaluate(self)
+        self.variable._update_domain_(self._generate_raw_results(variables))
+
+        filtered_results = entity(self.variable)._quantify_(self._quantifier_type_)
+        if self._where_conditions_:
+            filtered_results = filtered_results.where(*self._where_conditions_)
+        yield from filtered_results._evaluate_natively_()
+
+    @staticmethod
+    def _check_attribute_match_is_suitable_for_generation(
+        attribute_match: AttributeMatch,
+    ) -> None:
+        """
+        Raise if an assignment in the match cannot be used to generate solutions.
+
+        :param attribute_match: The attribute match to check.
+        :raises UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration: If a
+            non-enum leaf is left fully unspecified (``...``), which native generation cannot
+            sample.
+        """
+        if isinstance(
+            attribute_match.assigned_value, type(Ellipsis)
+        ) and not issubclass(attribute_match.assigned_variable._type_, enum.Enum):
+            raise UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
+                attribute_match
+            )
+
+    @staticmethod
+    def _convert_attribute_match_to_variable(
+        attribute_match: AttributeMatch,
+    ) -> Selectable:
+        """
+        Convert an attribute match into a variable to enumerate during generation, handling
+        ellipsis assignments for enum fields and concrete values.
+
+        :param attribute_match: The attribute match to convert.
+        :return: A variable (or symbolic expression) representing the attribute match.
+        """
+        from krrood.entity_query_language.factories import variable
+
+        if isinstance(attribute_match.assigned_value, type(Ellipsis)) and issubclass(
+            attribute_match.assigned_variable._type_, enum.Enum
+        ):
+            return variable(
+                attribute_match.assigned_variable._type_,
+                list(attribute_match.assigned_variable._type_),
+            )
+        if isinstance(attribute_match.assigned_value, SymbolicExpression):
+            return attribute_match.assigned_value
+        return variable(
+            type(attribute_match.assigned_value),
+            [attribute_match.assigned_value],
+        )
+
+    def _generate_raw_results(self, variables: Dict[str, Variable]) -> Iterator:
+        """
+        Generate instances from this match and the given enumerable variables.
+
+        :param variables: The variables used in the match expression, keyed by access-path name.
+        :return: A generator yielding instances constructed from each variable combination.
+        """
+        from krrood.entity_query_language.factories import set_of
+
+        all_combinations = set_of(*variables.values())
+        for combination in all_combinations._evaluate_natively_():
+            for variable_name, value in zip(variables, combination.values()):
+                mapped_variable = self._get_mapped_variable_by_name(variable_name)
+                mapped_variable._value_ = value
+            self._update_kwargs_from_literal_values()
+            yield self.construct_instance()
 
     @property
     def name(self) -> str:
@@ -471,6 +547,15 @@ class MatchVariable(Match[T]):
         from krrood.entity_query_language.factories import variable
 
         self.variable = variable(self.type, domain=self.domain)
+
+    def _evaluate_natively_(self) -> Iterator:
+        """
+        Evaluate selectively over the match's domain (a domain-bound match selects existing
+        elements rather than generating new ones).
+
+        :return: An iterator over the matching elements.
+        """
+        return self.expression._evaluate_natively_()
 
     def __call__(self, **kwargs) -> Union[Entity[T], T]:
         """

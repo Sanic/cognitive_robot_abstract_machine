@@ -1,34 +1,16 @@
-import enum
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing import Iterable, TypeVar
 
 from sqlalchemy.orm import sessionmaker
-from typing_extensions import Dict
 
-from krrood.entity_query_language.core.base_expressions import (
-    Selectable,
-    SymbolicExpression,
-)
-from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     NoSolutionFound,
     GenerativeBackendQueryIsNotUnderspecifiedVariable,
-    UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration,
 )
-from krrood.entity_query_language.factories import (
-    set_of,
-    variable,
-    variable_from,
-    entity,
-)
-from krrood.entity_query_language.query.match import (
-    Match,
-    AttributeMatch,
-    MatchVariable,
-)
+from krrood.entity_query_language.query.match import Match
 from krrood.entity_query_language.query.query import Query
-from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.parametrization.model_registries import (
     ModelRegistry,
@@ -49,7 +31,7 @@ class QueryBackend(ABC):
     """
 
     @abstractmethod
-    def evaluate(self, expression: Query) -> Iterable[T]:
+    def evaluate(self, expression: Evaluable) -> Iterable[T]:
         """
         Generate answers that match the expression.
 
@@ -74,7 +56,7 @@ class GenerativeBackend(QueryBackend, ABC):
     {py:class}`~krrood.entity_query_language.query.match.Match` is the only way to do so.
     """
 
-    def evaluate(self, expression: Query) -> Iterable[T]:
+    def evaluate(self, expression: Evaluable) -> Iterable[T]:
         if not isinstance(expression, Match):
             raise GenerativeBackendQueryIsNotUnderspecifiedVariable(expression)
         yield from self._evaluate(expression)
@@ -103,101 +85,12 @@ class SQLAlchemyBackend(SelectiveBackend):
 @dataclass
 class EntityQueryLanguageBackend(SelectiveBackend):
     """
-    A domain that selects elements from a python process. This is just ordinary EQL.
+    A backend that evaluates elements in this python process. This is just ordinary EQL: each
+    expression knows how to evaluate itself natively (queries select, matches generate).
     """
 
-    def evaluate(self, expression: Query) -> Iterable:
-        if isinstance(expression, Match) and not isinstance(expression, MatchVariable):
-            yield from self._evaluate_underspecified(expression)
-            return
+    def evaluate(self, expression: Evaluable) -> Iterable:
         yield from expression._evaluate_natively_()
-
-    def _evaluate_underspecified(self, expression: Match[T]) -> Iterable[T]:
-        """
-        Evaluate an underspecified match expression by generating results from its constructor.
-
-        :param expression: The underspecified match expression.
-        :return: A newly generated instance of `T` that is compliant with the match expression's constraints.
-        """
-
-        variables: Dict[str, Variable] = {}
-
-        for attribute_match in expression.matches_with_variables:
-            self._check_if_attribute_match_is_suitable_for_generation(attribute_match)
-            variables[attribute_match.name_from_variable_access_path] = (
-                self._convert_attribute_match_to_variable(attribute_match)
-            )
-
-        expression.variable._update_domain_(
-            self._generate_raw_results(expression, variables)
-        )
-
-        filtered_results = entity(expression.variable)._quantify_(
-            expression._quantifier_type_
-        )
-
-        if expression._where_conditions_:
-            filtered_results = filtered_results.where(*expression._where_conditions_)
-        yield from filtered_results._evaluate_natively_()
-
-    def _check_if_attribute_match_is_suitable_for_generation(
-        self, attribute_match: AttributeMatch
-    ):
-        """
-        Raise an error if an assignment in the match cannot be used to generate solutions.
-        :param attribute_match: The attribute match to check.
-        """
-        if isinstance(
-            attribute_match.assigned_value, type(Ellipsis)
-        ) and not issubclass(attribute_match.assigned_variable._type_, enum.Enum):
-            raise UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
-                attribute_match
-            )
-
-    def _convert_attribute_match_to_variable(self, attribute_match: AttributeMatch):
-        """
-        Convert an attribute match to a variable, handling ellipsis assignments for enum fields.
-        :param attribute_match: The attribute match to convert.
-        :return: A variable representing the attribute match.
-        """
-        # convert ellipsis assignments for enum fields to symbolic expressions
-        if isinstance(attribute_match.assigned_value, type(Ellipsis)) and issubclass(
-            attribute_match.assigned_variable._type_, enum.Enum
-        ):
-            result = variable(
-                attribute_match.assigned_variable._type_,
-                list(attribute_match.assigned_variable._type_),
-            )
-
-        # keep symbolic expressions as is
-        elif isinstance(attribute_match.assigned_value, SymbolicExpression):
-            result = attribute_match.assigned_value
-
-        # convert concrete objects to symbolic expressions
-        else:
-            result = variable(
-                type(attribute_match.assigned_value),
-                [attribute_match.assigned_value],
-            )
-        return result
-
-    def _generate_raw_results(
-        self, expression: Match[T], variables: Dict[str, Variable]
-    ) -> Iterable[T]:
-        """
-        Generate instances from a given match expression and variables.
-        :param expression: The match expression to generate instances from.
-        :param variables: The variables used in the match expression.
-        :return: A generator yielding instances generated from the match expression.
-        """
-        all_combinations = set_of(*variables.values())
-        for combination in all_combinations._evaluate_natively_():
-            for variable_name, value in zip(variables, combination.values()):
-                mapped_variable = expression._get_mapped_variable_by_name(variable_name)
-                mapped_variable._value_ = value
-
-            expression._update_kwargs_from_literal_values()
-            yield expression.construct_instance()
 
 
 @dataclass

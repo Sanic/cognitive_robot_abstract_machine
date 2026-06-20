@@ -54,6 +54,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     UnificationDict,
 )
+from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.cache_data import (
     SeenSet,
 )
@@ -91,7 +92,10 @@ A function that maps the results of a query to a new set of results.
 @monitored
 @dataclass(eq=False, repr=False)
 class Query(
-    MultiArityExpressionThatPerformsACartesianProduct, CanBehaveLikeAVariable[T], ABC
+    Evaluable,
+    MultiArityExpressionThatPerformsACartesianProduct,
+    CanBehaveLikeAVariable[T],
+    ABC,
 ):
     """
     Describes the queried object(s), could be a query over a single variable or a set of variables,
@@ -181,20 +185,15 @@ class Query(
         """
         Evaluate the query using the given backend, returning an iterator over the results.
 
+        Finalizes the query structure eagerly so that ``evaluate`` consistently marks the
+        query as built (and forbids further modification) regardless of when the returned
+        iterator is consumed. ``build`` is idempotent.
+
         :param backend: The query backend to evaluate with. Defaults to the
             ``EntityQueryLanguageBackend`` (native python evaluation).
         """
-        if backend is None:
-            from krrood.entity_query_language.backends import (
-                EntityQueryLanguageBackend,
-            )
-
-            backend = EntityQueryLanguageBackend()
-        # Finalize the query structure eagerly so that ``evaluate`` consistently marks the
-        # query as built (and forbids further modification) regardless of when the returned
-        # iterator is consumed. ``build`` is idempotent.
         self.build()
-        return backend.evaluate(self)
+        return super().evaluate(backend)
 
     def _evaluate_natively_(self) -> Iterator:
         """
