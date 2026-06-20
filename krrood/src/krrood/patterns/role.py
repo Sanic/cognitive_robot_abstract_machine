@@ -348,19 +348,11 @@ class Role(Symbol, SubClassSafeGeneric[T]):
                 return takers
             current = current.role_taker
 
-    # A role is an ordinary object with identity-based equality and hashing: each role is
-    # equal only to itself and distinct from its role taker. "Do these refer to the same
-    # underlying entity?" is answered explicitly by the ``IsSameEntity`` predicate
-    # (see ``krrood.patterns.role_predicates``) rather than by overloading ``==``/``hash``.
-    #
-    # ``__eq__`` returns a definitive ``False`` (rather than ``NotImplemented`` like
-    # ``object.__eq__``) so that Python does not fall back to the *taker's* equality via the
-    # reflected operand: a role delegates attribute reads to its taker, so a taker with a
-    # lenient (e.g. name-based) ``__eq__`` would otherwise compare equal to its role.
-    #
-    # ``__hash__`` must be set explicitly: ``Role``'s base ``SubClassSafeGeneric`` is a plain
-    # ``@dataclass`` (eq=True, no fields), which would otherwise set ``__hash__ = None``
-    # (unhashable); defining ``__eq__`` here would also reset it to ``None``.
+    # A role is equal only to itself (identity), never to its taker; "same underlying entity?"
+    # is answered by the ``IsSameEntity`` predicate instead. ``__eq__`` returns ``False`` rather
+    # than ``NotImplemented`` so Python cannot fall back to the taker's (possibly lenient) equality
+    # via the reflected operand. ``__hash__`` is set explicitly because defining ``__eq__`` here,
+    # like the plain-dataclass base, would otherwise reset it to ``None`` (unhashable).
     def __eq__(self, other: Any) -> bool:
         return self is other
 
