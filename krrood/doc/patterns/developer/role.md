@@ -51,8 +51,8 @@ The implementation centres on three collaborating components:
 identity-based equality/hashing (`__hash__`, `__eq__`), attribute delegation (`__getattr__`,
 `__setattr__`), and all querying class methods. It inherits from `SubClassSafeGeneric[T]` so that
 fields whose annotation uses the generic parameter are rewritten to the bound concrete type on each
-role subclass (keeping generic roles introspectable by the class diagram), and from `Symbol` to
-participate in the Symbol Graph and do reasoning over it (see last point below).
+role subclass (keeping generic roles introspectable by the class diagram), and from `Symbol` so a
+role participates in the class diagram and ORM like any other entity.
 
 **`role_taker_field()`** is a thin wrapper around `dataclasses.field()` that produces a
 `RoleTakerField` (a `dataclasses.Field` subclass) by building a field and reassigning its
@@ -60,11 +60,11 @@ participate in the Symbol Graph and do reasoning over it (see last point below).
 which field is the role taker. It also allows the class diagram (`krrood.class_diagrams`) to
 recognise role-taker relationships during graph construction.
 
-**`SymbolGraph`** (external, in `krrood.symbol_graph`) is the runtime registry. When a role is
-constructed, `Role.__post_init__` calls
-`_update_mapping_between_roles_and_role_takers`, which writes a `HasRoleTaker` edge into the
-symbol graph linking the wrapped role to its wrapped taker. Querying whether a taker has a
-given role type then becomes a graph traversal over incoming `HasRoleTaker` edges.
+**`RoleRegistry`** (`role_registry.py`) is the runtime inverse index. When a role is constructed,
+`Role.__post_init__` calls `RoleRegistry.register`, which indexes the role under every taker in its
+chain. Querying whether a taker has a given role type then becomes a lookup in this index. The
+registry is held on `Role` as a shared class attribute and can be replaced with a fresh instance to
+isolate state.
 
 ## Key Design Decisions and Rationale
 
@@ -112,16 +112,20 @@ roots by identity. Two roles at different levels of a chain, and a role versus i
 are therefore *not* `==` but *are* `IsSameEntity`. A direct consequence is that multiple roles,
 even of the same type, on one taker stay distinct in sets and dicts.
 
-### SymbolGraph as the Role Registry
+### The Role Registry
 
-Role lookup (checking whether a taker has a role, retrieving roles of a given type) is
-implemented as a graph traversal over the `SymbolGraph`. The role registers itself by adding a
-`HasRoleTaker` edge from itself to its taker during `__post_init__`.
+Role lookup (checking whether a taker has a role, retrieving roles of a given type) is a lookup in
+`RoleRegistry`, an inverse index from a taker to the roles attached to it. The role registers itself
+during `__post_init__`. Entries are keyed by taker identity and held through weak references, so the
+index neither keeps roles or takers alive nor conflates two distinct takers that compare equal.
 
-When the taker is itself a role, `_update_mapping_between_roles_and_role_takers` additionally
-adds transitive `HasRoleTaker` edges from the new role to every entity that the taker's taker
-already points to. This ensures that querying from any point in the chain resolves to all roles
-and takers in the chain.
+A role is indexed under every taker in its chain, not only its immediate taker. When the taker is
+itself a role, the new role is therefore reachable from every entity beneath it, so a query from any
+point in the chain resolves to all roles layered above it. The opposite direction (a role's takers)
+needs no index: `all_role_takers` walks the taker chain directly.
+
+The registry depends on nothing in `krrood.class_diagrams` or `krrood.symbol_graph`, so a role's
+membership behaviour is independent of whether its class has been added to the class diagram.
 
 ## Attribute Access
 
@@ -139,14 +143,14 @@ explicitly through `role.role_taker` (or `role.root_persistent_entity`).
 
 ## Source References
 
-- `krrood/src/krrood/patterns/role.py` — `Role`, `role_taker_field`, `HasRoleTaker`
+- `krrood/src/krrood/patterns/role.py` — `Role`, `role_taker_field`
+- `krrood/src/krrood/patterns/role_registry.py` — `RoleRegistry`
 - `krrood/src/krrood/patterns/exceptions.py` — `RoleTakerFieldNotFound`,
   `DelegatedFactoryMethodError`, `RoleAttributeNotDeclaredError`
 - `krrood/src/krrood/patterns/subclass_safe_generic.py` — `SubClassSafeGeneric`,
   `AbstractSubClassSafeGeneric`
 - `krrood/src/krrood/class_diagrams/utils.py` — `RoleTakerField`
-- `krrood/src/krrood/symbol_graph/symbol_graph.py` — `SymbolGraph`, `PredicateClassRelation`,
-  `Symbol`
+- `krrood/src/krrood/symbol_graph/symbol_graph.py` — `Symbol`
 - `test/krrood_test/test_patterns/test_role.py` — behavioural tests for the role pattern
 - `test/krrood_test/dataset/role_and_ontology/university_ontology_like_classes_without_descriptors.py`
   — canonical fixture for role pattern tests
