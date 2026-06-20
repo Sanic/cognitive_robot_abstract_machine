@@ -145,6 +145,23 @@ role cannot mutate the shared entity as a side effect, and the rejection of unde
 write from silently shadowing a role-taker attribute. Code that needs to modify the taker does so
 explicitly through `role.role_taker` (or `role.root_persistent_entity`).
 
+## Role-Taker Associations and Property Descriptors
+
+For every role, the class diagram infers an `AssociationThroughRoleTaker` (in
+`krrood.class_diagrams.class_diagram`): an association that connects the role class to each target
+reachable through its role taker's associations, transitively along the taker chain. This is how a
+role participates in the class model in the associations its taker already has, without inheriting
+from the taker.
+
+The property-descriptor module (`krrood.ontomatic.property_descriptor`) builds on this model:
+`PropertyDescriptor.get_superproperties_associations` and `PropertyDescriptorRelation` resolve
+property and super-property relations across role takers through these associations (using
+`ClassDiagram.get_outgoing_associations_with_condition` and
+`AssociationThroughRoleTaker.get_original_source_instance_given_this_relation_source_instance`). The
+property-descriptor code therefore depends on the role-taker association model defined here, so the
+two evolve together: a change to how roles project their takers' associations is reflected in both
+the class diagram and the property descriptors.
+
 ## Source References
 
 - `krrood/src/krrood/patterns/role.py` — `Role`, `role_taker_field`, `RoleTakerField`
