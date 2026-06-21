@@ -22,7 +22,6 @@ from krrood.entity_query_language.verbalization.rendering.discourse import (
     DiscourseView,
     EMPTY_DISCOURSE,
 )
-from krrood.entity_query_language.verbalization.vocabulary.english import Pronouns
 
 
 @dataclass
@@ -90,7 +89,8 @@ class CoreferenceProcessor:
         """Document-order rebuild, threading the accumulating discourse state.
 
         A fragment built from a query node opens a discourse scope whose focus the
-        :class:`DiscourseView` supplies (``None`` suppresses pronominalisation, e.g. a set-of)."""
+        :class:`DiscourseView` supplies (``None`` suppresses pronominalisation, e.g. a set-of).
+        """
         if self.discourse.is_scope(fragment.source):
             self._subject_stack.append(
                 SubjectFrame(self.discourse.focus_of(fragment.source))
@@ -119,10 +119,7 @@ class CoreferenceProcessor:
         mention)."""
         if self._pronominalises(possessive_chain):
             subject_number = self._subject_stack[-1].number
-            pronoun = (
-                Pronouns.THEIR if subject_number is Number.PLURAL else Pronouns.ITS
-            )
-            return pronominal_path(possessive_chain.parts, pronoun.as_fragment())
+            return pronominal_path(possessive_chain.parts, subject_number)
         return possessive_path(
             possessive_chain.parts, self._walk(possessive_chain.root_fragment)
         )
@@ -177,7 +174,8 @@ class CoreferenceProcessor:
     def _record_subject_number(self, noun_phrase: NounPhrase) -> None:
         """If this noun phrase *is* an enclosing scope's subject, record its grammatical number on
         that frame — the subject is rendered before the chains that refer to it, so the number
-        (*"its"*/*"their"*) is known by the time pronominalisation is decided. Rules supply none."""
+        (*"its"*/*"their"*) is known by the time pronominalisation is decided. Rules supply none.
+        """
         for frame in reversed(self._subject_stack):
             if frame.subject_id == noun_phrase.referent_id:
                 frame.number = noun_phrase.number

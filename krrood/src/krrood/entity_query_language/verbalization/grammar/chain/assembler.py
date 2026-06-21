@@ -34,7 +34,7 @@ from krrood.entity_query_language.verbalization.grammar.chain.planner import (
     ChainPlanner,
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
-    relational_verb_phrase,
+    relational_verb,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
     SpecificityRule,
@@ -126,7 +126,7 @@ class OrdinalIndexNavigation(NavigationForm):
     ) -> Fragment:
         ordinal = morphology.ordinal(navigation_chain[-1]._key_)
         prefix_fragment = possessive_path(
-            build_path_parts(navigation_chain[:-1], relational_verb_phrase),
+            build_path_parts(navigation_chain[:-1], relational_verb),
             root_fragment,
         )
         return PhraseFragment(
@@ -144,7 +144,7 @@ class PossessiveNavigation(NavigationForm):
     as ``assigned_to``) reads as a relative clause rather than a genitive.
 
     >>> verbalize_expression(variable(Mission, []).assigned_to.operational)
-    'the Robot which a Mission is assigned to is operational'
+    'the Robot to which a Mission is assigned is operational'
     """
 
     @classmethod
@@ -156,7 +156,7 @@ class PossessiveNavigation(NavigationForm):
         cls, navigation_chain: List[MappedVariable], root_fragment: Fragment
     ) -> Fragment:
         return possessive_path(
-            build_path_parts(navigation_chain, relational_verb_phrase), root_fragment
+            build_path_parts(navigation_chain, relational_verb), root_fragment
         )
 
 

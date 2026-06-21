@@ -322,6 +322,7 @@ def test_verbalize_second_index_ordinal():
 class _NavRobot:
     operational: bool
     battery: int
+    power: int
 
 
 @dataclass
@@ -384,7 +385,7 @@ def test_relational_navigation_reads_as_relative_clause():
     using the field's type as the head and dropping the genitive *of*."""
     m = variable(_NavMission, [])
     text = verbalize_expression(m.assigned_to.operational)
-    assert text == "the _NavRobot which a _NavMission is assigned to is operational"
+    assert text == "the _NavRobot to which a _NavMission is assigned is operational"
     assert "assigned_to" not in text and " of " not in text
 
 
@@ -392,7 +393,7 @@ def test_relational_navigation_standalone():
     m = variable(_NavMission, [])
     assert (
         verbalize_expression(m.assigned_to)
-        == "the _NavRobot which a _NavMission is assigned to"
+        == "the _NavRobot to which a _NavMission is assigned"
     )
 
 
@@ -401,11 +402,11 @@ def test_relational_navigation_agentive_by_does_not_reverse():
     read correctly rather than reversed (*not* "the Person owned by a Book")."""
     assert (
         verbalize_expression(variable(_NavBook, []).owned_by)
-        == "the _NavPerson which a _NavBook is owned by"
+        == "the _NavPerson by which a _NavBook is owned"
     )
     assert (
         verbalize_expression(variable(_NavDoc, []).written_by)
-        == "the _NavAuthor which a _NavDoc is written by"
+        == "the _NavAuthor by which a _NavDoc is written"
     )
 
 
@@ -413,7 +414,7 @@ def test_relational_navigation_irregular_participle():
     """The participle check is morphological, so an irregular participle (*sent*) is recognised."""
     assert (
         verbalize_expression(variable(_NavParcel, []).sent_to)
-        == "the _NavAddress which a _NavParcel is sent to"
+        == "the _NavAddress to which a _NavParcel is sent"
     )
 
 
@@ -422,7 +423,7 @@ def test_relational_navigation_multi_hop_outer_genitive():
     m = variable(_NavMission, [])
     assert (
         verbalize_expression(m.assigned_to.battery)
-        == "the battery of the _NavRobot which a _NavMission is assigned to"
+        == "the battery of the _NavRobot to which a _NavMission is assigned"
     )
 
 
@@ -439,6 +440,76 @@ def test_non_relational_navigation_unchanged():
     assert (
         verbalize_expression(variable(_NavEmp, []).department.name)
         == "the name of the department of a _NavEmp"
+    )
+
+
+# ── Relational navigation: pronominalisation of the relative-clause owner ─────────
+
+
+def test_relational_navigation_pronominalises_the_subject():
+    """When the chain root is the query subject, a deferred relational chain pronominalises the
+    owner to the nominative *it* inside the relative clause."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(an(entity(m).where(m.assigned_to.battery > 5)))
+    assert (
+        "the battery of the _NavRobot to which it is assigned is greater than 5" in text
+    )
+    assert (
+        "_NavMission is assigned" not in text
+    )  # the owner is pronominalised, not repeated
+
+
+def test_relational_navigation_pronominalises_at_every_occurrence():
+    """Each occurrence of the subject's relational chain pronominalises (two distinct terminals, so
+    they do not range-fold into one clause)."""
+    m = variable(_NavMission, [])
+    text = verbalize_expression(
+        an(entity(m).where(m.assigned_to.battery > 5, m.assigned_to.power > 10))
+    )
+    assert text.count("to which it is assigned") == 2
+
+
+def test_relational_navigation_pronominalises_in_nested_query():
+    """The relative clause pronominalises inside a nested aggregation sub-query too."""
+    m = variable(_NavMission, [])
+    nested = an(
+        entity(eql.average(m.assigned_to.battery)).where(m.assigned_to.battery > 5)
+    )
+    text = verbalize_expression(nested)
+    assert "to which it is assigned" in text
+
+
+def test_pronominal_relative_clause_agrees_with_subject_number():
+    """The relative-clause copula agrees with the subject: *it is* (singular) / *they are*
+    (plural) — exercised directly on the pronominal path."""
+    from krrood.entity_query_language.verbalization.navigation_path import (
+        PathStep,
+        RelationStep,
+    )
+    from krrood.entity_query_language.verbalization.microplanning.possessive import (
+        pronominal_path,
+    )
+    from krrood.entity_query_language.verbalization.fragments.features import Number
+    from krrood.entity_query_language.verbalization.rendering.realization import (
+        realize_subtree,
+    )
+
+    @dataclass
+    class _Target:
+        pass
+
+    step = PathStep(
+        "assigned_to",
+        None,
+        relation=RelationStep(_Target, _NavMission, "assigned", "to"),
+    )
+    assert (
+        realize_subtree(pronominal_path([step], Number.SINGULAR))
+        == "the _Target to which it is assigned"
+    )
+    assert (
+        realize_subtree(pronominal_path([step], Number.PLURAL))
+        == "the _Target to which they are assigned"
     )
 
 

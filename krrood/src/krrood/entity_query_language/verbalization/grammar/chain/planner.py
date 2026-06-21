@@ -20,7 +20,7 @@ from krrood.entity_query_language.verbalization.navigation_path import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
-    relational_verb_phrase,
+    relational_verb,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
@@ -85,6 +85,6 @@ class ChainPlanner(Planner[MappedVariable, ChainPlan]):
         return ChainPlan(
             chain=chain,
             root=root,
-            parts=build_path_parts(chain, relational_verb_phrase),
+            parts=build_path_parts(chain, relational_verb),
             is_boolean_terminal=chain_ends_in_boolean_attribute(chain),
         )

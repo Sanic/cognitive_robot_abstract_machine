@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Callable, List, Optional
+from typing_extensions import TYPE_CHECKING, Callable, List, Optional
 
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
@@ -16,20 +16,29 @@ from krrood.entity_query_language.verbalization.fragments.source_reference impor
     SourceReference,
 )
 
+if TYPE_CHECKING:
+    from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
+        RelationVerb,
+    )
+
 
 @dataclass(frozen=True)
 class RelationStep:
     """The data a *relational* hop renders from — the related type (the relative clause's head
-    noun), the verb phrase, and the owner class (for the verb phrase's source link)."""
+    noun), the verb split into participle + preposition (so the preposition pied-pipes before
+    *"which"*), and the owner class (for the verb's source link)."""
 
     value_type: object
     """The hop's value type — the head noun of the relative clause (*"the Robot"*)."""
 
     owner_class: type
-    """The attribute's owner class — supplies the verb phrase's source link."""
+    """The attribute's owner class — supplies the verb's source link."""
 
-    verb_phrase: str
-    """The passive verb phrase (*"assigned to"*), derived from the field name."""
+    participle: str
+    """The past-participle verb word(s) (*"assigned"*) — the *"… is assigned"* tail."""
+
+    preposition: str
+    """The trailing preposition (*"to"*) — pied-piped to *"to which …"*."""
 
 
 @dataclass(frozen=True)
@@ -60,7 +69,7 @@ class PathStep:
 
 def build_path_parts(
     chain: List[MappedVariable],
-    relational_phrase: Optional[Callable[[str], Optional[str]]] = None,
+    relation_verb: Optional[Callable[[str], Optional["RelationVerb"]]] = None,
 ) -> List[PathStep]:
     """
     Convert a walked chain into :class:`PathStep` hops.
@@ -68,7 +77,7 @@ def build_path_parts(
     Hop rules:
 
     * ``Attribute`` nodes appear as the attribute name, linked to their source reference. When
-      *relational_phrase* recognises the name as a verb relation (returns its phrase), the hop is
+      *relation_verb* recognises the name as a verb relation (returns its split verb), the hop is
       flagged relational, so it renders as a relative clause instead of a genitive.
     * Integer ``Index`` nodes appear as their ordinal word (``0`` → ``"first"``) with no source
       reference, so the possessive path reads *"the first of the tasks of …"* rather than leaking a
@@ -77,7 +86,7 @@ def build_path_parts(
     * ``FlatVariable`` nodes are skipped.
 
     :param chain: Innermost-first chain list (nearest the root first).
-    :param relational_phrase: Optional name → verb-phrase recogniser, injected so this module stays
+    :param relation_verb: Optional name → split-verb recogniser, injected so this module stays
         decoupled from the grammar's recognizers; ``None`` disables relational rendering.
     :return: Ordered list of :class:`PathStep`, innermost hop first.
     """
@@ -86,10 +95,15 @@ def build_path_parts(
         if isinstance(node, Attribute):
             owner = node._owner_class_
             name = node._attribute_name_
-            phrase = relational_phrase(name) if relational_phrase is not None else None
+            verb = relation_verb(name) if relation_verb is not None else None
             relation = (
-                RelationStep(getattr(node, "_type_", None), owner, phrase)
-                if phrase is not None
+                RelationStep(
+                    getattr(node, "_type_", None),
+                    owner,
+                    verb.participle,
+                    verb.preposition,
+                )
+                if verb is not None
                 else None
             )
             parts.append(

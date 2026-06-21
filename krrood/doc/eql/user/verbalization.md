@@ -113,19 +113,21 @@ boolean variable whose domain holds both values reads *"is either completed or n
 
 When an attribute is named as a *relation* — a past participle plus a preposition, like
 `assigned_to`, `owned_by`, or `written_by` — navigating through it reads as a **relative clause**
-naming the related type, rather than the bare genitive *"the assigned_to of …"*:
+naming the related type, rather than the bare genitive *"the assigned_to of …"*. The preposition
+moves in front of *"which"* (*"to which"*, *"by which"*):
 
 ```{code-cell} ipython3
 m = variable(Mission, domain=None)
-print(verbalize_expression(m.assigned_to))               # the Robot which a Mission is assigned to
+print(verbalize_expression(m.assigned_to))               # the Robot to which a Mission is assigned
 print(verbalize_expression(m.assigned_to.operational))   # … is operational
 ```
 
 The head noun (*"the Robot"*) is the attribute's declared type, and the owner stays the subject of
-the verb — so even agentive *by* relations read correctly (*"the Person which a Book is owned by"*,
-never the reversed *"the Person owned by a Book"*). A plain noun attribute is unaffected and keeps
-the genitive *"the name of the department of an Employee"*; a noun that merely ends in a preposition
-(e.g. `color_in`) is not treated as a relation.
+the verb — so even agentive *by* relations read correctly (*"the Person by which a Book is owned"*,
+never the reversed *"the Person owned by a Book"*). When the owner is the query's subject it
+pronominalises (*"the battery of the Robot **to which it is assigned**"*). A plain noun attribute is
+unaffected and keeps the genitive *"the name of the department of an Employee"*; a noun that merely
+ends in a preposition (e.g. `color_in`) is not treated as a relation.
 
 ## Absence Conditions (`== None`)
 
