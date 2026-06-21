@@ -55,6 +55,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
     Conjunctions,
     FallbackNouns,
+    GroupingPhrases,
     Keywords,
     Punctuation,
 )
@@ -94,6 +95,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         :return: The top-level imperative form *"Find X such that …"*, dispatched on the
             selection shape.
         """
+        if plan.report is not None and plan.report.kind is ReportKind.GROUPING:
+            return self._assemble_grouped_report(node, plan, plan.report)
         handlers = {
             SelectionKind.ENTITY_SELECTOR: self._realize_entity_selector,
             SelectionKind.EMPTY: self._realize_empty,
@@ -136,6 +139,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         """
         plan = self.plan(node)
         report = plan.report
+        if report is not None and report.kind is ReportKind.GROUPING:
+            return self._assemble_grouped_report(node, plan, report)
         if report is not None and report.kind is ReportKind.AGGREGATION:
             return self._assemble_aggregation_report(node, plan, report)
         return self._query_body(
@@ -274,6 +279,50 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             find_header=header,
         )
 
+    def _assemble_grouped_report(
+        self, node: Query, plan: QueryPlan, report: ReportPlan
+    ) -> Fragment:
+        """:return: a grouped report with no aggregates — *"For each <keys>, report all <columns>"*
+        (the columns listed as per-group populations), or *"Report the distinct <keys>"* when the
+        selection is exactly the group key (so there is nothing left to report but the keys
+        themselves). The trailing *"grouped by"* clause is dropped as redundant."""
+        if not report.columns:
+            return self._query_body(
+                node,
+                plan,
+                self._distinct_keys(report.group_keys),
+                where_items=[self._where_clause(plan)],
+                find_header=self._sentence_initial(Keywords.REPORT.as_fragment()),
+            )
+        selection = PhraseFragment(
+            parts=[
+                GroupingPhrases.ALL.as_fragment(),
+                self._selection_list(report.columns, number=Number.PLURAL),
+            ]
+        )
+        return self._query_body(
+            node,
+            plan,
+            selection,
+            where_items=[self._where_clause(plan)],
+            find_header=self._for_each_header(report.group_keys),
+        )
+
+    def _distinct_keys(self, keys: List[SymbolicExpression]) -> Fragment:
+        """:return: *"the distinct <keys>"* — the group keys as a plural population listing, for a
+        grouped query that reports nothing but its keys."""
+        labels = oxford_comma(
+            [self._group_label(key, Number.PLURAL) for key in keys],
+            Conjunctions.AND.as_fragment(),
+        )
+        return PhraseFragment(
+            parts=[
+                Articles.THE.as_fragment(),
+                GroupingPhrases.DISTINCT.as_fragment(),
+                labels,
+            ]
+        )
+
     def _for_each_header(self, keys: List[SymbolicExpression]) -> Fragment:
         """:return: the fronted *"For each <key>, report"* frame — the grouping first (it is the row
         dimension of the result), the keys as bare singular labels, then the lowercase verb.
@@ -290,13 +339,17 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             ]
         )
 
-    def _group_label(self, key: SymbolicExpression) -> Fragment:
-        """:return: a group key as a bare singular label — *"department"* for an attribute key,
-        the type name for a variable key — naming the group itself rather than one member's
-        navigation (*"the department of an Employee"*)."""
+    def _group_label(
+        self, key: SymbolicExpression, number: Number = Number.SINGULAR
+    ) -> Fragment:
+        """:return: a group key as a bare label in *number* — *"department"* / *"departments"* for an
+        attribute key, the type name for a variable key — naming the group itself rather than one
+        member's navigation (*"the department of an Employee"*)."""
         if isinstance(key, Attribute):
-            return RoleFragment.for_attribute(key._owner_class_, key._attribute_name_)
-        return RoleFragment.for_type(getattr(key, "_type_", None))
+            return RoleFragment.for_attribute(
+                key._owner_class_, key._attribute_name_, number=number
+            )
+        return RoleFragment.for_type(key._type_, number=number)
 
     @staticmethod
     def _sentence_initial(fragment: RoleFragment) -> Fragment:
@@ -336,7 +389,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         """
         if plan.ranking is not None:
             return ranking_surface(RankingRequest(plan=plan.ranking)).number
-        if plan.report is not None and plan.report.kind is ReportKind.ORDERING:
+        if plan.report is not None and plan.report.kind in (
+            ReportKind.ORDERING,
+            ReportKind.GROUPING,
+        ):
             return Number.PLURAL
         return Number.SINGULAR
 

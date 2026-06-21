@@ -375,8 +375,10 @@ def test_coindexed_non_equality_uses_faithful_those_of_form():
         .grouped_by(p.period.begin.month)
     )
     text = verbalize_expression(query)
+    # The selection is the group key, so the query fronts a distinct listing; the faithful
+    # non-equality co-indexed form ("are greater than those of …") is unchanged.
     assert (
-        "the month and year of the begin of its period are greater than "
+        "the month and year of the begin of the period of a _Statement are greater than "
         "those of the end of its period" in text
     )
 

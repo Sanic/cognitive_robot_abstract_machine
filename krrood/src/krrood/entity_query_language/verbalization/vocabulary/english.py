@@ -379,6 +379,16 @@ class SetMembership(VocabEnum):
     ONE_OF = PlainWord("one of")
 
 
+class GroupingPhrases(VocabEnum):
+    """The words a grouped query fronts itself with — *"For each <key>, report all <selection>"*,
+    or *"Report the distinct <keys>"* when the selection is exactly the group key."""
+
+    ALL = PlainWord("all")
+    """Quantifies a per-group selection listing (*"report all Employees"*)."""
+    DISTINCT = PlainWord("distinct")
+    """Marks a key-only grouped selection as a distinct listing (*"the distinct departments"*)."""
+
+
 class Specificity(VocabEnum):
     """Pre-head marking a concrete object literal as a specific instance (its identity, not its
     repr) — the *"specific"* of *"a specific Body"*."""

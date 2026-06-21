@@ -51,6 +51,9 @@ class ReportKind(Enum):
 
     AGGREGATION = auto()
     """The selection computes aggregates — *"Report the sum …"* / *"For each …, report …"*."""
+    GROUPING = auto()
+    """A grouped selection with no aggregates — fronted as *"For each <key>, report all <selection>"*,
+    or *"Report the distinct <keys>"* when the selection is exactly the group key."""
     ORDERING = auto()
     """An unranked ordered listing — *"Report Employees ordered by their salary"* (plural, because
     ordering ranges over all the results)."""
@@ -238,23 +241,59 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         aggregation = self._aggregation_report()
         if aggregation is not None:
             return aggregation
+        grouping = self._grouping_report()
+        if grouping is not None:
+            return grouping
         if self.node._ordered_by_builder_ is not None:
             return ReportPlan(kind=ReportKind.ORDERING)
         return None
+
+    def _selections(self) -> List[SymbolicExpression]:
+        """:return: the query's selected expressions — the tuple members of a set-of, else the
+        single selected variable (empty when there is none)."""
+        if isinstance(self.node, SetOf):
+            return list(self.node._selected_variables_)
+        selected = self._selected
+        return [selected] if selected is not None else []
+
+    def _group_keys(self) -> List[SymbolicExpression]:
+        """:return: the query's GROUP BY key expressions (empty when it is not grouped)."""
+        grouped = self.node._grouped_by_expression_
+        return list(grouped.variables_to_group_by) if grouped is not None else []
+
+    def _columns_without_keys(
+        self, keys: List[SymbolicExpression]
+    ) -> List[SymbolicExpression]:
+        """:return: the selected expressions with the group keys removed (so a key is named once, in
+        the *"For each …"* frame, not restated as a reported column)."""
+        key_ids = {key._id_ for key in keys}
+        return [s for s in self._selections() if s._id_ not in key_ids]
 
     def _aggregation_report(self) -> Optional[ReportPlan]:
         """:return: The ``AGGREGATION`` report for a set-of selecting at least one aggregate (its
         GROUP BY keys split out of the reported columns), else ``None``."""
         if not isinstance(self.node, SetOf):
             return None
-        selections = list(self.node._selected_variables_)
-        if not any(isinstance(selection, Aggregator) for selection in selections):
+        if not any(isinstance(s, Aggregator) for s in self.node._selected_variables_):
             return None
-        grouped = self.node._grouped_by_expression_
-        keys = list(grouped.variables_to_group_by) if grouped is not None else []
-        key_ids = {key._id_ for key in keys}
-        columns = [s for s in selections if s._id_ not in key_ids]
-        return ReportPlan(kind=ReportKind.AGGREGATION, group_keys=keys, columns=columns)
+        keys = self._group_keys()
+        return ReportPlan(
+            kind=ReportKind.AGGREGATION,
+            group_keys=keys,
+            columns=self._columns_without_keys(keys),
+        )
+
+    def _grouping_report(self) -> Optional[ReportPlan]:
+        """:return: The ``GROUPING`` report for a grouped query with no aggregates — its columns are
+        the selection minus the keys (empty when the selection is exactly the key), else ``None``."""
+        keys = self._group_keys()
+        if not keys:
+            return None
+        return ReportPlan(
+            kind=ReportKind.GROUPING,
+            group_keys=keys,
+            columns=self._columns_without_keys(keys),
+        )
 
     # ── selection shape ──────────────────────────────────────────────────────
 
