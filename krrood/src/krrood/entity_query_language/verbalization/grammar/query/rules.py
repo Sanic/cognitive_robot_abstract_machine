@@ -52,10 +52,11 @@ class NestedEntityRule(PhraseRule):
 
 
 class SetOfRule(PhraseRule):
-    """SetOf → *"Find (v1, v2, …) such that …"*.
+    """SetOf → *"Find v1 and v2 such that …"* (a search), or *"Report …"* / *"For each … report
+    …"* when the selection computes aggregates (a report).
 
     >>> verbalize_expression(an(set_of(variable(Robot, []), variable(Task, []))))
-    'Find (a Robot, a Task)'
+    'Find a Robot and a Task'
     """
 
     construct = SetOf

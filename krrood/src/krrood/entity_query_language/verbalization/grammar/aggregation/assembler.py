@@ -71,7 +71,7 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         aggregate = NounPhrase(
             head=aggregation_kind.as_fragment(),
             definiteness=Definiteness.DEFINITE,
-            modifiers=[leaf_fragment],
+            modifiers=aggregation_kind.compact_complement(leaf_fragment),
         )
 
         if not aggregation_data.is_constrained_or_grouped:

@@ -104,10 +104,24 @@ def test_limit_suppresses_the_ordered_by_clause():
     assert "descending" not in text
 
 
-def test_ordering_without_limit_keeps_the_ordered_by_clause():
+def test_ordering_without_limit_reports_the_ordered_listing():
+    """An unranked ordered query is a listing, not a search: it reports the whole (plural)
+    population and keeps the ordered-by clause."""
     e = variable(Employee, [])
     text = verbalize_expression(an(entity(e).ordered_by(e.salary, descending=True)))
-    assert text == "Find an Employee ordered by its salary (descending)"
+    assert text == "Report Employees ordered by their salary (descending)"
+
+
+def test_conditioned_ordering_still_reports():
+    """Report-ness and conditions are orthogonal: a filtered ordered query is still a report (a
+    filtered listing), so it keeps "Report" and the plural subject alongside its restriction.
+    """
+    e = variable(Employee, [])
+    text = verbalize_expression(an(entity(e).where(e.salary > 5).ordered_by(e.salary)))
+    assert (
+        text
+        == "Report Employees whose salary is greater than 5, ordered by their salary (ascending)"
+    )
 
 
 # ── composition with WHERE (the ranking selection stays a referring subject) ──

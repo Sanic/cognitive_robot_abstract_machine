@@ -287,6 +287,68 @@ print(verbalize_expression(query))
 # the battery is greater than 5
 ```
 
+## Reports (presenting results, not searching)
+
+Some queries *present* results rather than *search* for a match — a calculation, or an ordered
+listing. These open with **"Report"** rather than "Find". Report-ness and conditions are
+orthogonal: a report may still be filtered.
+
+A `set_of` that *computes* an aggregate is a calculation, so it opens with "Report" and drops the
+code-like parentheses:
+
+```{code-cell} ipython3
+employee = variable(Employee, domain=None)
+print(verbalize_expression(a(set_of(eql.sum(employee.salary)))))
+# Report the sum of salaries of Employees
+```
+
+When it is **grouped**, the grouping is stated first as a **"For each <key>"** frame (the natural
+reading of GROUP BY). The key is named once — as the bare group label — and is not restated as a
+column:
+
+```{code-cell} ipython3
+query = a(
+    set_of(employee.department, eql.sum(employee.salary)).grouped_by(employee.department)
+)
+print(verbalize_expression(query))
+# For each department, report the sum of salaries of Employees
+```
+
+An **ordered** query is also a report — ordering presents *all* the (matching) results in
+sequence, which is a listing, not a hunt for one match. The subject is therefore plural, and a
+filter does not change that (it just narrows the list):
+
+```{code-cell} ipython3
+print(verbalize_expression(an(entity(employee).ordered_by(employee.salary))))
+# Report Employees ordered by their salary (ascending)
+
+print(verbalize_expression(
+    an(entity(employee).where(employee.salary > 5).ordered_by(employee.salary))
+))
+# Report Employees whose salary is greater than 5, ordered by their salary (ascending)
+```
+
+A `limit` is the exception: it ranks (*"Find the top three …"*), a distinct count-bearing form.
+
+A reported aggregate is a *computed quantity*: named in full where it is first reported, a later
+mention of the same aggregate (in `having`, or an ordering) reduces to its bare head:
+
+```{code-cell} ipython3
+total = eql.sum(employee.salary)
+print(verbalize_expression(
+    a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
+))
+# For each department, report the sum of salaries of Employees having the sum greater than 30000
+```
+
+A plain (non-aggregating, unordered) `set_of` stays a search and also drops the parentheses.
+Several attributes of the *same* owner fold into a shared genitive rather than repeating the owner:
+
+```{code-cell} ipython3
+print(verbalize_expression(a(set_of(employee.department, employee.name))))
+# Find the department and name of an Employee
+```
+
 ## Date Range Folding
 
 When a lower-bound and an upper-bound comparison on the same datetime attribute appear

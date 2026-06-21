@@ -231,6 +231,12 @@ class NounPhrase(HasNumber, Fragment):
     """When set, this noun phrase is a referring expression for that entity, and its
     definiteness holds the first-mention form."""
 
+    subject_of_modifiers: bool = True
+    """Whether this referring noun phrase is the discourse subject *of its own modifiers* — true for
+    an entity with restrictive modifiers (*"a Robot whose battery exceeds its threshold"*), false
+    for a quantity whose modifiers are a complement rooted elsewhere (*"the sum of the amount of its
+    revenue"* — the complement keeps the outer subject, so it must not be re-scoped to the sum)."""
+
     pre_head: Optional[Fragment] = None
     """A qualifier placed between the determiner and the head (*"the [first two] Robots"*), e.g. a
     ``limit`` ranking phrase. Pre-nominal, so distinct from the post-nominal :attr:`modifiers`."""

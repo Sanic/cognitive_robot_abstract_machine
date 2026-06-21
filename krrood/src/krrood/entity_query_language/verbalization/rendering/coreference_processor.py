@@ -321,7 +321,7 @@ class CoreferenceProcessor:
         whose battery exceeds its threshold"*). This is inferred from structure — the modifiers
         slot — so rules never mark the scope."""
         head = self._walk(noun_phrase.head)
-        if noun_phrase.referent_id is None:
+        if noun_phrase.referent_id is None or not noun_phrase.subject_of_modifiers:
             modifiers = [self._walk(modifier) for modifier in noun_phrase.modifiers]
         else:
             self._subject_stack.append(

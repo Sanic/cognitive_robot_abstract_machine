@@ -39,11 +39,15 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
     Reference: Reiter & Dale (2000) — aggregation / clause structuring; Gatt & Reiter (2009),
     SimpleNLG — surface realisation.
 
+    A grouped set-of *report* fronts its grouping as *"For each <key>, report …"* in the query
+    assembler, so this clause is used for the in-query weave (*"and the <aggregated> are grouped by
+    …"*) and bare grouped-by nodes.
+
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(
     ...     a(set_of(employee.department, sum(employee.salary)).grouped_by(employee.department))
     ... )
-    'Find (the department of an Employee, the sum of salaries of Employees) grouped by their department'
+    'For each department, report the sum of salaries of Employees'
     """
 
     planner = GroupedByPlanner
@@ -102,7 +106,7 @@ class OrderedByAssembler(Assembler[Union[OrderedBy, OrderedByBuilder], None]):
 
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(a(set_of(employee).ordered_by(employee.salary, descending=True)))
-    'Find (an Employee) ordered by its salary (descending)'
+    'Report Employees ordered by their salary (descending)'
     """
 
     def realize(
@@ -151,7 +155,7 @@ class HavingAssembler(Assembler[Query, None]):
     >>> verbalize_expression(
     ...     a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
     ... )
-    'Find (the department of an Employee, the sum of salaries of Employees) grouped by the department of the Employee, having the sum of salaries of Employees greater than 30000'
+    'For each department, report the sum of salaries of Employees having the sum greater than 30000'
     """
 
     def realize(self, node: Query, plan: None = None) -> Fragment:

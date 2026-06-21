@@ -5,6 +5,7 @@ from typing_extensions import List
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.base import (
     NounPhrase,
+    oxford_comma,
     PhraseFragment,
     RoleFragment,
     Fragment,
@@ -17,6 +18,7 @@ from krrood.entity_query_language.verbalization.fragments.features import (
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
+    Conjunctions,
     Copulas,
     Keywords,
     Prepositions,
@@ -71,6 +73,22 @@ def _relative_clause(
             ),
         ],
         referent_id=relation.referent_id,
+    )
+
+
+def coordinated_genitive(
+    attribute_fragments: List[Fragment], owner_fragment: Fragment
+) -> Fragment:
+    """:return: *"the <a, b, and c> of <owner>"* — several attributes sharing one genitive owner,
+    coordinated under it (right-node raising: *"the department and salary of an Employee"*) rather
+    than repeated owner by owner (*"the department of an Employee and its salary"*)."""
+    return PhraseFragment(
+        parts=[
+            Articles.THE.as_fragment(),
+            oxford_comma(attribute_fragments, Conjunctions.AND.as_fragment()),
+            Prepositions.OF.as_fragment(),
+            owner_fragment,
+        ]
     )
 
 

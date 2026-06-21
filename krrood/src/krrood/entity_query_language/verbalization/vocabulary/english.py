@@ -147,6 +147,8 @@ class Keywords(VocabEnum):
     IF = KeyWord("If")
     THEN = KeyWord("then")
     FIND = KeyWord("Find")
+    REPORT = KeyWord("report")
+    FOR_EACH = KeyWord("For each")
     SUCH_THAT = KeyWord("such that")
     GIVEN_THAT = KeyWord("given that")
     WHERE = KeyWord("where")
@@ -186,14 +188,14 @@ class Logicals(VocabEnum):
 class Aggregations(VocabEnum):
     """Aggregation function phrases (number of, sum of, average of, etc.)."""
 
-    COUNT = AggregationWord("number of")
+    COUNT = AggregationWord("number")
     COUNT_ALL = AggregationWord("count of all", child_form=ChildForm.NONE)
-    SUM = AggregationWord("sum of")
-    AVERAGE = AggregationWord("average of")
-    MAX = AggregationWord("maximum", child_form=ChildForm.SINGULAR_OF)
-    MIN = AggregationWord("minimum", child_form=ChildForm.SINGULAR_OF)
-    MODE = AggregationWord("mode of")
-    MULTI_MODE = AggregationWord("all modes of")
+    SUM = AggregationWord("sum")
+    AVERAGE = AggregationWord("average")
+    MAX = AggregationWord("maximum", child_form=ChildForm.SINGULAR)
+    MIN = AggregationWord("minimum", child_form=ChildForm.SINGULAR)
+    MODE = AggregationWord("mode")
+    MULTI_MODE = AggregationWord("all modes")
 
     @property
     def has_child(self) -> bool:
@@ -203,9 +205,9 @@ class Aggregations(VocabEnum):
 
     @property
     def child_number(self) -> Number:
-        """:return: The grammatical number the complement is rendered in — plural after an *"… of"*
-        word (*"sum of amounts"*), singular otherwise (*"maximum … amount"*). This is the lexical
-        fact callers used to recompute from ``child_form``."""
+        """:return: The grammatical number the complement is rendered in — plural for a
+        population (*"sum of amounts"*), singular otherwise (*"maximum of the amount"*).
+        """
         return (
             Number.PLURAL
             if self.value.child_form is ChildForm.PLURAL
@@ -215,15 +217,21 @@ class Aggregations(VocabEnum):
     def complement(self, child: Fragment) -> List[Fragment]:
         """
         :param child: The already-rendered complement, built at :attr:`child_number`.
-        :return: The complement modifiers — a leading *"of"* when the word needs one
-            (*"maximum of …"*), else the child alone (an *"… of"* word carries its own *"of"*);
-            empty for a childless aggregate.
+        :return: The complement modifiers — *"of"* then the child — so the bare aggregation noun
+            stays the phrase head (a repeat reduces to *"the sum"*); empty for a childless aggregate.
         """
         if self.value.child_form is ChildForm.NONE:
             return []
-        if self.value.child_form is ChildForm.SINGULAR_OF:
-            return [Prepositions.OF.as_fragment(), child]
-        return [child]
+        return [Prepositions.OF.as_fragment(), child]
+
+    def compact_complement(self, leaf: Fragment) -> List[Fragment]:
+        """:return: The complement for the *compact* value form, where the leaf attaches directly to
+        the aggregation noun — *"of <plural leaf>"* for a population (*"the sum of amounts"*), the
+        bare singular leaf as a noun modifier otherwise (*"the maximum amount"*); empty for a
+        childless aggregate."""
+        if self.value.child_form is ChildForm.PLURAL:
+            return [Prepositions.OF.as_fragment(), leaf]
+        return [leaf]
 
 
 class Copulas(VocabEnum):

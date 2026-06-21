@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 
 from typing_extensions import List, Optional, Tuple
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.query.query import Query, SetOf
+from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
     NounPhrase,
+    oxford_comma,
     PhraseFragment,
     RoleFragment,
     Fragment,
+    WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
+    Number,
     Separator,
 )
 from krrood.entity_query_language.verbalization.grammar.aggregation.assembler import (
@@ -24,20 +30,30 @@ from krrood.entity_query_language.verbalization.grammar.aggregation.assembler im
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
     Assembler,
 )
+from krrood.entity_query_language.verbalization.grammar.chain.planner import (
+    ChainPlanner,
+)
 from krrood.entity_query_language.verbalization.grammar.clauses.composer import (
     ClauseComposer,
 )
 from krrood.entity_query_language.verbalization.grammar.query.planner import (
     QueryPlan,
     QueryPlanner,
+    ReportKind,
+    ReportPlan,
     SelectionKind,
 )
 from krrood.entity_query_language.verbalization.grammar.query.ranking import (
     ranking_surface,
     RankingRequest,
 )
+from krrood.entity_query_language.verbalization.microplanning.possessive import (
+    attribute_fragment,
+    coordinated_genitive,
+)
 from krrood.entity_query_language.verbalization.vocabulary.english import (
     Articles,
+    Conjunctions,
     FallbackNouns,
     Keywords,
     Punctuation,
@@ -114,39 +130,189 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
     def assemble_set_of(self, node: SetOf) -> Fragment:
         """
         :param node: The set-of query.
-        :return: *"Find (v1, v2, …) such that …"* — or *"Find the top three (v1, v2, …) …"* when the
-            set-of is ranked by a ``limit``.
+        :return: *"Find v1 and v2 such that …"* for a search; *"Report <columns>"* /
+            *"For each <keys>, report <columns>"* for an aggregation report; *"Report v1 and v2
+            ordered by …"* (plural) for an ordered listing.
         """
         plan = self.plan(node)
-        variable_fragments = [
-            self.context.child(variable) for variable in node._selected_variables_
-        ]
-        variables_phrase = PhraseFragment(
-            parts=variable_fragments, separator=Separator.COMMA
-        )
-        # The parens glue to their content via the orthography pass — no separator="".
-        selection = PhraseFragment(
-            parts=[
-                Punctuation.OPEN_PAREN.as_fragment(),
-                variables_phrase,
-                Punctuation.CLOSE_PAREN.as_fragment(),
-            ]
-        )
+        report = plan.report
+        if report is not None and report.kind is ReportKind.AGGREGATION:
+            return self._assemble_aggregation_report(node, plan, report)
         return self._query_body(
             node,
             plan,
-            selection,
+            self._set_of_selection(node, plan),
             where_items=[self._where_clause(plan)],
             find_header=self._set_of_header(plan),
         )
 
+    def _set_of_selection(self, node: SetOf, plan: QueryPlan) -> Fragment:
+        """:return: the set-of's rendered selection — a parenthesised tuple for a ranked set-of (the
+        ranking pre-head needs it as a unit), a plural listing for an ordered report, else natural
+        Oxford-comma prose."""
+        if plan.ranking is not None:
+            return self._parenthesised(node._selected_variables_)
+        if plan.report is not None:
+            return self._selection_list(node._selected_variables_, number=Number.PLURAL)
+        return self._selection_list(node._selected_variables_)
+
+    def _selection_list(
+        self,
+        variables: List[SymbolicExpression],
+        number: Number = Number.SINGULAR,
+    ) -> Fragment:
+        """:return: the selections joined as natural prose *"a, b, and c"* (Oxford comma, no
+        parentheses) — the tuple shape reads fine without the code-like brackets. A plural *number*
+        lists them as populations (*"Employees"*) for an ordered report; otherwise contiguous
+        attributes of one owner fold into a shared genitive (*"the department and salary of an
+        Employee"*)."""
+        if number is Number.PLURAL:
+            selections = [self._selected(variable, number) for variable in variables]
+        else:
+            selections = self._folded_selections(variables)
+        return oxford_comma(selections, Conjunctions.AND.as_fragment())
+
+    def _folded_selections(self, variables: List[SymbolicExpression]) -> List[Fragment]:
+        """:return: the rendered selections, with each maximal run of plain attributes sharing one
+        owner folded into a single coordinated genitive, and every other selection rendered alone.
+        """
+        fragments: List[Fragment] = []
+        index = 0
+        while index < len(variables):
+            run = self._co_owned_run(variables, index)
+            if len(run) > 1:
+                owner = run[0][0]._child_
+                fragments.append(
+                    coordinated_genitive(
+                        [attribute_fragment(terminal) for _, terminal in run],
+                        self.context.child(owner, inline=True),
+                    )
+                )
+                index += len(run)
+                continue
+            fragments.append(self._selected(variables[index], Number.SINGULAR))
+            index += 1
+        return fragments
+
+    def _co_owned_run(
+        self, variables: List[SymbolicExpression], start: int
+    ) -> List[Tuple[SymbolicExpression, PathStep]]:
+        """:return: the maximal run of selections from *start* that are plain attributes sharing one
+        owner — each as ``(selection, terminal_step)`` — empty when the start selection is not such
+        an attribute."""
+        run: List[Tuple[SymbolicExpression, PathStep]] = []
+        owner_id: Optional[uuid.UUID] = None
+        for selection in variables[start:]:
+            foldable = self._foldable_attribute(selection)
+            if foldable is None:
+                break
+            owner, terminal = foldable
+            if run and owner._id_ != owner_id:
+                break
+            owner_id = owner._id_
+            run.append((selection, terminal))
+        return run
+
+    def _foldable_attribute(
+        self, selection: SymbolicExpression
+    ) -> Optional[Tuple[SymbolicExpression, PathStep]]:
+        """:return: ``(owner, terminal_step)`` when *selection* is a plain genitive attribute that
+        can share an owner with siblings, else ``None`` — a relational terminal (*"the Robot to
+        which …"*) does not coordinate cleanly, so it is left alone."""
+        if not isinstance(selection, Attribute):
+            return None
+        plan = self.context.microplan.plan_for(selection, ChainPlanner)
+        if not plan.parts or plan.parts[-1].is_relation:
+            return None
+        return selection._child_, plan.parts[-1]
+
+    def _selected(self, variable: SymbolicExpression, number: Number) -> Fragment:
+        """:return: a single selection, as a bare plural population (*"Employees"*) when *number* is
+        plural and the selection is a variable, else its default referring form."""
+        if number is Number.PLURAL and isinstance(variable, Variable):
+            return NounPhrase(
+                head=RoleFragment.for_variable(
+                    variable._type_.__name__, variable, number=Number.PLURAL
+                ),
+                number=Number.PLURAL,
+                definiteness=Definiteness.INDEFINITE,
+                referent_id=_subject_id(variable),
+            )
+        return self.context.child(variable)
+
+    def _parenthesised(self, variables: List[SymbolicExpression]) -> Fragment:
+        """:return: the selections as a parenthesised tuple *"(a, b)"* — for a ranked set-of, whose
+        *"the top three"* pre-head needs the tuple grouped."""
+        tuple_phrase = PhraseFragment(
+            parts=[self.context.child(variable) for variable in variables],
+            separator=Separator.COMMA,
+        )
+        return PhraseFragment(
+            parts=[
+                Punctuation.OPEN_PAREN.as_fragment(),
+                tuple_phrase,
+                Punctuation.CLOSE_PAREN.as_fragment(),
+            ]
+        )
+
+    def _assemble_aggregation_report(
+        self, node: SetOf, plan: QueryPlan, report: ReportPlan
+    ) -> Fragment:
+        """:return: a calculation/report — *"Report <columns>"*, or *"For each <keys>, report
+        <columns>"* when grouped (the grouping stated first, so it frames the whole report and the
+        trailing *"grouped by"* clause is dropped as redundant)."""
+        header = (
+            self._for_each_header(report.group_keys)
+            if report.is_grouped
+            else self._sentence_initial(Keywords.REPORT.as_fragment())
+        )
+        return self._query_body(
+            node,
+            plan,
+            self._selection_list(report.columns),
+            where_items=[self._where_clause(plan)],
+            find_header=header,
+        )
+
+    def _for_each_header(self, keys: List[SymbolicExpression]) -> Fragment:
+        """:return: the fronted *"For each <key>, report"* frame — the grouping first (it is the row
+        dimension of the result), the keys as bare singular labels, then the lowercase verb.
+        """
+        labels = oxford_comma(
+            [self._group_label(key) for key in keys], Conjunctions.AND.as_fragment()
+        )
+        return PhraseFragment(
+            parts=[
+                Keywords.FOR_EACH.as_fragment(),
+                labels,
+                Punctuation.COMMA.as_fragment(),
+                Keywords.REPORT.as_fragment(),
+            ]
+        )
+
+    def _group_label(self, key: SymbolicExpression) -> Fragment:
+        """:return: a group key as a bare singular label — *"department"* for an attribute key,
+        the type name for a variable key — naming the group itself rather than one member's
+        navigation (*"the department of an Employee"*)."""
+        if isinstance(key, Attribute):
+            return RoleFragment.for_attribute(key._owner_class_, key._attribute_name_)
+        return RoleFragment.for_type(getattr(key, "_type_", None))
+
+    @staticmethod
+    def _sentence_initial(fragment: RoleFragment) -> Fragment:
+        """:return: *fragment* with its first letter capitalised — a keyword carries its mid-sentence
+        (lowercase) form, capitalised here when it opens the sentence (*"report"* → *"Report"*).
+        """
+        return replace(fragment, text=fragment.text[:1].upper() + fragment.text[1:])
+
     def _set_of_header(self, plan: QueryPlan) -> Fragment:
-        """:return: The set-of find header — *"Find"*, or *"Find the <top three>"* when a ``limit``
-        ranks the tuples (the order key is suppressed; it is a visible tuple element). The literal
-        *"sets of"* is intentionally dropped — the parenthesised tuple carries the set shape.
+        """:return: The set-of header — *"Find the <top three>"* when a ``limit`` ranks the tuples
+        (the order key is suppressed; it is a visible tuple element), else the plain verb
+        (*"Find"* / *"Report"*). The literal *"sets of"* is intentionally dropped — the selection
+        carries the set shape.
         """
         if plan.ranking is None:
-            return Keywords.FIND.as_fragment()
+            return self._verb(plan)
         surface = ranking_surface(RankingRequest(plan=plan.ranking))
         return PhraseFragment(
             parts=[
@@ -155,6 +321,13 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
                 surface.pre_head,
             ]
         )
+
+    def _verb(self, plan: QueryPlan) -> Fragment:
+        """:return: the opening verb — *"Report"* when the query presents results (a report),
+        else *"Find"* (a search)."""
+        if plan.report is not None:
+            return self._sentence_initial(Keywords.REPORT.as_fragment())
+        return Keywords.FIND.as_fragment()
 
     # ── subject selection ──────────────────────────────────────────────────────
 
@@ -175,6 +348,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         three Robots"*), else *"the unique Robot"* (``eql.the``) / *"a Robot"*."""
         if plan.ranking is not None:
             return self._build_ranking_selection(variable, plan)
+        if plan.report is not None and plan.report.kind is ReportKind.ORDERING:
+            # An ordered listing presents all the matching results, so the subject is plural
+            # ("Report Employees …"); a plural subject pronominalises to "their".
+            return self._selected(variable, Number.PLURAL)
         if plan.is_the:
             # "the unique <type>" first mention; the coreference pass reduces a repeat to
             # "the <type>" (UNIQUE downgrades to DEFINITE) — so it is a referring noun phrase.
@@ -276,7 +453,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         clauses (``None``) are simply skipped.
         """
         if find_header is None:
-            find_header = Keywords.FIND.as_fragment()
+            find_header = self._verb(plan)
         header = PhraseFragment(parts=[find_header, selection])
         clauses = [
             clause
@@ -299,8 +476,11 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             SelectionKind.SUBJECT,
             SelectionKind.SET_OF,
         )
+        # A grouped report fronts its grouping as "For each …", so the trailing "grouped by" clause
+        # would merely repeat it.
+        fronts_grouping = plan.report is not None and plan.report.is_grouped
         return [
-            composer.grouped_by(node),
+            None if fronts_grouping else composer.grouped_by(node),
             composer.having(node),
             None if ranked else composer.ordered_by(node),
         ]

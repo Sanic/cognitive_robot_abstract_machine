@@ -33,8 +33,13 @@ class AggregatorRule(PhraseRule):
         if not kind.has_child:
             return kind.as_fragment()  # childless aggregate, e.g. "count of all"
         child_fragment = context.child(node._child_, number=kind.child_number)
+        # A computed quantity is a referring expression: named in full when first introduced (the
+        # reported column), a later mention of the same aggregate (a HAVING / ordering on it) is the
+        # general repeat-reduction's job — "the sum of salaries of Employees" → "the sum".
         return NounPhrase(
             head=kind.as_fragment(),
             definiteness=Definiteness.DEFINITE,
             modifiers=kind.complement(child_fragment),
+            referent_id=node._id_,
+            subject_of_modifiers=False,
         )

@@ -83,12 +83,11 @@ class ChildForm(StrEnum):
     """How an aggregation word verbalizes its child expression."""
 
     PLURAL = "plural"
-    """The aggregation word already ends with *"of"* (e.g. ``"sum of"``); the child is rendered
-    in plural form: *"sum of amounts of BankTransactions"*."""
-    SINGULAR_OF = "singular_of"
-    """The aggregation word has no trailing *"of"* (e.g. ``"maximum"``); a literal *"of"* is
-    inserted and the child rendered via the regular singular chain: *"maximum of the amount of
-    …"*."""
+    """The child is rendered in plural form, joined by *"of"*: *"sum of amounts of
+    BankTransactions"*. The bare aggregation noun (*"sum"*) is the phrase head, so a repeat mention
+    reduces cleanly to *"the sum"*."""
+    SINGULAR = "singular"
+    """The child is rendered singular, joined by *"of"*: *"maximum of the amount of …"*."""
     NONE = "none"
     """The aggregation word takes no child (e.g. ``"count of all"``); it renders bare."""
 
