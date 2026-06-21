@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field, replace
-from typing_extensions import Callable, List, Optional, TypeVar
+from typing_extensions import Any, Callable, List, Optional, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.fragments.features import (
@@ -17,6 +17,7 @@ from krrood.entity_query_language.verbalization.fragments.source_reference impor
 )
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.exceptions import UnloweredFragmentError
+from krrood.entity_query_language.verbalization.value_lexicon import value_phrase
 
 _T = TypeVar("_T")
 
@@ -106,7 +107,12 @@ class RoleFragment(HasText, HasNumber, Fragment):
 
     @classmethod
     def for_attribute(
-        cls, owner: type, attribute_name: str, number: Number = Number.SINGULAR
+        cls,
+        owner: Optional[type],
+        attribute_name: str,
+        number: Number = Number.SINGULAR,
+        *,
+        text: Optional[str] = None,
     ) -> RoleFragment:
         """
         Build a fragment for an attribute access, linked to its owner class.
@@ -114,17 +120,64 @@ class RoleFragment(HasText, HasNumber, Fragment):
         Inflection is not applied here; a plural *number* is a feature realised later, and the
         source link always uses the canonical name.
 
-        :param owner: Owner class of the attribute (used for source linking).
-        :param attribute_name: Canonical attribute name on *owner*.
+        :param owner: Owner class of the attribute (for source linking), or ``None`` for no link
+            (when the access is referred to by name only, without a navigable owner in scope).
+        :param attribute_name: Canonical attribute name on *owner* (always used for the link).
         :param number: Grammatical-number feature.
+        :param text: Surface word override — a display name or a relational verb phrase
+            (*"assigned to"*); defaults to *attribute_name*.
         :return: A fragment with the ``ATTRIBUTE`` role.
         """
         return cls(
-            text=attribute_name,
+            text=text if text is not None else attribute_name,
             role=SemanticRole.ATTRIBUTE,
-            source_reference=SourceReference.for_attribute(owner, attribute_name),
+            source_reference=(
+                SourceReference.for_attribute(owner, attribute_name)
+                if owner is not None
+                else None
+            ),
             number=number,
         )
+
+    @classmethod
+    def for_type(
+        cls,
+        type_: object,
+        number: Number = Number.SINGULAR,
+        *,
+        text: Optional[str] = None,
+    ) -> RoleFragment:
+        """
+        Build a fragment for a type rendered as a noun (*"Robot"*), with the ``VARIABLE`` role.
+
+        :param type_: The class to name; linked to its source when it is a class (a non-class —
+            a typing generic or unknown — yields no link).
+        :param number: Grammatical-number feature.
+        :param text: Surface word override; defaults to the class ``__name__``.
+        :return: A fragment with the ``VARIABLE`` role.
+        """
+        is_class = isinstance(type_, type)
+        return cls(
+            text=(
+                text
+                if text is not None
+                else (type_.__name__ if is_class else str(type_))
+            ),
+            role=SemanticRole.VARIABLE,
+            source_reference=SourceReference.for_type(type_) if is_class else None,
+            number=number,
+        )
+
+    @classmethod
+    def for_literal(cls, value: Any) -> RoleFragment:
+        """
+        Build a fragment for a literal value (*42*, *"hello"*, an enum member), with the ``LITERAL``
+        role; the surface text is the shared value lexicalisation.
+
+        :param value: The Python value to render.
+        :return: A fragment with the ``LITERAL`` role.
+        """
+        return cls(text=value_phrase(value), role=SemanticRole.LITERAL)
 
     @classmethod
     def for_operator(cls, label: str) -> RoleFragment:

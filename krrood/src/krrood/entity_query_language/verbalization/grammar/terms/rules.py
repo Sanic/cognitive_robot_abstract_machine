@@ -22,11 +22,9 @@ from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     Number,
 )
-from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     is_concrete_object_literal,
 )
-from krrood.entity_query_language.verbalization.value_lexicon import value_phrase
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     PhraseRule,
     RuleContext,
@@ -105,11 +103,7 @@ class VariableRule(PhraseRule):
         if not values or len(values) > _MAX_DOMAIN_CHOICES:
             return None
         fragments: List[Fragment] = [
-            RoleFragment(
-                text=value_phrase(value),
-                role=SemanticRole.LITERAL,
-            )
-            for value in values
+            RoleFragment.for_literal(value) for value in values
         ]
         if len(fragments) == 1:
             return fragments[0]
@@ -150,10 +144,7 @@ class LiteralRule(PhraseRule):
     def build(self, node: Literal, context: RuleContext) -> Fragment:
         if is_concrete_object_literal(node):
             return self._concrete_object(node, context)
-        return RoleFragment(
-            text=value_phrase(node._value_),
-            role=SemanticRole.LITERAL,
-        )
+        return RoleFragment.for_literal(node._value_)
 
     def _concrete_object(self, node: Literal, context: RuleContext) -> Fragment:
         """:return: *"a specific <Type>"* for a concrete object literal — identity, not its (possibly
@@ -165,11 +156,8 @@ class LiteralRule(PhraseRule):
         details = [
             PhraseFragment(
                 parts=[
-                    RoleFragment(text=name, role=SemanticRole.ATTRIBUTE),
-                    RoleFragment(
-                        text=value_phrase(field_value),
-                        role=SemanticRole.LITERAL,
-                    ),
+                    RoleFragment.for_attribute(None, name),
+                    RoleFragment.for_literal(field_value),
                 ]
             )
             for name, field_value in self._identifying_fields(value)
@@ -226,7 +214,9 @@ class ExternalVariableRule(PhraseRule):
             if getattr(node, "_type_", None)
             else FallbackNouns.VARIABLE.text
         )
-        return NounPhrase(head=RoleFragment(text=type_name, role=SemanticRole.VARIABLE))
+        return NounPhrase(
+            head=RoleFragment.for_type(getattr(node, "_type_", None), text=type_name)
+        )
 
 
 class FlatVariableRule(PhraseRule):

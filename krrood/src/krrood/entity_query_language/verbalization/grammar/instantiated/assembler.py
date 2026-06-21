@@ -14,10 +14,6 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     Fragment,
 )
-from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-from krrood.entity_query_language.verbalization.fragments.source_reference import (
-    SourceReference,
-)
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
     Assembler,
 )
@@ -99,15 +95,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         type_root = PhraseFragment(
             parts=[
                 Articles.THE.as_fragment(),
-                RoleFragment(
-                    text=type_name,
-                    role=SemanticRole.VARIABLE,
-                    source_reference=(
-                        SourceReference.for_type(instantiated_type)
-                        if isinstance(instantiated_type, type)
-                        else None
-                    ),
-                ),
+                RoleFragment.for_type(instantiated_type, text=type_name),
             ]
         )
         return possessive_path([PathStep(field_name, None)], type_root)

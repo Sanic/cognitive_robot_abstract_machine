@@ -15,10 +15,6 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     RoleFragment,
 )
-from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-from krrood.entity_query_language.verbalization.fragments.source_reference import (
-    SourceReference,
-)
 from krrood.entity_query_language.verbalization.grammar.chain.assembler import (
     ChainAssembler,
 )
@@ -78,12 +74,8 @@ def render_absence(
             parts=[
                 context.child(left._child_),
                 PassiveAbsence.for_number(number).as_fragment(),
-                RoleFragment(
-                    text=verb_phrase,
-                    role=SemanticRole.ATTRIBUTE,
-                    source_reference=SourceReference.for_attribute(
-                        left._owner_class_, left._attribute_name_
-                    ),
+                RoleFragment.for_attribute(
+                    left._owner_class_, left._attribute_name_, text=verb_phrase
                 ),
                 *_relation_target(left),
             ]
@@ -103,14 +95,7 @@ def _relation_target(attribute: Attribute) -> List[Fragment]:
     (a primitive, a typing generic, or unknown)."""
     related_type = getattr(attribute, "_type_", None)
     if isinstance(related_type, type) and related_type.__module__ != "builtins":
-        return [
-            Quantifiers.ANY.as_fragment(),
-            RoleFragment(
-                text=related_type.__name__,
-                role=SemanticRole.VARIABLE,
-                source_reference=SourceReference.for_type(related_type),
-            ),
-        ]
+        return [Quantifiers.ANY.as_fragment(), RoleFragment.for_type(related_type)]
     return [Quantifiers.ANYTHING.as_fragment()]
 
 

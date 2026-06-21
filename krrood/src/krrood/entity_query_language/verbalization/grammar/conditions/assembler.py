@@ -9,7 +9,6 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     Fragment,
 )
-from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.grammar.aggregation.kinds import (
     AGGREGATION_KIND,
 )
@@ -186,6 +185,6 @@ class ConditionAssembler(Assembler[Comparator, None]):
         """
         :param name: The attribute's name.
         :param number: The grammatical number to tag for inflection.
-        :return: A role-tagged attribute noun tagged with *number* for inflection.
+        :return: A role-tagged attribute noun (no source link — name only) tagged with *number*.
         """
-        return RoleFragment(text=name, role=SemanticRole.ATTRIBUTE, number=number)
+        return RoleFragment.for_attribute(None, name, number)
