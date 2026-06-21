@@ -57,7 +57,7 @@ import com.jetbrains.python.psi.types.TypeEvalContext
  *   because the `Role[...]` base is searched across the whole ancestry.
  * - **Inherited taker members** — if `Person(Entity)`, then `Entity`'s members are
  *   delegated too, because the taker's full MRO is walked.
- * - **Nested roles** — if the taker is *itself* a role (`Department(Role[Teacher])`),
+ * - **Nested roles** — if the taker is *itself* a role (`VisitingTeacher(Role[Teacher])`),
  *   its delegated members are pulled in recursively.
  *
  * @see <a href="https://plugins.jetbrains.com/docs/intellij/pycharm.html">PyCharm plugin development</a>
