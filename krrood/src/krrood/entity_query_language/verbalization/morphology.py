@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inflect
+from lemminflect import getInflection, getLemma
 
 from typing_extensions import Dict
 
@@ -71,6 +72,25 @@ def is_plural(word: str) -> bool:
     if word in _plural_overrides:
         return False
     return bool(_engine.singular_noun(word))
+
+
+def is_past_participle(word: str) -> bool:
+    """
+    :param word: A single English word.
+    :return: ``True`` when *word* is a past-participle verb form — regular (*"assigned"*,
+        *"located"*) or irregular (*"sent"*, *"given"*, *"written"*) — and ``False`` for a base form
+        (*"assign"*), a noun (*"battery"*), or a past tense that differs from the participle
+        (*"sang"* vs *"sung"*).
+
+    Deterministic dictionary + rule lookup (``lemminflect``): the word's verb lemma is taken, and the
+    word is checked against that lemma's generated ``VBN`` forms. No statistical model, no data
+    download — so it is reproducible and offline, unlike a context-sensitive POS tagger.
+    """
+    lowered = word.lower()
+    return any(
+        lowered in {form.lower() for form in getInflection(lemma, tag="VBN")}
+        for lemma in getLemma(lowered, upos="VERB")
+    )
 
 
 def indefinite_article(following_word: str) -> str:

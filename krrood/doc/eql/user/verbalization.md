@@ -19,7 +19,7 @@ Verbalization turns any EQL expression into a plain-English sentence. This is us
 
 - **Debugging** — instantly understand what a complex query actually asks.
 - **Explainability** — surface query intent in logs, UIs, or reports.
-- **Testing** — assert on what a query means, not just what it returns.
+- **Testing** — assert on what a query *means* (its intent and structure), not just what it returns. Two queries can return the same rows on a fixture yet express different intent (e.g. `and_` vs `or_`); a verbalization assertion pins the intent regardless of the data.
 
 ## The Quick API
 
@@ -111,17 +111,27 @@ boolean variable whose domain holds both values reads *"is either completed or n
 
 ## Absence Conditions (`== None`)
 
-A comparison to `None` is read as an *absence*, not as a value.  An owned attribute reads
-*"<owner> has no <attribute>"*; a bare variable reads *"<subject> does not exist"*.
+A comparison to `None` is read as an *absence*, not as a value. The exact wording adapts to the
+attribute:
+
+- a plain **noun** attribute reads *"<owner> **has no** <attribute>"* (*"a Pose has no orientation"*);
+- a **relational** attribute — one named as a past participle plus a preposition (`assigned_to`,
+  `owned_by`, `shipped_to`) — reads as a passive verb naming the related type:
+  *"<owner> **has not been** <verb> **any** <Type>"*. The related type is taken automatically from
+  the attribute's declared type;
+- a bare variable (no attribute to name) reads *"<subject> **does not exist"***.
 
 ```{code-cell} ipython3
 m = variable(Mission, domain=None)
-print(verbalize_expression(m.assigned_to == None))          # "a Mission has no assigned_to"
+print(verbalize_expression(m.assigned_to == None))          # "a Mission has not been assigned to any Robot"
 print(verbalize_expression(variable(Mission, domain=None) == None))  # "... does not exist"
 ```
 
-Inside a query this is said as its own clause (*"such that the Mission has no assigned_to"*) — it
-never folds into the *"whose …"* group, because the subject/object flip cannot sit there.
+Whether an attribute is "relational" is decided morphologically — the part before the preposition
+must be a real past participle — so `assigned_to` (verb) becomes the passive form while a noun that
+merely ends in a preposition (e.g. `color_in`) stays *"has no color_in"*. Inside a query the absence
+is said as its own clause (*"such that the Mission has not been assigned to any Robot"*) — it never
+folds into the *"whose …"* group, because the subject/object flip cannot sit there.
 
 ## Domain-Constrained Values
 
@@ -362,8 +372,8 @@ clause states only the grouping key without restating the full selection tuple.
 
 ## Colored Terminal Output
 
-For richer output in a terminal, pass a renderer to `verbalize_expression`. Each part of the sentence is
-color-coded by its semantic role.
+For richer output in a terminal, use `VerbalizationPipeline` with a renderer (`verbalize_expression`
+itself only returns plain text). Each part of the sentence is color-coded by its semantic role.
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
@@ -386,7 +396,7 @@ Color legend:
 
 ## HTML Output for Notebooks
 
-Pass an `HTMLFormatter` renderer to produce `<span>` tags for direct use in Jupyter or any HTML context.
+Build a `VerbalizationPipeline` with an `HTMLFormatter` renderer to produce `<span>` tags for direct use in Jupyter or any HTML context.
 
 ```{code-cell} ipython3
 from IPython.display import HTML

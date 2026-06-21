@@ -249,6 +249,61 @@ class Prepositions(VocabEnum):
     WITH = PlainWord("with")
 
 
+#: The closed-class inventory of common English prepositions, as a lexical datum (distinct from the
+#: :class:`Prepositions` enum, which holds the few prepositions the verbalizer *emits*). Prepositions
+#: are a fixed, finite class — no inflection library or POS tagger is needed (or appropriate) to
+#: enumerate them. Recognizers consult this to read a relation off a field name's final token.
+ENGLISH_PREPOSITIONS = frozenset(
+    {
+        "about",
+        "above",
+        "across",
+        "after",
+        "against",
+        "along",
+        "among",
+        "around",
+        "at",
+        "before",
+        "behind",
+        "below",
+        "beneath",
+        "beside",
+        "between",
+        "beyond",
+        "by",
+        "for",
+        "from",
+        "in",
+        "inside",
+        "into",
+        "near",
+        "of",
+        "off",
+        "on",
+        "onto",
+        "out",
+        "outside",
+        "over",
+        "past",
+        "per",
+        "through",
+        "to",
+        "toward",
+        "towards",
+        "under",
+        "underneath",
+        "until",
+        "up",
+        "upon",
+        "via",
+        "with",
+        "within",
+        "without",
+    }
+)
+
+
 class Conjunctions(VocabEnum):
     """Coordinating conjunctions (AND, OR)."""
 
@@ -282,6 +337,30 @@ class NonExistence(VocabEnum):
     def for_number(cls, number: Number) -> "NonExistence":
         """:return: ``DO_NOT_EXIST`` for a plural subject, else ``DOES_NOT_EXIST``."""
         return cls.DO_NOT_EXIST if number is Number.PLURAL else cls.DOES_NOT_EXIST
+
+
+class PassiveAbsence(VocabEnum):
+    """Passive absence verb for a *relational* (past-participle) attribute — the *"has not been"* /
+    *"have not been"* of *"a Mission has not been assigned to any Robot"*, produced for a
+    ``<participle>_<preposition>`` attribute compared ``== None``. Number-agreeing, selected
+    explicitly (the morphology pass only agrees the copula)."""
+
+    HAS_NOT_BEEN = OperatorWord("has not been")
+    HAVE_NOT_BEEN = OperatorWord("have not been")
+
+    @classmethod
+    def for_number(cls, number: Number) -> "PassiveAbsence":
+        """:return: ``HAVE_NOT_BEEN`` for a plural owner, else ``HAS_NOT_BEEN``."""
+        return cls.HAVE_NOT_BEEN if number is Number.PLURAL else cls.HAS_NOT_BEEN
+
+
+class Quantifiers(VocabEnum):
+    """Indefinite quantifier for the object of a passive absence — the *"any"* of *"… assigned to
+    any Robot"*, or the bare *"anything"* when the related type is not a nameable class.
+    """
+
+    ANY = PlainWord("any")
+    ANYTHING = PlainWord("anything")
 
 
 class SetMembership(VocabEnum):

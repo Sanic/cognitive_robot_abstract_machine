@@ -27,8 +27,10 @@ from krrood.entity_query_language.verbalization.grammar.conditions.recognition i
     is_concrete_object_literal,
     is_none_literal,
     references,
+    relational_verb_phrase,
     single_hop_attribute,
 )
+from krrood.entity_query_language.verbalization.morphology import is_past_participle
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 
@@ -112,8 +114,39 @@ def test_predicate_form_end_to_end():
 
 
 @dataclass
+class _Robot2:
+    pass
+
+
+@dataclass
+class _Address:
+    pass
+
+
+@dataclass
+class _Author:
+    pass
+
+
+@dataclass
 class _Mission:
-    assigned_to: _Robot
+    assigned_to: _Robot2  # past participle + preposition → relational
+
+
+@dataclass
+class _Parcel:
+    shipped_to: _Address  # regular participle
+    written_by: _Author  # irregular participle ("written", not "*writed")
+
+
+@dataclass
+class _Gadget:
+    color_in: str  # noun + preposition → NOT a relation
+
+
+@dataclass
+class _Note:
+    located_in: str  # relational, but the related type is a primitive → "anything"
 
 
 def test_is_none_literal_recognizer():
@@ -122,12 +155,72 @@ def test_is_none_literal_recognizer():
     assert is_none_literal((r.battery == 5).right) is False
 
 
-def test_attribute_eq_none_reads_as_has_no():
-    """An owned attribute ``== None`` flips to *"<owner> has no <attribute>"*, not a value."""
+def test_is_past_participle_morphology():
+    """The participle check is morphological (dictionary + rules), not 'ends in -ed'."""
+    assert is_past_participle("assigned")  # regular
+    assert is_past_participle("sent") and is_past_participle("written")  # irregular
+    assert not is_past_participle("assign")  # base form
+    assert not is_past_participle("color")  # noun that is also a base-form verb
+    assert not is_past_participle("battery")  # plain noun
+    assert not is_past_participle("sang")  # past tense ≠ participle ("sung")
+
+
+def test_relational_verb_phrase_recognizer():
+    """A relational field is *participle + preposition*; a noun ending in a preposition is not."""
+    assert relational_verb_phrase("assigned_to") == "assigned to"
+    assert relational_verb_phrase("written_by") == "written by"  # irregular participle
+    assert relational_verb_phrase("cross_referenced_with") == "cross referenced with"
+    assert relational_verb_phrase("color_in") is None  # 'color' is not a participle
+    assert relational_verb_phrase("number_of") is None  # 'of' excluded (genitive)
+    assert (
+        relational_verb_phrase("depends_on") is None
+    )  # present tense, not a participle
+    assert relational_verb_phrase("orientation") is None  # no preposition at all
+
+
+def test_noun_attribute_eq_none_reads_as_has_no():
+    """A plain *noun* attribute ``== None`` reads *"<owner> has no <attribute>"*, not a value."""
+    r = variable(_Robot, [])
+    text = verbalize_expression(r.battery == None)
+    assert "has no battery" in text
+    assert "None" not in text and "nothing" not in text
+
+
+def test_relational_attribute_eq_none_reads_as_passive():
+    """A relational (participle + preposition) attribute ``== None`` reads as a passive verb naming
+    the related type — *"<owner> has not been <verb> <prep> any <Type>"* — not *"has no <field>"*.
+    """
     m = variable(_Mission, [])
     text = verbalize_expression(m.assigned_to == None)
-    assert "has no assigned_to" in text
-    assert "None" not in text and "nothing" not in text
+    assert "has not been assigned to any _Robot2" in text
+    assert "has no assigned" not in text and "assigned_to" not in text
+
+
+def test_relational_absence_handles_irregular_participle():
+    """An irregular participle (*written*) is recognised, and the related type is the field's type."""
+    p = variable(_Parcel, [])
+    assert "has not been shipped to any _Address" in verbalize_expression(
+        p.shipped_to == None
+    )
+    assert "has not been written by any _Author" in verbalize_expression(
+        p.written_by == None
+    )
+
+
+def test_noun_with_preposition_suffix_is_not_passivised():
+    """A noun that merely ends in a preposition (*color_in*) keeps *"has no …"* — its leading token
+    is not a participle."""
+    g = variable(_Gadget, [])
+    text = verbalize_expression(g.color_in == None)
+    assert "has no color_in" in text
+    assert "has not been" not in text
+
+
+def test_relational_absence_with_primitive_type_says_anything():
+    """When the related type is not a nameable class (here a primitive), the object is *"anything"*."""
+    n = variable(_Note, [])
+    text = verbalize_expression(n.located_in == None)
+    assert "has not been located in anything" in text
 
 
 def test_bare_variable_eq_none_reads_as_does_not_exist():
@@ -137,11 +230,11 @@ def test_bare_variable_eq_none_reads_as_does_not_exist():
     assert "does not exist" in text
 
 
-def test_subject_where_eq_none_is_standalone_not_whose():
+def test_subject_where_relational_eq_none_is_standalone_not_whose():
     """A subject ``where … == None`` is said as its own clause, never folded into *"whose"*."""
     m = variable(_Mission, [])
     text = verbalize_expression(an(entity(m).where(m.assigned_to == None)))
-    assert "has no assigned_to" in text
+    assert "has not been assigned to any _Robot2" in text
     assert "whose" not in text
 
 
