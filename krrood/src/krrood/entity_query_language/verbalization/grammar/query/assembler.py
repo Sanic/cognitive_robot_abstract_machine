@@ -49,6 +49,10 @@ from krrood.entity_query_language.verbalization.grammar.query.ranking import (
     ranking_surface,
     RankingRequest,
 )
+from krrood.entity_query_language.verbalization.microplanning.coordination import (
+    group_consecutive_by_owner,
+    OwnerGroup,
+)
 from krrood.entity_query_language.verbalization.microplanning.possessive import (
     attribute_fragment,
     coordinated_genitive,
@@ -280,44 +284,22 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     def _folded_selections(self, variables: List[SymbolicExpression]) -> List[Fragment]:
         """:return: the rendered selections, with each maximal run of plain attributes sharing one
-        owner folded into a single coordinated genitive, and every other selection rendered alone.
+        owner folded into a single coordinated genitive (via the shared
+        :func:`~…coordination.group_consecutive_by_owner` aggregation primitive), and every other
+        selection rendered alone.
         """
         fragments: List[Fragment] = []
-        index = 0
-        while index < len(variables):
-            run = self._co_owned_run(variables, index)
-            if len(run) > 1:
-                owner = run[0][0]._child_
+        for item in group_consecutive_by_owner(variables, self._foldable_attribute):
+            if isinstance(item, OwnerGroup):
                 fragments.append(
                     coordinated_genitive(
-                        [attribute_fragment(terminal) for _, terminal in run],
-                        self.context.child(owner, inline=True),
+                        [attribute_fragment(terminal) for terminal in item.items],
+                        self.context.child(item.owner, inline=True),
                     )
                 )
-                index += len(run)
-                continue
-            fragments.append(self._selected(variables[index], Number.SINGULAR))
-            index += 1
+            else:
+                fragments.append(self._selected(item, Number.SINGULAR))
         return fragments
-
-    def _co_owned_run(
-        self, variables: List[SymbolicExpression], start: int
-    ) -> List[Tuple[SymbolicExpression, PathStep]]:
-        """:return: the maximal run of selections from *start* that are plain attributes sharing one
-        owner — each as ``(selection, terminal_step)`` — empty when the start selection is not such
-        an attribute."""
-        run: List[Tuple[SymbolicExpression, PathStep]] = []
-        owner_id: Optional[uuid.UUID] = None
-        for selection in variables[start:]:
-            foldable = self._foldable_attribute(selection)
-            if foldable is None:
-                break
-            owner, terminal = foldable
-            if run and owner._id_ != owner_id:
-                break
-            owner_id = owner._id_
-            run.append((selection, terminal))
-        return run
 
     def _foldable_attribute(
         self, selection: SymbolicExpression

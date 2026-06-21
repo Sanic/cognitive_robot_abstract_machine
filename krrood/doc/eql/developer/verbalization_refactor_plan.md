@@ -322,8 +322,35 @@ the rules and lock in comprehension. Each phase is a small, green, reviewable un
 - Removed the dead `fragment_for_folded_conjunct` (no callers). `has_pair` is kept (it has tests).
 - New `test_conjunct_reduction.py` adds generality cases (reverse-order bounds, distinct chains, a
   third unpaired bound, empty/lone/ non-comparator inputs). 572 passed, 7 skipped.
-- **Scope note / decision:** *fragment-level* coordination (the co-owned genitive selection fold in
-  `QueryAssembler`, the match *"…respectively"* grouping) is a different stage — it builds fragments
-  from already-recursed pieces rather than reducing EQL to artifacts — so it is *not* merged into this
-  EQL pass. The selection fold is extracted into its own cohesive unit in Phase 6; the two stages are
-  now documented side by side so a developer knows where each lives.
+### Phase 3b — done (owner-based folding: set_of selections + match grouping)
+
+Folding/grouping was also happening on `set_of` selectables (a co-owned genitive run) and in
+match/`underspecified` assembly (the *"…respectively"* grouping by object) — both *owner-based*
+aggregation. These now share one mechanism in the coordination home:
+
+- new **`OwnerGroup`** + **`group_by_owner`** (all same-owner items together, first-seen order) +
+  **`group_consecutive_by_owner`** (maximal adjacent same-owner runs → an `OwnerGroup`, others pass
+  through — the order-preserving analogue of `reduce_conjuncts`) in `coordination.py`.
+- `MatchPlanner.plan` now groups its construction-pattern equalities via `group_by_owner` (its
+  bespoke dict loop is gone). The grouping stays *content determination* in the construct planner —
+  the right NLG home — but uses the shared primitive.
+- `QueryAssembler._folded_selections` now folds via `group_consecutive_by_owner`; the bespoke
+  `_co_owned_run` walker is deleted (`_foldable_attribute` remains as the classifier callable).
+- New `test_coordination_grouping.py`. Suite green.
+
+**The complete folding/aggregation map** (all of it now reachable from `coordination.py`):
+
+| What folds | Mechanism (in `coordination.py`) | Recognizer / classifier | Used by |
+|---|---|---|---|
+| complementary `>=`/`<=` bounds on one chain | `RangeBoundFold` → `RangeFold` | `coordination` (internal) | conditions (`reduce_conjuncts`) |
+| co-indexed `a.X⊙b.X` across two prefixes | `CoindexedComparisonFold` → `CoindexedFold` | `coordination` (internal) | conditions (`reduce_conjuncts`) |
+| a position's x/y/z (match construction) | `group_by_owner` → `OwnerGroup` | `MatchPlanner._as_assignment` | match / underspecified |
+| co-owned attributes in a `set_of` tuple | `group_consecutive_by_owner` → `OwnerGroup` | `QueryAssembler._foldable_attribute` | query (set_of selection) |
+
+Each construct supplies *which* items and *how to classify* them (content determination, per
+construct); the *grouping/folding mechanism* lives once, in `coordination.py`.
+
+The fragment **builders** that render the folded results (`build_between`, `coordinated_genitive`,
+`oxford_comma`, the match *"respectively"* phrase) are a separate, later stage and stay with the
+fragment layer / their construct assembler — they assemble already-rendered pieces and need the
+recursion, so they are deliberately not in the (pure) coordination mechanism.

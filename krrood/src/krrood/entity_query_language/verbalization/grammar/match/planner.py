@@ -3,7 +3,7 @@ from __future__ import annotations
 import operator
 from dataclasses import dataclass
 
-from typing_extensions import Dict, List, Optional, Tuple
+from typing_extensions import List, Optional, Tuple
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.expression_structure import walk_chain
@@ -12,6 +12,9 @@ from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.query.match import Match, is_underspecified
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
+from krrood.entity_query_language.verbalization.microplanning.coordination import (
+    group_by_owner,
+)
 
 
 @dataclass(frozen=True)
@@ -91,26 +94,14 @@ class MatchPlanner(Planner[Match, MatchPlan]):
         """:return: The match plan."""
         match = self.node
         match.resolve()
-        ordered_keys: List[object] = []
-        builders: Dict[object, Tuple[SymbolicExpression, List[AttributeAssignment]]] = (
-            {}
+        # Aggregate single-hop equalities by their object via the shared owner-grouping primitive;
+        # conditions that are not such an equality (``_as_assignment`` → ``None``) are the remainder.
+        owner_groups, other = group_by_owner(
+            list(match.conditions), self._as_assignment
         )
-        other: List[SymbolicExpression] = []
-
-        for condition in match.conditions:
-            decomposed = self._as_assignment(condition)
-            if decomposed is None:
-                other.append(condition)
-                continue
-            obj, assignment = decomposed
-            if obj._id_ not in builders:
-                builders[obj._id_] = (obj, [])
-                ordered_keys.append(obj._id_)
-            builders[obj._id_][1].append(assignment)
-
         groups = [
-            AttributeGroup(object=builders[key][0], assignments=builders[key][1])
-            for key in ordered_keys
+            AttributeGroup(object=group.owner, assignments=group.items)
+            for group in owner_groups
         ]
         return MatchPlan(
             underspecified=is_underspecified(match),

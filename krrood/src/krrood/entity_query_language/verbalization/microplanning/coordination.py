@@ -28,6 +28,7 @@ from typing_extensions import (
     List,
     Optional,
     Tuple,
+    TypeVar,
     Union,
 )
 
@@ -377,6 +378,112 @@ def fold_coindexed_groups(
         for index in indices[1:]:
             dropped[index] = True
     return [slot for index, slot in enumerate(slots) if not dropped[index]]
+
+
+# ── owner grouping (shared aggregation primitive) ───────────────────────────
+
+_Item = TypeVar("_Item")
+_Payload = TypeVar("_Payload")
+
+#: Classify a sibling item for owner-grouping: ``(owner, payload)`` when the item belongs to an
+#: owner (the owner is identified by its ``_id_``), or ``None`` when it does not group.
+OwnerClassifier = Callable[
+    [_Item], Optional[Tuple["SymbolicExpression", _Payload]]
+]
+
+
+@dataclass(frozen=True)
+class OwnerGroup:
+    """A group of sibling items that share one owner — the unit of owner-based aggregation, shared
+    by the match construction-pattern grouping (a position's x/y/z) and the ``set_of`` selection
+    grouping (the department and salary of one Employee)."""
+
+    owner: SymbolicExpression
+    """The shared owner expression (the position, the selected variable)."""
+
+    items: List[object]
+    """The grouped payloads, in source order (attribute assignments, terminal hops, …)."""
+
+
+def group_by_owner(
+    items: List[_Item], classify: OwnerClassifier
+) -> Tuple[List[OwnerGroup], List[_Item]]:
+    """
+    Group *items* by their owner's id — all items of one owner together, owners in first-seen order
+    — partitioning out the items that do not classify.
+
+    Used by the match planner: a construction pattern's single-hop equalities aggregate per object
+    (``position.x/y/z`` group under ``position``), while multi-hop / non-equality conditions fall to
+    the ungrouped remainder.
+
+    :param items: The sibling items to group.
+    :param classify: Maps an item to ``(owner, payload)`` or ``None`` (does not group).
+    :return: ``(groups, ungrouped)`` — the owner groups and the items that did not classify.
+    """
+    builders: Dict[object, Tuple[SymbolicExpression, List[object]]] = {}
+    order: List[object] = []
+    ungrouped: List[_Item] = []
+    for item in items:
+        decomposed = classify(item)
+        if decomposed is None:
+            ungrouped.append(item)
+            continue
+        owner, payload = decomposed
+        if owner._id_ not in builders:
+            builders[owner._id_] = (owner, [])
+            order.append(owner._id_)
+        builders[owner._id_][1].append(payload)
+    groups = [OwnerGroup(owner=builders[key][0], items=builders[key][1]) for key in order]
+    return groups, ungrouped
+
+
+def group_consecutive_by_owner(
+    items: List[_Item], classify: OwnerClassifier
+) -> List[Union[OwnerGroup, _Item]]:
+    """
+    Replace each maximal *consecutive* run of two-or-more items sharing one owner with a single
+    :class:`OwnerGroup`, leaving every other item (a lone item, or one that does not classify) in
+    place — the order-preserving analogue of :func:`reduce_conjuncts` for owner aggregation.
+
+    Used by the ``set_of`` selection grouping: a contiguous run of attributes on one owner folds
+    into a shared genitive (*"the department and salary of an Employee"*), while a run of one, or a
+    relational terminal, is said on its own.
+
+    :param items: The sibling items, in order.
+    :param classify: Maps an item to ``(owner, payload)`` or ``None`` (not foldable).
+    :return: The items with each consecutive same-owner run of length ≥ 2 replaced by an
+        ``OwnerGroup``; everything else passes through unchanged.
+    """
+    result: List[Union[OwnerGroup, _Item]] = []
+    run_owner: Optional[SymbolicExpression] = None
+    run_items: List[_Item] = []
+    run_payloads: List[object] = []
+
+    def flush() -> None:
+        if len(run_payloads) > 1:
+            result.append(OwnerGroup(owner=run_owner, items=list(run_payloads)))
+        else:
+            result.extend(run_items)
+
+    for item in items:
+        decomposed = classify(item)
+        if decomposed is not None and (
+            run_owner is None or decomposed[0]._id_ == run_owner._id_
+        ):
+            run_owner, payload = decomposed
+            run_items.append(item)
+            run_payloads.append(payload)
+            continue
+        flush()
+        if decomposed is None:
+            result.append(item)
+            run_owner, run_items, run_payloads = None, [], []
+        else:
+            run_owner = decomposed[0]
+            run_items = [item]
+            run_payloads = [decomposed[1]]
+    flush()
+    return result
 
 
 def coindexed_natural_parts(fold: CoindexedFold) -> Optional[CoindexedNaturalParts]:
