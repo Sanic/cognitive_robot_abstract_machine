@@ -258,7 +258,7 @@ class URDFParser:
             multiplier=multiplier,
             offset=offset,
             axis=Vector3(*map(int, joint.axis), reference_frame=parent),
-            dof_id=dof.id,
+            raw_dof=dof,
         )
         return result
 

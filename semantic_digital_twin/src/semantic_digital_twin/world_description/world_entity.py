@@ -951,7 +951,7 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
         return Matrix.vstack([position, orientation]).T
 
     @property
-    def dofs(self) -> Set[DegreeOfFreedom]:
+    def dofs(self) -> list[DegreeOfFreedom]:
         """
         Returns the degrees of freedom associated with this connection.
         """
@@ -962,7 +962,7 @@ class Connection(WorldEntity, HasSimulatorProperties, SubclassJSONSerializer):
         if hasattr(self, "passive_dofs"):
             dofs.update(set(self.passive_dofs))
 
-        return dofs
+        return list(dofs)
 
     @classmethod
     def create_with_dofs(
