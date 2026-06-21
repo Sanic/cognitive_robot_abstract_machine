@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, field, fields
+from dataclasses import Field, dataclass, field, fields
 from functools import lru_cache
 
 from typing_extensions import (
     Any,
+    ClassVar,
     Iterator,
     List,
     Tuple,
@@ -13,37 +14,51 @@ from typing_extensions import (
     TypeVar,
 )
 
-from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.method_classifier import factory_method, is_factory_method
-from krrood.class_diagrams.utils import ROLE_TAKER_METADATA_KEY, T
-from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.class_diagrams.utils import T
 from krrood.patterns.exceptions import (
     DelegatedFactoryMethodError,
     RoleAttributeNotDeclaredError,
     RoleTakerFieldNotFound,
 )
+from krrood.patterns.role_registry import RoleRegistry
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.symbol_graph.symbol_graph import (
-    PredicateClassRelation,
-    Symbol,
-    SymbolGraph,
-)
+from krrood.symbol_graph.symbol_graph import Symbol
 from krrood.utils import get_generic_type_params
+
+
+class RoleTakerField(Field):
+    """
+    Dataclass field that marks the role taker of a role.
+
+    Subclasses :class:`dataclasses.Field` as a type-level marker: the role pattern and the
+    class-diagram detection identify the role taker by ``isinstance`` against this type rather
+    than by inspecting field metadata. It adds no state, so it declares empty ``__slots__`` to
+    keep its memory layout identical to :class:`dataclasses.Field`; this lets
+    :func:`role_taker_field` produce one by reassigning the ``__class__`` of a field built by
+    :func:`dataclasses.field`.
+    """
+
+    __slots__ = ()
 
 
 def role_taker_field(*, kw_only: bool = True, **kwargs: Any) -> Any:
     """
     Declare the dataclass field that stores a role's role taker.
 
-    A thin wrapper around :func:`dataclasses.field` that tags the field in its metadata so
+    A thin wrapper around :func:`dataclasses.field` that produces a :class:`RoleTakerField` so
     both the role pattern and the class diagram recognise it as the role taker.
 
     :param kw_only: Whether the role-taker field is keyword-only in the generated constructor.
     :param kwargs: Any other keyword arguments accepted by :func:`dataclasses.field`.
     :return: A dataclass field marked as the role taker.
     """
-    metadata = {**kwargs.pop("metadata", {}), ROLE_TAKER_METADATA_KEY: True}
-    return field(kw_only=kw_only, metadata=metadata, **kwargs)
+    declared_field = field(kw_only=kw_only, **kwargs)
+    # Reassign __class__ instead of constructing RoleTakerField directly: this delegates all
+    # argument handling and validation to dataclasses.field(). RoleTakerField declares
+    # __slots__ = (), so its memory layout matches Field and the reassignment is safe.
+    declared_field.__class__ = RoleTakerField
+    return declared_field
 
 
 @dataclass(eq=False)
@@ -103,6 +118,21 @@ class Role(Symbol, SubClassSafeGeneric[T]):
     True
     """
 
+    _cache_instances_: ClassVar[bool] = False
+    """Roles are not cached as instances in the :class:`SymbolGraph
+    <krrood.symbol_graph.symbol_graph.SymbolGraph>`. Membership queries use :attr:`_role_registry`
+    and persistence uses the role's own ORM mapping, so a role need not be a graph node. Role
+    classes still take part in the class diagram and ORM through ``Symbol`` subclassing.
+
+    A subclass that needs its instances enumerable through the SymbolGraph (for example to match an
+    entity-query-language query) may override this to ``True`` for itself; the override applies to
+    that subclass and its descendants and does not affect membership queries."""
+
+    _role_registry: ClassVar[RoleRegistry] = RoleRegistry()
+    """Inverse index from takers to roles, shared by all role types, that backs the membership
+    queries (:meth:`has_role`, :meth:`roles_for`). Replace it with a fresh
+    :class:`RoleRegistry <krrood.patterns.role_registry.RoleRegistry>` to isolate state."""
+
     @classmethod
     @lru_cache
     def role_taker_field_name(cls) -> str:
@@ -110,7 +140,7 @@ class Role(Symbol, SubClassSafeGeneric[T]):
         :return: The name of the field that holds the role taker instance.
         """
         for declared_field in fields(cls):
-            if declared_field.metadata.get(ROLE_TAKER_METADATA_KEY, False):
+            if isinstance(declared_field, RoleTakerField):
                 return declared_field.name
         raise RoleTakerFieldNotFound(role_type=cls)
 
@@ -171,7 +201,7 @@ class Role(Symbol, SubClassSafeGeneric[T]):
         super_post_init = getattr(super(), "__post_init__", None)
         if super_post_init is not None:
             super_post_init()
-        self._update_mapping_between_roles_and_role_takers(self.role_taker)
+        type(self)._role_registry.register(self)
 
     def __getattr__(self, item: str) -> Any:
         """
@@ -299,109 +329,31 @@ class Role(Symbol, SubClassSafeGeneric[T]):
         :param role_types: The type or tuple of types of roles to yield.
         :return: All roles of the given type(s) for the role taker instance.
         """
-        wrapped_taker = SymbolGraph().get_wrapped_instance(role_taker)
-        if wrapped_taker is None:
-            return
         yield from (
-            relation.source.instance
-            for relation in SymbolGraph().get_incoming_relations_with_type(
-                wrapped_taker, HasRoleTaker
-            )
-            if isinstance(relation.source.instance, role_types)
+            role
+            for role in cls._role_registry.roles_of(role_taker)
+            if isinstance(role, role_types)
         )
 
     @property
     def all_role_takers(self) -> List[Any]:
         """
-        :return: All role takers of the role instance.
+        :return: This role's taker and every transitive taker beneath it, ending at the root entity.
         """
-        return list(self.yield_takers_of_role(self))
+        takers: List[Any] = []
+        current = self.role_taker
+        while True:
+            takers.append(current)
+            if not isinstance(current, Role):
+                return takers
+            current = current.role_taker
 
-    @classmethod
-    def yield_takers_of_role(cls, role: Role) -> Iterator[Any]:
-        """
-        :param role: The role whose role takers are requested.
-        :return: All role takers of the given role.
-        """
-        wrapped_role = SymbolGraph().get_wrapped_instance(role)
-        if wrapped_role is None:
-            return
-        yield from (
-            relation.target.instance
-            for relation in SymbolGraph().get_outgoing_relations_with_type(
-                wrapped_role, HasRoleTaker
-            )
-        )
-
-    def _update_mapping_between_roles_and_role_takers(self, role_taker: T):
-        """
-        Update the SymbolGraph mapping between this role and its role taker.
-
-        Silently skips if this class is not registered in the SymbolGraph class
-        diagram (for example, test-only or dynamically created classes).
-
-        :param role_taker: The role taker instance to link.
-        """
-        try:
-            # The class diagram is built lazily, so a role class defined after the graph was first
-            # used would otherwise be missing. Register it (and a role-taker class) on demand so the
-            # role registry works regardless of class-definition order.
-            SymbolGraph().ensure_class_in_class_diagram(type(self))
-            if isinstance(role_taker, Symbol):
-                SymbolGraph().ensure_class_in_class_diagram(type(role_taker))
-            wrapped_self = SymbolGraph().get_wrapped_instance(self)
-            wrapped_role_taker = SymbolGraph().ensure_wrapped_instance(role_taker)
-            SymbolGraph().add_relation(
-                HasRoleTaker(
-                    wrapped_self, wrapped_role_taker, self.role_taker_wrapped_field
-                )
-            )
-            if isinstance(role_taker, Role):
-                for relation in SymbolGraph().get_outgoing_relations_with_type(
-                    wrapped_role_taker, HasRoleTaker
-                ):
-                    SymbolGraph().add_relation(
-                        HasRoleTaker(
-                            wrapped_self, relation.target, relation.wrapped_field
-                        )
-                    )
-        except ClassIsUnMappedInClassDiagram:
-            pass
-
-    @property
-    def role_taker_wrapped_field(self) -> WrappedField:
-        """
-        :return: The wrapped field of this class that points to the role taker.
-        """
-        return next(
-            wrapped_field
-            for wrapped_field in SymbolGraph()
-            .class_diagram.get_wrapped_class(self.__class__)
-            .fields
-            if wrapped_field.name == self.role_taker_field_name()
-        )
-
-    # A role is an ordinary object with identity-based equality and hashing: each role is
-    # equal only to itself and distinct from its role taker. "Do these refer to the same
-    # underlying entity?" is answered explicitly by the ``IsSameEntity`` predicate
-    # (see ``krrood.patterns.role_predicates``) rather than by overloading ``==``/``hash``.
-    #
-    # ``__eq__`` returns a definitive ``False`` (rather than ``NotImplemented`` like
-    # ``object.__eq__``) so that Python does not fall back to the *taker's* equality via the
-    # reflected operand: a role delegates attribute reads to its taker, so a taker with a
-    # lenient (e.g. name-based) ``__eq__`` would otherwise compare equal to its role.
-    #
-    # ``__hash__`` must be set explicitly: ``Role``'s base ``SubClassSafeGeneric`` is a plain
-    # ``@dataclass`` (eq=True, no fields), which would otherwise set ``__hash__ = None``
-    # (unhashable); defining ``__eq__`` here would also reset it to ``None``.
+    # A role is equal only to itself (identity), never to its taker; "same underlying entity?"
+    # is answered by the ``IsSameEntity`` predicate instead. ``__eq__`` returns ``False`` rather
+    # than ``NotImplemented`` so Python cannot fall back to the taker's (possibly lenient) equality
+    # via the reflected operand. ``__hash__`` is set explicitly because defining ``__eq__`` here,
+    # like the plain-dataclass base, would otherwise reset it to ``None`` (unhashable).
     def __eq__(self, other: Any) -> bool:
         return self is other
 
     __hash__ = object.__hash__
-
-
-class HasRoleTaker(PredicateClassRelation[Role]):
-    """
-    A predicate class relation that indicates that a class has a field that points to a role taker.
-    """
-    ...

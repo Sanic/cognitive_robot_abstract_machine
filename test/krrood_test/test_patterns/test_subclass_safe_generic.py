@@ -251,7 +251,7 @@ def test_subclass_safe_generic_type_resolution_failure_does_not_kill_class_defin
         "krrood.patterns.subclass_safe_generic"
         ".get_and_resolve_generic_type_hints_of_object_using_substitutions"
     )
-    with patch(target, side_effect=RuntimeError("simulated circular-import failure")):
+    with patch(target, side_effect=ImportError("simulated circular-import failure")):
 
         @dataclass
         class _IntStorage(_Storage[int]):
@@ -266,6 +266,57 @@ def test_subclass_safe_generic_type_resolution_failure_does_not_kill_class_defin
     ), "items.default_factory was lost after type-resolution failure"
     instance = _IntStorage(required=1)
     assert instance.items == []
+
+
+def test_subclass_safe_generic_propagates_non_transient_resolution_errors():
+    """
+    A failure that is not a transient import/resolution error is a genuine fault and must
+    surface, not be swallowed by ``__init_subclass__``.
+    """
+    from unittest.mock import patch
+
+    T_local = TypeVar("T_local")
+
+    @dataclass
+    class _Storage(SubClassSafeGeneric[T_local]):
+        required: T_local = dataclass_field(kw_only=True)
+
+    target = (
+        "krrood.patterns.subclass_safe_generic"
+        ".get_and_resolve_generic_type_hints_of_object_using_substitutions"
+    )
+    with patch(target, side_effect=ValueError("genuine bug")):
+        with pytest.raises(ValueError):
+
+            @dataclass
+            class _IntStorage(_Storage[int]):
+                pass
+
+
+def test_subclass_safe_generic_flags_a_lost_concrete_binding():
+    """
+    A substitution that maps a type variable to a concrete type is reported as a lost binding,
+    which is the case worth surfacing when resolution fails.
+    """
+    T_local = TypeVar("T_local")
+
+    assert (
+        AbstractSubClassSafeGeneric._concrete_binding_was_lost({T_local: int}) is True
+    )
+
+
+def test_subclass_safe_generic_does_not_flag_a_typevar_only_rename():
+    """
+    A substitution that only renames a type variable (or is empty) is a no-op, not a lost binding.
+    """
+    T_local = TypeVar("T_local")
+    Renamed = TypeVar("Renamed")
+
+    assert (
+        AbstractSubClassSafeGeneric._concrete_binding_was_lost({T_local: Renamed})
+        is False
+    )
+    assert AbstractSubClassSafeGeneric._concrete_binding_was_lost({}) is False
 
 
 def test_subclass_safe_generic_inherited_default_factory_survives_type_update():

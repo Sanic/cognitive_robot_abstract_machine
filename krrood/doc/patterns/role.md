@@ -103,8 +103,7 @@ ceo = CEO(person=alice, head_of=acme)
 print(ceo)
 ```
 
-The role registers itself with the `SymbolGraph` during `__post_init__`, which is what enables role lookup and
-reasoning.
+The role registers itself with the `RoleRegistry` during `__post_init__`, which is what enables role lookup.
 
 ## Distinct Identity
 
@@ -359,8 +358,9 @@ flowchart TD
 ## Learn More
 
 - **Developer guide**: {doc}`developer/role` — design decisions, architecture, and extension points.
-- **API reference**: `krrood.patterns.role` — `Role`, `role_taker_field`, `HasRoleTaker`,
-  `RoleTakerFieldNotFound`; `krrood.patterns.role_predicates` — `IsSameEntity`.
+- **API reference**: `krrood.patterns.role` — `Role`, `role_taker_field`,
+  `RoleTakerFieldNotFound`; `krrood.patterns.role_registry` — `RoleRegistry`;
+  `krrood.patterns.role_predicates` — `IsSameEntity`.
 - **Source**: `krrood/src/krrood/patterns/role.py`
 - **Tests**: `test/krrood_test/test_patterns/test_role.py` and the dataset under
   `test/krrood_test/dataset/role_and_ontology/`.

@@ -27,6 +27,7 @@ from typing_extensions import (
 
 from krrood import logger
 from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
@@ -37,6 +38,17 @@ from krrood.utils import (
     ensure_hashable,
     get_existing_field_by_name,
 )
+
+TRANSIENT_TYPE_RESOLUTION_ERRORS = (
+    ImportError,
+    NameError,
+    TypeError,
+    CouldNotResolveType,
+)
+"""Exceptions raised while importing and resolving a field's type annotation when that type is
+not yet available (typically a circular import during module load). They are transient: the field
+is narrowed later, once a subclass binds the parameter to a concrete type. Any other exception is
+a genuine fault and is left to propagate."""
 
 if TYPE_CHECKING:
     pass
@@ -78,18 +90,17 @@ class AbstractSubClassSafeGeneric(ABC):
                     cls, substitutions
                 )
             )
-        except Exception as error:
-            # Resolving annotations imports the field types, which can fail transiently
-            # (e.g. a circular import while a module defines its own generic classes, as
-            # symbol_graph does). Such fields are narrowed later, when a subclass binds the
-            # parameter to a concrete type, so a class must still be definable here. Only warn
-            # when a concrete binding was actually lost; a failed pure type-variable rename is
-            # a no-op and expected, so it is logged at debug level to avoid noise.
-            lost_concrete_binding = any(
-                not isinstance(value, (TypeVar, TypeVarTuple))
-                for value in substitutions.values()
+        except TRANSIENT_TYPE_RESOLUTION_ERRORS as error:
+            # A field's type could not be imported/resolved yet (typically a circular import during
+            # module load). The class must still be definable; such fields are narrowed later, when a
+            # subclass binds the parameter to a concrete type. Only warn when a concrete binding was
+            # actually lost; a failed pure type-variable rename is a no-op, logged at debug to avoid
+            # noise.
+            log = (
+                logger.warning
+                if cls._concrete_binding_was_lost(substitutions)
+                else logger.debug
             )
-            log = logger.warning if lost_concrete_binding else logger.debug
             log(
                 f"SubClassSafeGeneric: could not resolve type hints for {cls} — field "
                 f"types will not be updated. Cause: {error}"
@@ -99,6 +110,22 @@ class AbstractSubClassSafeGeneric(ABC):
             if not result.resolved:
                 continue
             cls._update_field_kwargs(name, {"type": result.resolved_type})
+
+    @staticmethod
+    def _concrete_binding_was_lost(
+        substitutions: Dict[Any, ResolvableType],
+    ) -> bool:
+        """
+        Decide whether a failed substitution dropped information worth surfacing.
+
+        :param substitutions: The substitution map that could not be applied.
+        :return: True if any substitution maps to a concrete type, False when every substitution
+            only renames a type variable (a no-op not worth warning about).
+        """
+        return any(
+            not isinstance(value, (TypeVar, TypeVarTuple))
+            for value in substitutions.values()
+        )
 
     @classmethod
     def _update_field_kwargs(

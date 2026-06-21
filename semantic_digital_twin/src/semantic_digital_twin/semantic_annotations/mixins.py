@@ -241,13 +241,6 @@ class HasRootBody(HasRootKinematicStructureEntity[TBody], ABC):
     naturally more specific than their bases.
     """
 
-    @property
-    def bodies(self) -> List[Body]:
-        """
-        The bodies that are part of the semantic annotation.
-        """
-        return [self.root]
-
     @classmethod
     def create_with_new_body_in_world(
         cls,
@@ -303,13 +296,6 @@ class HasRootRegion(HasRootKinematicStructureEntity[TRegion], ABC):
     """
     A mixin class for semantic annotations that have a region.
     """
-
-    @property
-    def regions(self) -> Iterable[Region]:
-        """
-        The regions that are part of the semantic annotation.
-        """
-        return [self.root]
 
     @classmethod
     def create_with_new_region_in_world(

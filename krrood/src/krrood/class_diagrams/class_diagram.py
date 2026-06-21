@@ -46,7 +46,6 @@ from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
 from krrood.class_diagrams.method_classifier import factory_method_names
-from krrood.class_diagrams.utils import get_generic_type_param, resolve_type
 from krrood.class_diagrams.wrapped_field import WrappedField
 
 from krrood.class_diagrams.exceptions import (
