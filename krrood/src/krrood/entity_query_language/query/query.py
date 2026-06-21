@@ -426,8 +426,8 @@ class Query(
         """
         Wire this instance as the cartesian-product node: build the data-source chain (Where /
         GroupedBy / Having) and selected variables as its children. Ordering and quantification are
-        applied as result-pipeline stages during evaluation, not as wrapper nodes, so the product is
-        its own compiled expression. Called once on a freshly compiled product instance.
+        applied as result-pipeline stages during evaluation, so the product is its own compiled
+        expression. Called once on a freshly compiled product instance.
 
         :return: This instance.
         """

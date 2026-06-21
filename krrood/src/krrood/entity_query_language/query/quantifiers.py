@@ -203,7 +203,7 @@ class ResultQuantifier(ABC):
     Marker for the kind of result quantification a query requests (e.g. :class:`An`, :class:`The`).
 
     A query stores the requested kind, and its quantification pipeline stage enforces that kind's
-    default result-count constraint. Quantifiers are no longer nodes in the expression tree.
+    default result-count constraint.
     """
 
     @classmethod

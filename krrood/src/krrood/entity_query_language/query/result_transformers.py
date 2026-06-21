@@ -2,9 +2,9 @@
 Composable result-stream transformers for the Entity Query Language.
 
 A query produces a stream of result rows from its cartesian product; ordering and quantification are
-expressed as :class:`ResultTransformer` stages applied to that stream, rather than as wrapper nodes in
-the expression tree. A query owns an ordered list of transformers and runs them in sequence, so each
-stage stays single-responsibility and the query node itself stays thin and inspectable.
+expressed as :class:`ResultTransformer` stages applied to that stream. A query owns an ordered list of
+transformers and runs them in sequence, so each stage stays single-responsibility and the query node
+itself stays thin and inspectable.
 """
 
 from __future__ import annotations
