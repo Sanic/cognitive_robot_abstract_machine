@@ -57,8 +57,8 @@ class RegionFilter(ThreadedAnnotator):
     ) -> None:
         """Initialize the region filter.
 
-        :param name: Name of this annotator instance, defaults to "RegionFilter"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name=name, descriptor=descriptor)
 

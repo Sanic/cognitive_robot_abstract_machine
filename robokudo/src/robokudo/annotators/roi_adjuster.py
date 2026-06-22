@@ -53,8 +53,8 @@ class ROIAdjusterAnnotator(BaseAnnotator):
     ) -> None:
         """Initialize the ROI adjuster.
 
-        :param name: Name of the annotator instance, defaults to "ROIAdjusterAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
 

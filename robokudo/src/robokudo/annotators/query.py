@@ -88,7 +88,7 @@ class QueryAnnotator(BaseAnnotator):
     def __init__(self, name: str = "QueryAnnotator") -> None:
         """Initialize the query annotator.
 
-        :param name: Annotator name, defaults to "QueryAnnotator"
+        :param name: Annotator name
         """
         super().__init__(name=name)
 
@@ -212,7 +212,7 @@ class QueryReply(BaseAnnotator):
     def __init__(self, name: str = "QueryReply"):
         """Initialize query reply generator.
 
-        :param name: Annotator name, defaults to "QueryReply"
+        :param name: Annotator name
         """
         super().__init__(name=name)
 
@@ -272,7 +272,7 @@ class GenerateQueryResult(BaseAnnotator):
     ) -> None:
         """Initialize query result generator.
 
-        :param name: Annotator name, defaults to "GenerateQueryResult"
+        :param name: Annotator name
         :param descriptor: Annotator configuration descriptor
         """
         self.rk_logger = logging.getLogger(PACKAGE_NAME)

@@ -66,8 +66,8 @@ class ClusterPositionAnnotator(BaseAnnotator):
     ) -> None:
         """Initialize the position estimator.
 
-        :param name: Name of this annotator instance, defaults to "ClusterPositionAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

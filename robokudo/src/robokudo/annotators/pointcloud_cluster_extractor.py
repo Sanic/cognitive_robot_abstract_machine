@@ -61,7 +61,7 @@ def generate_roi_with_mask_from_points(
     :param image_width: Width of the target image
     :param pc_cam_intrinsics: Camera intrinsic parameters
     :param cloud: Point cloud to project
-    :param color2depth_ratio: Scale ratio between color and depth images, defaults to (1, 1)
+    :param color2depth_ratio: Scale ratio between color and depth images
     :return: Tuple of (ROI with mask, full image mask)
     """
     # TODO: Use robokudo.utils.o3d_helper.get_mask_from_pointcloud
@@ -163,7 +163,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
                 """Minimum total points for valid cluster"""
 
                 self.min_on_plane_point_count: int = 90
-                """Minimum points above plane, defaults to 90"""
+                """Minimum points above plane"""
 
                 self.eps: float = 0.04
                 """DBSCAN epsilon parameter (density threshold)"""
@@ -178,8 +178,8 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
     ) -> None:
         """Initialize the cluster extractor.
 
-        :param name: The name of this annotator instance, defaults to "PointCloudClusterExtractor"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: The name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
 
@@ -460,8 +460,8 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
     ) -> None:
         """Initialize the naive cluster extractor.
 
-        :param name: The name of this annotator instance, defaults to "NaivePointCloudClusterExtractor"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: The name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
 

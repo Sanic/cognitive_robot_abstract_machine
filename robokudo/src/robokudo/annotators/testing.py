@@ -114,8 +114,8 @@ class EmptyAnnotator(BaseAnnotator):
     def __init__(self, name: str = "EmptyAnnotator", sleep_in_s: float = 1) -> None:
         """Initialize the empty annotator.
 
-        :param name: Annotator name, defaults to "EmptyAnnotator"
-        :param sleep_in_s: Sleep duration in seconds, defaults to 1
+        :param name: Annotator name
+        :param sleep_in_s: Sleep duration in seconds
         """
         super().__init__(name)
 
@@ -144,7 +144,7 @@ class FailingAnnotator(ThreadedAnnotator):
     def __init__(self, name: str = "FailingAnnotator") -> None:
         """Initialize the failing annotator.
 
-        :param name: Annotator name, defaults to "FailingAnnotator"
+        :param name: Annotator name
         """
         super().__init__(name)
 
@@ -208,7 +208,7 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
         """
         Initialize the fake collection reader.
 
-        :param name: Name of the annotator instance, defaults to "FakeCollectionReader"
+        :param name: Name of the annotator instance
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % (self.__class__.__name__))
@@ -327,8 +327,8 @@ class ScopedAnnotator(BaseAnnotator):
         """
         Initialize the scoped annotator.
 
-        :param name: Name of the annotator instance, defaults to "ScopedAnnotator"
-        :param descriptor: Descriptor instance with parameters, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Descriptor instance with parameters
         """
         super().__init__(name, descriptor)
 

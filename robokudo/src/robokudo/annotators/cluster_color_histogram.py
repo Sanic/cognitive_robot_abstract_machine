@@ -62,13 +62,13 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.histogram_cols: int = 16
-                """Number of histogram columns (hue bins), defaults to 16"""
+                """Number of histogram columns (hue bins)"""
 
                 self.histogram_rows: int = 16
-                """histogram_rows: Number of histogram rows(saturation bins), defaults to 16"""
+                """Number of histogram rows (saturation bins)"""
 
                 self.generate_plot_output: bool = False
-                """Whether to generate histogram plots, defaults to False. Plotting takes a lot of time in matplotlib (200-500ms)"""
+                """Whether to generate histogram plots. Plotting takes a lot of time in matplotlib (200-500ms)"""
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()

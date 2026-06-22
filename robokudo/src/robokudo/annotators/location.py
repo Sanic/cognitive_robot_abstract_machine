@@ -82,8 +82,8 @@ class LocationAnnotator(ThreadedAnnotator):
     ) -> None:
         """Initialize the location annotator.
 
-        :param name: Annotator name, defaults to "LocationAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Annotator name
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name=name, descriptor=descriptor)
 

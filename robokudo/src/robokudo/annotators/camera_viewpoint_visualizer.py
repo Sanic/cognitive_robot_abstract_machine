@@ -25,7 +25,7 @@ class CameraViewpointVisualizer(BaseAnnotator):
     def __init__(self, name: str = "CameraViewpointVisualizer") -> None:
         """Initialize the camera viewpoint visualizer.
 
-        :param name: Name of the annotator instance, defaults to "CameraViewpointVisualizer"
+        :param name: Name of the annotator instance
         """
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

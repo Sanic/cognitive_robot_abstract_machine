@@ -62,8 +62,8 @@ class StorageWriter(BaseAnnotator):
     ) -> None:
         """Initialize the storage writer. Minimal one-time init!
 
-        :param name: Annotator name, defaults to "StorageWriter"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Annotator name
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

@@ -59,8 +59,8 @@ class LambdaFunctionAnnotator(BaseAnnotator):
     ):
         """Initialize the lambda function annotator. Minimal one-time init!
 
-        :param name: Annotator name, defaults to "LambdaFunctionAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Annotator name
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.logger.debug("%s.__init__()" % self.__class__.__name__)

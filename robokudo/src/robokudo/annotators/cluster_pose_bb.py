@@ -80,7 +80,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
                 """
 
                 self.bounding_box_visualization_color: Tuple[int, int, int] = (0, 0, 0)
-                """RGB color for box visualization, defaults to [0,0,0]"""
+                """RGB color for box visualization"""
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -92,8 +92,8 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
     ) -> None:
         """Initialize the pose estimator.
 
-        :param name: Name of this annotator instance, defaults to "ClusterPoseBBAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

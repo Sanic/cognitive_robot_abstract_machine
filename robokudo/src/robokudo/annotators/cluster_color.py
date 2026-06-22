@@ -119,8 +119,8 @@ class ClusterColorAnnotator(BaseAnnotator):
     ) -> None:
         """Default construction. Minimal one-time init!
 
-        :param name: Name of the annotator instance, defaults to "ClusterColorAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

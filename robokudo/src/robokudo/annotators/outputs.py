@@ -92,7 +92,7 @@ class AnnotatorOutputs:
         """Dictionary mapping annotator names to their outputs"""
 
         self.redraw = True
-        """Whether the outputs should be redrawn on the next GUI update. Defaults to True for the first run."""
+        """Whether the outputs should be redrawn on the next GUI update."""
 
     def init_annotator(self, annotator_name: str) -> None:
         """Initialize the output structure for an annotator.

@@ -70,8 +70,8 @@ class FileWriter(BaseAnnotator):
     ) -> None:
         """Initialize the file writer.
 
-        :param name: Name of this annotator instance, defaults to "FileWriter"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.initialized = False

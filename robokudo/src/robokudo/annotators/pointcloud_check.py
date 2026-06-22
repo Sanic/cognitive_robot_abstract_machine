@@ -67,8 +67,8 @@ class PointcloudCheckAnnotator(BaseAnnotator):
     ) -> None:
         """Initialize the point cloud checker.
 
-        :param name: Name of this annotator instance, defaults to "PointcloudcloudCheckAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
 

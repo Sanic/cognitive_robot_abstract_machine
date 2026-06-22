@@ -41,9 +41,9 @@ class CASCheckFunc(BaseAnnotator):
     ) -> None:
         """Initialize the CAS condition checker.
 
-        :param name: Name of this node in the behavior tree, defaults to "CASCheckFunc"
-        :param func: Function that evaluates CAS conditions, must return bool, defaults to None
-        :param raise_with_str: Error message to raise on failure, empty string disables raising, defaults to ""
+        :param name: Name of this node in the behavior tree
+        :param func: Function that evaluates CAS conditions, must return bool
+        :param raise_with_str: Error message to raise on failure, empty string disables raising
         :raises Exception: If func is None
         """
         super(CASCheckFunc, self).__init__(name=name)
@@ -99,9 +99,9 @@ class CASCheckAnnotationTypeExists(CASCheckFunc):
     ) -> None:
         """Initialize annotation type checker.
 
-        :param name: Name of this node in the behavior tree, defaults to "CASCheckAnnotationTypeExists"
-        :param annotation_type: Type of annotation to check for, defaults to None
-        :param raise_with_str: Error message to raise on failure, empty string disables raising, defaults to ""
+        :param name: Name of this node in the behavior tree
+        :param annotation_type: Type of annotation to check for
+        :param raise_with_str: Error message to raise on failure, empty string disables raising
         """
         func = functools.partial(any_of_type_present, annotation_type)
         super(CASCheckAnnotationTypeExists, self).__init__(
@@ -124,8 +124,8 @@ class CASCheckOHExists(CASCheckAnnotationTypeExists):
     ) -> None:
         """Initialize ObjectHypothesis checker.
 
-        :param name: Name of this node in the behavior tree, defaults to "CASCheckOHExists"
-        :param raise_with_str: Error message to raise on failure, empty string disables raising, defaults to ""
+        :param name: Name of this node in the behavior tree
+        :param raise_with_str: Error message to raise on failure, empty string disables raising
         """
         super(CASCheckOHExists, self).__init__(
             name=name, annotation_type=ObjectHypothesis, raise_with_str=raise_with_str

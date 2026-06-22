@@ -76,8 +76,8 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
     ) -> None:
         """Initialize the object hypothesis visualizer.
 
-        :param name: Name of the annotator instance, defaults to "ObjectHypothesisVisualizer"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -122,9 +122,9 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         :param image: Image to draw on
         :param text: Text to draw
         :param color: BGR color tuple
-        :param font: OpenCV font type, defaults to cv2.FONT_HERSHEY_SIMPLEX
-        :param font_scale: Font scale factor, defaults to 1
-        :param thickness: Line thickness, defaults to 2
+        :param font: OpenCV font type
+        :param font_scale: Font scale factor
+        :param thickness: Line thickness
         """
         # Get the size of the text
         text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]

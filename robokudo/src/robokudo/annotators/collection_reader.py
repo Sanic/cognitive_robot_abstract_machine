@@ -84,7 +84,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
         """Initialize the collection reader.
 
         :param descriptor: Configuration descriptor
-        :param name: Name of this annotator instance, defaults to "CollectionReader"
+        :param name: Name of this annotator instance
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

@@ -341,7 +341,7 @@ class BaseAnnotator(Behaviour):
         """Record timing information for a function.
 
         :param value: The timing value to record
-        :param func: The function name to associate with the timing, defaults to "update"
+        :param func: The function name to associate with the timing
         """
         timing_dict = getattr(self, "_times")
         timing_dict[func] = value
@@ -439,7 +439,7 @@ class Worker(object):
         """Initialize the worker.
 
         :param fn: The function to execute
-        :param args: Arguments to pass to the function, defaults to ()
+        :param args: Arguments to pass to the function
         """
         self.future: Future = Future()
         self._fn: Callable = fn
@@ -448,7 +448,7 @@ class Worker(object):
     def start(self, callback: Optional[Callable] = None) -> threading.Thread:
         """Start executing the function in a separate thread.
 
-        :param callback: Function to call when execution completes, defaults to None
+        :param callback: Function to call when execution completes
         """
         self._callback = callback
         self.future.set_running_or_notify_cancel()
@@ -482,8 +482,8 @@ class ThreadedAnnotator(BaseAnnotator):
     ) -> None:
         """Initialize the ThreadedAnnotator.
 
-        :param name: Name of the annotator instance, defaults to "ThreadedAnnotator"
-        :param descriptor: Configuration descriptor, defaults to BaseAnnotator.Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

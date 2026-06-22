@@ -49,7 +49,7 @@ class BlurAnnotator(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.blur_threshold: float = 100.0
-                """Threshold for acceptable blur level, defaults to 100"""
+                """Threshold for acceptable blur level"""
 
                 self.return_failure_above_threshold: bool = True
                 """Let this behaviour return failure to stop the advancement of the current pipeline"""
@@ -64,8 +64,8 @@ class BlurAnnotator(BaseAnnotator):
     ) -> None:
         """Initialize the blur annotator. Minimal one-time init!
 
-        :param name: Name of the annotator instance, defaults to "BlurAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.logger.debug("%s.__init__()" % self.__class__.__name__)

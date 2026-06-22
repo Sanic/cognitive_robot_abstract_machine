@@ -64,8 +64,8 @@ class FilterAnnotator(BaseAnnotator):
     ) -> None:
         """Initialize the filter annotator.
 
-        :param name: Annotator name, defaults to "FilterAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Annotator name
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.logger.debug("%s.__init__()" % self.__class__.__name__)

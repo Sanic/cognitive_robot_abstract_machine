@@ -71,8 +71,8 @@ class PlaneAnnotator(ThreadedAnnotator):
     ) -> None:
         """Initialize the plane detector.
 
-        :param name: Name of this annotator instance, defaults to "PlaneAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
 

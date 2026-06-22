@@ -35,10 +35,10 @@ class AnnotationStorageWriter(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.basic_path: str = "annotations"
-                """Base directory for storing annotations, defaults to "annotations"""
+                """Base directory for storing annotations"""
 
                 self.suffix: str = "json"
-                """File extension for annotation files, defaults to "json"""
+                """File extension for annotation files"""
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -50,8 +50,8 @@ class AnnotationStorageWriter(BaseAnnotator):
     ) -> None:
         """Initialize the annotation storage writer. Minimal one-time init!
 
-        :param name: Name of the annotator instance, defaults to "AnnotationStorageWriter"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -108,7 +108,7 @@ class AnnotationPublisherWriter(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.topic_name: str = "/annotations"
-                """Name of the ROS topic to publish on, defaults to "/annotations"""
+                """Name of the ROS topic to publish on"""
 
         # overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -120,8 +120,8 @@ class AnnotationPublisherWriter(BaseAnnotator):
     ) -> None:
         """Initialize the annotation publisher. Minimal one-time init!
 
-        :param name: Name of the annotator instance, defaults to "AnnotationPublisherWriter"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

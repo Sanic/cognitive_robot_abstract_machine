@@ -86,8 +86,8 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
     ) -> None:
         """Initialize the ICP pose refiner.
 
-        :param name: Name of this annotator instance, defaults to "ICPPoseRefinementAnnotator"
-        :param descriptor: Configuration descriptor, defaults to Descriptor()
+        :param name: Name of this annotator instance
+        :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
