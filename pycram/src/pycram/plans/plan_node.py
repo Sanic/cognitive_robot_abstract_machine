@@ -204,7 +204,7 @@ class PlanNode(PlanEntity):
         """
         previous_nodes = []
         for search_node in self.plan.nodes:
-            if search_node == self:
+            if search_node is self:
                 break
             previous_nodes.append(search_node)
         return previous_nodes
