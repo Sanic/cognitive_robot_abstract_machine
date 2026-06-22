@@ -7,10 +7,10 @@ import robokudo.defs
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
 import robokudo.descriptors.camera_configs.config_semdt_raytracer
-import robokudo.garden
 import robokudo.io.file_reader_interface
 import robokudo.io.semdt_raytracer_camera_interface
 import robokudo.io.storage_reader_interface
+import robokudo.pipeline
 import robokudo.types.annotation
 import robokudo.types.scene
 import robokudo.utils.data_downloader
@@ -22,8 +22,8 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
+from robokudo.annotators.shape_estimator import ShapeEstimatorAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import CrDescriptorFactory
-from robokudo.pipeline import Pipeline
 
 
 class TestFullAEExecution(object):
@@ -84,6 +84,14 @@ class TestFullAEExecution(object):
         cluster_desc.parameters.min_on_plane_point_count = 10
         cluster_desc.parameters.eps = 0.05
 
+        shape_desc = ShapeEstimatorAnnotator.Descriptor()
+        shape_desc.parameters.minimum_point_count = 20
+        shape_desc.parameters.distance_threshold = 0.015
+        shape_desc.parameters.cylinder_minimum_inlier_ratio = 0.5
+        shape_desc.parameters.cuboid_minimum_inlier_ratio = 0.3
+        shape_desc.parameters.log_candidate_metrics = False
+        shape_desc.parameters.log_rejection_reasons = False
+
         seq = robokudo.pipeline.Pipeline("SemDTRayTracerTestPipeline")
         seq.add_children(
             [
@@ -95,6 +103,7 @@ class TestFullAEExecution(object):
                 PointCloudClusterExtractor(descriptor=cluster_desc),
                 ClusterColorAnnotator(),
                 ClusterPoseBBAnnotator(),
+                ShapeEstimatorAnnotator(descriptor=shape_desc),
             ]
         )
 
@@ -121,3 +130,17 @@ class TestFullAEExecution(object):
             )
         }
         assert dominant_colors == {"red", "blue"}
+
+        object_shapes = [
+            seq.cas.filter_by_type(
+                robokudo.types.annotation.Shape,
+                object_hypothesis.annotations,
+            )
+            for object_hypothesis in object_hypotheses
+        ]
+        assert [len(shapes) for shapes in object_shapes] == [1, 1]
+        assert all(
+            isinstance(shapes[0], robokudo.types.annotation.Cylinder)
+            for shapes in object_shapes
+        )
+        assert all(len(shapes[0].inliers) > 0 for shapes in object_shapes)
