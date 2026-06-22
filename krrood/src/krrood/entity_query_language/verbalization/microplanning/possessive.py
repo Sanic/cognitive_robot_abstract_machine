@@ -156,6 +156,29 @@ def possessive_path(parts: List[PathStep], root_fragment: Fragment) -> Fragment:
     return owner
 
 
+def chain_head_number(parts: List[PathStep], subject_number: Number) -> Number:
+    """:return: The grammatical number the chain's head noun is realised with once its root is
+    pronominalised — *subject_number* only when a single scalar hop distributes over the subject
+    (*"their batteries"*), else singular: a deeper or relational chain heads on an inner genitive
+    that does not distribute (*"the priority of their missions"*).
+
+    This is the head-agreement counterpart of :func:`pronominal_path` (which distributes the
+    *innermost* hop): a finite verb agrees with the head, so its copula reads *"are"* exactly when
+    this returns plural.
+
+    >>> from krrood.entity_query_language.verbalization.fragments.features import Number
+    >>> chain_head_number([PathStep("battery", is_scalar_value=True)], Number.PLURAL)
+    <Number.PLURAL: 'plural'>
+    >>> chain_head_number(
+    ...     [PathStep("assigned_to"), PathStep("battery", is_scalar_value=True)], Number.PLURAL
+    ... )
+    <Number.SINGULAR: 'singular'>
+    """
+    if len(parts) == 1 and parts[0].is_scalar_value:
+        return subject_number
+    return Number.SINGULAR
+
+
 def pronominal_path(parts: List[PathStep], subject_number: Number) -> Fragment:
     """:return: the navigation read out with the (elided) root pronominalised — *"its attribute"* /
     *"the attribute of its foo"* for plain hops, and the relative clause *"the <Type> <prep> which

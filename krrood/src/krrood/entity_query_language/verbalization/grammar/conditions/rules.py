@@ -366,7 +366,7 @@ class ForAllRule(PhraseRule):
 
     >>> robot = variable(Robot, [])
     >>> verbalize_expression(for_all(robot, robot.battery > 0))
-    'for all Robots, the battery of the Robot is greater than 0'
+    'for all Robots, their batteries are greater than 0'
     """
 
     construct = ForAll
@@ -376,11 +376,14 @@ class ForAllRule(PhraseRule):
         """Say *"for all <plural var>, <condition>"*.
 
         It owns the *for all Robots,* prefix — rendering the variable as plural and joining it to the
-        condition — while the condition clause comes from the recursion.
+        condition — while the condition clause comes from the recursion. Rendering the variable
+        *plural* is what makes the body distribute over the population: the quantifier opens a
+        discourse scope on the variable, so the condition's chain pronominalises to the agreeing
+        *their batteries are* rather than repeating *the battery of the Robot is*.
 
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(for_all(robot, robot.battery > 0))
-        'for all Robots, the battery of the Robot is greater than 0'
+        'for all Robots, their batteries are greater than 0'
         """
         variable_fragment = context.child(node.variable, number=Number.PLURAL)
         condition_fragment = context.child(node.condition)
@@ -399,7 +402,7 @@ class ExistsRule(PhraseRule):
 
     >>> robot = variable(Robot, [])
     >>> verbalize_expression(exists(robot, robot.battery > 0))
-    'there exists a Robot such that the battery of the Robot is greater than 0'
+    'there exists a Robot such that its battery is greater than 0'
     """
 
     construct = Exists
@@ -409,11 +412,13 @@ class ExistsRule(PhraseRule):
         """Say *"there exists <variable> such that <condition>"*.
 
         It owns the *there exists a Robot such that* framing around the condition; the condition
-        clause itself comes from the recursion.
+        clause itself comes from the recursion. The quantifier opens a discourse scope on the
+        (singular) variable, so the condition pronominalises to *its battery* rather than repeating
+        *the battery of the Robot*.
 
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(exists(robot, robot.battery > 0))
-        'there exists a Robot such that the battery of the Robot is greater than 0'
+        'there exists a Robot such that its battery is greater than 0'
         """
         variable_fragment = context.child(node.variable)
         condition_fragment = context.child(node.condition)

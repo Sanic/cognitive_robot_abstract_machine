@@ -7,16 +7,20 @@ import uuid
 from krrood.entity_query_language.verbalization.fragments.base import (
     map_structural_children,
     NounPhrase,
+    PhraseFragment,
     PossessiveChain,
     Fragment,
+    RoleFragment,
 )
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     Number,
 )
+from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.microplanning.possessive import (
     attribute_fragment,
+    chain_head_number,
     possessive_path,
     pronominal_path,
 )
@@ -160,9 +164,80 @@ class CoreferenceProcessor(RealizationPass):
                 return self._noun_phrase(fragment)
             case PossessiveChain():
                 return self._possessive_chain(fragment)
+            case PhraseFragment(parts=[PossessiveChain(), *_]):
+                return self._predicate_clause(fragment)
             case _:
                 rebuilt = map_structural_children(fragment, self._walk)
                 return rebuilt if rebuilt is not None else fragment
+
+    def _predicate_clause(self, clause: PhraseFragment) -> Fragment:
+        """A clause led by its subject chain (*"<subject> <copula> <value>"* — a comparator
+        predicate or a *"… is between …"* range) whose finite copula agrees with that subject.
+
+        The build tags the copula singular; coreference is what may realise the subject as a plural
+        population (*"their batteries"*), distributing a scalar attribute over the quantified
+        variable. Since that population reading is decided here — with the pronominalisation — the
+        copula's agreement is decided here too, in one place, rather than pre-baked into the
+        quantifier rule (which cannot know whether the body's grammatical subject is the variable).
+        A singular subject leaves the copula untouched, so every plain predicate is unaffected.
+
+        Both surfaces agree off the same plural subject (*"are"* / *"are between"*):
+
+        >>> robot = variable(Robot, [])
+        >>> verbalize_expression(for_all(robot, robot.battery > 0))
+        'for all Robots, their batteries are greater than 0'
+        >>> robot = variable(Robot, [])
+        >>> verbalize_expression(for_all(robot, and_(robot.battery > 10, robot.battery < 90)))
+        'for all Robots, their batteries are between 10 and 90'
+        """
+        subject_number = self._clause_subject_number(clause.parts[0])
+        rebuilt = map_structural_children(clause, self._walk)
+        if subject_number is Number.PLURAL:
+            return self._with_agreed_copula(rebuilt, subject_number)
+        return rebuilt
+
+    def _clause_subject_number(self, subject: Fragment) -> Number:
+        """:return: The grammatical number the clause's subject is realised with — plural only when
+        a pronominalised chain distributes a scalar leaf over a plural population (*"their
+        batteries"*); singular for every other subject (a deeper chain, a non-pronominalised one, or
+        a plain noun phrase the build already agreed)."""
+        if not isinstance(subject, PossessiveChain) or not self._pronominalises(subject):
+            return Number.SINGULAR
+        return chain_head_number(subject.parts, self._subject_stack[-1].number)
+
+    @staticmethod
+    def _with_agreed_copula(clause: PhraseFragment, number: Number) -> Fragment:
+        """:return: *clause* with its finite copula tagged *number* (*"is"* → *"are"* once the
+        morphology pass realises it). Only the operator slot's leading copula inflects — the subject
+        and value (and any copula nested in a relative clause on either) are left untouched."""
+        return replace(
+            clause,
+            parts=[
+                CoreferenceProcessor._agree_operator(part, number)
+                for part in clause.parts
+            ],
+        )
+
+    @staticmethod
+    def _agree_operator(part: Fragment, number: Number) -> Fragment:
+        """:return: *part* re-tagged with *number* when it is the clause's operator slot — an
+        ``OPERATOR`` leaf, or a phrase led by one (the factored *"is greater than"*) — else *part*
+        unchanged. A non-copula operator (*"contains"*) is tagged too but the morphology pass leaves
+        it be, so this never has to single the copula out by word."""
+        if isinstance(part, RoleFragment) and part.role is SemanticRole.OPERATOR:
+            return replace(part, number=number)
+        leads_with_operator = (
+            isinstance(part, PhraseFragment)
+            and part.parts
+            and isinstance(part.parts[0], RoleFragment)
+            and part.parts[0].role is SemanticRole.OPERATOR
+        )
+        if leads_with_operator:
+            return replace(
+                part,
+                parts=[replace(part.parts[0], number=number), *part.parts[1:]],
+            )
+        return part
 
     def _possessive_chain(self, possessive_chain: PossessiveChain) -> Fragment:
         """:return: The chain as *"its/their …"* when its root is the current subject (the

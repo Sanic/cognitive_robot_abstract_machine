@@ -17,6 +17,7 @@ from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.base import (
     flatten_fragment_to_plain_text,
     Fragment,
+    map_fragment,
     NounPhrase,
     PhraseFragment,
     PossessiveChain,
@@ -234,3 +235,73 @@ def test_chain_rooted_at_plural_subject_pronominalises_with_their():
     # _realise runs coreference + determiner only; the head inflects to "Robots" later in the
     # morphology pass (the full pipeline is pinned by test_deeply_nested_subqueries_golden).
     assert _realise(scoped, discourse) == "Robot their battery"
+
+
+# ── subject–verb agreement after pronominalisation ───────────────────────────────
+
+
+def _scalar_part(name):
+    """A scalar-valued hop — a leaf that distributes over a plural subject (*"their batteries"*)."""
+    return PathStep(name, None, is_scalar_value=True)
+
+
+def _operator_numbers(fragment: Fragment) -> list:
+    """:return: The grammatical number of every OPERATOR leaf in *fragment*, in document order —
+    so a test can read off the copula's realised agreement without the morphology pass."""
+    numbers = []
+
+    def collect(leaf: Fragment) -> Fragment:
+        if isinstance(leaf, RoleFragment) and leaf.role is SemanticRole.OPERATOR:
+            numbers.append(leaf.number)
+        return leaf
+
+    map_fragment(fragment, collect)
+    return numbers
+
+
+def _quantified_clause(chain_parts, *, subject_number: Number):
+    """A *"<subject>, <chain> is high"* shape — a population intro (the scope focus) followed by a
+    subject-led predicate whose singular-built copula must agree with the realised subject."""
+    rid = uuid.uuid4()
+    intro = NounPhrase(head=_noun("Robot"), number=subject_number, referent_id=rid)
+    chain = PossessiveChain(
+        parts=chain_parts,
+        root_fragment=NounPhrase(head=_noun("Robot"), referent_id=rid),
+        root_referent_id=rid,
+    )
+    copula = RoleFragment(text="is", role=SemanticRole.OPERATOR)
+    clause = PhraseFragment(parts=[chain, copula, WordFragment(text="high")])
+    return _scope(PhraseFragment(parts=[intro, clause]), focus_id=rid)
+
+
+def test_copula_agrees_plural_when_a_scalar_leaf_distributes():
+    """A single scalar hop distributes over the plural population (*"their batteries"*), so the
+    clause's singular-built copula is re-tagged plural — the morphology pass then realises *"are"*.
+    The agreement is decided here, where the population reading is, not pre-baked into the rule."""
+    scoped, discourse = _quantified_clause(
+        [_scalar_part("battery")], subject_number=Number.PLURAL
+    )
+    resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
+    assert _operator_numbers(resolved) == [Number.PLURAL]
+
+
+def test_copula_stays_singular_for_a_deeper_head_chain():
+    """A two-hop chain heads on an inner genitive that does not distribute (*"the amount of their
+    amount_details"*), so the copula stays singular even under a plural subject — the rule keys off
+    the realised head, not the bare presence of a plural scope."""
+    scoped, discourse = _quantified_clause(
+        [_attr_part("amount_details"), _scalar_part("amount")],
+        subject_number=Number.PLURAL,
+    )
+    resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
+    assert _operator_numbers(resolved) == [Number.SINGULAR]
+
+
+def test_copula_untouched_for_a_singular_subject():
+    """A singular-subject scope leaves the copula singular: every plain predicate is unaffected, so
+    this never disturbs the existing singular cases."""
+    scoped, discourse = _quantified_clause(
+        [_scalar_part("battery")], subject_number=Number.SINGULAR
+    )
+    resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
+    assert _operator_numbers(resolved) == [Number.SINGULAR]
