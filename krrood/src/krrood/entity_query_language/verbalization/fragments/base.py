@@ -95,6 +95,9 @@ class RoleFragment(HasText, HasNumber, Fragment):
         :param expression: Expression whose ``_type_`` attribute supplies the source reference.
         :param number: Grammatical-number feature.
         :return: A fragment with the ``VARIABLE`` role.
+
+        >>> RoleFragment.for_variable("Robot", variable(Robot, [])).text
+        'Robot'
         """
         return cls(
             text=label,
@@ -127,6 +130,9 @@ class RoleFragment(HasText, HasNumber, Fragment):
         :param text: Surface word override — a display name or a relational verb phrase
             (*"assigned to"*); defaults to *attribute_name*.
         :return: A fragment with the ``ATTRIBUTE`` role.
+
+        >>> RoleFragment.for_attribute(Robot, "battery").text
+        'battery'
         """
         return cls(
             text=text if text is not None else attribute_name,
@@ -155,6 +161,9 @@ class RoleFragment(HasText, HasNumber, Fragment):
         :param number: Grammatical-number feature.
         :param text: Surface word override; defaults to the class ``__name__``.
         :return: A fragment with the ``VARIABLE`` role.
+
+        >>> RoleFragment.for_type(Robot).text
+        'Robot'
         """
         is_class = isinstance(type_, type)
         return cls(
@@ -176,6 +185,9 @@ class RoleFragment(HasText, HasNumber, Fragment):
 
         :param value: The Python value to render.
         :return: A fragment with the ``LITERAL`` role.
+
+        >>> RoleFragment.for_literal(42).text
+        '42'
         """
         return cls(text=value_phrase(value), role=SemanticRole.LITERAL)
 
@@ -186,6 +198,9 @@ class RoleFragment(HasText, HasNumber, Fragment):
 
         :param label: Display text (e.g. ``"is"``, ``"not"``, ``"greater than"``).
         :return: A fragment with the ``OPERATOR`` role.
+
+        >>> RoleFragment.for_operator("greater than").text
+        'greater than'
         """
         return cls(text=label, role=SemanticRole.OPERATOR)
 
@@ -324,6 +339,12 @@ def fold_fragment(
     :param phrase: Handler for ``PhraseFragment`` ``(folded_parts, separator)``.
     :param block: Handler for a raw ``BlockFragment`` (controls its own recursion).
     :return: The folded value.
+
+    >>> phrase = PhraseFragment(parts=[RoleFragment.for_operator("is"), RoleFragment.for_literal(42)])
+    >>> fold_fragment(phrase, word=lambda text: [text], role=lambda text, role, ref: [text],
+    ...               phrase=lambda parts, separator: [w for part in parts for w in part],
+    ...               block=lambda block: [])
+    ['is', '42']
     """
     match fragment:
         case WordFragment(text=text):
@@ -356,6 +377,9 @@ def map_structural_children(
     :param fragment: Node to rebuild.
     :param recurse: Transform applied to each child.
     :return: The rebuilt container, or ``None`` when *fragment* is not a structural container.
+
+    >>> map_structural_children(RoleFragment.for_operator("is"), lambda f: f) is None
+    True
     """
     match fragment:
         case PhraseFragment(parts=parts):
@@ -383,6 +407,11 @@ def map_fragment(fragment: Fragment, leaf: Callable[[Fragment], Fragment]) -> Fr
     :param fragment: Root of the tree to transform.
     :param leaf: Transform applied to each leaf fragment (identity for unaffected leaves).
     :return: The rebuilt tree.
+
+    >>> phrase = PhraseFragment(parts=[RoleFragment.for_operator("is"), RoleFragment.for_literal(42)])
+    >>> shouted = map_fragment(phrase, lambda leaf: RoleFragment.for_operator(leaf.text.upper()))
+    >>> flatten_fragment_to_plain_text(shouted)
+    'IS 42'
     """
     rebuilt = map_structural_children(fragment, lambda f: map_fragment(f, leaf))
     return rebuilt if rebuilt is not None else leaf(fragment)
@@ -397,6 +426,10 @@ def flatten_fragment_to_plain_text(fragment: Fragment) -> str:
 
     :param fragment: Root of the fragment tree to flatten.
     :return: Plain-text representation with spaces between tokens.
+
+    >>> flatten_fragment_to_plain_text(
+    ...     PhraseFragment(parts=[RoleFragment.for_operator("is"), RoleFragment.for_literal(42)]))
+    'is 42'
     """
 
     def _block(b: BlockFragment) -> str:
@@ -434,6 +467,12 @@ def oxford_comma(
         ``False`` — *"a and b"*, standard English (the serial comma is defined only for a series of
         three or more, so a pair takes none); pass ``True`` only to join two independent clauses.
     :return: A single fragment representing the joined sequence.
+
+    >>> words = [RoleFragment.for_operator(w) for w in ("a", "b", "c")]
+    >>> flatten_fragment_to_plain_text(oxford_comma(words, RoleFragment.for_operator("and")))
+    'a, b, and c'
+    >>> flatten_fragment_to_plain_text(oxford_comma(words[:2], RoleFragment.for_operator("and")))
+    'a and b'
     """
     if not parts:
         return WordFragment(text="")

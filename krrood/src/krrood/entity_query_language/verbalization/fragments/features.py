@@ -31,6 +31,11 @@ class Number(StrEnum):
         """
         :param is_plural: Whether the number is plural.
         :return: ``PLURAL`` when *is_plural* else ``SINGULAR``.
+
+        >>> Number.of(True)
+        <Number.PLURAL: 'plural'>
+        >>> Number.of(False)
+        <Number.SINGULAR: 'singular'>
         """
         return cls.PLURAL if is_plural else cls.SINGULAR
 

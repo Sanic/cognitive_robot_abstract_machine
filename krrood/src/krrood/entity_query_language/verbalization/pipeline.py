@@ -245,5 +245,11 @@ def verbalize_expression(expression: SymbolicExpression) -> str:
 
     :param expression: Any EQL expression or query.
     :return: Plain-text natural-language string.
+
+    >>> verbalize_expression(a(entity(variable(Robot, []))))
+    'Find a Robot'
+    >>> robot = variable(Robot, [])
+    >>> verbalize_expression(a(entity(robot).where(robot.battery > 50)))
+    'Find a Robot whose battery is greater than 50'
     """
     return _PLAIN_PIPELINE.verbalize(expression)

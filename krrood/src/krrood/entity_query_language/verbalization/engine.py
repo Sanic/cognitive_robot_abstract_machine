@@ -69,6 +69,13 @@ def fold(
     :param options: The render flags to build *node* under (defaults to all reset).
     :return: The fragment for *node*.
     :raises UnverbalizableExpressionError: when no grammar rule covers *node*.
+
+    The catamorphism is observable through :func:`~krrood.entity_query_language.verbalization.pipeline.verbalize_expression`,
+    which runs this fold and then lowers the produced tree — a two-hop chain dispatches the
+    attribute rule, which recurses on its variable child:
+
+    >>> verbalize_expression(variable(Robot, []).battery)
+    'the battery of a Robot'
     """
     rules = RULES if rules is None else rules
 
@@ -102,5 +109,13 @@ def _with_source(fragment: Fragment, node: SymbolicExpression) -> Fragment:
     :param node: The EQL node dispatched.
     :return: *fragment* with ``source`` set when it was not already (a fresh copy; never mutates a
         possibly-shared instance).
+
+    >>> from krrood.entity_query_language.verbalization.fragments.base import RoleFragment
+    >>> robot = variable(Robot, [])
+    >>> _with_source(RoleFragment.for_variable("Robot", robot), robot).source is robot
+    True
+    >>> stamped = _with_source(RoleFragment.for_variable("Robot", robot), robot)
+    >>> _with_source(stamped, variable(Robot, [])).source is robot
+    True
     """
     return fragment if fragment.source is not None else replace(fragment, source=node)
