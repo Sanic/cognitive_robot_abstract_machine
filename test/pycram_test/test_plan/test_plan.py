@@ -717,3 +717,27 @@ def test_expand_move_torso(immutable_model_world):
     node = plan.plan.get_nodes_by_designator_type(MoveTorsoAction)[0]
 
     assert len(node.children) == 3
+
+
+def test_context_back_reference(immutable_model_world):
+    world, view, context = immutable_model_world
+
+    plan = sequential(
+        [
+            MoveTorsoAction(TorsoState.HIGH),
+            PickUpAction(
+                world.get_body_by_name("milk.stl"),
+                Arms.RIGHT,
+                GraspDescription(
+                    ApproachDirection.FRONT,
+                    VerticalAlignment.NoAlignment,
+                    view.right_arm.end_effector,
+                ),
+            ),
+        ],
+        context=context,
+    )
+
+    plan.notify()
+
+    assert plan.plan.context == context
