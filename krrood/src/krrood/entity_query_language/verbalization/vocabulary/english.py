@@ -833,15 +833,19 @@ def copula_with(
     :param negated: Use the negative copula (*"is not"* / *"are not"*).
     :return: The copula leaf alone when *core* is empty, else a phrase of copula then core.
 
-    Its contribution is making the operator *agreeable*: the *is* leaf carries *number*, so the same
-    call with a plural number realises *are greater than*. The flatten here shows only the singular
-    composition.
+    Its contribution is making the operator *agree*: the *is* leaf carries *number*, so once the
+    morphology pass runs, a plural number realises *are greater than* where a singular one stays
+    *is greater than*.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-    >>> flatten_fragment_to_plain_text(copula_with("greater than"))
+    >>> from krrood.entity_query_language.verbalization.rendering.morphology_processor import MorphologyProcessor
+    >>> realise = lambda fragment: flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
+    >>> realise(copula_with("greater than", Number.SINGULAR))
     'is greater than'
-    >>> flatten_fragment_to_plain_text(copula_with(""))
-    'is'
+    >>> realise(copula_with("greater than", Number.PLURAL))
+    'are greater than'
+    >>> realise(copula_with("", Number.PLURAL))
+    'are'
     """
     copula = RoleFragment(
         text=(Copulas.IS_NOT if negated else Copulas.IS).text,
@@ -865,14 +869,17 @@ def predicative_operator(text: str, number: Number = Number.SINGULAR) -> Fragmen
     :param number: The grammatical number the copula agrees with.
     :return: The factored operator fragment.
 
-    The work it does is the split, which this singular flatten does not reveal: it separates the
-    leading *is* (which agrees) from the invariant *greater than*, so a plural owner would inflect to
-    *are greater than*; *contains* has no leading copula and is returned un-agreed.
+    Its contribution is the split that enables agreement: it separates the leading *is* (which
+    agrees) from the invariant *greater than*, so once the morphology pass runs a plural owner reads
+    *are greater than*. A verb operator with no leading copula (*contains*) carries none and stays
+    un-agreed.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-    >>> flatten_fragment_to_plain_text(predicative_operator("is greater than"))
-    'is greater than'
-    >>> flatten_fragment_to_plain_text(predicative_operator("contains"))
+    >>> from krrood.entity_query_language.verbalization.rendering.morphology_processor import MorphologyProcessor
+    >>> realise = lambda fragment: flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
+    >>> realise(predicative_operator("is greater than", Number.PLURAL))
+    'are greater than'
+    >>> realise(predicative_operator("contains", Number.PLURAL))
     'contains'
     """
     tokens = text.split()

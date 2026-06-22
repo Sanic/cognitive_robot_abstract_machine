@@ -62,8 +62,7 @@ class CoreferenceProcessor(RealizationPass):
     Reference: Reiter & Dale (2000) — referring-expression generation as a microplanning subtask;
     Gatt & Reiter (2009), SimpleNLG — ordered realisation stages.
 
-    Both chains rooted at the Employee subject are downgraded to the pronoun *its* (a first mention
-    would read *the salary of the Employee*):
+    Both chains rooted at the Employee subject are downgraded to the pronoun *its*:
 
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(an(entity(employee).where(employee.salary > employee.starting_salary)))
@@ -127,9 +126,9 @@ class CoreferenceProcessor(RealizationPass):
         A fragment built from a query node opens a discourse scope whose focus the
         :class:`DiscourseView` supplies (``None`` suppresses pronominalisation, e.g. a set-of).
 
-        Here it is :meth:`_walk` that opens the Mission's scope, so the relational *the Robot to
-        which* **it** *is assigned* can bind its pronoun to the in-scope subject (with no scope open
-        the root would re-name *a Mission*):
+        Here it is :meth:`_walk` that opens the Mission's scope, so the *it* in *the Robot to which
+        it is assigned* resolves to the in-scope Mission subject (with no scope open, that *it* would
+        instead re-name the whole *a Mission*):
 
         >>> mission = variable(Mission, [])
         >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
@@ -240,8 +239,9 @@ class CoreferenceProcessor(RealizationPass):
         entity it introduces and the attributes hanging off it — or ``None`` when the chain has no
         relational hop (or it carries no referent id).
 
-        It is what singles out the *assigned_to* hop whose related Robot the rest of the pass refers
-        back to as *it* / centres on:
+        It singles out the *assigned_to* hop and the Robot it introduces — the related entity the
+        pass goes on to centre on (so a later attribute of that Robot can read *its …*). The *it* in
+        *to which it is assigned* is the Mission subject, pied-piped into the relative clause:
 
         >>> mission = variable(Mission, [])
         >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))

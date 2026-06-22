@@ -239,9 +239,10 @@ class HierarchicalRenderer(FragmentRenderer):
         for a block that sits at the item level, not one embedded in a phrase (e.g. a *"whose …"*
         modifier inside an inline noun phrase).
 
-        It is the hierarchical renderer's *flatten-to-prose* escape hatch: on this whole tree it
-        produces the same line :meth:`ParagraphRenderer.render` would; the difference shows when it is
-        called on a block embedded *inside* a phrase, which it inlines rather than expanding to bullets.
+        It is the hierarchical renderer's *flatten-to-prose* helper: it collapses a (possibly
+        multi-block) fragment to a single inline line — here the whole tree to *Find a Robot whose
+        battery is between 50 and 90* — the form a *whose …* modifier takes when it sits inside a noun
+        phrase rather than at the bullet level.
 
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> robot = variable(Robot, [])
