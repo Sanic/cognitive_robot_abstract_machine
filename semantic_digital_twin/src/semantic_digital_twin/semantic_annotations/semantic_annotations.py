@@ -4,20 +4,6 @@ from abc import ABC
 from dataclasses import dataclass, field
 from typing import Iterable, Optional, Self, Tuple, TYPE_CHECKING
 
-from typing_extensions import List, Type, TypeVar
-
-from krrood.ormatic.utils import classproperty
-from krrood.symbolic_math import symbolic_math
-from random_events.interval import closed
-from random_events.product_algebra import SimpleEvent
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.exceptions import (
-    InvalidPlaneDimensions,
-    InvalidHingeActiveAxis,
-    MissingSemanticAnnotationError,
-)
-from semantic_digital_twin.reasoning.predicates import InsideOf
 from typing_extensions import List, Type
 
 from krrood.ormatic.utils import classproperty
@@ -641,69 +627,10 @@ class Wall(HasApertures):
 
 
 @dataclass(eq=False)
-class Liquid(HasRootBody):
-    """
-    A physical substance that has a definite volume but no fixed shape.
-    .. warning:: I do not believe that Liquids have a root body, but I am not sure how to represent them without a root
-     body. This is something that should be investigated further and potentially refactored in the future.
-    """
-
-    ...
-
-
-@dataclass(eq=False)
-class Wine(Liquid):
-    """
-    An alcoholic beverage made from fermented grapes or other fruits.
-    """
-
-    ...
-
-
-@dataclass(eq=False)
-class Mustard(Liquid):
-    """
-    A condiment made from ground mustard seeds, vinegar, and other ingredients.
-    """
-
-    ...
-
-
-@dataclass(eq=False)
-class Soap(SemanticAnnotation, ABC):
-    """
-    A soap is a substance used for cleaning that typically comes in the form of a solid bar or a liquid.
-     It is designed to remove dirt, oils, and impurities from surfaces, including skin, by breaking down and emulsifying
-      them for easy rinsing with water.
-    """
-
-    ...
-
-
-@dataclass(eq=False)
-class LiquidSoap(Liquid, Soap):
-    """
-    A liquid soap is a soap in liquid form.
-    """
-
-    ...
-
-
-TLiquid = TypeVar("TLiquid", bound=Liquid)
-"""
-A type variable for Liquid types.
-"""
-
-
-@dataclass(eq=False)
-class Bottle(HasCaseAsRootBody, IsStorageSpace[TLiquid]):
+class Bottle(HasRootBody):
     """
     Abstract class for bottles.
     """
-
-    @classproperty
-    def hole_direction(self) -> Vector3:
-        return Vector3.Z()
 
 
 @dataclass(eq=False)
@@ -711,28 +638,28 @@ class Statue(HasRootBody): ...
 
 
 @dataclass(eq=False)
-class SoapBottle(Bottle[LiquidSoap]):
+class SoapBottle(Bottle):
     """
-    A soap bottle is a bottle that contains liquid soap.
-    """
-
-
-@dataclass(eq=False)
-class WineBottle(Bottle[Wine]):
-    """
-    A wine bottle is a bottle that contains wine.
+    A soap bottle.
     """
 
 
 @dataclass(eq=False)
-class MustardBottle(Bottle[Mustard]):
+class WineBottle(Bottle):
     """
-    A mustard bottle is a bottle that contains mustard.
+    A wine bottle.
     """
 
 
 @dataclass(eq=False)
-class DrinkingContainer(IsStorageSpace[TLiquid]): ...
+class MustardBottle(Bottle):
+    """
+    A mustard bottle.
+    """
+
+
+@dataclass(eq=False)
+class DrinkingContainer(HasRootBody): ...
 
 
 @dataclass(eq=False)
@@ -892,6 +819,13 @@ class Milk(Food, IsPerceivable):
 
 
 @dataclass(eq=False)
+class SaltContainer(HasRootBody, IsPerceivable):
+    """
+    A container of salt.
+    """
+
+
+@dataclass(eq=False)
 class Produce(Food):
     """
     In American English, produce generally refers to fresh fruits and vegetables intended to be eaten by humans.
@@ -957,33 +891,9 @@ class Orange(Fruit):
 
 
 @dataclass(eq=False)
-class SaltOrPepper(Food):
-    """
-    A super class for salt and pepper.
-    """
-
-
-@dataclass(eq=False)
-class Salt(SaltOrPepper):
+class Salt(Food):
     """
     A pack or container of salt (e.g., salt shaker or salt can).
-    """
-
-
-@dataclass(eq=False)
-class SaltContainer(
-    IsStorageSpace[Salt],
-    IsPerceivable,
-):
-    """
-    A container of salt.
-    """
-
-
-@dataclass(eq=False)
-class Pepper(SaltOrPepper):
-    """
-    A powder like plant-based substance that is used as a spice.
     """
 
 
@@ -1158,12 +1068,9 @@ class BookFront(HasRootBody): ...
 
 
 @dataclass(eq=False)
-class SaltPepperShaker(
-    IsStorageSpace[SaltOrPepper],
-):
+class SaltPepperShaker(HasRootBody):
     """
-    A salt and pepper shaker is a container that cotains salt and pepper and can be shaken to sprinkle the contents
-     onto food.
+    A salt and pepper shaker.
     """
 
 

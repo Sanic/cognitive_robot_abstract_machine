@@ -60,12 +60,21 @@ ResolvableType: TypeAlias = (
 @dataclass
 class AbstractSubClassSafeGeneric(ABC):
     """
-    Base implementation that automatically updates field types when a subclass binds the generic
-    type parameters of its generic base to concrete types.
+    Generic-agnostic engine that updates field types when a subclass binds the generic type
+    parameters of its generic base to concrete types. It resolves every parameter (multiple
+    ``TypeVar`` s and ``TypeVarTuple`` s) across the whole inheritance chain.
 
-    Concrete subclasses must declare the generic parameters via ``Generic[...]`` and inherit from
-    this class. Here it is important that in the inheritance order, ``Generic[...]`` is positioned before
-    ``AbstractSubClassSafeGeneric`` similar to how it is done in ``SubClassSafeGeneric``.
+    Inherit this directly when the class declares its **own** ``Generic[...]`` — including multiple
+    parameters (``Generic[T, T2]``) or a ``TypeVarTuple`` (``Generic[Unpack[Ts]]``). Put
+    ``Generic[...]`` before ``AbstractSubClassSafeGeneric`` in the bases.
+
+    ..note::
+        This class is intentionally **not** ``Generic`` and is kept separate from
+        :class:`SubClassSafeGeneric`, which *is* ``Generic[T]``. The two cannot be merged: a class
+        that supplies its own ``Generic[Unpack[Ts]]`` cannot also inherit a ``Generic[T]`` base
+        without raising ``TypeError: Cannot create a consistent MRO``. So
+        ``SubClassSafeGeneric[T]`` serves the common single-parameter case, while this class serves
+        every other generic shape.
     """
 
     def __init_subclass__(cls, **kwargs):
@@ -441,9 +450,11 @@ class SubClassSafeGeneric(Generic[T], AbstractSubClassSafeGeneric):
          >>> class MyClass2(SubClassSafeGeneric[int]): ...
          >>> assert next(f for f in fields(MyClass2) if f.name == "my_attribute").type == int)
 
-    The field-type updating is performed by :class:`AbstractSubClassSafeGeneric`, which
-    resolves every generic parameter (multiple ``TypeVar`` s and ``TypeVarTuple`` s) across
-    the whole inheritance chain, rather than only the first generic parameter.
+    This is the ``Generic[T]`` convenience for the common single-parameter case; the field-type
+    updating itself is performed by :class:`AbstractSubClassSafeGeneric`. For multiple parameters or
+    a ``TypeVarTuple``, inherit :class:`AbstractSubClassSafeGeneric` directly alongside your own
+    ``Generic[...]`` — the two classes cannot be merged because a class supplying its own
+    ``Generic[Unpack[Ts]]`` cannot also inherit this ``Generic[T]`` base (it would break the MRO).
     """
 
     @classmethod
