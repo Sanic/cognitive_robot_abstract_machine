@@ -24,6 +24,8 @@ from ..dataset.example_classes import (
     KRROODOrientation,
     SceneObjectType,
     TestExParts,
+    SceneRoomAggregations,
+    TestExPartsAggregations,
 )
 
 
@@ -216,3 +218,140 @@ def test_feature_extraction_over_empty_exchangeable_part_does_not_raise():
     extractor = FeatureExtractor.from_instances([to_dao(room)])
     assert extractor is not None
     assert all(not isinstance(feature, Call) for feature in extractor.features)
+
+
+# --- SceneObjectAggregationBase shared-base-class tests ---
+
+
+def test_scene_room_aggregations_exposes_correct_feature_names_for_objects_field():
+    """
+    SceneRoomAggregations must inherit all three statistics from
+    SceneObjectAggregationBase for the 'objects' field.
+    """
+    room = SceneRoom(
+        position=KRROODPosition(0, 0, 0),
+        orientation=KRROODOrientation(0, 0, 0, 1),
+        objects=[],
+    )
+    instance = SceneRoomAggregations(instance=room, field_name="objects")
+    feature_names = {feature.__name__ for feature in instance.aggregation_features}
+    assert feature_names == {"chair_count", "table_count", "total_count"}
+
+
+def test_test_ex_parts_aggregations_exposes_correct_feature_names_for_objects_field():
+    """
+    TestExPartsAggregations must inherit all three statistics from
+    SceneObjectAggregationBase for the 'objects' field.
+    """
+    test_ex_parts = TestExParts(objects=[], rooms=[])
+    instance = TestExPartsAggregations(instance=test_ex_parts, field_name="objects")
+    feature_names = {feature.__name__ for feature in instance.aggregation_features}
+    assert feature_names == {"chair_count", "table_count", "total_count"}
+
+
+def test_base_class_statistics_are_not_duplicated_in_scene_room_aggregations():
+    """
+    Each statistic from SceneObjectAggregationBase should appear exactly once
+    in SceneRoomAggregations.aggregation_features — no duplicates via
+    multiple inheritance paths.
+    """
+    room = SceneRoom(
+        position=KRROODPosition(0, 0, 0),
+        orientation=KRROODOrientation(0, 0, 0, 1),
+        objects=[],
+    )
+    instance = SceneRoomAggregations(instance=room, field_name="objects")
+    feature_names = [feature.__name__ for feature in instance.aggregation_features]
+    assert len(feature_names) == len(set(feature_names))
+
+
+def test_base_class_statistics_are_not_duplicated_in_test_ex_parts_aggregations():
+    """
+    Each statistic from SceneObjectAggregationBase should appear exactly once
+    in TestExPartsAggregations.aggregation_features — no duplicates via
+    multiple inheritance paths.
+    """
+    test_ex_parts = TestExParts(objects=[], rooms=[])
+    instance = TestExPartsAggregations(instance=test_ex_parts, field_name="objects")
+    feature_names = [feature.__name__ for feature in instance.aggregation_features]
+    assert len(feature_names) == len(set(feature_names))
+
+
+def test_scene_room_aggregations_has_no_features_for_rooms_field():
+    """
+    SceneRoomAggregations owns no 'rooms' statistics — that field
+    belongs only to TestExPartsAggregations.
+    """
+    room = SceneRoom(
+        position=KRROODPosition(0, 0, 0),
+        orientation=KRROODOrientation(0, 0, 0, 1),
+        objects=[],
+    )
+    instance = SceneRoomAggregations(instance=room, field_name="rooms")
+    assert instance.aggregation_features == []
+
+
+def test_test_ex_parts_aggregations_exposes_room_count_for_rooms_field():
+    """
+    TestExPartsAggregations must expose exactly the 'room_count' statistic
+    for the 'rooms' field.
+    """
+    test_ex_parts = TestExParts(objects=[], rooms=[])
+    instance = TestExPartsAggregations(instance=test_ex_parts, field_name="rooms")
+    feature_names = {feature.__name__ for feature in instance.aggregation_features}
+    assert feature_names == {"room_count"}
+
+
+def test_get_aggregation_class_returns_scene_room_aggregations_for_scene_room():
+    """
+    The registry must resolve SceneRoom to SceneRoomAggregations specifically,
+    not just any AggregationStatistic subclass.
+    """
+    assert get_aggregation_class(SceneRoom) is SceneRoomAggregations
+
+
+def test_get_aggregation_class_returns_test_ex_parts_aggregations_for_test_ex_parts():
+    """
+    The registry must resolve TestExParts to TestExPartsAggregations specifically.
+    """
+    assert get_aggregation_class(TestExParts) is TestExPartsAggregations
+
+
+def test_base_class_objects_aggregation_produces_same_values_for_test_ex_parts_as_for_scene_room(
+    example_scenario,
+):
+    """
+    The inherited chair_count, table_count, and total_count methods must
+    produce identical results regardless of which concrete subclass executes
+    them, given the same 'objects' list.
+    """
+    room = example_scenario
+    test_ex_parts = TestExParts(objects=room.objects, rooms=[])
+
+    room_aggregation = SceneRoomAggregations(instance=room, field_name="objects")
+    test_ex_parts_aggregation = TestExPartsAggregations(
+        instance=test_ex_parts, field_name="objects"
+    )
+
+    assert room_aggregation.apply_mapping() == test_ex_parts_aggregation.apply_mapping()
+
+
+def test_room_count_computes_correct_number_of_rooms():
+    """
+    The room_count statistic defined on TestExPartsAggregations must return
+    the exact number of SceneRoom instances in the 'rooms' field.
+    """
+    room1 = SceneRoom(
+        position=KRROODPosition(0, 0, 0),
+        orientation=KRROODOrientation(0, 0, 0, 1),
+        objects=[],
+    )
+    room2 = SceneRoom(
+        position=KRROODPosition(1, 1, 1),
+        orientation=KRROODOrientation(0, 0, 0, 1),
+        objects=[],
+    )
+    test_ex_parts = TestExParts(objects=[], rooms=[room1, room2])
+    instance = TestExPartsAggregations(instance=test_ex_parts, field_name="rooms")
+    [room_count] = instance.apply_mapping()
+    assert room_count == 2
