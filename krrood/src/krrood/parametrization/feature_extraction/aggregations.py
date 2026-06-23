@@ -1,33 +1,28 @@
 from __future__ import annotations
 
 import inspect
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
-from typing_extensions import Callable, Optional, Type, TypeVar, Any
+from typing_extensions import Callable, Optional, Type, Any, ClassVar
 
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
+from krrood.parametrization.feature_extraction.exceptions import MissingFieldNameError
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.variable import Variable
 from krrood.entity_query_language.factories import variable
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import T, recursive_subclasses
 
 
-def aggregation_statistic(field_ref: list[Any]) -> Callable[[Callable], Callable]:
+def aggregation_statistic(field_name: str) -> Callable[[Callable], Callable]:
     """
     Marks a method as an aggregation statistic for the named exchangeable-part field.
 
-    The field reference must be created via
-    :func:`~krrood.entity_query_language.factories.variable`:
-    ``variable(OwnerType, None).field_name``.  Its ``_attribute_name_`` property
-    identifies which exchangeable-part field this statistic aggregates over.
-
-    :param field_ref: A typed :class:`~krrood.entity_query_language.core.mapped_variable.Attribute`
-        produced by attribute access on a symbolic variable.
+    :param field_name: The name of the exchangeable-part field this statistic aggregates over.
     """
 
     def decorator(func: Callable) -> Callable:
-        func._field_reference = field_ref
-        func.is_aggregation_statistic = True
+        AggregationStatistic._aggregation_registry[field_name].append(func)
         return func
 
     return decorator
@@ -36,18 +31,21 @@ def aggregation_statistic(field_ref: list[Any]) -> Callable[[Callable], Callable
 @lru_cache(maxsize=None)
 def get_aggregation_class(owner: Type) -> Optional[Type[AggregationStatistic]]:
     """
-    Returns the :class:`AggregationStatistic` subclass whose generic ``T`` matches ``owner``.
+    Returns the most specific :class:`AggregationStatistic` subclass for ``owner``.
 
-    Modelled on :func:`~krrood.ormatic.data_access_objects.helper.get_dao_class`: discovery
-    is implicit — any concrete subclass of :class:`AggregationStatistic` that binds ``T``
-    to a domain class is automatically found here without explicit registration.
+    Walks the MRO of ``owner`` from most specific to least specific, returning the
+    first subclass of :class:`AggregationStatistic` whose generic ``T`` matches that
+    ancestor.  This means that if ``B`` extends ``A`` and only ``AggregationStatistic[A]``
+    exists, a lookup for ``B`` will return it.
 
     :param owner: The domain class to look up.
-    :return: The matching subclass, or ``None`` if none has been defined.
+    :return: The most specific matching subclass, or ``None`` if none has been defined.
     """
-    for subclass in recursive_subclasses(AggregationStatistic):
-        if subclass.get_generic_type() == owner:
-            return subclass
+    subclasses = list(recursive_subclasses(AggregationStatistic))
+    for ancestor in owner.__mro__:
+        for subclass in subclasses:
+            if subclass.get_generic_type() == ancestor:
+                return subclass
     return None
 
 
@@ -60,6 +58,9 @@ class AggregationStatistic(SubClassSafeGeneric[T]):
     annotated with :func:`aggregation_statistic`.  Discovery happens automatically via
     :func:`get_aggregation_class` — no explicit registration is required.
 
+    Set :attr:`field_name` to scope :attr:`aggregation_features` and related methods to
+    a single exchangeable-part field.
+
     .. note::
         Each owner class may have at most one ``AggregationStatistic`` subclass, which must
         handle all of its exchangeable-part fields.  Shared logic across owner types should
@@ -69,52 +70,51 @@ class AggregationStatistic(SubClassSafeGeneric[T]):
 
     instance: T
     """
-    The owner domain object whose exchangeable-part fields are aggregated.
+    The domain object whose statistics are computed.
     """
+
+    field_name: Optional[str] = None
+    """
+    The exchangeable-part field this instance is scoped to.
+    Must be set before accessing :attr:`aggregation_features`.
+    """
+
+    _aggregation_registry: ClassVar[dict[str, list[Callable]]] = defaultdict(list)
 
     @property
     def aggregation_features(self) -> list[Callable]:
         """
-        All methods on this class marked with :func:`aggregation_statistic`.
+        All methods on this class marked with :func:`aggregation_statistic` for :attr:`field_name`.
 
-        :return: The marked callable methods, sorted alphabetically by name.
+        :return: The marked callable methods for the scoped field, sorted alphabetically by name.
+        :raises MissingFieldNameError: If :attr:`field_name` was not provided.
         """
+        if self.field_name is None:
+            raise MissingFieldNameError()
+        registered = {f.__name__ for f in self._aggregation_registry.get(self.field_name, [])}
         return [
             func
-            for _, func in inspect.getmembers(
-                self.__class__, predicate=inspect.isfunction
-            )
-            if hasattr(func, "is_aggregation_statistic")
+            for _, func in inspect.getmembers(self.__class__, predicate=inspect.isfunction)
+            if func.__name__ in registered
         ]
 
-    def symbolic_aggregation_features_for(
-        self, field_name: str
-    ) -> list[MappedVariable]:
+    def symbolic_aggregation_features(self) -> list[MappedVariable]:
         """
-        Symbolic variables for statistic methods that aggregate the named exchangeable-part field.
+        Symbolic variables for statistic methods that aggregate :attr:`field_name`.
 
-        :param field_name: The field name on the owner to filter by.
         :return: One :class:`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
             per matching statistic method, in alphabetical order.
         """
         aggregation_variable = variable(type(self), [])
-        return [
-            getattr(aggregation_variable, func.__name__)()
-            for func in self.aggregation_features
-            if func._field_reference._attribute_name_ == field_name
-        ]
+        return [getattr(aggregation_variable, func.__name__)() for func in self.aggregation_features]
 
-    def apply_mapping_for(self, field_name: str) -> list:
+    def apply_mapping(self) -> list:
         """
-        Evaluates every statistic for the named field against this instance.
+        Evaluates every statistic for :attr:`field_name` against this instance.
 
-        :param field_name: The exchangeable-part field name to evaluate.
         :return: One concrete value per matching statistic method, in alphabetical order.
         """
-        return [
-            feature.apply_mapping_on_external_root(self)
-            for feature in self.symbolic_aggregation_features_for(field_name)
-        ]
+        return [feature.apply_mapping_on_external_root(self) for feature in self.symbolic_aggregation_features()]
 
 
 def compute_aggregation_statistics(
@@ -133,11 +133,13 @@ def compute_aggregation_statistics(
     :param latent_variables: Latent variables that define which statistics are relevant.
     :return: A mapping from matched latent variables to their observed values.
     """
-    latent_variable_by_name = {latent_variable.name: latent_variable for latent_variable in latent_variables}
-    aggregation_cls = get_aggregation_class(type(domain_object))
-    if aggregation_cls is None:
+    latent_variable_by_name = {
+        latent_variable.name: latent_variable for latent_variable in latent_variables
+    }
+    aggregation_class = get_aggregation_class(type(domain_object))
+    if aggregation_class is None:
         return {}
-    aggregation_instance = aggregation_cls(instance=domain_object)
+    aggregation_instance = aggregation_class(instance=domain_object)
     statistics = {}
     for feature_function in feature_functions:
         feature_name = feature_function._name_

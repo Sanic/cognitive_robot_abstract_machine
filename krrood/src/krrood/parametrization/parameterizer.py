@@ -142,7 +142,6 @@ class UnderspecifiedParameters:
         krrood_variable = attribute_match.assigned_variable
         type_ = self._process_attribute_match_type(krrood_variable._type_)
 
-        # value incompatible
         if (
             issubclass(type_, compatible_types)
             and not isinstance(value, compatible_types)
@@ -152,40 +151,55 @@ class UnderspecifiedParameters:
                 f"The attribute type is {type_}, but the assigned value is of type {type(value)}."
                 f"Please enter a value of a valid type. Valid types are {type_} or Ellipsis"
             )
-        #  value compatible
-        elif isinstance(value, compatible_types):
+
+        if isinstance(value, EllipsisType) and not issubclass(type_, compatible_types):
+            raise InvalidEllipsis(type_)
+
+        if isinstance(value, EllipsisType):
+            return {name: variable_from_name_and_type(name=name, type_=type_)}
+
+        if isinstance(value, compatible_types):
             result = {name: variable_from_name_and_type(name=name, type_=type(value))}
             self.conditioning_assignments_from_literal_values[result[name]] = value
             return result
-        # value compatible but type is not leaf type, so Ellipsis was not allowed
-        elif isinstance(value, EllipsisType) and not issubclass(
-            type_, compatible_types
-        ):
-            raise InvalidEllipsis(type_)
-        # value compatible
-        elif isinstance(value, EllipsisType):
-            return {name: variable_from_name_and_type(name=name, type_=type_)}
 
         if isinstance(value, (list, tuple)):
             return self._extract_variables_from_iterable_literal(name, value)
 
         if isinstance(value, compatible_types) or isinstance(type_, compatible_types):
-            effective_type = (
-                type_
-                if (
-                    type_ is not None
-                    and isinstance(type_, type)
-                    and issubclass(type_, compatible_types)
-                )
-                else type(value)
-            )
-            result = {
-                name: variable_from_name_and_type(name=name, type_=effective_type)
-            }
-            self.conditioning_assignments_from_literal_values[result[name]] = value
-            return result
+            return self._handle_compatible_type_literal(name, value, type_)
 
         return self._extract_variables_from_non_primitive_literal(attribute_match)
+
+    def _handle_compatible_type_literal(
+        self,
+        name: str,
+        value: Any,
+        type_: type,
+    ) -> dict[str, random_events.variable.Variable]:
+        """
+        Handle a literal whose value or declared type is a primitive compatible type.
+
+        Picks ``type_`` when it is a concrete compatible type; falls back to
+        ``type(value)`` otherwise.
+
+        :param name: The variable name derived from the attribute access path.
+        :param value: The literal value being matched.
+        :param type_: The processed declared type of the attribute.
+        :return: A dictionary containing the extracted variable.
+        """
+        effective_type = (
+            type_
+            if (
+                type_ is not None
+                and isinstance(type_, type)
+                and issubclass(type_, compatible_types)
+            )
+            else type(value)
+        )
+        result = {name: variable_from_name_and_type(name=name, type_=effective_type)}
+        self.conditioning_assignments_from_literal_values[result[name]] = value
+        return result
 
     def _extract_variables_from_iterable_literal(
         self, name: str, value: Union[list, tuple]

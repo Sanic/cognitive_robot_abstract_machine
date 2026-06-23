@@ -25,8 +25,6 @@ from krrood.ormatic.data_access_objects.dao import (
     DataAccessObjectSchema,
     get_dao_schema,
 )
-from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
-from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.feature_extraction.aggregations import (
     compute_aggregation_statistics,
 )
@@ -42,6 +40,7 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     UndeterminedLatentsNotModeledError,
 )
 from probabilistic_model.probabilistic_circuit.relational.helper import (
+    class_qualified_name,
     find_lowest_product_nodes_that_model_variables,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -84,7 +83,7 @@ def _rename_variables_with_part_prefix(
     :param excluded_variables: Variables that should keep their current names.
     """
     variable_renames = {
-        variable: type(variable)(f"{prefix}.{variable.name}", domain=variable.domain)
+        variable: type(variable)(class_qualified_name(prefix, variable.name), domain=variable.domain)
         for variable in circuit.variables
         if variable not in excluded_variables
     }
@@ -244,22 +243,21 @@ class RelationalProbabilisticCircuit:
         aggregation_indices: list[int],
         aggregation_names: list[str],
         child_feature_extractor: FeatureExtractor,
-        child_class_prefix: str,
     ) -> pd.DataFrame:
         """
         Build a dataframe combining aggregation statistics with per-child-object attributes.
 
         Each row corresponds to one child object and contains the parent instance's
         aggregation values followed by all child features (including nested unique-part
-        attributes). Column names strip the child class prefix so that, after variable
-        renaming, they align with the krrood access-path convention.
+        attributes). Column names are the access-path names produced by
+        :meth:`~krrood.entity_query_language.core.mapped_variable.MappedVariable.get_clean_name_from_mapped_variable`
+        so that, after part-prefix renaming, they align with the krrood access-path convention.
 
         :param exchangeable_part: Field name of the one-to-many relation on each instance.
         :param instances: Training instances from which rows are generated.
         :param aggregation_indices: Positions of aggregation features in the feature vector.
         :param aggregation_names: Column names for the aggregation portion of each row.
         :param child_feature_extractor: Feature extractor built from the child instances.
-        :param child_class_prefix: Class name prefix to strip from child feature names
         :return: A dataframe with one row per child object across all instances.
         """
         rows = []
@@ -271,16 +269,11 @@ class RelationalProbabilisticCircuit:
                     association.target
                 )
                 rows.append(aggregation_row + child_features)
-        full_names = [f._name_ for f in child_feature_extractor.features]
-        short_names = [
-            (
-                name[len(child_class_prefix) :]
-                if name.startswith(child_class_prefix)
-                else name
-            )
-            for name in full_names
+        child_column_names = [
+            f.get_clean_name_from_mapped_variable()
+            for f in child_feature_extractor.features
         ]
-        return pd.DataFrame(columns=aggregation_names + short_names, data=rows)
+        return pd.DataFrame(columns=aggregation_names + child_column_names, data=rows)
 
     def _fit_exchangeable_part(
         self,
@@ -320,17 +313,12 @@ class RelationalProbabilisticCircuit:
         ]
         child_type = type(getattr(instances[0], exchangeable_part)[0].target)
         child_feature_extractor = FeatureExtractor.from_instances(child_instances)
-        child_class_name = type(
-            child_instances[0].from_dao(FromDataAccessObjectState())
-        ).__name__
-        child_class_prefix = f"{child_class_name}."
         child_dataframe = self._build_child_joint_dataframe(
             exchangeable_part,
             instances,
             aggregation_indices,
             aggregation_names,
             child_feature_extractor,
-            child_class_prefix,
         )
         latent_variables = [
             inferred.variable

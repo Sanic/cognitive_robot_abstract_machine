@@ -10,6 +10,21 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.variable import Variable
 
 
+def class_qualified_name(class_name: str, attribute_name: str) -> str:
+    """
+    Return the dot-qualified name ``"{class_name}.{attribute_name}"``.
+
+    Used throughout the relational circuit code to namespace variable and
+    feature names under their owner class, producing names of the form
+    ``"ClassName.field_name"``.
+
+    :param class_name: The owner class name, typically ``SomeClass.__name__``.
+    :param attribute_name: The attribute or variable name to qualify.
+    :return: The qualified name string.
+    """
+    return f"{class_name}.{attribute_name}"
+
+
 def find_lowest_product_nodes_that_model_variables(
     circuit: ProbabilisticCircuit, variables: SortedSet[Variable]
 ) -> list[ProductUnit]:

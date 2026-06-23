@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import itertools
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import pandas as pd
 import sqlalchemy
@@ -19,6 +19,10 @@ from krrood.ormatic.data_access_objects.dao import (
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column
 from krrood.parametrization.feature_extraction.aggregations import get_aggregation_class
+from krrood.parametrization.feature_extraction.exceptions import (
+    NoInstancesProvidedError,
+    UnsupportedFeatureTypeError,
+)
 from random_events.variable import compatible_types
 
 if TYPE_CHECKING:
@@ -49,35 +53,42 @@ class FeatureExtractor:
     unique-part sub-trees, and aggregation statistics over exchangeable parts.
 
     Prefer ``FeatureExtractor.from_instances`` for construction; the direct
-    constructor is for cases where the feature list is already known.
+    constructor receives an already-built :class:`ExtractedFeatures`.
     """
 
-    features: list[MappedVariable]
+    extracted_features: ExtractedFeatures
     """
-    Symbolic variables representing every extractable feature, in traversal order.
+    The discovered features produced by traversing the DAO object graph.
     """
 
-    exchangeable_features: dict[str, list[MappedVariable]] = field(
-        default_factory=lambda: defaultdict(list), init=False
-    )
-    """
-    Mapping from each exchangeable-part field name to its discovered aggregation variables.
-    """
+    @property
+    def features(self) -> list[MappedVariable]:
+        """
+        Symbolic variables representing every extractable feature, in traversal order.
+        """
+        return self.extracted_features.features
+
+    @property
+    def exchangeable_features(self) -> dict[str, list[MappedVariable]]:
+        """
+        Mapping from each exchangeable-part field name to its aggregation variables.
+        """
+        return self.extracted_features.exchangeable_features
 
     @classmethod
     def from_instances(cls, instances: list[DataAccessObject]) -> FeatureExtractor:
         """
         Create a new feature extractor from the given instances.
 
-        Exchangeable parts whose domain class has no entry in
-        :class:`~krrood.parametrization.feature_extraction.aggregations.AggregationRegistry`
+        Exchangeable parts whose domain class has no :class:`~krrood.parametrization.feature_extraction.aggregations.AggregationStatistic`
         are silently skipped; the remaining scalar and unique-part features are still extracted.
 
         :param instances: The instances to create the feature extractor from.
         :return: A new feature extractor.
+        :raises NoInstancesProvidedError: If ``instances`` is empty.
         """
         if not instances:
-            raise ValueError("No instances provided")
+            raise NoInstancesProvidedError()
 
         dao_state = FromDataAccessObjectState()
         first_instance = instances[0]
@@ -85,9 +96,7 @@ class FeatureExtractor:
 
         root = variable(type(domain_object), [])
         extracted = cls._extract_features(first_instance, root)
-        extractor = cls(features=extracted.features)
-        extractor.exchangeable_features = extracted.exchangeable_features
-        return extractor
+        return cls(extracted_features=extracted)
 
     @staticmethod
     def _extract_features(
@@ -211,13 +220,13 @@ class FeatureExtractor:
         if aggregation_cls is None:
             return result
 
-        aggregation_instance = aggregation_cls(instance=domain_object)
         for relationship in relationships:
             if not getattr(domain_object, relationship.key):
                 continue
-            for feature in aggregation_instance.symbolic_aggregation_features_for(
-                relationship.key
-            ):
+            aggregation_instance = aggregation_cls(
+                instance=domain_object, field_name=relationship.key
+            )
+            for feature in aggregation_instance.symbolic_aggregation_features():
                 result[relationship.key].append(feature)
 
         return result
@@ -275,7 +284,7 @@ class FeatureExtractor:
             elif isinstance(feature._type_, enum.EnumType):
                 df[column] = df[column].apply(lambda x: hash(x))
             elif feature._type_ not in compatible_types and feature._type_ is not None:
-                raise TypeError(
-                    f"Unsupported type {feature._type_} for column {column}"
+                raise UnsupportedFeatureTypeError(
+                    feature_type=feature._type_, column_name=column
                 )
         return df

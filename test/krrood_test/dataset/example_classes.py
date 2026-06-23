@@ -774,7 +774,7 @@ class SceneObjectAggregationBase(AggregationStatistic[T]):
     Concrete subclasses bind ``T`` to the owner type and are auto-registered.
     """
 
-    @aggregation_statistic(variable(SceneRoom, None).objects)
+    @aggregation_statistic("objects")
     def chair_count(self) -> int:
         """Count of CHAIR-type objects."""
         type_var = variable(SceneObject, self.instance.objects).type
@@ -785,7 +785,7 @@ class SceneObjectAggregationBase(AggregationStatistic[T]):
         )
         return cou
 
-    @aggregation_statistic(variable(SceneRoom, None).objects)
+    @aggregation_statistic("objects")
     def table_count(self) -> int:
         """Count of TABLE-type objects."""
         type_var = variable(SceneObject, self.instance.objects).type
@@ -796,7 +796,7 @@ class SceneObjectAggregationBase(AggregationStatistic[T]):
         )
         return cou
 
-    @aggregation_statistic(variable(SceneRoom, None).objects)
+    @aggregation_statistic("objects")
     def total_count(self) -> int:
         """Total number of objects."""
         [cou] = count(variable(SceneObject, self.instance.objects)).tolist()
@@ -815,7 +815,7 @@ class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
     ``rooms`` fields.
     """
 
-    @aggregation_statistic(variable(TestExParts, None).rooms)
+    @aggregation_statistic("rooms")
     def room_count(self) -> int:
         """Total number of rooms."""
         [cou] = count(variable(SceneRoom, self.instance.rooms)).tolist()
