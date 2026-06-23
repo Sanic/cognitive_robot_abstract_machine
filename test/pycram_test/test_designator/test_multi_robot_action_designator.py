@@ -568,10 +568,14 @@ def test_detect(immutable_multiple_robot_apartment):
     plan = execute_single(description, context)
     with simulated_robot:
         plan.perform()
-    detected_objects = plan.result
 
-    assert detected_objects[0].name.name == "milk.stl"
-    assert detected_objects[0] is milk_body
+    # Detection no longer returns a value; it writes the result into the
+    # world/belief state by marking the perceived annotation with its class label.
+    milk_annotations = world.get_semantic_annotations_by_type(Milk)
+    assert milk_annotations
+    perceived = milk_annotations[0]
+    assert perceived.class_label == "Milk"
+    assert milk_body in perceived.bodies
 
 
 def test_open(immutable_multiple_robot_apartment):

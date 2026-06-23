@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
-from typing import Optional, Any, Dict
 
-from typing_extensions import Optional, Type, Any
+from typing_extensions import Optional, Type
 
 from pycram.datastructures.enums import DetectionTechnique, DetectionState
 from pycram.datastructures.grasp import GraspDescription
 from pycram.perception import PerceptionQuery
-from pycram.plans.factories import sequential
+from pycram.plans.factories import sequential, execute_single
 from pycram.plans.plan_node import PlanNode
 from pycram.robot_plans.actions.base import ActionDescription
 from pycram.robot_plans.actions.core.navigation import NavigateAction
 from pycram.robot_plans.actions.core.robot_body import MoveManipulatorAction
+from pycram.robot_plans.motions.misc import DetectingMotion
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
@@ -59,7 +58,16 @@ class DetectAction(ActionDescription):
     The region in which the object should be detected
     """
 
-    def execute(self) -> None:
+    @property
+    def _action_plan(self) -> PlanNode:
+        return execute_single(DetectingMotion(query=self._build_query()))
+
+    def _build_query(self) -> PerceptionQuery:
+        """
+        Build the perception query from this action's parameters.
+
+        :return: The perception query that the detection motion answers.
+        """
         if not self.object_sem_annotation and self.region:
             raise AttributeError(
                 "Either a Semantic Annotation or a Region must be provided."
@@ -79,18 +87,12 @@ class DetectAction(ActionDescription):
                 max_z=3,
             )
         )
-        if not self.object_sem_annotation:
-            self.object_sem_annotation = SemanticEnvironmentAnnotation
-        query = PerceptionQuery(
-            self.object_sem_annotation, region_bb, self.robot, self.world
+        object_sem_annotation = (
+            self.object_sem_annotation or SemanticEnvironmentAnnotation
         )
-
-        return query.from_world()
-
-    def validate(
-        self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None
-    ):
-        return
+        return PerceptionQuery(
+            object_sem_annotation, region_bb, self.robot, self.world
+        )
 
 
 @dataclass
