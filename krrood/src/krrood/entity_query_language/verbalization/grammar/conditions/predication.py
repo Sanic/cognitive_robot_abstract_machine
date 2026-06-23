@@ -62,9 +62,11 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     NonExistence,
     Operators,
     PassiveAbsence,
+    predicative_core,
     predicative_operator,
     Quantifiers,
 )
+from krrood.entity_query_language.verbalization.vocabulary.words import OperatorWord
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import MicroplanningServices
@@ -294,6 +296,7 @@ def comparator_operator(
     negated: bool = False,
     compact: Optional[bool] = None,
     number: Number = Number.SINGULAR,
+    copula: bool = True,
 ) -> Fragment:
     """
     Select the operator fragment for *comparator* (e.g. *"is greater than"*,
@@ -315,6 +318,9 @@ def comparator_operator(
     :param compact: Copula-less variant (HAVING clauses).  Defaults to
         ``services.configuration.compact_predicates`` when ``None``.
     :param number: The grammatical number the predicative copula agrees with.
+    :param copula: Keep the leading copula on the predicative (non-compact) surface. Pass ``False``
+        for the bare core (*"greater than"*) when a shared copula is factored out across coordinated
+        tails (*"is either greater than 50 or less than 10"*); ignored when *compact*.
     :return: The operator fragment.
 
     Of the example sentence it supplies only the operator span *is greater than*; the surrounding
@@ -333,7 +339,7 @@ def comparator_operator(
     if is_calculation:
         calc_negated = (operation is operator.ne) ^ negated
         word = Operators.CALC_EQ.select(negated=calc_negated, compact=compact)
-        return word.as_fragment() if compact else predicative_operator(word.text, number)
+        return _operator_fragment(word, number, compact=compact, copula=copula)
 
     temporal = is_temporal(comparator.left) or is_temporal(comparator.right)
     operator_member = Operators.for_callable(operation)
@@ -343,7 +349,20 @@ def comparator_operator(
             f"{Logicals.NOT.text} {name}" if negated else name
         )
     word = operator_member.select(negated=negated, compact=compact, temporal=temporal)
-    return word.as_fragment() if compact else predicative_operator(word.text, number)
+    return _operator_fragment(word, number, compact=compact, copula=copula)
+
+
+def _operator_fragment(
+    word: OperatorWord, number: Number, *, compact: bool, copula: bool
+) -> Fragment:
+    """:return: the operator surface for a selected *word* — the bare compact verb when *compact*,
+    the bare predicative core (*"greater than"*) when ``not copula``, else the agreeing predicative
+    *"is greater than"*."""
+    if compact:
+        return word.as_fragment()
+    if not copula:
+        return RoleFragment.for_operator(predicative_core(word.text))
+    return predicative_operator(word.text, number)
 
 
 def coindexed_operator(operation) -> Fragment:

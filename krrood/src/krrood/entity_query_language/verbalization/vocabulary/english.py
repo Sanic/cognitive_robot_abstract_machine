@@ -886,5 +886,25 @@ def predicative_operator(text: str, number: Number = Number.SINGULAR) -> Fragmen
     if not tokens or tokens[0] != Copulas.IS.text:
         return RoleFragment.for_operator(text)
     negated = len(tokens) > 1 and tokens[1] == Logicals.NOT.text
-    core_tokens = tokens[2:] if negated else tokens[1:]
-    return copula_with(" ".join(core_tokens), number, negated=negated)
+    return copula_with(predicative_core(text), number, negated=negated)
+
+
+def predicative_core(text: str) -> str:
+    """
+    :param text: A baked predicative operator surface (*"is greater than"*, *"is"*, *"contains"*).
+    :return: the invariant core after a leading copula (and any following *"not"*) — *"is greater
+        than"* → *"greater than"*, *"is"* → *""* — so a shared copula can be factored out across
+        coordinated tails. A copula-less verb operator (*"contains"*) is returned unchanged.
+
+    >>> predicative_core("is greater than")
+    'greater than'
+    >>> predicative_core("is")
+    ''
+    >>> predicative_core("contains")
+    'contains'
+    """
+    tokens = text.split()
+    if not tokens or tokens[0] != Copulas.IS.text:
+        return text
+    negated = len(tokens) > 1 and tokens[1] == Logicals.NOT.text
+    return " ".join(tokens[2:] if negated else tokens[1:])

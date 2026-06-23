@@ -24,6 +24,11 @@ from krrood.entity_query_language.query.aggregation_structure import (
     selected_aggregator,
     unwrap_result_quantifiers,
 )
+from krrood.entity_query_language.verbalization.microplanning.coordination import (
+    chain_key,
+    COINDEXED_OPERATORS,
+    SharedSubjectComparisons,
+)
 
 
 def attribute_names(left: SymbolicExpression) -> List[str]:
@@ -165,6 +170,52 @@ def is_boolean_attribute_chain(expression: SymbolicExpression) -> bool:
         return False
     chain, _ = walk_chain(expression)
     return chain_ends_in_boolean_attribute(chain)
+
+
+def fold_shared_subject_comparisons(
+    operands: List[SymbolicExpression],
+) -> Optional[SharedSubjectComparisons]:
+    """
+    :param operands: The flattened operands of a coordination (e.g. an ``OR``'s disjuncts).
+    :return: a :class:`SharedSubjectComparisons` when *every* operand is a plain value comparison on
+        one shared subject chain (at least two of them), else ``None`` so the caller renders the
+        operands unfactored.
+
+    A *plain value comparison* uses an order/equality operator (``>``, ``<``, ``>=``, ``<=``, ``==``)
+    to compare the subject chain to a value: its left is a pure attribute chain that is not a boolean
+    attribute, and its right is neither ``None`` (an absence) nor a reference back to the subject (a
+    co-indexed comparison). Those shapes — and negated/membership operators, whose factored tail
+    would drop the negation — keep their own dedicated surface, so they are never folded here.
+
+    >>> robot = variable(Robot, [])
+    >>> fold = fold_shared_subject_comparisons([robot.battery > 50, robot.battery < 10])
+    >>> [comparator.operation.__name__ for comparator in fold.comparators]
+    ['gt', 'lt']
+    >>> fold_shared_subject_comparisons([robot.battery > 50, robot.name == 'x']) is None
+    True
+    """
+    if len(operands) < 2:
+        return None
+    subject_key = None
+    for operand in operands:
+        if not isinstance(operand, Comparator):
+            return None
+        if operand.operation not in COINDEXED_OPERATORS:
+            return None
+        key = chain_key(operand.left)
+        if key is None or is_boolean_attribute_chain(operand.left):
+            return None
+        if subject_key is None:
+            subject_key = key
+        elif key != subject_key:
+            return None
+        if is_none_literal(operand.right) or references(
+            operand.right, chain_root(operand.left)
+        ):
+            return None
+    return SharedSubjectComparisons(
+        subject_expression=operands[0].left, comparators=list(operands)
+    )
 
 
 @dataclass(frozen=True)
