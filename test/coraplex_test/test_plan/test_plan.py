@@ -6,6 +6,7 @@ import pytest
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.executables import GiskardExecutable
 from coraplex.plans.failures import EmptyUnderspecified
+from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.plan import Plan
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -570,6 +571,31 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
             plan.perform()
         except EmptyUnderspecified:
             pass
+
+
+def test_conditions_reference_surviving_action_node_after_merge(immutable_model_world):
+    """
+    Expanding an action mounts a fresh action node whose conditions reference it,
+    and simplification merges that node into the equivalent node already in the
+    plan. After the merge every condition must reference the surviving node, not
+    the discarded one, otherwise the dangling node leaks into serialization.
+    """
+    world, robot_view, context = immutable_model_world
+
+    plan = sequential(
+        [MoveTorsoAction(TorsoState.HIGH)],
+        context=context,
+    ).plan
+    with simulated_robot:
+        plan.perform()
+
+    live_node_indices = {node.index for node in [plan.root, *plan.root.descendants]}
+    condition_nodes = [
+        node for node in plan.root.descendants if isinstance(node, ConditionNode)
+    ]
+    assert condition_nodes
+    for condition_node in condition_nodes:
+        assert condition_node.action_node.index in live_node_indices
 
 
 def test_motion_order_pick_up(mutable_model_world):

@@ -15,7 +15,7 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.ros_executor import Ros2Executor
 from krrood.entity_query_language.factories import evaluate_condition
 from coraplex.datastructures.enums import ExecutionType
-from pycram.exceptions import MotionDidNotFinish, ConditionNotSatisfied
+from coraplex.exceptions import MotionDidNotFinish, ConditionNotSatisfied
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 

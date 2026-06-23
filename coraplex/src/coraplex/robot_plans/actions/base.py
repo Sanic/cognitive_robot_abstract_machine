@@ -15,23 +15,17 @@ from typing_extensions import (
     Optional,
 )
 
-from coraplex.exceptions import ContextIsUnavailable, ConditionNotSatisfied
-from coraplex.plans.failures import PlanFailure
-from semantic_digital_twin.world import World
-
-from coraplex.plans.plan_node import PlanNode
+from coraplex.datastructures.dataclasses import Context
+from coraplex.exceptions import ContextIsUnavailable
+from coraplex.plans.condition_nodes import ConditionNode
 from coraplex.plans.designator import Designator
+from coraplex.plans.plan_node import PlanNode, ActionNode
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import (
     variable,
 )
-from pycram.exceptions import ContextIsUnavailable
-from coraplex.plans.designator import Designator
-from coraplex.plans.plan_node import PlanNode, ActionNode
 from semantic_digital_twin.world import World
-from coraplex.datastructures.dataclasses import Context
-from coraplex.plans.condition_nodes import ConditionNode
 
 logger = logging.getLogger(__name__)
 
@@ -153,30 +147,6 @@ class ActionDescription(Designator):
             )
             for f in self.fields
         }
-
-    # def evaluate_pre_condition(self) -> bool:
-    #     condition = self.pre_condition(
-    #         self.bound_variables,
-    #         self.context,
-    #         self.designator_parameter,
-    #     )
-    #     evaluation = evaluate_condition(condition)
-    #     if evaluation:
-    #         return True
-    #     raise ConditionNotSatisfied(
-    #         pre_condition=True, action=self.__class__, condition=condition
-    #     )
-    #
-    # def evaluate_post_condition(self) -> bool:
-    #     condition = self.post_condition(
-    #         self.bound_variables,
-    #         self.context,
-    #         self.designator_parameter,
-    #     )
-    #     evaluation = evaluate_condition(condition)
-    #     if evaluation:
-    #         return True
-    #     raise ConditionNotSatisfied(False, self.__class__, condition)
 
     def add_subplan(self, subplan_root: PlanNode) -> PlanNode:
         subplan_root = self.plan._migrate_nodes_from_plan(subplan_root.plan)

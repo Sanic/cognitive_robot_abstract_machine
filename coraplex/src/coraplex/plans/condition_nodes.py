@@ -37,6 +37,12 @@ class ConditionNode(PlanNode):
     def notify(self):
         pass
 
+    def redirect_node_reference(
+        self, replaced_node: PlanNode, replacement_node: ActionNode
+    ) -> None:
+        if self.action_node is replaced_node:
+            self.action_node = replacement_node
+
 
 def condition_monitor(condition_node: ConditionNode) -> ThreadedPredicateMonitor:
     """

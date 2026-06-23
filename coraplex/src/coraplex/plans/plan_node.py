@@ -308,11 +308,27 @@ class PlanNode(PlanEntity):
         :param other: The other node to merge
         """
         for grand_child in other.children:
+            grand_child.redirect_node_reference(other, self)
             self.plan.add_edge(
                 self, grand_child, other.layer_index + grand_child.layer_index
             )
         self.plan.plan_graph.remove_edge(self.index, other.index)
         self.plan.remove_node(other)
+
+    def redirect_node_reference(
+        self, replaced_node: PlanNode, replacement_node: PlanNode
+    ) -> None:
+        """
+        Update references this node holds to ``replaced_node`` so they point to
+        ``replacement_node`` instead.
+
+        Called when ``replaced_node`` is merged into ``replacement_node`` and removed
+        from the plan. Subclasses that reference other plan nodes override this to
+        avoid dangling references to the removed node.
+
+        :param replaced_node: The node being removed from the plan.
+        :param replacement_node: The node that takes its place.
+        """
 
     @abstractmethod
     def notify(self):
