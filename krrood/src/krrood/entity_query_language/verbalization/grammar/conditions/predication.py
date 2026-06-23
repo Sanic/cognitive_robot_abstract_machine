@@ -19,7 +19,7 @@ from abc import abstractmethod
 from dataclasses import replace
 from itertools import islice
 
-from typing_extensions import TYPE_CHECKING, Dict, List, Optional, Set
+from typing_extensions import TYPE_CHECKING, List, Optional, Set
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.expression_structure import is_temporal
@@ -368,43 +368,49 @@ def _operator_fragment(
     return predicative_operator(word.text, number)
 
 
-#: The affirmative-to-negative copula surfaces a predicate clause is negated through.
-_NEGATED_COPULA: Dict[str, str] = {
-    Copulas.IS.text: Copulas.IS_NOT.text,
-    Copulas.ARE.text: Copulas.ARE_NOT.text,
-}
+#: Copula surfaces a clause is negatable through (the leaf the ``negated`` feature attaches to).
+_COPULA_SURFACES = frozenset({Copulas.IS.text, Copulas.ARE.text})
 
 
-def negate_copula(fragment: Fragment) -> Optional[Fragment]:
+def _is_negatable_head(fragment: Fragment) -> bool:
+    """:return: whether *fragment* is a clause's negatable head — a ``VERB`` lemma (do-support) or a
+    copula (*"is"* / *"are"*)."""
+    return isinstance(fragment, RoleFragment) and (
+        fragment.role is SemanticRole.VERB
+        or (
+            fragment.role is SemanticRole.OPERATOR
+            and fragment.text in _COPULA_SURFACES
+        )
+    )
+
+
+def negate_clause(fragment: Fragment) -> Optional[Fragment]:
     """
-    :param fragment: A predicate clause built from the shared vocabulary.
-    :return: *fragment* with its first copula leaf flipped to the negative (*"is"* → *"is not"*), or
-        ``None`` when it carries no copula to negate — the caller then wraps it in *"not (…)"*.
+    :param fragment: A predicate clause built from the typed clause vocabulary.
+    :return: *fragment* with its head verb or copula marked ``negated`` (so the morphology pass
+        realises *"does not work"* / *"is not reachable"*), or ``None`` when the clause has no verb
+        or copula head to negate — the caller then wraps it in *"not (…)"*.
 
-    This is what lets a wrapping ``Not`` over a verbalizable predicate read *"a Robot is not
-    reachable"* in place rather than *"not (a Robot is reachable)"*: a predicate that says its clause
-    with a vocabulary copula is negated by flipping that copula.
+    Negation is set as a feature, not rewritten as text: marking the typed head leaf lets the
+    morphology pass realise do-support and copula suppletion uniformly with number agreement, so a
+    wrapping ``Not`` reads *"an Employee does not work in a Department"* in place rather than
+    *"not (an Employee works in a Department)"*.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
-    ...     flatten_fragment_to_plain_text, PhraseFragment, WordFragment,
+    ...     PhraseFragment, WordFragment,
     ... )
-    >>> from krrood.entity_query_language.verbalization.vocabulary.english import Copulas
-    >>> clause = PhraseFragment(parts=[WordFragment(text="a Robot"), Copulas.IS.as_fragment(),
-    ...                                WordFragment(text="reachable")])
-    >>> flatten_fragment_to_plain_text(negate_copula(clause))
-    'a Robot is not reachable'
-    >>> negate_copula(WordFragment(text="a Robot")) is None
+    >>> from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import Verb
+    >>> clause = PhraseFragment(parts=[WordFragment(text="an Employee"), Verb("work").as_fragment()])
+    >>> negate_clause(clause).parts[1].negated
+    True
+    >>> negate_clause(WordFragment(text="a Robot")) is None
     True
     """
-    if (
-        isinstance(fragment, RoleFragment)
-        and fragment.role is SemanticRole.OPERATOR
-        and fragment.text in _NEGATED_COPULA
-    ):
-        return replace(fragment, text=_NEGATED_COPULA[fragment.text])
+    if _is_negatable_head(fragment):
+        return replace(fragment, negated=True)
     if isinstance(fragment, PhraseFragment):
         for index, part in enumerate(fragment.parts):
-            negated_part = negate_copula(part)
+            negated_part = negate_clause(part)
             if negated_part is not None:
                 parts = list(fragment.parts)
                 parts[index] = negated_part

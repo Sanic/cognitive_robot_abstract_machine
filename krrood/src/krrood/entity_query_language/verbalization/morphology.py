@@ -72,6 +72,24 @@ def is_past_participle(word: str) -> bool:
     )
 
 
+def third_person_singular(lemma: str) -> str:
+    """
+    :param lemma: A verb in its base (lemma) form.
+    :return: The third-person-singular present form (*"work"* → *"works"*, *"have"* → *"has"*,
+        *"go"* → *"goes"*), via ``lemminflect``'s ``VBZ`` inflection; falls back to ``lemma + "s"``
+        for an unknown word.
+
+    >>> third_person_singular("work")
+    'works'
+    >>> third_person_singular("have")
+    'has'
+    >>> third_person_singular("contain")
+    'contains'
+    """
+    forms = getInflection(lemma, tag="VBZ")
+    return forms[0] if forms else lemma + "s"
+
+
 def indefinite_article(following_word: str) -> str:
     """
     :param following_word: The word the article precedes.

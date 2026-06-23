@@ -33,7 +33,7 @@ from krrood.entity_query_language.verbalization.grammar.conditions.assembler imp
 from krrood.entity_query_language.verbalization.grammar.conditions.predication import (
     coindexed_operator,
     comparator_operator,
-    negate_copula,
+    negate_clause,
 )
 from krrood.entity_query_language.verbalization.grammar.instantiated.planner import (
     InstantiatedPlanner,
@@ -361,15 +361,20 @@ def _negation_wrap(child_fragment: Fragment) -> Fragment:
 
 
 class NotVerbalizablePredicateRule(PhraseRule):
-    """Inline-negated verbalizable predicate *"<subject> is not <complement>"* (Not over a predicate
-    whose type builds its own verbalization fragment).
+    """Inline-negated verbalizable predicate (Not over a predicate whose type builds its own
+    verbalization fragment).
 
-    Because the predicate states its clause with a vocabulary copula, the negation flips that copula
-    in place rather than wrapping the whole clause in *"not (...)"*. A predicate with no copula
-    (a verb phrase like *"works in"*) has nothing to flip, so it falls back to the wrapped form.
+    Because the predicate states its clause with the typed clause vocabulary, the negation is set as
+    a feature on the clause's head verb or copula — realised by the morphology pass as do-support
+    (*"does not work"*) or copula suppletion (*"is not reachable"*) — rather than wrapping the whole
+    clause in *"not (...)"*. A clause with no verb or copula head has nothing to negate, so it falls
+    back to the wrapped form.
 
     >>> verbalize_expression(Not(IsReachable(variable(Location, []))))
     'a Location is not reachable'
+    >>> employee, department = variable(StaffMember, []), variable(Department, [])
+    >>> verbalize_expression(Not(WorksIn(employee, department)))
+    'a StaffMember does not work in a Department'
     """
 
     construct = Not
@@ -379,22 +384,22 @@ class NotVerbalizablePredicateRule(PhraseRule):
         """Fires when the negation wraps a predicate that builds its own verbalization fragment.
 
         Detecting a verbalizable-predicate child is the gate that selects this rule over the generic
-        :class:`NotRule`, so the class example flips the predicate's copula to *is not* instead of
-        wrapping it in *not (…)*.
+        :class:`NotRule`, so the class example negates the predicate's head verb / copula in place
+        instead of wrapping it in *not (…)*.
         """
         return isinstance(
             node._child_, InstantiatedVariable
         ) and InstantiatedPlanner.has_fragment(node._child_)
 
     def build(self, node: Not, context: RuleContext) -> Fragment:
-        """Say the predicate with its copula flipped to the negative, or wrap it when it has none.
+        """Say the predicate with its head verb / copula negated, or wrap it when it has neither.
 
-        Flipping the copula of the rendered predicate clause is what yields the inline *is not
-        reachable*; a copula-less predicate clause has nothing to flip, so it falls back to the
+        Marking the clause's verb or copula negated is what yields the inline *does not work in* /
+        *is not reachable*; a clause with no such head has nothing to negate, so it falls back to the
         *not (…)* wrapper.
         """
         clause = context.child(node._child_)
-        negated = negate_copula(clause)
+        negated = negate_clause(clause)
         return negated if negated is not None else _negation_wrap(clause)
 
 

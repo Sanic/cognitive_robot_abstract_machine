@@ -57,6 +57,16 @@ class HasNumber:
 
 
 @dataclass
+class HasPolarity:
+    """Mixin contributing the grammatical ``negated`` field shared by fragments whose surface is
+    realised in the negative (a verb with do-support, a copula with its negative suppletion)."""
+
+    negated: bool = field(default=False, kw_only=True)
+    """Whether this leaf is realised negative — the morphology pass turns a ``VERB`` lemma into
+    *"does not <lemma>"* and a copula into *"is not"*. Affirmative by default."""
+
+
+@dataclass
 class WordFragment(HasText, HasNumber, Fragment):
     """
     Plain neutral text with no semantic role: articles, connectives, punctuation.
@@ -70,7 +80,7 @@ class WordFragment(HasText, HasNumber, Fragment):
 
 
 @dataclass
-class RoleFragment(HasText, HasNumber, Fragment):
+class RoleFragment(HasText, HasNumber, HasPolarity, Fragment):
     """
     Text carrying a semantic role — drives colour markup and optional source hyperlinking.
     """

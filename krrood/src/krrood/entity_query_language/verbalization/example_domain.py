@@ -39,12 +39,15 @@ from typing_extensions import Mapping
 
 from krrood.entity_query_language.factories import Symbol
 from krrood.entity_query_language.predicate import Predicate
-from krrood.entity_query_language.verbalization.fragments.base import (
-    Fragment,
-    PhraseFragment,
-    WordFragment,
+from krrood.entity_query_language.verbalization.fragments.base import Fragment
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Adjective,
+    clause,
+    Copula,
+    Noun,
+    Preposition,
+    Verb,
 )
-from krrood.entity_query_language.verbalization.vocabulary.english import Copulas
 
 # ── Robots & missions (the quick-start + cross-variable examples) ────────────
 
@@ -164,13 +167,7 @@ class IsReachable(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, fields: Mapping[str, Fragment]) -> Fragment:
-        return PhraseFragment(
-            parts=[
-                fields["body"],
-                Copulas.IS.as_fragment(),
-                WordFragment(text="reachable"),
-            ]
-        )
+        return clause(Noun(fields["body"]), Copula(), Adjective("reachable"))
 
 
 @dataclass(eq=False)
@@ -207,12 +204,11 @@ class WorksIn(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, fields: Mapping[str, Fragment]) -> Fragment:
-        return PhraseFragment(
-            parts=[
-                fields["employee"],
-                WordFragment(text="works in"),
-                fields["department"],
-            ]
+        return clause(
+            Noun(fields["employee"]),
+            Verb("work"),
+            Preposition.IN,
+            Noun(fields["department"]),
         )
 
 

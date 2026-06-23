@@ -81,12 +81,14 @@ class Verbalizable(ABC):
         """
         Optional structured verbalization for this predicate.
 
-        Build the surface from the shared fragment vocabulary (copulas, phrase / noun-phrase
-        fragments), composing the already-rendered field fragments in *fields* (keyed by field name).
-        Returning a :class:`Fragment` rather than a string keeps the predicate composable with the
-        rest of the pipeline — a wrapping ``Not`` negates it inline (*"… is not …"*) and coreference
-        still reduces the operands — instead of an opaque text blob. Using a copula from the vocabulary
-        (``Copulas.IS``) is what makes inline negation possible. Example::
+        Build the clause from the typed part-of-speech vocabulary
+        (:func:`~…vocabulary.parts_of_speech.clause` with ``Noun`` / ``Verb`` / ``Copula`` /
+        ``Preposition`` / ``Adjective``), composing the already-rendered field fragments in *fields*
+        (keyed by field name). State only the **affirmative, present-tense** form: a ``Verb`` is given
+        as its lemma, and the realisation passes inflect it (*"work"* → *"works"*) and agree its
+        number. Returning a typed clause rather than a string keeps the predicate composable — a
+        wrapping ``Not`` negates it automatically (a verb with do-support, *"does not love"*; a copula
+        with suppletion, *"is not reachable"*) and coreference still reduces the operands. Example::
 
             @dataclass(eq=False)
             class Loves(Predicate):
@@ -95,10 +97,7 @@ class Verbalizable(ABC):
 
                 @classmethod
                 def _verbalization_fragment_(cls, fields):
-                    return PhraseFragment(
-                        parts=[fields["person_1"], RoleFragment.for_operator("loves"),
-                               fields["person_2"]]
-                    )
+                    return clause(Noun(fields["person_1"]), Verb("love"), Noun(fields["person_2"]))
 
         :param fields: The rendered fragment for each predicate field, keyed by field name.
         :return: The predicate's verbalization fragment.

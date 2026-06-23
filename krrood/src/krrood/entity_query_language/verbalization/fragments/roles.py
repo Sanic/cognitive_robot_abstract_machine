@@ -14,6 +14,9 @@ class SemanticRole(StrEnum):
     """Aggregation phrases — *sum of*, *number of*, *average of*."""
     OPERATOR = "operator"
     """Comparator phrases — *is greater than*, *equals*."""
+    VERB = "verb"
+    """Lexical verbs of a predicate clause, given as a lemma — *work*, *contain*, *love* — realised
+    present-tense (*works*) and negated with do-support (*does not work*) by the morphology pass."""
     LOGICAL = "logical"
     """Logical connectives — *and*, *or*, *not*, *for all*, *there exists*."""
     LITERAL = "literal"
