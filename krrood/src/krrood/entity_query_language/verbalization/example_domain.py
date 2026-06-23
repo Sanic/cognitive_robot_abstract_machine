@@ -144,7 +144,7 @@ class Employee:
     """Salary at hiring time."""
 
 
-# ── Custom predicates (template-driven verbalization examples) ───────────────
+# ── Custom predicates (fragment-built verbalization examples) ────────────────
 
 
 @dataclass(eq=False)
@@ -194,10 +194,10 @@ class WorksIn(Predicate):
     """Multi-field custom predicate: *"<employee> works in <department>"*."""
 
     employee: object
-    """The employee (first positional argument of the template)."""
+    """The employee (first positional field of the predicate)."""
 
     department: object
-    """The department (second positional argument of the template)."""
+    """The department (second positional field of the predicate)."""
 
     def __call__(self):
         return True

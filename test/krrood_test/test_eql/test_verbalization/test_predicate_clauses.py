@@ -9,9 +9,18 @@ copula with suppletion.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+import pytest
+from typing_extensions import Any
+
 from krrood.entity_query_language.factories import variable
 from krrood.entity_query_language.operators.core_logical_operators import Not
+from krrood.entity_query_language.predicate import Predicate
 from krrood.entity_query_language.verbalization import morphology
+from krrood.entity_query_language.verbalization.exceptions import (
+    NonFragmentPredicateError,
+)
 from krrood.entity_query_language.verbalization.example_domain import (
     Department,
     IsReachable,
@@ -133,3 +142,24 @@ def test_verb_predicate_affirmative_and_negated_with_do_support():
     assert verbalize_expression(Not(WorksIn(employee, department))) == (
         "a StaffMember does not work in a Department"
     )
+
+
+# ── fragments are required ───────────────────────────────────────────────────────
+
+
+def test_predicate_returning_a_string_template_is_rejected():
+    """A hook returning a string (an old-style template) rather than a Fragment is an error."""
+
+    @dataclass(eq=False)
+    class SaysHello(Predicate):
+        who: Any
+
+        def __call__(self) -> bool:
+            return True
+
+        @classmethod
+        def _verbalization_fragment_(cls, fields):
+            return "{who} says hello"  # a string template — no longer supported
+
+    with pytest.raises(NonFragmentPredicateError):
+        verbalize_expression(SaysHello(variable(Location, [])))

@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from krrood.entity_query_language.core.variable import InstantiatedVariable
+from krrood.entity_query_language.predicate import Verbalizable
+from krrood.entity_query_language.verbalization.exceptions import (
+    NonFragmentPredicateError,
+    PredicateFragmentRequiredError,
+)
 from krrood.entity_query_language.verbalization.fragments.base import Fragment
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     PhraseRule,
@@ -24,14 +29,19 @@ class InstantiatedVariableRule(PhraseRule):
         """:return: The instantiated variable's *"a TypeName, where the field of the TypeName is …"*
         noun phrase, built by the :class:`InstantiatedAssembler`.
 
-        Its contribution is selecting the generic decomposed surface: with no verbalization template
-        on ``Drawer``, this fallback rule fires and delegates to the assembler, which is why the
-        result is the long *"a Drawer, where …"* form rather than a templated sentence.
+        Its contribution is selecting the generic decomposed surface for a *non-predicate*
+        constructed entity: with no verbalization fragment on ``Drawer``, this fallback rule fires
+        and delegates to the assembler, which is why the result is the long *"a Drawer, where …"*
+        form. A :class:`Verbalizable` predicate, by contrast, is *required* to supply a fragment —
+        reaching this rule without one is an error, not a name-based fallback.
 
         >>> connection = variable(FixedConnection, [])
         >>> verbalize_expression(inference(Drawer)(container=connection.parent, handle=connection.child))
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
+        type_ = node._type_
+        if isinstance(type_, type) and issubclass(type_, Verbalizable):
+            raise PredicateFragmentRequiredError(node=node)
         return InstantiatedAssembler(context).assemble(node)
 
 
@@ -69,4 +79,9 @@ class InstantiatedVerbalizableRule(PhraseRule):
             name: context.child(child)
             for name, child in node._child_vars_.items()
         }
-        return node._type_._verbalization_fragment_(fields)
+        fragment = node._type_._verbalization_fragment_(fields)
+        if not isinstance(fragment, Fragment):
+            raise NonFragmentPredicateError(
+                predicate_type=node._type_, returned=fragment
+            )
+        return fragment

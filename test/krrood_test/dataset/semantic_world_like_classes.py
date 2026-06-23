@@ -5,10 +5,12 @@ from dataclasses import dataclass, field
 from typing_extensions import ClassVar, List, Mapping, Optional, Type, Iterable
 
 from krrood.entity_query_language.predicate import Symbol, Predicate
-from krrood.entity_query_language.verbalization.fragments.base import (
-    Fragment,
-    PhraseFragment,
-    WordFragment,
+from krrood.entity_query_language.verbalization.fragments.base import Fragment
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    clause,
+    Noun,
+    Preposition,
+    Verb,
 )
 
 
@@ -150,12 +152,12 @@ class ContainsType(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, fields: Mapping[str, Fragment]) -> Fragment:
-        return PhraseFragment(
-            parts=[
-                fields["iterable"],
-                WordFragment(text="contains an instance of"),
-                fields["obj_type"],
-            ]
+        return clause(
+            Noun(fields["iterable"]),
+            Verb("contain"),
+            Noun("an instance"),
+            Preposition.OF,
+            Noun(fields["obj_type"]),
         )
 
 

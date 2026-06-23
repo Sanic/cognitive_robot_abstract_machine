@@ -1,10 +1,10 @@
 """
-Tests for predicate verbalization via a returned :class:`Fragment` (rather than a string template).
+Tests for predicate verbalization via a required :class:`Fragment`.
 
-A :class:`Verbalizable` predicate builds its surface from the shared fragment vocabulary (copulas,
-phrase / noun-phrase fragments), so the result composes with the rest of the pipeline: a wrapping
+A :class:`Verbalizable` predicate builds its surface from the typed clause vocabulary (``clause`` /
+``Noun`` / ``Verb`` / ``Copula``), so the result composes with the rest of the pipeline: a wrapping
 ``Not`` negates it inline — *"a Robot is not reachable"* — instead of the opaque *"not (a Robot is
-reachable)"* a flat string blob forced.
+reachable)"* a flat string blob would force.
 """
 
 from __future__ import annotations

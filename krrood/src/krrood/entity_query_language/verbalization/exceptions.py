@@ -16,10 +16,63 @@ from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+    from krrood.entity_query_language.core.variable import InstantiatedVariable
     from krrood.entity_query_language.verbalization.fragments.base import Fragment
     from krrood.entity_query_language.verbalization.grammar.conditions.placement import (
         ConditionForm,
     )
+
+
+@dataclass
+class PredicateFragmentRequiredError(DataclassException):
+    """
+    A :class:`~krrood.entity_query_language.predicate.Verbalizable` predicate was verbalized without
+    implementing ``_verbalization_fragment_``. A predicate must state its surface as a structured
+    fragment clause (there is no name-based string fallback), so the omission is an error rather than
+    a degraded *"a HasHighSalary, where …"* rendering.
+    """
+
+    node: "InstantiatedVariable"
+    """The instantiated predicate whose type supplies no verbalization fragment."""
+
+    def error_message(self) -> str:
+        return (
+            f"{self.node._type_.__name__!r} is a predicate but does not implement "
+            "`_verbalization_fragment_`, so it has no verbalization."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Implement `_verbalization_fragment_(cls, fields)` returning a clause built with "
+            "`vocabulary.parts_of_speech.clause(Noun(...), Verb(...), …)`."
+        )
+
+
+@dataclass
+class NonFragmentPredicateError(DataclassException):
+    """
+    A predicate's ``_verbalization_fragment_`` returned something that is not a :class:`Fragment`
+    (e.g. a leftover format string). Fragments are required so the surface composes with the
+    realisation passes (negation, coreference, morphology).
+    """
+
+    predicate_type: type
+    """The predicate type whose hook returned a non-fragment."""
+
+    returned: object
+    """The non-fragment value the hook returned."""
+
+    def error_message(self) -> str:
+        return (
+            f"{self.predicate_type.__name__}._verbalization_fragment_ returned a "
+            f"{type(self.returned).__name__}, not a Fragment."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Return a Fragment — build the clause with "
+            "`vocabulary.parts_of_speech.clause(...)`, not a string template."
+        )
 
 
 @dataclass
