@@ -6604,25 +6604,6 @@ class NoControlledJointsErrorDAO(
     }
 
 
-class NoQPControllerConfigExceptionDAO(
-    SetupExceptionDAO,
-    DataAccessObject[giskardpy.data_types.exceptions.NoQPControllerConfigException],
-):
-    __tablename__ = "NoQPControllerConfigExceptionDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(SetupExceptionDAO.database_id),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "NoQPControllerConfigExceptionDAO",
-        "inherit_condition": database_id == SetupExceptionDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class ExecutorDAO(Base, DataAccessObject[giskardpy.executor.Executor]):
     __tablename__ = "ExecutorDAO"
 
@@ -11812,7 +11793,7 @@ class EnforcementStrategyDAO(
         String(255), nullable=False, use_existing_column=True
     )
 
-    config_id: Mapped[int] = mapped_column(
+    qp_controller_config_id: Mapped[int] = mapped_column(
         ForeignKey("QPControllerConfigDAO.database_id", use_alter=True),
         nullable=True,
         use_existing_column=True,
@@ -11836,10 +11817,10 @@ class EnforcementStrategyDAO(
         foreign_keys="[EnforcementStrategyDAO_constraints_association.source_enforcementstrategydao_id]",
         lazy="selectin",
     )
-    config: Mapped[QPControllerConfigDAO] = relationship(
+    qp_controller_config: Mapped[QPControllerConfigDAO] = relationship(
         "QPControllerConfigDAO",
         uselist=False,
-        foreign_keys=[config_id],
+        foreign_keys=[qp_controller_config_id],
         post_update=True,
     )
 
