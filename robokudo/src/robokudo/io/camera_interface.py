@@ -44,7 +44,7 @@ from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union, Tuple
 
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
-from robokudo.io import tf_listener_proxy
+from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.tf import StampedTransform
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.world import setup_world_for_camera_frame, world_instance
@@ -133,8 +133,8 @@ class ROSCameraInterface(CameraInterface):
         """Camera rotation from TF"""
 
         if self.lookup_viewpoint:
-            self.transform_listener: Buffer = tf_listener_proxy.instance(self.node)
-            """ROS transform listener"""
+            self.tf_buffer: Buffer = TFListenerProxy().buffer_for_node(self.node)
+            """TF buffer populated by the per-node transform listener."""
 
     def lookup_transform(self, timestamp: Time = Time()) -> bool:
         """Look up the camera transform from TF.
@@ -143,7 +143,7 @@ class ROSCameraInterface(CameraInterface):
         """
         if self.lookup_viewpoint:
             try:
-                world_T_camera = self.transform_listener.lookup_transform(
+                world_T_camera = self.tf_buffer.lookup_transform(
                     target_frame=self.tf_to,
                     source_frame=self.tf_from,
                     time=timestamp,
