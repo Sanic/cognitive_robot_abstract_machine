@@ -12,7 +12,7 @@ from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
-from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
+from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     variable_from,
@@ -766,3 +766,28 @@ def test_context_back_reference(immutable_model_world):
     plan.notify()
 
     assert plan.plan.context == context
+
+
+def test_action_nodes_unequal(immutable_model_world):
+    world, view, context = immutable_model_world
+
+    plan = sequential(
+        [
+            ParkArmsAction(Arms.LEFT),
+            PickUpAction(
+                world.get_body_by_name("milk.stl"),
+                Arms.LEFT,
+                GraspDescription(
+                    ApproachDirection.FRONT,
+                    VerticalAlignment.NoAlignment,
+                    view.right_arm.end_effector,
+                ),
+            ),
+        ],
+        context=context,
+    )
+
+    park_node = plan.children[0]
+    pick_node = plan.children[1]
+
+    assert not park_node == pick_node

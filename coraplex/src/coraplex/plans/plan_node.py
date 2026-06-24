@@ -454,7 +454,7 @@ class UnderspecifiedNode(PlanNode):
         return f"{self.designator_type.__name__}"
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=True, repr=False)
 class DesignatorNode(PlanNode, ABC):
     """
     Abstract base class for all nodes that represent a designator.
@@ -486,6 +486,9 @@ class DesignatorNode(PlanNode, ABC):
                     if not self_field == child_field:
                         continue
                 self.merge(child)
+
+    def __hash__(self):
+        return id(self)
 
 
 @dataclass(eq=False, repr=False)
