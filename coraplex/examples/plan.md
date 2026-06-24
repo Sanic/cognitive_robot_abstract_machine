@@ -1,4 +1,4 @@
----
+from coraplex.plans.plan import Plan---
 jupyter:
   jupytext:
     text_representation:
@@ -54,10 +54,10 @@ plan = sequential([navigate, park], context=context).plan
 ```
 
 This will create a simple plan which has a SequentialNode as its root and two DesignatorNodes as its children. You can 
-plot the plan using the `plot_plan_structure` method.
+plot the plan using the `plot` method.
 
 ```python
-plan.plot_plan_structure()
+plan.plot()
 ```
 
 ## Arguments of Nodes

@@ -6016,6 +6016,10 @@ class GraphVisualizerDAO(
     height: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     update_interval: Mapped[builtins.int] = mapped_column(use_existing_column=True)
 
+    attributes: Mapped[typing.List[builtins.str]] = mapped_column(
+        JSON, nullable=False, use_existing_column=True
+    )
+
 
 class FunctionMappingDAO(
     Base,

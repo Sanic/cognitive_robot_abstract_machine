@@ -63,7 +63,7 @@ from coraplex.execution_environment import simulated_robot
 from coraplex.datastructures.enums import Arms
 
 motion_description = MoveToolCenterPointMotion(
-    target=Pose.from_xyz_quaternion(0.5, 0.6, 0.6, 0, 0, 0, 1, reference_frame=world.root), arm=Arms.LEFT)
+    target=Pose.from_xyz_quaternion(1.5, 0.6, 0.6, 0, 0, 0, 1, reference_frame=world.root), arm=Arms.LEFT)
 
 with simulated_robot:
     execute_single(motion_description, context=context).perform()

@@ -53,8 +53,8 @@ pr2_view = PR2.from_world(world)
 context = Context(world, pr2_view)
 
 description = TransportAction(world.get_body_by_name("milk.stl"),
-                              Pose.from_xyz_quaternion(3.1, 2.2, 0.95,
-                                                       0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
+                              Pose.from_xyz_quaternion(2.4, 2.8, 1,
+                                                       0.0, 0.0, 0.0, 1.0, reference_frame=world.root),
                               Arms.LEFT)
 plan = sequential([MoveTorsoAction(TorsoState.HIGH),
                    description], context=context).plan
@@ -63,7 +63,7 @@ with simulated_robot:
 ```
 
 The data obtained throughout the plan execution, including robot states, poses, action descriptions and more will be
-logged into the database once we insert the plan .
+logged into the database once we insert the plan.
 
 ```python
 from krrood.ormatic.data_access_objects.helper import to_dao, get_dao_class
