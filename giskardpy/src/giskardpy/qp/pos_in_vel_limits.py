@@ -1,7 +1,6 @@
 from copy import copy
 
 import numpy as np
-from sympy.series import acceleration
 from typing_extensions import Tuple, List
 
 import krrood.symbolic_math.symbolic_math as sm
