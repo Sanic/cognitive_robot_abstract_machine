@@ -23,7 +23,7 @@ from giskardpy.qp.exceptions import (
 )
 from giskardpy.qp.pos_in_vel_limits import (
     shifted_velocity_profile,
-    compute_slowdown_asap_vel_profile,
+    compute_immediate_slowdown_profile,
 )
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.math import mpc
@@ -419,7 +419,7 @@ class DegreeOfFreedomLimitProfiler:
         Projects the slow-down-as-fast-as-possible velocity profile under the real jerk limit and
         the jerk profile that would be required without a jerk limit.
         """
-        projected_velocity_profile, _, _ = compute_slowdown_asap_vel_profile(
+        projected_velocity_profile, _, _ = compute_immediate_slowdown_profile(
             dof_symbols.velocity,
             dof_symbols.acceleration,
             goal_profile,
@@ -428,7 +428,7 @@ class DegreeOfFreedomLimitProfiler:
             prediction_horizon,
             skip_first,
         )
-        _, _, projected_jerk_profile_violated = compute_slowdown_asap_vel_profile(
+        _, _, projected_jerk_profile_violated = compute_immediate_slowdown_profile(
             dof_symbols.velocity,
             dof_symbols.acceleration,
             goal_profile,

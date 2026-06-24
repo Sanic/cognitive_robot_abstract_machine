@@ -18,6 +18,18 @@ def shifted_velocity_profile(
     distance: Scalar,
     delta_time: float,
 ) -> Tuple[Vector, Vector]:
+    """
+    Shift a velocity and acceleration profile forward in time based on a remaining distance.
+
+    Selects how far into the braking profile the motion already is by comparing the remaining
+    ``distance`` against the distance covered by progressively truncated tails of the profile.
+
+    :param velocity_profile: Velocity values over the prediction horizon; negative values are clamped to zero.
+    :param acceleration_profile: Acceleration values matching ``velocity_profile``.
+    :param distance: Remaining distance that determines how much of the profile is shifted out.
+    :param delta_time: Duration of a single time step.
+    :return: The shifted velocity profile and the shifted acceleration profile.
+    """
     velocity_profile = copy(velocity_profile)
     velocity_profile[velocity_profile < 0] = 0
     velocity_if_cases = []
@@ -49,6 +61,14 @@ def shifted_velocity_profile(
 
 
 def reverse_gauss(integral: Scalar) -> Scalar:
+    """
+    Invert the Gauss summation formula to recover the term count from a triangular sum.
+
+    Solves ``n * (n + 1) / 2 == integral`` for ``n``, returning the continuous (non-floored) solution.
+
+    :param integral: Value of the triangular sum.
+    :return: The number of terms that produce the given sum.
+    """
     return sm.sqrt(2 * integral + (1 / 4)) - 1 / 2
 
 
@@ -56,6 +76,17 @@ def reverse_gauss(integral: Scalar) -> Scalar:
 def acceleration_cap(
     current_velocity: Scalar, jerk_limit: Scalar, delta_time: Scalar
 ) -> Scalar:
+    """
+    Compute the largest acceleration that can be reached when braking to a stop under the jerk limit.
+
+    Distributes the velocity that has to be removed across the jerk-limited acceleration steps and
+    returns the peak acceleration of that braking ramp.
+
+    :param current_velocity: Velocity that needs to be reduced to zero.
+    :param jerk_limit: Maximum allowed change of acceleration per time step.
+    :param delta_time: Duration of a single time step.
+    :return: The peak acceleration of the jerk-limited braking ramp.
+    """
     acceleration_integral = sm.abs(current_velocity) / delta_time
     jerk_step = jerk_limit * delta_time
     n = sm.floor(reverse_gauss(sm.abs(acceleration_integral / jerk_step)))
@@ -64,7 +95,7 @@ def acceleration_cap(
 
 
 @substitution_cache
-def compute_next_vel_and_acc(
+def compute_next_velocity_and_acceleration(
     current_velocity: Scalar,
     current_acceleration: Scalar,
     velocity_limit: Scalar,
@@ -73,6 +104,22 @@ def compute_next_vel_and_acc(
     remaining_prediction_horizon: Scalar,
     no_cap: Scalar,
 ) -> Tuple[Scalar, Scalar]:
+    """
+    Advance velocity and acceleration by one time step while respecting jerk and horizon limits.
+
+    Picks the acceleration that drives the velocity towards ``velocity_limit`` as fast as allowed,
+    bounded both by the jerk-reachable acceleration and by the acceleration still recoverable within
+    the remaining horizon.
+
+    :param current_velocity: Velocity at the current time step.
+    :param current_acceleration: Acceleration at the current time step.
+    :param velocity_limit: Target velocity the step moves towards.
+    :param jerk_limit: Maximum allowed change of acceleration per time step.
+    :param delta_time: Duration of a single time step.
+    :param remaining_prediction_horizon: Number of time steps left in the horizon.
+    :param no_cap: When truthy, skips the horizon-based acceleration capping.
+    :return: The velocity and acceleration of the next time step.
+    """
     acceleration_cap1 = acceleration_cap(
         current_velocity, jerk_limit, delta_time
     )  # if we start at arbitrary horizon and jerk as strongly as possible, which acc do we have when we reach the vel limit
@@ -112,7 +159,7 @@ def compute_next_vel_and_acc(
 
 
 @substitution_cache
-def compute_slowdown_asap_vel_profile(
+def compute_immediate_slowdown_profile(
     current_velocity: Scalar,
     current_acceleration: Scalar,
     target_velocity_profile: Vector,
@@ -122,13 +169,25 @@ def compute_slowdown_asap_vel_profile(
     skip_first: Scalar,
 ) -> Tuple[Vector, Vector, Vector]:
     """
-    Compute the vel, acc and jerk profile for slowing down asap.
+    Compute the velocity, acceleration and jerk profile for slowing down as soon as possible.
+
+    Iterates :func:`compute_next_velocity_and_acceleration` over the whole prediction horizon and derives the
+    jerk profile from the resulting accelerations.
+
+    :param current_velocity: Velocity at the start of the horizon.
+    :param current_acceleration: Acceleration at the start of the horizon.
+    :param target_velocity_profile: Per-step target velocities the motion is driven towards.
+    :param jerk_limit: Maximum allowed change of acceleration per time step.
+    :param delta_time: Duration of a single time step.
+    :param prediction_horizon: Number of time steps in the profile.
+    :param skip_first: When truthy, the horizon cap is disabled for the first step.
+    :return: The velocity profile, acceleration profile and jerk profile over the horizon.
     """
     velocity_profile = []
     acceleration_profile = []
     next_velocity, next_acceleration = current_velocity, current_acceleration
     for i in range(prediction_horizon):
-        next_velocity, next_acceleration = compute_next_vel_and_acc(
+        next_velocity, next_acceleration = compute_next_velocity_and_acceleration(
             next_velocity,
             next_acceleration,
             target_velocity_profile[i],
@@ -148,12 +207,24 @@ def compute_slowdown_asap_vel_profile(
     return Vector(velocity_profile), acceleration_profile, jerk_profile
 
 
-def implicit_vel_profile(
+def implicit_velocity_profile(
     acceleration_limit: float,
     jerk_limit: float,
     delta_time: float,
     prediction_horizon: int,
 ) -> List[float]:
+    """
+    Build the velocity profile implied by ramping up acceleration under jerk and acceleration limits.
+
+    Integrates jerk into acceleration and acceleration into velocity over the horizon and returns the
+    profile reversed, so it represents the velocities to brake from while ending at rest.
+
+    :param acceleration_limit: Maximum allowed acceleration.
+    :param jerk_limit: Maximum allowed change of acceleration per time step.
+    :param delta_time: Duration of a single time step.
+    :param prediction_horizon: Number of time steps in the profile.
+    :return: The implied velocity profile, ordered from the highest velocity down to rest.
+    """
     velocity_profile = [0, 0]  # because last two vel are always 0
     velocity = 0
     acceleration = 0
