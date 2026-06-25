@@ -8,12 +8,17 @@ from typing_extensions import Iterable, Protocol, Union, runtime_checkable
 from krrood.entity_query_language.predicate import Field
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.base import (
+    Clause,
     Fragment,
+    NounPhrase,
     PhraseFragment,
     RoleFragment,
     WordFragment,
 )
-from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.fragments.features import (
+    Definiteness,
+    Number,
+)
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
     MAX_SET_MEMBERS,
@@ -46,20 +51,38 @@ class ClauseElement(ABC):
 @dataclass(frozen=True)
 class Noun(ClauseElement):
     """A noun constituent — a predicate :class:`~krrood.entity_query_language.predicate.Field`, an
-    already-rendered fragment, or a literal noun word."""
+    already-rendered fragment, or a literal noun given by its *head word only*."""
 
     content: Union[str, "ClauseConstituent"]
-    """A literal noun string, or any constituent (a field, a rendered fragment) rendered as-is."""
+    """A literal noun *head* (the article is a feature, not part of the text — write ``"instance"``,
+    not ``"an instance"``), or any constituent (a field, a rendered fragment) rendered as-is."""
+
+    definiteness: Definiteness = Definiteness.INDEFINITE
+    """For a literal-head noun, the article to realise — *"an instance"* (indefinite, the default) vs
+    *"the instance"*. Ignored when *content* is already a rendered constituent."""
 
     def as_fragment(self) -> Fragment:
-        """:return: a word leaf for a literal string, else the constituent's own fragment.
+        """:return: an indefinite (or definite) noun phrase for a literal head — so the article is
+        chosen by the determiner pass (*"a"* / *"an"*) and the head pluralises and reduces with
+        coreference — else the constituent's own fragment.
 
-        >>> Noun("department").as_fragment().text
-        'department'
+        >>> Noun("instance").as_fragment().definiteness
+        <Definiteness.INDEFINITE: 'indefinite'>
         """
         if isinstance(self.content, str):
-            return WordFragment(text=self.content)
+            return NounPhrase(
+                head=WordFragment(text=self.content), definiteness=self.definiteness
+            )
         return self.content.as_fragment()
+
+    @classmethod
+    def the(cls, head: str) -> "Noun":
+        """:return: a definite literal noun (*"the name"*).
+
+        >>> Noun.the("name").as_fragment().definiteness
+        <Definiteness.DEFINITE: 'definite'>
+        """
+        return cls(head, definiteness=Definiteness.DEFINITE)
 
 
 @dataclass(frozen=True)
@@ -190,17 +213,18 @@ class ClauseConstituent(Protocol):
         """:return: the fragment this constituent contributes to a clause."""
 
 
-def clause(*constituents: ClauseConstituent) -> PhraseFragment:
+def clause(*constituents: ClauseConstituent) -> Clause:
     """
     Build a predicate clause from typed part-of-speech constituents.
 
     A predicate states its affirmative form once — *"<subject> works in <object>"* —
     ``clause(Noun(subject), Verb("work"), Preposition.IN, Noun(object))`` — and the realisation
     passes handle agreement and negation. A raw :class:`Fragment` is accepted too, so a rendered
-    field fragment can be dropped in directly.
+    field fragment can be dropped in directly. The result is a :class:`Clause`, so coreference
+    treats the first constituent as the clause's subject (pronominalisation, verb agreement).
 
     :param constituents: The clause's elements in surface order.
-    :return: The inline phrase fragment for the clause.
+    :return: The clause fragment.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
     ...     flatten_fragment_to_plain_text, WordFragment,
@@ -211,6 +235,4 @@ def clause(*constituents: ClauseConstituent) -> PhraseFragment:
     ... )
     'an Employee work in a Department'
     """
-    return PhraseFragment(
-        parts=[constituent.as_fragment() for constituent in constituents]
-    )
+    return Clause(parts=[constituent.as_fragment() for constituent in constituents])

@@ -5,6 +5,7 @@ from typing_extensions import Dict, Iterable, List, Optional, Set, Tuple
 import uuid
 
 from krrood.entity_query_language.verbalization.fragments.base import (
+    Clause,
     map_structural_children,
     NounPhrase,
     PhraseFragment,
@@ -28,6 +29,7 @@ from krrood.entity_query_language.verbalization.rendering.discourse import (
     DiscourseView,
     EMPTY_DISCOURSE,
 )
+from krrood.entity_query_language.verbalization.vocabulary.english import Pronouns
 from krrood.entity_query_language.verbalization.rendering.passes import RealizationPass
 
 
@@ -164,6 +166,8 @@ class CoreferenceProcessor(RealizationPass):
                 return self._noun_phrase(fragment)
             case PossessiveChain():
                 return self._possessive_chain(fragment)
+            case Clause():
+                return self._subject_clause(fragment)
             case PhraseFragment(parts=[PossessiveChain(), *_]):
                 return self._predicate_clause(fragment)
             case _:
@@ -201,38 +205,93 @@ class CoreferenceProcessor(RealizationPass):
         a pronominalised chain distributes a scalar leaf over a plural population (*"their
         batteries"*); singular for every other subject (a deeper chain, a non-pronominalised one, or
         a plain noun phrase the build already agreed)."""
-        if not isinstance(subject, PossessiveChain) or not self._pronominalises(subject):
+        if not isinstance(subject, PossessiveChain) or not self._pronominalises(
+            subject
+        ):
             return Number.SINGULAR
         return chain_head_number(subject.parts, self._subject_stack[-1].number)
+
+    def _subject_clause(self, clause: Clause) -> Fragment:
+        """A part-of-speech predicate clause (*"<subject> <verb/copula> …"* built by
+        :func:`~krrood.entity_query_language.verbalization.vocabulary.parts_of_speech.clause`).
+
+        When the leading constituent is the current discourse subject, it pronominalises to the
+        nominative *"it"* / *"they"* and the finite verb or copula agrees with that subject's number
+        (*"is"* → *"are"*, *"works"* → *"work"*); otherwise the clause is rebuilt unchanged, so a
+        plain predicate and a top-level mention are untouched. A clause whose subject is a navigation
+        chain defers to :meth:`_predicate_clause` (the *"its/their …"* path).
+
+        The body's subject is the quantified population, so it reads *"they"* and the copula agrees:
+
+        >>> robot = variable(Robot, [])
+        >>> verbalize_expression(for_all(robot, IsReachable(robot)))
+        'for all Robots, they are reachable'
+        """
+        subject = clause.parts[0]
+        if isinstance(subject, PossessiveChain):
+            return self._predicate_clause(clause)
+        number = self._subject_pronoun_number(subject)
+        if number is None:
+            rebuilt = map_structural_children(clause, self._walk)
+            return rebuilt if rebuilt is not None else clause
+        pronoun = Pronouns.nominative(number).as_fragment()
+        agreed_rest = [
+            self._agree_finite(self._walk(part), number) for part in clause.parts[1:]
+        ]
+        return replace(clause, parts=[pronoun, *agreed_rest])
+
+    def _subject_pronoun_number(self, subject: Fragment) -> Optional[Number]:
+        """:return: The number to pronominalise the clause subject with — the in-scope subject's
+        number when *subject* is the current, already-introduced discourse subject, else ``None``
+        (leaving the subject as its first/repeat noun-phrase mention)."""
+        if not isinstance(subject, NounPhrase) or subject.referent_id is None:
+            return None
+        if subject.referent_id not in self._seen:
+            return None
+        if (
+            not self._subject_stack
+            or self._subject_stack[-1].subject_id != subject.referent_id
+        ):
+            return None
+        return self._subject_stack[-1].number
 
     @staticmethod
     def _with_agreed_copula(clause: PhraseFragment, number: Number) -> Fragment:
         """:return: *clause* with its finite copula tagged *number* (*"is"* → *"are"* once the
         morphology pass realises it). Only the operator slot's leading copula inflects — the subject
-        and value (and any copula nested in a relative clause on either) are left untouched."""
+        and value (and any copula nested in a relative clause on either) are left untouched.
+        """
         return replace(
             clause,
             parts=[
-                CoreferenceProcessor._agree_operator(part, number)
+                CoreferenceProcessor._agree_finite(part, number)
                 for part in clause.parts
             ],
         )
 
+    _FINITE_ROLES = (SemanticRole.OPERATOR, SemanticRole.VERB)
+    """The clause roles a finite predicate agrees through — the copula / comparison operator and a
+    lexical verb."""
+
     @staticmethod
-    def _agree_operator(part: Fragment, number: Number) -> Fragment:
-        """:return: *part* re-tagged with *number* when it is the clause's operator slot — an
-        ``OPERATOR`` leaf, or a phrase led by one (the factored *"is greater than"*) — else *part*
-        unchanged. A non-copula operator (*"contains"*) is tagged too but the morphology pass leaves
-        it be, so this never has to single the copula out by word."""
-        if isinstance(part, RoleFragment) and part.role is SemanticRole.OPERATOR:
+    def _agree_finite(part: Fragment, number: Number) -> Fragment:
+        """:return: *part* re-tagged with *number* when it is the clause's finite slot — an
+        ``OPERATOR`` or ``VERB`` leaf, or a phrase led by one (the factored *"is greater than"*) —
+        else *part* unchanged. The copula inflects (*"is"* → *"are"*) and a lexical verb agrees
+        (*"works"* → *"work"*); a non-copula operator (*"contains"*) is tagged too but the morphology
+        pass leaves it be, so this never has to single the finite word out by text."""
+        if (
+            isinstance(part, RoleFragment)
+            and part.role in CoreferenceProcessor._FINITE_ROLES
+        ):
             return replace(part, number=number)
-        leads_with_operator = (
+        leads_with_finite = (
             isinstance(part, PhraseFragment)
             and part.parts
             and isinstance(part.parts[0], RoleFragment)
-            and part.parts[0].role is SemanticRole.OPERATOR
+            and part.parts[0].role in CoreferenceProcessor._FINITE_ROLES
         )
-        if leads_with_operator:
+        if leads_with_finite:
             return replace(
                 part,
                 parts=[replace(part.parts[0], number=number), *part.parts[1:]],

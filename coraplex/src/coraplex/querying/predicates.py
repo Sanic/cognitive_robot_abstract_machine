@@ -3,6 +3,12 @@ from dataclasses import dataclass
 from typing_extensions import List, Callable
 
 from krrood.entity_query_language.predicate import Predicate
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Adjective,
+    clause,
+    Copula,
+    Noun,
+)
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -50,13 +56,6 @@ class GripperIsFree(GripperOccupancy, Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, fields):
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            Adjective,
-            clause,
-            Copula,
-            Noun,
-        )
-
         return clause(Noun(fields["end_effector"]), Copula(), Adjective("free"))
 
 
@@ -72,11 +71,4 @@ class GripperIsNotFree(GripperOccupancy, Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, fields):
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            Adjective,
-            clause,
-            Copula,
-            Noun,
-        )
-
         return clause(Noun(fields["end_effector"]), Copula(), Adjective("occupied"))

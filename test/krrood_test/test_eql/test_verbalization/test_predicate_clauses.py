@@ -14,7 +14,7 @@ from dataclasses import dataclass
 import pytest
 from typing_extensions import Any
 
-from krrood.entity_query_language.factories import variable
+from krrood.entity_query_language.factories import an, entity, for_all, variable
 from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.predicate import Predicate
 from krrood.entity_query_language.verbalization import morphology
@@ -34,6 +34,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import Number
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
+from krrood.entity_query_language.verbalization.rendering.realization import (
+    realize_tree,
+)
 from krrood.entity_query_language.verbalization.grammar.conditions.predication import (
     negate_clause,
 )
@@ -49,7 +52,6 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Preposition,
     Verb,
 )
-
 
 # ── verb morphology ──────────────────────────────────────────────────────────────
 
@@ -79,9 +81,12 @@ def test_morphology_realizes_verb_do_support_negation():
     assert MorphologyProcessor().rewrite(_verb_leaf("work", negated=True)).text == (
         "does not work"
     )
-    assert MorphologyProcessor().rewrite(
-        _verb_leaf("work", number=Number.PLURAL, negated=True)
-    ).text == "do not work"
+    assert (
+        MorphologyProcessor()
+        .rewrite(_verb_leaf("work", number=Number.PLURAL, negated=True))
+        .text
+        == "do not work"
+    )
 
 
 def test_morphology_realizes_negated_copula():
@@ -103,22 +108,25 @@ def test_verb_element_is_a_verb_role_leaf_carrying_the_lemma():
 
 
 def test_clause_joins_constituents_in_order():
-    built = clause(Noun("an Employee"), Verb("work"), Preposition.IN, Noun("a Department"))
-    # Pre-morphology the verb leaf still holds the lemma.
-    assert flatten_fragment_to_plain_text(built) == "an Employee work in a Department"
+    built = clause(Noun("Employee"), Verb("work"), Preposition.IN, Noun("Department"))
+    # Realization lowers the noun phrases (articles) and inflects the verb for agreement.
+    assert (
+        flatten_fragment_to_plain_text(realize_tree(built))
+        == "an Employee works in a Department"
+    )
 
 
 # ── negate_clause (feature marking) ──────────────────────────────────────────────
 
 
 def test_negate_clause_marks_the_verb_head():
-    built = clause(Noun("an Employee"), Verb("work"), Preposition.IN, Noun("a Department"))
+    built = clause(Noun("Employee"), Verb("work"), Preposition.IN, Noun("Department"))
     negated = negate_clause(built)
     assert negated.parts[1].negated is True
 
 
 def test_negate_clause_returns_none_without_a_verb_or_copula():
-    built = clause(Noun("an Employee"), Noun("a Department"))
+    built = clause(Noun("Employee"), Noun("Department"))
     assert negate_clause(built) is None
 
 
@@ -141,6 +149,40 @@ def test_verb_predicate_affirmative_and_negated_with_do_support():
     )
     assert verbalize_expression(Not(WorksIn(employee, department))) == (
         "a StaffMember does not work in a Department"
+    )
+
+
+# ── subject-aware clause: pronominalisation and agreement ────────────────────────
+
+
+def test_clause_subject_pronominalises_in_singular_scope():
+    """A predicate whose subject is the singular discourse subject reads *"it"*, not *"the …"*."""
+    location = variable(Location, [])
+    assert verbalize_expression(an(entity(location).where(IsReachable(location)))) == (
+        "Find a Location such that it is reachable"
+    )
+
+
+def test_clause_subject_pronominalises_and_copula_agrees_with_plural_population():
+    """Under ``for_all`` the subject is a plural population — *"they"* and *"are"*."""
+    location = variable(Location, [])
+    assert verbalize_expression(for_all(location, IsReachable(location))) == (
+        "for all Locations, they are reachable"
+    )
+
+
+def test_clause_verb_agrees_with_plural_population():
+    """A lexical verb (not a copula) likewise agrees with the plural population — *"work"*."""
+    employee, department = variable(StaffMember, []), variable(Department, [])
+    assert verbalize_expression(for_all(employee, WorksIn(employee, department))) == (
+        "for all StaffMembers, they work in a Department"
+    )
+
+
+def test_clause_subject_keeps_noun_phrase_outside_a_subject_scope():
+    """A plain predicate (no enclosing subject) keeps its first-mention noun phrase — *"a Location"*."""
+    assert verbalize_expression(IsReachable(variable(Location, []))) == (
+        "a Location is reachable"
     )
 
 

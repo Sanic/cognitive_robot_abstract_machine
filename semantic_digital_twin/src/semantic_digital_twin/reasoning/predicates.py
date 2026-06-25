@@ -14,6 +14,12 @@ from krrood.entity_query_language.predicate import (
     Symbol,
     symbolic_function,
 )
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    clause,
+    Noun,
+    Preposition,
+    Verb,
+)
 from random_events.interval import Interval
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -554,17 +560,10 @@ class ContainsType(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, fields):
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            clause,
-            Noun,
-            Preposition,
-            Verb,
-        )
-
         return clause(
             Noun(fields["iterable"]),
             Verb("contain"),
-            Noun("an instance"),
+            Noun("instance"),
             Preposition.OF,
             Noun(fields["obj_type"]),
         )

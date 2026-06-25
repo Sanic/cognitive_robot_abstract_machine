@@ -8,6 +8,12 @@ from dataclasses import dataclass
 from typing_extensions import List, Iterator, Optional, Iterable
 
 from krrood.entity_query_language.predicate import Predicate
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Adjective,
+    clause,
+    Copula,
+    Noun,
+)
 from coraplex.datastructures.dataclasses import Context
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -162,22 +168,10 @@ class PoseValidator(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, fields):
-        """Default clause for a pose validator — *"<robot> validates a pose candidate in <world>"*.
+        """Default clause for a pose validator — *"a pose candidate is valid"*.
 
-        Concrete validators (visibility / reachability) inherit this generic surface unless they
-        override it; both ``world`` and ``robot`` are present on every :class:`PoseValidator`.
+        A validator is a validity *check*, agnostic of who performs it, so it says the candidate is
+        valid rather than naming an agent. Concrete validators (visibility / reachability) may
+        override this with their own surface.
         """
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            clause,
-            Noun,
-            Preposition,
-            Verb,
-        )
-
-        return clause(
-            Noun(fields["robot"]),
-            Verb("validate"),
-            Noun("a pose candidate"),
-            Preposition.IN,
-            Noun(fields["world"]),
-        )
+        return clause(Noun("pose candidate"), Copula(), Adjective("valid"))

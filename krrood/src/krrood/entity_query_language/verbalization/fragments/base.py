@@ -81,7 +81,8 @@ class HasNumber:
 @dataclass
 class HasPolarity:
     """Mixin contributing the grammatical ``negated`` field shared by fragments whose surface is
-    realised in the negative (a verb with do-support, a copula with its negative suppletion)."""
+    realised in the negative (a verb with do-support, a copula with its negative suppletion).
+    """
 
     negated: bool = field(default=False, kw_only=True)
     """Whether this leaf is realised negative — the morphology pass turns a ``VERB`` lemma into
@@ -246,6 +247,19 @@ class PhraseFragment(Fragment):
 
     separator: Separator = Separator.SPACE
     """Separator inserted between adjacent parts."""
+
+
+@dataclass
+class Clause(PhraseFragment):
+    """A subject-led predicate clause — *"<subject> <verb/copula> …"* — built from typed
+    part-of-speech constituents.
+
+    Marking the clause (rather than inferring it from its parts) lets coreference recognise the
+    leading constituent as the clause's grammatical subject: when that subject is the current
+    discourse subject it pronominalises (*"it"* / *"they"*) and the finite verb or copula agrees
+    with it (*"is"* → *"are"*, *"works"* → *"work"*). A plain :class:`PhraseFragment` carries no
+    such promise about its first part.
+    """
 
 
 @dataclass
