@@ -45,11 +45,6 @@ class CollisionVizMarkerPublisher(CollisionConsumer):
     The name of the topic to which the closest-points marker should be published.
     """
 
-    collision_distance_threshold: float = field(kw_only=True, default=0.0)
-    """
-    Contacts with a distance below this threshold are drawn red, others green.
-    """
-
     throttle: int = field(kw_only=True, default=1)
     """
     Publish only on every nth collision check to reduce ROS traffic.
@@ -124,19 +119,25 @@ class CollisionVizMarkerPublisher(CollisionConsumer):
         marker.scale.x = self.line_width
         marker.pose.orientation.w = 1.0
         for contact in collision_results.contacts:
-            color = self._color_for_distance(contact.distance)
+            color = self._color_for_distance(contact)
             marker.points.append(self._to_ros_point(contact.root_P_point_on_body_a))
             marker.points.append(self._to_ros_point(contact.root_P_point_on_body_b))
             marker.colors.append(color)
             marker.colors.append(color)
         return marker
 
-    def _color_for_distance(self, distance: float) -> ColorRGBA:
+    def _color_for_distance(self, contact: ClosestPoints) -> ColorRGBA:
         """
         Returns red for contacts below the threshold and green otherwise.
         """
-        if distance < self.collision_distance_threshold:
+        if contact.distance < self.collision_manager.get_violated_distance(
+            contact.body_a, contact.body_b
+        ):
             return ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0)
+        elif contact.distance < self.collision_manager.get_buffer_zone_distance(
+            contact.body_a, contact.body_b
+        ):
+            return ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0)
         return ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)
 
     @staticmethod

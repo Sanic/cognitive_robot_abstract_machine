@@ -85,7 +85,10 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-def test_external_collision_avoidance(cylinder_bot_world: World):
+def test_external_collision_avoidance(cylinder_bot_world: World, rclpy_node):
+    viz = VizMarkerPublisher(
+        _world=cylinder_bot_world, node=rclpy_node
+    ).with_tf_and_collision_visualization()
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -139,7 +142,7 @@ def test_external_collision_avoidance(cylinder_bot_world: World):
     collisions = kin_sim.context.world.collision_manager.compute_collisions()
     assert len(collisions.contacts) == 1
     assert collisions.contacts[0].distance > 0.049
-    assert len(cylinder_bot_world.collision_manager.collision_consumers) == 0
+    assert len(cylinder_bot_world.collision_manager.collision_consumers) == 1
 
 
 def test_external_collision_avoidance_battle():
