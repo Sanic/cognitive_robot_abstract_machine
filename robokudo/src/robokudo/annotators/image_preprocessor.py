@@ -14,6 +14,7 @@ This module provides an annotator for:
 from __future__ import annotations
 
 import copy
+from enum import Enum
 from timeit import default_timer
 
 import cv2
@@ -46,14 +47,11 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
        Requires properly configured camera intrinsics and color-to-depth ratio.
     """
 
-    class ViewMode:
+    class ViewMode(Enum):
         """Visualization mode enumeration."""
 
-        color: int = 1
-        """Display color image (1)"""
-
-        depth: int = 2
-        """Display depth image (2)"""
+        COLOR = "color"
+        DEPTH = "depth"
 
     class Descriptor(BaseAnnotator.Descriptor):
         """Configuration descriptor for image preprocessing."""
@@ -87,7 +85,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         self.depth: Optional[npt.NDArray] = None
         """Optional depth image currently being worked with"""
 
-        self.display_mode: int = self.ViewMode.color
+        self.display_mode: ImagePreprocessorAnnotator.ViewMode = self.ViewMode.COLOR
         """The display mode to use (color or depth)"""
 
     def update(self) -> Status:
@@ -110,7 +108,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         self.cam_intrinsics = copy.deepcopy(self.get_cas().get(CASViews.CAM_INTRINSIC))
 
-        if self.display_mode == self.ViewMode.depth:
+        if self.display_mode is self.ViewMode.DEPTH:
             self.get_annotator_output_struct().set_image(self.depth)
         else:
             self.get_annotator_output_struct().set_image(self.color)
@@ -173,6 +171,6 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         * '2': Switch to depth view mode
         """
         if key == ord("1"):
-            self.display_mode = self.ViewMode.color
+            self.display_mode = self.ViewMode.COLOR
         if key == ord("2"):
-            self.display_mode = self.ViewMode.depth
+            self.display_mode = self.ViewMode.DEPTH
