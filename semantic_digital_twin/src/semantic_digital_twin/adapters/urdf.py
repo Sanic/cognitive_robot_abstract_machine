@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Dict, Optional, Tuple, Union, List
 from urdf_parser_py import urdf as urdfpy
+from xacro import process_file
 
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
@@ -169,7 +170,6 @@ class URDFParser:
             (the ``arg`` values, e.g. ``{"ur_type": "ur5"}``).
         :return: A parser for the world described by the expanded xacro file.
         """
-        from xacro import process_file
 
         xacro_path = CompositePathResolver().resolve(xacro_path)
         urdf = process_file(xacro_path, mappings=mappings).toxml()

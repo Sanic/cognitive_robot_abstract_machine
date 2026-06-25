@@ -403,12 +403,13 @@ class Mesh(Shape):
         base_mesh = trimesh.load_mesh(self.filename, process=False)
         # Bake materials/textures down to per-vertex colors so the mesh's color
         # survives serialization (e.g. across the ROS world synchronizer).
-        if hasattr(base_mesh.visual, "to_color"):
+        if isinstance(base_mesh.visual, TextureVisuals):
             base_mesh.visual = base_mesh.visual.to_color()
         mesh_dict = base_mesh.to_dict()
-        vertex_colors = getattr(base_mesh.visual, "vertex_colors", None)
-        if vertex_colors is not None:
-            mesh_dict["vertex_colors"] = np.asarray(vertex_colors).tolist()
+        if base_mesh.visual.kind is not None:
+            mesh_dict["vertex_colors"] = np.asarray(
+                base_mesh.visual.vertex_colors
+            ).tolist()
         file_type = self.filename.split(".")[-1]
         return {
             **super().to_json(),

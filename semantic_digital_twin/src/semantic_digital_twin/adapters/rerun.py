@@ -124,16 +124,19 @@ class RerunAdapter(StateChangeCallback):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.recording = rr.RecordingStream(self.application_id)
-        if self.mode is RerunMode.SPAWN:
-            self.recording.spawn(memory_limit=self.memory_limit)
-        elif self.mode is RerunMode.CONNECT:
-            if self.target is None:
-                raise ValueError("RerunMode.CONNECT requires a target gRPC URL.")
-            self.recording.connect_grpc(self.target)
-        elif self.mode is RerunMode.SAVE:
-            if self.target is None:
-                raise ValueError("RerunMode.SAVE requires a target file path.")
-            self.recording.save(self.target)
+        match self.mode:
+            case RerunMode.SPAWN:
+                self.recording.spawn(memory_limit=self.memory_limit)
+            case RerunMode.CONNECT:
+                if self.target is None:
+                    raise ValueError("RerunMode.CONNECT requires a target gRPC URL.")
+                self.recording.connect_grpc(self.target)
+            case RerunMode.SAVE:
+                if self.target is None:
+                    raise ValueError("RerunMode.SAVE requires a target file path.")
+                self.recording.save(self.target)
+            case RerunMode.NONE:
+                pass
         self.model_cb = RerunModelCallback(
             _world=self._world,
             recording=self.recording,
