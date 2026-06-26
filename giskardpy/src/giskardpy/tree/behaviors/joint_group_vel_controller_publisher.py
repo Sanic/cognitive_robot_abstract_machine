@@ -19,7 +19,16 @@ from semantic_digital_twin.world_description.connections import (
 class JointGroupVelController(GiskardBehavior):
     connections: List[ActiveConnection1DOF]
 
-    def __init__(self, cmd_topic: str, connections: List[ActiveConnection1DOF]):
+    minimum_valid_velocity: float
+    """Minimum magnitude that small non-prismatic, non-finger joint velocities are raised
+    to so the hardware actually moves. A value of ``0.0`` disables clamping."""
+
+    def __init__(
+        self,
+        cmd_topic: str,
+        connections: List[ActiveConnection1DOF],
+        minimum_valid_velocity: float,
+    ):
         super().__init__()
         self.cmd_topic = cmd_topic
         self.cmd_pub = rospy.node.create_publisher(
@@ -27,6 +36,7 @@ class JointGroupVelController(GiskardBehavior):
         )
 
         self.connections = connections
+        self.minimum_valid_velocity = minimum_valid_velocity
         for connection in self.connections:
             connection.has_hardware_interface = True
         self.msg = None
@@ -38,7 +48,6 @@ class JointGroupVelController(GiskardBehavior):
     @record_time
     def update(self):
         msg = Float64MultiArray()
-        minimum_valid_velocity = 0.03
         low_velocity = 0.0
         for i, connection in enumerate(self.connections):
             velocity = connection.velocity
@@ -47,9 +56,9 @@ class JointGroupVelController(GiskardBehavior):
             if (
                 not isinstance(connection, PrismaticConnection)
                 and not "finger" in connection.name.name
-                and low_velocity < abs_velocity < minimum_valid_velocity
+                and low_velocity < abs_velocity < self.minimum_valid_velocity
             ):
-                velocity = minimum_valid_velocity * vel_sign
+                velocity = self.minimum_valid_velocity * vel_sign
             msg.data.append(velocity)
         self.cmd_pub.publish(msg)
         return Status.RUNNING

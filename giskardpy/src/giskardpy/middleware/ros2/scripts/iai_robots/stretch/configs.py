@@ -69,7 +69,9 @@ class StretchVelocityInterface(RobotInterfaceConfig):
             "joint_left_wheel", #9
         ]
         self.add_joint_velocity_group_controller(
-            cmd_topic="/joint_velocity_cmd", connections=joints
+            cmd_topic="/joint_velocity_cmd",
+            connections=joints,
+            minimum_valid_velocity=0.03,
         )
 
 

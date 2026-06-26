@@ -44,7 +44,9 @@ class ConnectionSpec:
     """The concrete connection class to instantiate."""
 
 
-def build_controller(specs: List[ConnectionSpec]) -> JointGroupVelController:
+def build_controller(
+    specs: List[ConnectionSpec], minimum_valid_velocity: float = 0.0
+) -> JointGroupVelController:
     """Build a controller over a chain of freshly created connections."""
     world = World()
     connections: List[ActiveConnection1DOF] = []
@@ -64,7 +66,11 @@ def build_controller(specs: List[ConnectionSpec]) -> JointGroupVelController:
             parent = child
     for spec, connection in zip(specs, connections):
         connection.velocity = spec.velocity
-    return JointGroupVelController(cmd_topic="test_cmd", connections=connections)
+    return JointGroupVelController(
+        cmd_topic="test_cmd",
+        connections=connections,
+        minimum_valid_velocity=minimum_valid_velocity,
+    )
 
 
 def tick(controller: JointGroupVelController) -> List[float]:
@@ -93,12 +99,25 @@ def test_below_threshold_velocity_is_raised_to_minimum(init_rospy):
         ConnectionSpec(name="slow_positive", velocity=0.01),
         ConnectionSpec(name="slow_negative", velocity=-0.01),
     ]
-    controller = build_controller(specs)
+    controller = build_controller(specs, minimum_valid_velocity=0.03)
 
     data = tick(controller)
 
     assert data[0] == pytest.approx(0.03)
     assert data[1] == pytest.approx(-0.03)
+
+
+def test_default_minimum_valid_velocity_does_not_clamp(init_rospy):
+    specs = [
+        ConnectionSpec(name="slow_positive", velocity=0.01),
+        ConnectionSpec(name="slow_negative", velocity=-0.01),
+    ]
+    controller = build_controller(specs)
+
+    data = tick(controller)
+
+    assert data[0] == pytest.approx(0.01)
+    assert data[1] == pytest.approx(-0.01)
 
 
 def test_velocities_outside_threshold_are_unchanged(init_rospy):
@@ -123,7 +142,7 @@ def test_prismatic_and_finger_joints_are_not_clamped(init_rospy):
         ),
         ConnectionSpec(name="gripper_finger_joint", velocity=0.01),
     ]
-    controller = build_controller(specs)
+    controller = build_controller(specs, minimum_valid_velocity=0.03)
 
     data = tick(controller)
 
