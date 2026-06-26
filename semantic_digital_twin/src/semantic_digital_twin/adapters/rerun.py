@@ -169,7 +169,6 @@ class RerunAdapter(StateChangeCallback):
     """
 
     def __post_init__(self) -> None:
-        super().__post_init__()
         self.recording = rerun.RecordingStream(self.application_id)
         match self.mode:
             case RerunMode.SPAWN:
@@ -190,6 +189,7 @@ class RerunAdapter(StateChangeCallback):
             root_entity_path=self.root_entity_path,
         )
         self.model_cb.notify_model_change()
+        super().__post_init__()
         self.on_state_change()
 
     def _log_state(self, world: World, *, static: bool = False) -> None:
