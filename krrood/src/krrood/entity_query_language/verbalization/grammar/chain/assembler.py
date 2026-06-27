@@ -63,7 +63,7 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         """
         return self.possessive(plan)
 
-    # ── surface forms ──────────────────────────────────────────────────────────
+    # %% surface forms
 
     def possessive(self, plan: ChainPlan) -> VerbalizationFragment:
         """

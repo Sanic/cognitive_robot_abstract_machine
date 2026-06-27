@@ -356,7 +356,7 @@ class BlockFragment(VerbalizationFragment):
     header as a plain label above its items (e.g. a *"whose"* / *"given that"* section)."""
 
 
-# ── VerbalizationFragment catamorphism ──────────────────────────────────────────────────────
+# %% VerbalizationFragment catamorphism
 
 
 def fold_fragment(
@@ -413,7 +413,7 @@ def fold_fragment(
             raise UnloweredFragmentError(fragment=fragment)
 
 
-# ── VerbalizationFragment transform (tree → tree) ────────────────────────────────────────────
+# %% VerbalizationFragment transform (tree → tree)
 
 
 def map_structural_children(
@@ -469,7 +469,7 @@ def map_fragment(
     return rebuilt if rebuilt is not None else leaf(fragment)
 
 
-# ── VerbalizationFragment flattening ────────────────────────────────────────────────────────
+# %% VerbalizationFragment flattening
 
 
 def flatten_fragment_to_plain_text(fragment: VerbalizationFragment) -> str:
@@ -504,7 +504,7 @@ def flatten_fragment_to_plain_text(fragment: VerbalizationFragment) -> str:
     )
 
 
-# ── VerbalizationFragment joining utilities ─────────────────────────────────────────────────
+# %% VerbalizationFragment joining utilities
 
 
 def oxford_comma(

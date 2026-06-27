@@ -360,7 +360,7 @@ def place(request: Placement, context: RuleContext) -> Placed:
     return Placed(position=form.position, fragment=form.render(request, context))
 
 
-# ── placing a whole subject restriction ─────────────────────────────────────
+# %% placing a whole subject restriction
 
 
 @dataclass(frozen=True)

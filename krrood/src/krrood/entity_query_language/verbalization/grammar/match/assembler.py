@@ -98,7 +98,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
             source=node.expression,
         )
 
-    # ── predict ────────────────────────────────────────────────────────────────
+    # %% predict
 
     def _inline_predict(
         self, predict_groups: List[AttributeGroup], plan: MatchPlan
@@ -158,7 +158,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
             [assignment.attribute for assignment in group.predicted], group.object
         )
 
-    # ── given that ───────────────────────────────────────────────────────────
+    # %% given that
 
     def _given_that_block(self, plan: MatchPlan) -> Optional[VerbalizationFragment]:
         """:return: The *"given that"* block — one point per attribute group (concrete assignments)
@@ -300,7 +300,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
             owner_referent_id=owner._id_,
         )
 
-    # ── where ────────────────────────────────────────────────────────────────
+    # %% where
 
     def _where_block(self, plan: MatchPlan) -> Optional[VerbalizationFragment]:
         """:return: The *"where"* block — one point per free condition — or ``None`` when absent.
@@ -321,7 +321,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
             conjunction=Conjunctions.AND.as_fragment(),
         )
 
-    # ── shared ───────────────────────────────────────────────────────────────
+    # %% shared
 
     def _attribute_list(self, attributes: List[Attribute]) -> VerbalizationFragment:
         """:return: The attribute names as a single fragment — *"x, y, and z"* or *"x"*.

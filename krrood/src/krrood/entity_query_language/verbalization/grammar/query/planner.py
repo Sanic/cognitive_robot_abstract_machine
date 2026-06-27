@@ -309,7 +309,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             columns=self._columns_without_keys(keys),
         )
 
-    # ── selection shape ──────────────────────────────────────────────────────
+    # %% selection shape
 
     @property
     def _selected(self) -> Optional[SymbolicExpression]:
@@ -349,7 +349,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         """
         return FallbackNouns.ENTITY.name_of(self._selected)
 
-    # ── subject restriction (WHERE partition) ────────────────────────────────
+    # %% subject restriction (WHERE partition)
 
     def _subject(self) -> Optional[Variable]:
         if not isinstance(self.node, Entity):
@@ -366,13 +366,13 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             return None
         return RestrictionPlan(conditions=flatten_operands(condition, AND))
 
-    # ── clauses ──────────────────────────────────────────────────────────────
+    # %% clauses
 
     def _where_condition(self) -> Optional[SymbolicExpression]:
         where = getattr(self.node, "_where_expression_", None)
         return where.condition if where is not None else None
 
-    # ── aggregation value-subquery ───────────────────────────────────────────
+    # %% aggregation value-subquery
 
     def _aggregation_data(self) -> Optional[AggregationData]:
         if not is_aggregation_subquery(self.node):
@@ -384,7 +384,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             source=aggregation_source_root(self.node),
         )
 
-    # ── ranking (limit + ordering) ───────────────────────────────────────────
+    # %% ranking (limit + ordering)
 
     def _ranking(self) -> Optional[RankingPlan]:
         """:return: The ``limit`` (+ ordering) decomposition, or ``None`` when the query has no
@@ -422,7 +422,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             return RankingKeyRelation.OTHER
         return RankingKeyRelation.ATTRIBUTE if chain else RankingKeyRelation.SELF
 
-    # ── discourse focus (pronominalisation) ──────────────────────────────────
+    # %% discourse focus (pronominalisation)
 
     def _discourse_root(self) -> Optional[uuid.UUID]:
         """:return: The single variable every chain in this query roots at, or ``None`` when the

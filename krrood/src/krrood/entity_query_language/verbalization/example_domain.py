@@ -51,7 +51,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Verb,
 )
 
-# ── Robots & missions (the quick-start + cross-variable examples) ────────────
+# %% Robots & missions (the quick-start + cross-variable examples)
 
 
 @dataclass
@@ -79,7 +79,7 @@ class Mission:
     """Priority rank (higher is more urgent)."""
 
 
-# ── Boolean & list attributes (predicative / indexed-attribute examples) ─────
+# %% Boolean & list attributes (predicative / indexed-attribute examples)
 
 
 @dataclass
@@ -104,7 +104,7 @@ class Worker:
     """The worker's tasks (indexable, e.g. ``tasks[0]``)."""
 
 
-# ── Money (aggregation, nested-attribute, and date-range examples) ───────────
+# %% Money (aggregation, nested-attribute, and date-range examples)
 
 
 @dataclass
@@ -126,7 +126,7 @@ class BankTransaction:
     """When the transaction was booked (used for *"between … and …"* date folding)."""
 
 
-# ── Employees (same-type disambiguation, grouping, having examples) ──────────
+# %% Employees (same-type disambiguation, grouping, having examples)
 
 
 @dataclass
@@ -146,7 +146,7 @@ class Employee:
     """Salary at hiring time."""
 
 
-# ── Custom predicates (fragment-built verbalization examples) ────────────────
+# %% Custom predicates (fragment-built verbalization examples)
 
 
 @dataclass(eq=False)
@@ -218,7 +218,7 @@ class WorksIn(Predicate):
         )
 
 
-# ── Birds (rule-tree / inference verbalization examples) ─────────────────────
+# %% Birds (rule-tree / inference verbalization examples)
 
 
 @dataclass
@@ -261,7 +261,7 @@ class WeakLoveBird(BirdView):
     """A bird inferred to be in a weak-love pairing."""
 
 
-# ── Furniture (deeply nested chains + aggregated-antecedent rule examples) ───
+# %% Furniture (deeply nested chains + aggregated-antecedent rule examples)
 
 
 @dataclass

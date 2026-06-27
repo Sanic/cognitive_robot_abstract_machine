@@ -81,7 +81,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     planner = QueryPlanner
 
-    # ── entry points ─────────────────────────────────────────────────────────
+    # %% entry points
 
     def realize(self, node: Query, plan: QueryPlan) -> VerbalizationFragment:
         """
@@ -655,7 +655,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             return GrammaticalNumber.PLURAL
         return GrammaticalNumber.SINGULAR
 
-    # ── subject selection ──────────────────────────────────────────────────────
+    # %% subject selection
 
     def _assemble_subject(self, node: Query, plan: QueryPlan) -> VerbalizationFragment:
         """:return: *"Find a Robot whose battery is high, such that … [clauses]"* — the
@@ -750,7 +750,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         )
         return selected, [rendered.whose, residual]
 
-    # ── noun forms ───────────────────────────────────────────────────────────
+    # %% noun forms
 
     def _as_noun(self, entity: Query) -> VerbalizationFragment:
         """
@@ -797,7 +797,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             modifiers=modifiers,
         )
 
-    # ── query-body clauses ─────────────────────────────────────────────────────
+    # %% query-body clauses
 
     def _query_body(
         self,

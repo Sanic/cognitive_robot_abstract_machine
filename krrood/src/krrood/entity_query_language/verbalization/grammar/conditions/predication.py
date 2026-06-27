@@ -85,7 +85,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.verbalization.context import MicroplanningServices
 
 
-# ── predicate-transform registry (the surface a comparator takes as a predicate) ──
+# %% predicate-transform registry (the surface a comparator takes as a predicate)
 
 
 class PredicateTransform(SpecificityRule):
@@ -365,7 +365,7 @@ class RelationalIdentityTransform(GenericComparator):
         return None
 
 
-# ── operator-word selection ──────────────────────────────────────────────────
+# %% operator-word selection
 
 
 def comparator_operator(
@@ -514,7 +514,7 @@ def coindexed_operator(operation) -> VerbalizationFragment:
     return predicative_operator(phrase.value.standard, GrammaticalNumber.PLURAL)
 
 
-# ── absence rendering (== None) ──────────────────────────────────────────────
+# %% absence rendering (== None)
 
 
 def render_absence(

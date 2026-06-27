@@ -186,7 +186,7 @@ class VerbalizationPipeline:
             html_path = Path(html_file.name)
         webbrowser.open(html_path.as_uri())
 
-    # ── Factories ──────────────────────────────────────────────────────────────
+    # %% Factories
 
     @classmethod
     def plain(cls) -> VerbalizationPipeline:

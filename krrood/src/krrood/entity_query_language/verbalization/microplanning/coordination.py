@@ -67,7 +67,7 @@ COINDEXED_OPERATORS: Tuple[Callable, ...] = (
 )
 
 
-# ── fold artifacts (the vocabulary the pass produces) ───────────────────────
+# %% fold artifacts (the vocabulary the pass produces)
 
 
 @dataclass
@@ -164,7 +164,7 @@ class CoindexedNaturalParts:
     """The right prefix's distinguishing final hop ``(name, owner)`` (e.g. ``end``)."""
 
 
-# ── the conjunct-reduction pass (high-level entry) ──────────────────────────
+# %% the conjunct-reduction pass (high-level entry)
 
 FoldNode: TypeAlias = Union[SymbolicExpression, RangeFold, CoindexedFold]
 """A node the verbalization fold dispatches over: either a real EQL expression or a synthetic
@@ -262,7 +262,7 @@ def reduce_conjuncts(conjuncts: List[SymbolicExpression]) -> ConjunctList:
     return ConjunctReducer().reduce(conjuncts)
 
 
-# ── range-bound fold ────────────────────────────────────────────────────────
+# %% range-bound fold
 
 
 class _RangeBound(Enum):
@@ -403,7 +403,7 @@ def has_pair(conjuncts: List[SymbolicExpression]) -> bool:
     return any(isinstance(item, RangeFold) for item in fold_range_pairs(conjuncts))
 
 
-# ── co-indexed fold ─────────────────────────────────────────────────────────
+# %% co-indexed fold
 
 
 def _attribute_pair(node: SymbolicExpression) -> Optional[Tuple[str, type]]:
@@ -529,7 +529,7 @@ def fold_coindexed_groups(
     return [slot for index, slot in enumerate(slots) if not dropped[index]]
 
 
-# ── owner grouping (shared aggregation primitive) ───────────────────────────
+# %% owner grouping (shared aggregation primitive)
 
 _Item = TypeVar("_Item")
 _Payload = TypeVar("_Payload")
@@ -690,7 +690,7 @@ def coindexed_natural_parts(fold: CoindexedFold) -> Optional[CoindexedNaturalPar
     )
 
 
-# ── fragment-level coordination builders ────────────────────────────────────
+# %% fragment-level coordination builders
 
 
 def build_between(

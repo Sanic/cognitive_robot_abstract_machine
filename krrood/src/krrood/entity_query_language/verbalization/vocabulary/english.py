@@ -45,7 +45,7 @@ from krrood.entity_query_language.verbalization.vocabulary.words import (
     VocabEnum,
 )
 
-# ── English-specific word subtypes ─────────────────────────────────────────────
+# %% English-specific word subtypes
 # These add behaviour for phrases that depend on a runtime type_name argument.
 
 
@@ -167,7 +167,7 @@ class CommonGroupKeyWord(PlainWord):
         )
 
 
-# ── Namespace Enums ────────────────────────────────────────────────────────────
+# %% Namespace Enums
 
 
 class Keywords(VocabEnum):

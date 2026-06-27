@@ -13,7 +13,7 @@ from krrood.entity_query_language.query.aggregation_structure import (
     aggregation_source_root,
 )
 
-# ── restriction-subject rules (which variable does the WHERE restrict?) ──────
+# %% restriction-subject rules (which variable does the WHERE restrict?)
 
 
 class RestrictionSubjectRule(SpecificityRule):

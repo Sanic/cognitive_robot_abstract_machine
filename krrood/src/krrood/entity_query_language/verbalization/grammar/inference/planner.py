@@ -153,7 +153,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
             group_key_ids=group_key_ids,
         )
 
-    # ── shared analysis helpers ──────────────────────────────────────────────────
+    # %% shared analysis helpers
 
     @property
     def _inferred(self) -> InstantiatedVariable:
@@ -213,7 +213,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
             return AggregationStatus.GROUP_KEY
         return AggregationStatus.AGGREGATED if group_key_ids else AggregationStatus.NONE
 
-    # ── consequent (THEN bindings) ───────────────────────────────────────────────
+    # %% consequent (THEN bindings)
 
     def _plan_consequent(
         self, group_key_ids: FrozenSet[uuid.UUID]
@@ -236,7 +236,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
             for field_name, child in self._inferred._child_vars_.items()
         ]
 
-    # ── antecedents (IF roots + their conditions) ────────────────────────────────
+    # %% antecedents (IF roots + their conditions)
 
     def _plan_antecedents(
         self, group_key_ids: FrozenSet[uuid.UUID]

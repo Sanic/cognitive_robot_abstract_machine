@@ -85,7 +85,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
             node, plan.type_name, binding_fragments, constraint_fragments
         )
 
-    # ── bindings ───────────────────────────────────────────────────────────────
+    # %% bindings
 
     def _bindings(
         self, plan: InstantiatedPlan, instantiated_type: type
@@ -162,7 +162,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
             binding.value, number=GrammaticalNumber.of(binding.is_plural)
         )
 
-    # ── phrase assembly ──────────────────────────────────────────────────────────
+    # %% phrase assembly
 
     def _phrase(
         self,
