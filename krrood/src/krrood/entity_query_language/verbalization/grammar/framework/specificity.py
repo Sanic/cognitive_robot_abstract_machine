@@ -116,11 +116,10 @@ class SpecificityRule(ABC):
         ...     RankingForm, RankingRequest)
         >>> from krrood.entity_query_language.verbalization.grammar.query.planner import (
         ...     RankingPlan, RankingDirection, RankingKeyRelation)
-        >>> plan = RankingPlan(n=3, direction=RankingDirection.DESCENDING,
+        >>> plan = RankingPlan(limit_number=3, direction=RankingDirection.DESCENDING,
         ...     relation=RankingKeyRelation.ATTRIBUTE, order_key=None)
         >>> RankingForm.most_applicable(RankingRequest(plan=plan)).__name__
         'AttributeRankedByForm'
         """
         applicable = [alt for alt in cls.alternatives() if alt.applies(*args)]
         return most_specific(applicable, key=mro_depth)
-

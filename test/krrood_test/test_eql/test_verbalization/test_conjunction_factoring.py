@@ -25,7 +25,8 @@ def test_bare_variable_conjuncts_factor_into_a_relative_clause():
 def test_complementary_bounds_fold_to_between_in_the_clause():
     x = variable(int, [])
     assert (
-        verbalize_expression(and_(x > 1, x < 10)) == "an Integer that is between 1 and 10"
+        verbalize_expression(and_(x > 1, x < 10))
+        == "an Integer that is between 1 and 10"
     )
 
 

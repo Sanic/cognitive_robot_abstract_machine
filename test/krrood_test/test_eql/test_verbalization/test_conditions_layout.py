@@ -29,7 +29,13 @@ def test_placement_owns_subject_slot_placement():
     placement = importlib.import_module(
         "krrood.entity_query_language.verbalization.grammar.conditions.placement"
     )
-    for name in ("ConditionForm", "Slot", "Placement", "place", "as_subject_restrictions"):
+    for name in (
+        "ConditionForm",
+        "Slot",
+        "Placement",
+        "place",
+        "as_subject_restrictions",
+    ):
         assert hasattr(placement, name), f"placement is missing {name}"
 
 

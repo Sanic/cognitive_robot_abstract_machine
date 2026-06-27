@@ -152,9 +152,7 @@ def test_set_of_limit_ascending_is_bottom():
         set_of(pnl.period, revenue).grouped_by(pnl.period).ordered_by(revenue).limit(2)
     )
     text = verbalize_expression(q)
-    assert text.startswith(
-        "For the two ProfitAndLossStatements with the lowest sum"
-    )
+    assert text.startswith("For the two ProfitAndLossStatements with the lowest sum")
     assert "(" not in text
     assert "ordered by" not in text
     assert "grouped by" not in text
@@ -181,7 +179,8 @@ def _top_revenue_month_query(*, by_year: bool = False):
 def test_grouped_aggregation_limit_one_ranks_the_aggregate():
     """A grouped aggregation taking the single highest group identifies the winner by the value it
     is ranked by — 'with the highest <aggregate>' — names the entity first so the body pronominalises
-    to it, and reduces the aggregate to 'the sum' on its second mention. Never restates the grouping."""
+    to it, and reduces the aggregate to 'the sum' on its second mention. Never restates the grouping.
+    """
     text = verbalize_expression(_top_revenue_month_query())
     assert text == (
         "For the ProfitAndLossStatement "
@@ -218,7 +217,8 @@ def test_grouped_aggregation_limit_one_ascending_is_lowest():
 
 def test_ranked_report_reduces_only_the_ranked_aggregate():
     """With two aggregates selected, only the one the query is ranked by is named in the frame and so
-    reduces to 'the sum' in the body; the unranked aggregate keeps its full description."""
+    reduces to 'the sum' in the body; the unranked aggregate keeps its full description.
+    """
     pnl = variable(ProfitAndLossStatement, domain=None)
     ranked = eql.sum(pnl.revenue.money.amount)
     other = eql.average(pnl.revenue.money.amount)

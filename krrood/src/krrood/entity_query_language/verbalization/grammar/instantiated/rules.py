@@ -77,8 +77,7 @@ class InstantiatedVerbalizableRule(PhraseRule):
         """
         fields = RenderedFields(
             fragments={
-                name: context.child(child)
-                for name, child in node._child_vars_.items()
+                name: context.child(child) for name, child in node._child_vars_.items()
             },
             raw=node._child_vars_,
         )

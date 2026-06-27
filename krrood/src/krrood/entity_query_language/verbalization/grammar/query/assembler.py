@@ -22,7 +22,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.grammar.aggregation.assembler import (
     AggregationValueAssembler,
@@ -188,12 +188,17 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         ``limit(1)``, *"the three <entities> with the highest …"* for ``n > 1``). Naming the entity
         first lets the columns pronominalise to it (*"its period"*) and the aggregate, named once in
         the frame, reduce to *"the sum"* in the body. A ranking by a plain attribute (or a tuple with
-        no single root) keeps the attribute-keyed reframe, which already names its basis."""
+        no single root) keeps the attribute-keyed reframe, which already names its basis.
+        """
         subject = self._tuple_subject(node, plan)
         aggregate = self._ranked_aggregate_column(node, plan.ranking)
         if subject is None or aggregate is None:
             return self._assemble_ranked_set_of(node, plan)
-        number = Number.PLURAL if plan.ranking.n > 1 else Number.SINGULAR
+        number = (
+            GrammaticalNumber.PLURAL
+            if plan.ranking.limit_number > 1
+            else GrammaticalNumber.SINGULAR
+        )
         subject_noun = NounPhrase(
             head=RoleFragment.for_variable(
                 subject._type_.__name__, subject, number=number
@@ -201,8 +206,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             number=number,
             definiteness=Definiteness.DEFINITE,
             pre_head=(
-                WordFragment(text=morphology.cardinal(plan.ranking.n))
-                if plan.ranking.n > 1
+                WordFragment(text=morphology.cardinal(plan.ranking.limit_number))
+                if plan.ranking.limit_number > 1
                 else None
             ),
             modifiers=[
@@ -230,7 +235,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         self, node: SetOf, ranking
     ) -> Optional[SymbolicExpression]:
         """:return: the selected aggregate column the query is ranked by (matched to the order key
-        structurally), or ``None`` when the order key is not an aggregate or names no column."""
+        structurally), or ``None`` when the order key is not an aggregate or names no column.
+        """
         if not isinstance(ranking.order_key, Aggregator):
             return None
         for selection in node._selected_variables_:
@@ -242,7 +248,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         self, aggregate: SymbolicExpression, direction: RankingDirection
     ) -> Fragment:
         """:return: the post-nominal ranking modifier *"with the highest/lowest <aggregate>"* — the
-        aggregate's first (full) mention, which the body's repeat reduces to *"the sum"*."""
+        aggregate's first (full) mention, which the body's repeat reduces to *"the sum"*.
+        """
         return PhraseFragment(
             parts=[
                 Prepositions.WITH.as_fragment(),
@@ -266,7 +273,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     def _expression_signature(self, expression: SymbolicExpression) -> Tuple:
         """:return: a structural key for *expression* — its kind, root variable, and attribute path —
-        so two distinct objects describing the same navigation/aggregate compare equal."""
+        so two distinct objects describing the same navigation/aggregate compare equal.
+        """
         if isinstance(expression, Aggregator):
             kind = type(expression).__name__
             chain, root = walk_chain(expression._chain_expression_)
@@ -304,7 +312,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         'Find the department and salary of an Employee'
         """
         if plan.report is not None:
-            return self._selections.prose(node._selected_variables_, number=Number.PLURAL)
+            return self._selections.prose(
+                node._selected_variables_, number=GrammaticalNumber.PLURAL
+            )
         return self._selections.prose(node._selected_variables_)
 
     def _assemble_ranked_set_of(self, node: SetOf, plan: QueryPlan) -> Fragment:
@@ -418,9 +428,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             return RankingKeyRelation.OTHER
         return RankingKeyRelation.ATTRIBUTE if chain else RankingKeyRelation.SELF
 
-    def _ranked_columns(
-        self, node: SetOf, ranking
-    ) -> List[SymbolicExpression]:
+    def _ranked_columns(self, node: SetOf, ranking) -> List[SymbolicExpression]:
         """:return: the reported columns — the selected tuple, with the order key removed when the
         ranking already names it (*"by salary"*), so it is not listed twice.
 
@@ -498,7 +506,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         selection = PhraseFragment(
             parts=[
                 GroupingPhrases.ALL.as_fragment(),
-                self._selections.prose(report.columns, number=Number.PLURAL),
+                self._selections.prose(report.columns, number=GrammaticalNumber.PLURAL),
             ]
         )
         return self._query_body(
@@ -518,7 +526,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         'Report the distinct departments'
         """
         labels = oxford_comma(
-            [self._group_label(key, Number.PLURAL) for key in keys],
+            [self._group_label(key, GrammaticalNumber.PLURAL) for key in keys],
             Conjunctions.AND.as_fragment(),
         )
         return PhraseFragment(
@@ -551,7 +559,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         )
 
     def _group_label(
-        self, key: SymbolicExpression, number: Number = Number.SINGULAR
+        self,
+        key: SymbolicExpression,
+        number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> Fragment:
         """:return: a group key as a bare label in *number* — *"department"* / *"departments"* for an
         attribute key, the type name for a variable key — naming the group itself rather than one
@@ -620,7 +630,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             return self._sentence_initial(Keywords.REPORT.as_fragment())
         return Keywords.FIND.as_fragment()
 
-    def _subject_number(self, plan: QueryPlan) -> Number:
+    def _subject_number(self, plan: QueryPlan) -> GrammaticalNumber:
         """:return: the grammatical number of the rendered subject — plural for a ranking of several
         (*"the top three Employees"*) or an ordered report (*"Report Employees"*), else singular. The
         subject's restriction and possessives agree with it (*"whose salaries are …"*).
@@ -638,8 +648,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             ReportKind.ORDERING,
             ReportKind.GROUPING,
         ):
-            return Number.PLURAL
-        return Number.SINGULAR
+            return GrammaticalNumber.PLURAL
+        return GrammaticalNumber.SINGULAR
 
     # ── subject selection ──────────────────────────────────────────────────────
 

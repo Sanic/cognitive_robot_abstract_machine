@@ -15,7 +15,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.rendering.coreference_processor import (
@@ -34,7 +34,9 @@ from krrood.entity_query_language.verbalization.rendering.passes import (
     RealizationPass,
     RewritePass,
 )
-from krrood.entity_query_language.verbalization.rendering.realization import realize_tree
+from krrood.entity_query_language.verbalization.rendering.realization import (
+    realize_tree,
+)
 from krrood.entity_query_language.verbalization.vocabulary.english import Punctuation
 
 
@@ -57,7 +59,7 @@ def _sample_tree() -> PhraseFragment:
     plural_indefinite = NounPhrase(
         head=RoleFragment(text="Cabinet", role=SemanticRole.VARIABLE),
         definiteness=Definiteness.INDEFINITE,
-        number=Number.PLURAL,
+        number=GrammaticalNumber.PLURAL,
     )
     return PhraseFragment(
         parts=[
@@ -70,15 +72,16 @@ def _sample_tree() -> PhraseFragment:
 
 def test_realize_tree_is_the_ordered_pass_pipeline():
     """``realize_tree`` equals coreference → determiner → morphology → orthography, applied in that
-    order — exercised on a tree that needs every pass (determiner-drop + pluralise + comma glue)."""
+    order — exercised on a tree that needs every pass (determiner-drop + pluralise + comma glue).
+    """
     tree = _sample_tree()
     manual = OrthographyProcessor().process(
         MorphologyProcessor().process(
             DeterminerProcessor().process(CoreferenceProcessor().process(tree))
         )
     )
-    assert flatten_fragment_to_plain_text(realize_tree(tree)) == flatten_fragment_to_plain_text(
-        manual
-    )
+    assert flatten_fragment_to_plain_text(
+        realize_tree(tree)
+    ) == flatten_fragment_to_plain_text(manual)
     # And it really produced the determiner-drop + plural + glued comma.
     assert flatten_fragment_to_plain_text(realize_tree(tree)) == "Cabinets, end"

@@ -14,7 +14,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     WordFragment,
 )
-from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.fragments.features import (
+    GrammaticalNumber,
+)
 from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
     SpecificityRule,
 )
@@ -50,7 +52,7 @@ class RankingSurface:
     """The qualifier between the determiner and the head (*"first two"* / *"top three"* /
     *"highest"*), or ``None`` (the attribute-superlative form carries it as a modifier instead)."""
 
-    number: Number
+    number: GrammaticalNumber
     """The head's grammatical number — ``SINGULAR`` for *n = 1*, ``PLURAL`` for *n > 1*."""
 
     modifiers: List[Fragment]
@@ -157,10 +159,12 @@ class LeadingRankForm(RankingForm):
         It emits the leading qualifier *"first two"* placed before the head, with no trailing key
         modifier — so the class example's ranking reads *"the first two Robots"*.
         """
-        n = request.plan.n
+        n = request.plan.limit_number
         quality = _quality(request.plan.direction, n).as_fragment()
         pre_head = quality if n == 1 else PhraseFragment(parts=[quality, _cardinal(n)])
-        return RankingSurface(pre_head=pre_head, number=Number.of(n > 1), modifiers=[])
+        return RankingSurface(
+            pre_head=pre_head, number=GrammaticalNumber.of(n > 1), modifiers=[]
+        )
 
 
 class AttributeSuperlativeForm(LeadingRankForm):
@@ -181,7 +185,7 @@ class AttributeSuperlativeForm(LeadingRankForm):
         than a leading-quality *"the highest Employee"*.
         """
         plan = request.plan
-        return plan.relation is RankingKeyRelation.ATTRIBUTE and plan.n == 1
+        return plan.relation is RankingKeyRelation.ATTRIBUTE and plan.limit_number == 1
 
     @classmethod
     def render(cls, request: RankingRequest) -> RankingSurface:
@@ -205,7 +209,7 @@ class AttributeSuperlativeForm(LeadingRankForm):
             ]
         )
         return RankingSurface(
-            pre_head=None, number=Number.SINGULAR, modifiers=[modifier]
+            pre_head=None, number=GrammaticalNumber.SINGULAR, modifiers=[modifier]
         )
 
 
@@ -227,7 +231,7 @@ class AttributeRankedByForm(LeadingRankForm):
         salary"* rather than dropping the key as the leading base form would.
         """
         plan = request.plan
-        return plan.relation is RankingKeyRelation.ATTRIBUTE and plan.n > 1
+        return plan.relation is RankingKeyRelation.ATTRIBUTE and plan.limit_number > 1
 
     @classmethod
     def render(cls, request: RankingRequest) -> RankingSurface:
@@ -243,12 +247,14 @@ class AttributeRankedByForm(LeadingRankForm):
             if plan.direction is RankingDirection.ASCENDING
             else RankingWords.TOP
         )
-        pre_head = PhraseFragment(parts=[quality.as_fragment(), _cardinal(plan.n)])
+        pre_head = PhraseFragment(
+            parts=[quality.as_fragment(), _cardinal(plan.limit_number)]
+        )
         modifier = PhraseFragment(
             parts=[RankingWords.BY.as_fragment(), _key_attribute(plan.order_key)]
         )
         return RankingSurface(
-            pre_head=pre_head, number=Number.PLURAL, modifiers=[modifier]
+            pre_head=pre_head, number=GrammaticalNumber.PLURAL, modifiers=[modifier]
         )
 
 

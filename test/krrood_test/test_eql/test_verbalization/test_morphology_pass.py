@@ -1,6 +1,6 @@
 """
 Unit tests for the morphology realisation pass — the single place grammatical number is
-*applied*.  Assemblers tag a leaf ``Number.PLURAL``; this pass pluralises it.
+*applied*.  Assemblers tag a leaf ``GrammaticalNumber.PLURAL``; this pass pluralises it.
 """
 
 from __future__ import annotations
@@ -11,7 +11,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     WordFragment,
 )
-from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.fragments.features import (
+    GrammaticalNumber,
+)
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.rendering.morphology_processor import (
     MorphologyProcessor,
@@ -29,7 +31,9 @@ def test_pass_pluralises_only_plural_tagged_leaves():
     tree = PhraseFragment(
         parts=[
             RoleFragment(
-                text="Robot", role=SemanticRole.VARIABLE, number=Number.PLURAL
+                text="Robot",
+                role=SemanticRole.VARIABLE,
+                number=GrammaticalNumber.PLURAL,
             ),
             WordFragment(text="of"),
             RoleFragment(text="Cabinet", role=SemanticRole.VARIABLE),  # singular
@@ -44,11 +48,13 @@ def test_pass_leaves_singular_untouched():
 
 
 def test_pass_is_idempotent():
-    leaf = RoleFragment(text="task", role=SemanticRole.ATTRIBUTE, number=Number.PLURAL)
+    leaf = RoleFragment(
+        text="task", role=SemanticRole.ATTRIBUTE, number=GrammaticalNumber.PLURAL
+    )
     once = MorphologyProcessor().process(leaf)
     twice = MorphologyProcessor().process(once)
     assert _text(twice) == "tasks"
-    assert once.number is Number.SINGULAR  # reset after inflection
+    assert once.number is GrammaticalNumber.SINGULAR  # reset after inflection
 
 
 def test_pass_preserves_block_structure():
@@ -56,7 +62,9 @@ def test_pass_preserves_block_structure():
         parts=[
             WordFragment(text="the"),
             RoleFragment(
-                text="container", role=SemanticRole.ATTRIBUTE, number=Number.PLURAL
+                text="container",
+                role=SemanticRole.ATTRIBUTE,
+                number=GrammaticalNumber.PLURAL,
             ),
         ]
     )
@@ -64,5 +72,7 @@ def test_pass_preserves_block_structure():
 
 
 def test_realize_subtree_runs_pass_then_flattens():
-    leaf = RoleFragment(text="task", role=SemanticRole.ATTRIBUTE, number=Number.PLURAL)
+    leaf = RoleFragment(
+        text="task", role=SemanticRole.ATTRIBUTE, number=GrammaticalNumber.PLURAL
+    )
     assert realize_subtree(leaf) == "tasks"

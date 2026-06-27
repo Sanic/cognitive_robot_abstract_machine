@@ -75,7 +75,7 @@ def symbolic_function(
 
 
 @dataclass(frozen=True)
-class Field:
+class VerbalizationField:
     """One predicate field as ``_verbalization_fragment_`` sees it.
 
     It carries both the field's already-rendered (and source-linked) :attr:`fragment` and the raw
@@ -91,8 +91,9 @@ class Field:
     """The raw Python value bound to the field (a literal's value) — what :class:`OneOf` enumerates."""
 
     def as_fragment(self) -> "Fragment":
-        """:return: the field's rendered fragment, so a :class:`Field` is a clause constituent like
-        the part-of-speech elements — ``clause(field)`` and ``Noun(field)`` both work."""
+        """:return: the field's rendered fragment, so a :class:`VerbalizationField` is a clause constituent like
+        the part-of-speech elements — ``clause(field)`` and ``Noun(field)`` both work.
+        """
         return self.fragment
 
 
@@ -100,7 +101,7 @@ class Field:
 class RenderedFields(Mapping):
     """The arguments passed to :meth:`Verbalizable._verbalization_fragment_`.
 
-    A mapping of *field name → :class:`Field`*. Each ``fields["x"]`` carries both the rendered
+    A mapping of *field name → :class:`VerbalizationField`*. Each ``fields["x"]`` carries both the rendered
     fragment and the raw value, so it can be passed straight to a part-of-speech element — ``Noun``
     takes the fragment, ``OneOf`` takes the value — without the author choosing between them.
     """
@@ -111,10 +112,10 @@ class RenderedFields(Mapping):
     raw: "Mapping[str, SymbolicExpression]"
     """The raw child expression for each field, keyed by field name."""
 
-    def __getitem__(self, field_name: str) -> Field:
+    def __getitem__(self, field_name: str) -> VerbalizationField:
         raw = self.raw[field_name]
         value = raw._value_ if isinstance(raw, Literal) else raw
-        return Field(fragment=self.fragments[field_name], value=value)
+        return VerbalizationField(fragment=self.fragments[field_name], value=value)
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.fragments)
@@ -252,7 +253,9 @@ class Triple(Predicate):
         # Imported locally: the verbalization layer depends on the core predicate types, so a
         # module-level import here would close an import cycle.
         from krrood.entity_query_language.verbalization import morphology
-        from krrood.entity_query_language.verbalization.fragments.base import WordFragment
+        from krrood.entity_query_language.verbalization.fragments.base import (
+            WordFragment,
+        )
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             clause,
             Noun,

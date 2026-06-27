@@ -18,7 +18,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.rendering.determiner_processor import (
@@ -54,7 +54,7 @@ def test_indefinite_singular_picks_article_from_head():
 
 def test_indefinite_plural_drops_the_determiner():
     # the "a Robot" -> "Robots" determiner-drop, expressed in one cell
-    np = NounPhrase(head=_noun("Robot"), number=Number.PLURAL)
+    np = NounPhrase(head=_noun("Robot"), number=GrammaticalNumber.PLURAL)
     assert _realised(np) == "Robots"
 
 
@@ -67,7 +67,7 @@ def test_definite_keeps_the_for_both_numbers():
         _realised(
             NounPhrase(
                 head=_noun("Robot"),
-                number=Number.PLURAL,
+                number=GrammaticalNumber.PLURAL,
                 definiteness=Definiteness.DEFINITE,
             )
         )
@@ -86,11 +86,11 @@ def test_bare_emits_no_determiner():
 def test_modifiers_follow_the_head():
     np = NounPhrase(
         head=RoleFragment(text="drawer", role=SemanticRole.ATTRIBUTE),
-        number=Number.PLURAL,
+        number=GrammaticalNumber.PLURAL,
         definiteness=Definiteness.INDEFINITE,
         modifiers=[
             WordFragment(text="of"),
-            NounPhrase(head=_noun("Cabinet"), number=Number.PLURAL),
+            NounPhrase(head=_noun("Cabinet"), number=GrammaticalNumber.PLURAL),
         ],
     )
     assert _realised(np) == "drawers of Cabinets"
@@ -110,7 +110,7 @@ def test_pass_lowers_nested_noun_phrases_inside_a_phrase():
     tree = PhraseFragment(
         parts=[
             WordFragment(text="the sum of"),
-            NounPhrase(head=_noun("Robot"), number=Number.PLURAL),
+            NounPhrase(head=_noun("Robot"), number=GrammaticalNumber.PLURAL),
         ]
     )
     assert _realised(tree) == "the sum of Robots"

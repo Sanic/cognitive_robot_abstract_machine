@@ -26,7 +26,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.rendering.coreference_processor import (
@@ -225,13 +225,11 @@ def test_chain_rooted_at_plural_subject_pronominalises_with_their():
         root_referent_id=rid,
     )
     intro = NounPhrase(
-        head=_noun("Robot"), number=Number.PLURAL, referent_id=rid
+        head=_noun("Robot"), number=GrammaticalNumber.PLURAL, referent_id=rid
     )  # "Robots" (bare plural population intro)
     # The pass derives "their" from the plural population intro (referent_id == focus) it walks
     # before the chain — no number is supplied by the scope.
-    scoped, discourse = _scope(
-        PhraseFragment(parts=[intro, chain]), focus_id=rid
-    )
+    scoped, discourse = _scope(PhraseFragment(parts=[intro, chain]), focus_id=rid)
     # _realise runs coreference + determiner only; the head inflects to "Robots" later in the
     # morphology pass (the full pipeline is pinned by test_deeply_nested_subqueries_golden).
     assert _realise(scoped, discourse) == "Robot their battery"
@@ -247,7 +245,8 @@ def _scalar_part(name):
 
 def _operator_numbers(fragment: Fragment) -> list:
     """:return: The grammatical number of every OPERATOR leaf in *fragment*, in document order —
-    so a test can read off the copula's realised agreement without the morphology pass."""
+    so a test can read off the copula's realised agreement without the morphology pass.
+    """
     numbers = []
 
     def collect(leaf: Fragment) -> Fragment:
@@ -259,9 +258,10 @@ def _operator_numbers(fragment: Fragment) -> list:
     return numbers
 
 
-def _quantified_clause(chain_parts, *, subject_number: Number):
+def _quantified_clause(chain_parts, *, subject_number: GrammaticalNumber):
     """A *"<subject>, <chain> is high"* shape — a population intro (the scope focus) followed by a
-    subject-led predicate whose singular-built copula must agree with the realised subject."""
+    subject-led predicate whose singular-built copula must agree with the realised subject.
+    """
     rid = uuid.uuid4()
     intro = NounPhrase(head=_noun("Robot"), number=subject_number, referent_id=rid)
     chain = PossessiveChain(
@@ -277,12 +277,13 @@ def _quantified_clause(chain_parts, *, subject_number: Number):
 def test_copula_agrees_plural_when_a_scalar_leaf_distributes():
     """A single scalar hop distributes over the plural population (*"their batteries"*), so the
     clause's singular-built copula is re-tagged plural — the morphology pass then realises *"are"*.
-    The agreement is decided here, where the population reading is, not pre-baked into the rule."""
+    The agreement is decided here, where the population reading is, not pre-baked into the rule.
+    """
     scoped, discourse = _quantified_clause(
-        [_scalar_part("battery")], subject_number=Number.PLURAL
+        [_scalar_part("battery")], subject_number=GrammaticalNumber.PLURAL
     )
     resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
-    assert _operator_numbers(resolved) == [Number.PLURAL]
+    assert _operator_numbers(resolved) == [GrammaticalNumber.PLURAL]
 
 
 def test_copula_stays_singular_for_a_deeper_head_chain():
@@ -291,17 +292,17 @@ def test_copula_stays_singular_for_a_deeper_head_chain():
     the realised head, not the bare presence of a plural scope."""
     scoped, discourse = _quantified_clause(
         [_attr_part("amount_details"), _scalar_part("amount")],
-        subject_number=Number.PLURAL,
+        subject_number=GrammaticalNumber.PLURAL,
     )
     resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
-    assert _operator_numbers(resolved) == [Number.SINGULAR]
+    assert _operator_numbers(resolved) == [GrammaticalNumber.SINGULAR]
 
 
 def test_copula_untouched_for_a_singular_subject():
     """A singular-subject scope leaves the copula singular: every plain predicate is unaffected, so
     this never disturbs the existing singular cases."""
     scoped, discourse = _quantified_clause(
-        [_scalar_part("battery")], subject_number=Number.SINGULAR
+        [_scalar_part("battery")], subject_number=GrammaticalNumber.SINGULAR
     )
     resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
-    assert _operator_numbers(resolved) == [Number.SINGULAR]
+    assert _operator_numbers(resolved) == [GrammaticalNumber.SINGULAR]

@@ -13,11 +13,16 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
     group_by_owner,
     group_consecutive_by_owner,
 )
-from krrood.entity_query_language.verbalization.example_domain import Department, Employee
+from krrood.entity_query_language.verbalization.example_domain import (
+    Department,
+    Employee,
+)
 
 
 def _attribute_owner(expression):
-    return (expression._child_, expression) if isinstance(expression, Attribute) else None
+    return (
+        (expression._child_, expression) if isinstance(expression, Attribute) else None
+    )
 
 
 def test_group_by_owner_collects_all_same_owner_in_first_seen_order():

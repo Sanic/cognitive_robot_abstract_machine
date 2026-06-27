@@ -18,7 +18,9 @@ from krrood.entity_query_language.verbalization.navigation_path import (
     PathStep,
     build_path_parts,
 )
-from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.fragments.features import (
+    GrammaticalNumber,
+)
 from krrood.entity_query_language.verbalization.relational_attributes import (
     relational_verb,
 )
@@ -58,7 +60,7 @@ class ChainPlan:
             and isinstance(self.chain[0], Attribute)
         )
 
-    def renders_as_plural_attribute(self, number: Number) -> bool:
+    def renders_as_plural_attribute(self, number: GrammaticalNumber) -> bool:
         """
         The chain precedence policy in one place: a single attribute on a variable, asked for in
         the plural, renders as the bare-plural noun phrase *"attributes of Roots"* — which takes
@@ -67,10 +69,10 @@ class ChainPlan:
         :param number: The grammatical number requested for the chain.
         :return: ``True`` when the chain renders as the bare-plural attribute form.
 
-        >>> ChainPlanner(variable(Robot, []).battery).plan().renders_as_plural_attribute(Number.PLURAL)
+        >>> ChainPlanner(variable(Robot, []).battery).plan().renders_as_plural_attribute(GrammaticalNumber.PLURAL)
         True
         """
-        return number is Number.PLURAL and self.is_single_variable_attribute
+        return number is GrammaticalNumber.PLURAL and self.is_single_variable_attribute
 
 
 @dataclass

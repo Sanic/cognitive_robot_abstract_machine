@@ -131,7 +131,6 @@ def test_predicates_build_a_verbalization_fragment(cls_name):
     vocabulary, given the rendered fragment for each field."""
     cls = getattr(example_domain, cls_name)
     fields = {
-        field.name: WordFragment(text=field.name)
-        for field in dataclasses.fields(cls)
+        field.name: WordFragment(text=field.name) for field in dataclasses.fields(cls)
     }
     assert isinstance(cls._verbalization_fragment_(fields), Fragment)

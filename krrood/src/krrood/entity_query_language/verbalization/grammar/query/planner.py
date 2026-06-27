@@ -88,7 +88,7 @@ class RankingPlan:
     has a ``limit``; the surface form is the ranking registry's concern at render time.
     """
 
-    n: int
+    limit_number: int
     """The limit (always ``>= 1``)."""
 
     direction: RankingDirection
@@ -298,7 +298,8 @@ class QueryPlanner(Planner[Query, QueryPlan]):
 
     def _grouping_report(self) -> Optional[ReportPlan]:
         """:return: The ``GROUPING`` report for a grouped query with no aggregates — its columns are
-        the selection minus the keys (empty when the selection is exactly the key), else ``None``."""
+        the selection minus the keys (empty when the selection is exactly the key), else ``None``.
+        """
         keys = self._group_keys()
         if not keys:
             return None
@@ -395,7 +396,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         builder = getattr(self.node, "_ordered_by_builder_", None)
         if builder is None:
             return RankingPlan(
-                n=limit,
+                limit_number=limit,
                 direction=RankingDirection.NONE,
                 relation=RankingKeyRelation.SELF,
                 order_key=None,
@@ -406,7 +407,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             else RankingDirection.ASCENDING
         )
         return RankingPlan(
-            n=limit,
+            limit_number=limit,
             direction=direction,
             relation=self._key_relation(builder.variable),
             order_key=builder.variable,

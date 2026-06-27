@@ -12,7 +12,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     Fragment,
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
-    Number,
+    GrammaticalNumber,
     Separator,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
@@ -68,7 +68,7 @@ class GroupedByAssembler(Assembler[Union[Query, GroupedBy], GroupPlan]):
         if plan.aggregated and plan.weaves_aggregated:
             aggregated_phrase = oxford_comma(
                 [
-                    self.context.child(expression, number=Number.PLURAL)
+                    self.context.child(expression, number=GrammaticalNumber.PLURAL)
                     for expression in plan.aggregated
                 ],
                 Conjunctions.AND.as_fragment(),

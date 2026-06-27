@@ -14,7 +14,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.grammar.framework.assembler import (
     Assembler,
@@ -97,12 +97,14 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         attribute = plan.chain[0]
         # The root's plural noun phrase ("Robots" / "Robot 2") is the variable rule's job; recurse
         # for it rather than rebuilding its number/definiteness/label here.
-        root_noun_phrase = self.context.child(plan.root, number=Number.PLURAL)
+        root_noun_phrase = self.context.child(
+            plan.root, number=GrammaticalNumber.PLURAL
+        )
         return NounPhrase(
             head=RoleFragment.for_attribute(
                 attribute._owner_class_, attribute._attribute_name_
             ),
-            number=Number.PLURAL,
+            number=GrammaticalNumber.PLURAL,
             definiteness=Definiteness.INDEFINITE,
             modifiers=[Prepositions.OF.as_fragment(), root_noun_phrase],
         )

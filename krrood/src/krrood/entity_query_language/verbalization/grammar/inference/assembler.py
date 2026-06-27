@@ -40,7 +40,9 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     GroupKeyPhrases,
     Keywords,
 )
-from krrood.entity_query_language.verbalization.vocabulary.words import Number
+from krrood.entity_query_language.verbalization.vocabulary.words import (
+    GrammaticalNumber,
+)
 
 
 class InferenceAssembler(Assembler[Entity, RuleStructure]):
@@ -81,7 +83,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         )
 
     @staticmethod
-    def _number(antecedent: AntecedentInformation) -> Number:
+    def _number(antecedent: AntecedentInformation) -> GrammaticalNumber:
         """:return: The grammatical number of an antecedent — plural if and only if aggregated.
 
         >>> aggregated = AntecedentInformation(root=None, variable=None, type_name='Drawer',
@@ -89,7 +91,9 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         >>> InferenceAssembler._number(aggregated).name
         'PLURAL'
         """
-        return Number.of(antecedent.aggregation_status == AggregationStatus.AGGREGATED)
+        return GrammaticalNumber.of(
+            antecedent.aggregation_status == AggregationStatus.AGGREGATED
+        )
 
     # ── IF clause ───────────────────────────────────────────────────────────────
 
@@ -219,9 +223,9 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         ...     verbalize_expression(entity(drawer).where(connection.parent == variable(Container, []))))
         True
         """
-        intro: Fragment = ExistentialPhrase.for_number(Number.SINGULAR).build_phrase(
-            structure.consequent_type
-        )
+        intro: Fragment = ExistentialPhrase.for_number(
+            GrammaticalNumber.SINGULAR
+        ).build_phrase(structure.consequent_type)
         bindings = [
             self._binding_predicate(binding)
             for binding in structure.consequent_bindings
@@ -246,7 +250,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         ...     entity(drawer).where(connection.parent == variable(Container, [])))
         True
         """
-        number = Number.of(binding.is_plural_field)
+        number = GrammaticalNumber.of(binding.is_plural_field)
         return ConditionAssembler(self.context).attribute_predicate(
             binding.field_name, number, self._binding_value(binding)
         )
@@ -273,11 +277,15 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
             return PhraseFragment(
                 parts=[
                     Articles.THE.as_fragment(),
-                    self.context.child(binding.value_expression, number=Number.PLURAL),
+                    self.context.child(
+                        binding.value_expression, number=GrammaticalNumber.PLURAL
+                    ),
                 ]
             )
         if binding.is_plural_field:
-            return self.context.child(binding.value_expression, number=Number.PLURAL)
+            return self.context.child(
+                binding.value_expression, number=GrammaticalNumber.PLURAL
+            )
         if binding.aggregation_status == AggregationStatus.GROUP_KEY:
             return self._group_key_value(binding.value_expression)
         return self.context.child(binding.value_expression)

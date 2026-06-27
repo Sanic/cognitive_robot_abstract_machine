@@ -13,7 +13,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.vocabulary.countability import (
@@ -30,7 +30,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 
 def attribute_fragment(
-    step: PathStep, number: Number = Number.SINGULAR
+    step: PathStep, number: GrammaticalNumber = GrammaticalNumber.SINGULAR
 ) -> RoleFragment:
     """:return: A role-tagged attribute fragment for *step*, tagged with *number* for inflection
     (a single-hop possessive of a plural subject distributes — *"their salaries"*).
@@ -83,7 +83,9 @@ def _genitive_step(step: PathStep, owner_fragment: Fragment) -> Fragment:
 
 
 def _relative_clause(
-    step: PathStep, owner_fragment: Fragment, owner_number: Number = Number.SINGULAR
+    step: PathStep,
+    owner_fragment: Fragment,
+    owner_number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
 ) -> Fragment:
     """:return: *"the <Type> <preposition> which <owner> is <participle>"* — one relational hop
     wrapping its owner as a relative clause (the preposition pied-piped before *which*: *"the Robot
@@ -173,7 +175,9 @@ def possessive_path(parts: List[PathStep], root_fragment: Fragment) -> Fragment:
     return owner
 
 
-def chain_head_number(parts: List[PathStep], subject_number: Number) -> Number:
+def chain_head_number(
+    parts: List[PathStep], subject_number: GrammaticalNumber
+) -> GrammaticalNumber:
     """:return: The grammatical number the chain's head noun is realised with once its root is
     pronominalised — *subject_number* only when a single scalar hop distributes over the subject
     (*"their batteries"*), else singular: a deeper or relational chain heads on an inner genitive
@@ -183,20 +187,22 @@ def chain_head_number(parts: List[PathStep], subject_number: Number) -> Number:
     *innermost* hop): a finite verb agrees with the head, so its copula reads *"are"* exactly when
     this returns plural.
 
-    >>> from krrood.entity_query_language.verbalization.fragments.features import Number
-    >>> chain_head_number([PathStep("battery", is_scalar_value=True)], Number.PLURAL)
-    <Number.PLURAL: 'plural'>
+    >>> from krrood.entity_query_language.verbalization.fragments.features import GrammaticalNumber
+    >>> chain_head_number([PathStep("battery", is_scalar_value=True)], GrammaticalNumber.PLURAL)
+    <GrammaticalNumber.PLURAL: 'plural'>
     >>> chain_head_number(
-    ...     [PathStep("assigned_to"), PathStep("battery", is_scalar_value=True)], Number.PLURAL
+    ...     [PathStep("assigned_to"), PathStep("battery", is_scalar_value=True)], GrammaticalNumber.PLURAL
     ... )
-    <Number.SINGULAR: 'singular'>
+    <GrammaticalNumber.SINGULAR: 'singular'>
     """
     if len(parts) == 1 and parts[0].is_scalar_value:
         return subject_number
-    return Number.SINGULAR
+    return GrammaticalNumber.SINGULAR
 
 
-def pronominal_path(parts: List[PathStep], subject_number: Number) -> Fragment:
+def pronominal_path(
+    parts: List[PathStep], subject_number: GrammaticalNumber
+) -> Fragment:
     """:return: the navigation read out with the (elided) root pronominalised — *"its attribute"* /
     *"the attribute of its foo"* for plain hops, and the relative clause *"the <Type> <prep> which
     it is <participle>"* for a relational hop (the innermost hop, adjacent to the elided root, takes
@@ -207,8 +213,8 @@ def pronominal_path(parts: List[PathStep], subject_number: Number) -> Fragment:
     :param subject_number: The discourse subject's number (its/it singular, their/they plural).
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-    >>> from krrood.entity_query_language.verbalization.fragments.features import Number
-    >>> flatten_fragment_to_plain_text(pronominal_path([], Number.SINGULAR))
+    >>> from krrood.entity_query_language.verbalization.fragments.features import GrammaticalNumber
+    >>> flatten_fragment_to_plain_text(pronominal_path([], GrammaticalNumber.SINGULAR))
     'its'
     """
     possessive_pronoun = Pronouns.possessive(subject_number).as_fragment()
@@ -220,7 +226,9 @@ def pronominal_path(parts: List[PathStep], subject_number: Number) -> Fragment:
     first, rest = parts[0], parts[1:]
     # A scalar leaf possessed by a plural subject distributes ("their salaries"); an entity owner of
     # further structure stays singular ("the begin and end of their period").
-    attribute_number = subject_number if first.is_scalar_value else Number.SINGULAR
+    attribute_number = (
+        subject_number if first.is_scalar_value else GrammaticalNumber.SINGULAR
+    )
     owner: Fragment = (
         _relative_clause(first, nominative_pronoun, subject_number)
         if first.is_relation

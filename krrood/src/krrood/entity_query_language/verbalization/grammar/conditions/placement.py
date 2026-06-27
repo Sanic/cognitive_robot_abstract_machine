@@ -46,7 +46,9 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Conjunctions,
     Keywords,
 )
-from krrood.entity_query_language.verbalization.vocabulary.words import Number
+from krrood.entity_query_language.verbalization.vocabulary.words import (
+    GrammaticalNumber,
+)
 
 
 class Slot(Enum):
@@ -71,7 +73,7 @@ class Placement:
     subject: Variable
     """The variable the condition may attach to."""
 
-    number: Number = Number.SINGULAR
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR
     """The number the subject (and so the predicate) agrees with — singular for a query subject,
     plural for an aggregated inference antecedent (*"whose children are …"*)."""
 
@@ -384,7 +386,7 @@ def as_subject_restrictions(
     conditions: List[SymbolicExpression],
     subject: Variable,
     context: RuleContext,
-    number: Number = Number.SINGULAR,
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
 ) -> RestrictionFragments:
     """
     Say a subject's WHERE conjuncts as restrictions on its noun — the counterpart to

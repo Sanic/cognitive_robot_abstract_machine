@@ -57,4 +57,6 @@ def test_every_construct_folder_contributes_rules():
         "clauses",
         "instantiated",
     ):
-        assert construct_folder in modules, f"no rules discovered for grammar/{construct_folder}"
+        assert (
+            construct_folder in modules
+        ), f"no rules discovered for grammar/{construct_folder}"

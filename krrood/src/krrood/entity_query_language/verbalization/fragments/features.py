@@ -18,7 +18,7 @@ class Separator(StrEnum):
     """A comma and space for inline coordinated lists (*"a, b, or c"*) and tuple selections."""
 
 
-class Number(StrEnum):
+class GrammaticalNumber(StrEnum):
     """Grammatical number of a noun or verb (singular vs. plural)."""
 
     SINGULAR = "singular"
@@ -27,15 +27,15 @@ class Number(StrEnum):
     """More than one entity."""
 
     @classmethod
-    def of(cls, is_plural: bool) -> Number:
+    def of(cls, is_plural: bool) -> GrammaticalNumber:
         """
         :param is_plural: Whether the number is plural.
         :return: ``PLURAL`` when *is_plural* else ``SINGULAR``.
 
-        >>> Number.of(True)
-        <Number.PLURAL: 'plural'>
-        >>> Number.of(False)
-        <Number.SINGULAR: 'singular'>
+        >>> GrammaticalNumber.of(True)
+        <GrammaticalNumber.PLURAL: 'plural'>
+        >>> GrammaticalNumber.of(False)
+        <GrammaticalNumber.SINGULAR: 'singular'>
         """
         return cls.PLURAL if is_plural else cls.SINGULAR
 

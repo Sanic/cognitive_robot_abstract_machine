@@ -71,7 +71,11 @@ def _attribute_except_handlers(tree: ast.Module) -> int:
         if isinstance(node.type, ast.Name):
             caught = {node.type.id}
         elif isinstance(node.type, ast.Tuple):
-            caught = {element.id for element in node.type.elts if isinstance(element, ast.Name)}
+            caught = {
+                element.id
+                for element in node.type.elts
+                if isinstance(element, ast.Name)
+            }
         if forbidden & caught:
             count += 1
     return count

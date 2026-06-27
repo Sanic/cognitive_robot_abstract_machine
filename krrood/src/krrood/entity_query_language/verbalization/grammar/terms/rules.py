@@ -20,7 +20,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.grammar.conditions.recognition import (
     is_concrete_object_literal,
@@ -70,7 +70,7 @@ class VariableRule(PhraseRule):
             choice = self._domain_choice(node, context)
             if choice is not None:
                 return choice
-        if context.number is Number.PLURAL:
+        if context.number is GrammaticalNumber.PLURAL:
             return self._plural(node, context)
         noun_form = context.refer.noun_for_parts(node)
         return NounPhrase(
@@ -118,7 +118,11 @@ class VariableRule(PhraseRule):
         numbered = context.refer.numbered_label(node)
         return NounPhrase(
             head=RoleFragment.for_variable(numbered.text, node),
-            number=Number.SINGULAR if numbered.is_numbered else Number.PLURAL,
+            number=(
+                GrammaticalNumber.SINGULAR
+                if numbered.is_numbered
+                else GrammaticalNumber.PLURAL
+            ),
             definiteness=(
                 Definiteness.BARE if numbered.is_numbered else Definiteness.INDEFINITE
             ),

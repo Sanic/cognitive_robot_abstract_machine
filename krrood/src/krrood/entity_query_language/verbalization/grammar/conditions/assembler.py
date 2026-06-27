@@ -33,7 +33,9 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Copulas,
     Prepositions,
 )
-from krrood.entity_query_language.verbalization.vocabulary.words import Number
+from krrood.entity_query_language.verbalization.vocabulary.words import (
+    GrammaticalNumber,
+)
 
 
 class ConditionAssembler(Assembler[Comparator, None]):
@@ -114,7 +116,7 @@ class ConditionAssembler(Assembler[Comparator, None]):
         self,
         comparator: Comparator,
         subject: Variable,
-        number: Number = Number.SINGULAR,
+        number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> Fragment:
         """
         :param comparator: The comparator on *subject*'s single-hop attribute.
@@ -179,7 +181,7 @@ class ConditionAssembler(Assembler[Comparator, None]):
         self,
         range_fold: RangeFold,
         subject: Variable,
-        number: Number = Number.SINGULAR,
+        number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> Fragment:
         """
         :param range_fold: The folded lower/upper bound pair on *subject*'s single-hop attribute.
@@ -210,7 +212,7 @@ class ConditionAssembler(Assembler[Comparator, None]):
         )
 
     def attribute_predicate(
-        self, attribute_name: str, number: Number, value: Fragment
+        self, attribute_name: str, number: GrammaticalNumber, value: Fragment
     ) -> Fragment:
         """
         The bare *"<attribute> <copula> <value>"* predicate (the noun and copula agree with
@@ -240,7 +242,7 @@ class ConditionAssembler(Assembler[Comparator, None]):
             ]
         )
 
-    def _attribute_noun(self, name: str, number: Number) -> Fragment:
+    def _attribute_noun(self, name: str, number: GrammaticalNumber) -> Fragment:
         """
         :param name: The attribute's name.
         :param number: The grammatical number to tag for inflection.

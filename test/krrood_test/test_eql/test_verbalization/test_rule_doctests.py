@@ -38,17 +38,27 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 # *"verbalize_expression(variable(Task, []).completed)"* rather than re-import everything.
 # It also includes the example-domain classes, so the rendered examples also hyperlink to real API pages.
 factories = [
-    eql.variable, # variables
-    eql.a, eql.an, eql.the, # quantifiers
-    eql.entity, eql.set_of, # query construction
-    eql.and_, eql.or_, # boolean logic
-    eql.max, eql.min, eql.sum, eql.count, # aggregations
-    eql.contains, eql.in_, # membership
-    eql.for_all, eql.exists, # quantified conditionals
-    eql.not_, # negation
-    eql.inference, # rule-tree inference queries
-    eql.match, eql.match_variable, # construction-pattern matches
-    eql.underspecified, # generative (underspecified) requests
+    eql.variable,  # variables
+    eql.a,
+    eql.an,
+    eql.the,  # quantifiers
+    eql.entity,
+    eql.set_of,  # query construction
+    eql.and_,
+    eql.or_,  # boolean logic
+    eql.max,
+    eql.min,
+    eql.sum,
+    eql.count,  # aggregations
+    eql.contains,
+    eql.in_,  # membership
+    eql.for_all,
+    eql.exists,  # quantified conditionals
+    eql.not_,  # negation
+    eql.inference,  # rule-tree inference queries
+    eql.match,
+    eql.match_variable,  # construction-pattern matches
+    eql.underspecified,  # generative (underspecified) requests
 ]
 _GLOBS = {factory.__name__: factory for factory in factories}
 _GLOBS.update(
@@ -123,9 +133,7 @@ def test_doctest_discovery_includes_previously_uncovered_modules():
         "grammar.aggregation.rules",
         "grammar.aggregation.assembler",
     }
-    discovered_suffixes = {
-        name.split("verbalization.", 1)[1] for name in _MODULE_NAMES
-    }
+    discovered_suffixes = {name.split("verbalization.", 1)[1] for name in _MODULE_NAMES}
     missing = previously_curated - discovered_suffixes
     assert not missing, f"auto-discovery regressed on: {sorted(missing)}"
     assert "grammar.conditions.placement" in discovered_suffixes

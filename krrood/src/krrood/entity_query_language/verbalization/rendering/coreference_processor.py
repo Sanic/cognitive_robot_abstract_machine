@@ -17,7 +17,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.microplanning.possessive import (
@@ -42,7 +42,7 @@ class SubjectFrame:
     subject_id: Optional[uuid.UUID]
     """The subject's referent id, or ``None`` for a scope with no single subject (e.g. ``SetOf``)."""
 
-    number: Number = Number.SINGULAR
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR
     """The subject's grammatical number — selects *"its"* (singular) vs. *"their"* (plural). Filled
     from the subject's own noun phrase when the pass walks it (rules supply no number)."""
 
@@ -200,11 +200,11 @@ class CoreferenceProcessor(RealizationPass):
         """
         subject_number = self._clause_subject_number(clause.parts[0])
         rebuilt = map_structural_children(clause, self._walk)
-        if subject_number is Number.PLURAL:
+        if subject_number is GrammaticalNumber.PLURAL:
             return self._with_agreed_copula(rebuilt, subject_number)
         return rebuilt
 
-    def _clause_subject_number(self, subject: Fragment) -> Number:
+    def _clause_subject_number(self, subject: Fragment) -> GrammaticalNumber:
         """:return: The grammatical number the clause's subject is realised with — plural only when
         a pronominalised chain distributes a scalar leaf over a plural population (*"their
         batteries"*); singular for every other subject (a deeper chain, a non-pronominalised one, or
@@ -212,7 +212,7 @@ class CoreferenceProcessor(RealizationPass):
         if not isinstance(subject, PossessiveChain) or not self._pronominalises(
             subject
         ):
-            return Number.SINGULAR
+            return GrammaticalNumber.SINGULAR
         return chain_head_number(subject.parts, self._subject_stack[-1].number)
 
     def _subject_clause(self, clause: Clause) -> Fragment:
@@ -244,7 +244,7 @@ class CoreferenceProcessor(RealizationPass):
         ]
         return replace(clause, parts=[pronoun, *agreed_rest])
 
-    def _subject_pronoun_number(self, subject: Fragment) -> Optional[Number]:
+    def _subject_pronoun_number(self, subject: Fragment) -> Optional[GrammaticalNumber]:
         """:return: The number to pronominalise the clause subject with — the in-scope subject's
         number when *subject* is the current, already-introduced discourse subject, else ``None``
         (leaving the subject as its first/repeat noun-phrase mention)."""
@@ -260,7 +260,9 @@ class CoreferenceProcessor(RealizationPass):
         return self._subject_stack[-1].number
 
     @staticmethod
-    def _with_agreed_copula(clause: PhraseFragment, number: Number) -> Fragment:
+    def _with_agreed_copula(
+        clause: PhraseFragment, number: GrammaticalNumber
+    ) -> Fragment:
         """:return: *clause* with its finite copula tagged *number* (*"is"* → *"are"* once the
         morphology pass realises it). Only the operator slot's leading copula inflects — the subject
         and value (and any copula nested in a relative clause on either) are left untouched.
@@ -278,7 +280,7 @@ class CoreferenceProcessor(RealizationPass):
     lexical verb."""
 
     @staticmethod
-    def _agree_finite(part: Fragment, number: Number) -> Fragment:
+    def _agree_finite(part: Fragment, number: GrammaticalNumber) -> Fragment:
         """:return: *part* re-tagged with *number* when it is the clause's finite slot — an
         ``OPERATOR`` or ``VERB`` leaf, or a phrase led by one (the factored *"is greater than"*) —
         else *part* unchanged. The copula inflects (*"is"* → *"are"*) and a lexical verb agrees
@@ -482,7 +484,7 @@ class CoreferenceProcessor(RealizationPass):
         referent_id, tail = relation
         if referent_id != self._center or not tail:
             return None
-        return pronominal_path(tail, Number.SINGULAR)
+        return pronominal_path(tail, GrammaticalNumber.SINGULAR)
 
     def _pronominalises(self, possessive_chain: PossessiveChain) -> bool:
         """:return: ``True`` when the chain root is the current, already-introduced, non-numbered subject.
@@ -535,7 +537,7 @@ class CoreferenceProcessor(RealizationPass):
         self._record_subject_number(noun_phrase)
         repeat = noun_phrase.referent_id in self._seen
         self._seen.add(noun_phrase.referent_id)
-        if repeat and noun_phrase.number is Number.SINGULAR:
+        if repeat and noun_phrase.number is GrammaticalNumber.SINGULAR:
             return self._reduced(noun_phrase)
         return self._rebuilt(noun_phrase)
 

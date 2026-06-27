@@ -9,7 +9,9 @@ from __future__ import annotations
 from krrood.entity_query_language.factories import an, entity, variable
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.verbalization.grammar.framework.registry import RULES
-from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import PhraseRule
+from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
+    PhraseRule,
+)
 
 
 def test_registry_is_a_list_of_phrase_rules():

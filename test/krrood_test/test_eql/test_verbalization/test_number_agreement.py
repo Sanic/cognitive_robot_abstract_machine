@@ -22,7 +22,9 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     ExistentialPhrase,
     predicative_operator,
 )
-from krrood.entity_query_language.verbalization.vocabulary.words import Number
+from krrood.entity_query_language.verbalization.vocabulary.words import (
+    GrammaticalNumber,
+)
 
 from ...dataset.department_and_employee import Employee
 
@@ -33,46 +35,55 @@ def _realised(fragment) -> str:
 
 
 def test_number_of_bridges_boolean_plan_features():
-    assert Number.of(True) is Number.PLURAL
-    assert Number.of(False) is Number.SINGULAR
+    assert GrammaticalNumber.of(True) is GrammaticalNumber.PLURAL
+    assert GrammaticalNumber.of(False) is GrammaticalNumber.SINGULAR
 
 
 def test_copula_agreement_is_applied_by_the_pass():
-    assert _realised(Copulas.for_number(Number.SINGULAR)) == "is"
-    assert _realised(Copulas.for_number(Number.PLURAL)) == "are"
+    assert _realised(Copulas.for_number(GrammaticalNumber.SINGULAR)) == "is"
+    assert _realised(Copulas.for_number(GrammaticalNumber.PLURAL)) == "are"
 
 
 def test_predicative_operator_factors_copula_for_agreement():
     # The copula is factored out as a single agreeing leaf; the invariant core never changes, so a
     # plural subject agrees without any duplicated plural operator phrase.
     assert (
-        _realised(predicative_operator("is greater than", Number.SINGULAR))
+        _realised(predicative_operator("is greater than", GrammaticalNumber.SINGULAR))
         == "is greater than"
     )
     assert (
-        _realised(predicative_operator("is greater than", Number.PLURAL))
+        _realised(predicative_operator("is greater than", GrammaticalNumber.PLURAL))
         == "are greater than"
     )
     # A suppletive temporal core keeps its text; only the copula agrees.
     assert (
-        _realised(predicative_operator("is no later than", Number.PLURAL))
+        _realised(predicative_operator("is no later than", GrammaticalNumber.PLURAL))
         == "are no later than"
     )
     assert (
-        _realised(predicative_operator("is not equal to", Number.PLURAL))
+        _realised(predicative_operator("is not equal to", GrammaticalNumber.PLURAL))
         == "are not equal to"
     )
     # A verb operator has no copula and is left un-agreed.
-    assert _realised(predicative_operator("contains", Number.PLURAL)) == "contains"
+    assert (
+        _realised(predicative_operator("contains", GrammaticalNumber.PLURAL))
+        == "contains"
+    )
 
 
 def test_existential_noun_pluralised_by_the_pass():
     assert (
-        _realised(ExistentialPhrase.for_number(Number.SINGULAR).build_phrase("Robot"))
+        _realised(
+            ExistentialPhrase.for_number(GrammaticalNumber.SINGULAR).build_phrase(
+                "Robot"
+            )
+        )
         == "there's a Robot"
     )
     assert (
-        _realised(ExistentialPhrase.for_number(Number.PLURAL).build_phrase("Robot"))
+        _realised(
+            ExistentialPhrase.for_number(GrammaticalNumber.PLURAL).build_phrase("Robot")
+        )
         == "there are Robots"
     )
 

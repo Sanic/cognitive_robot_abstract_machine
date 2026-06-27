@@ -14,7 +14,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.rendering.passes import RewritePass
 from krrood.entity_query_language.verbalization.vocabulary.english import Articles
@@ -94,11 +94,11 @@ class DeterminerProcessor(RewritePass):
         )
 
     @staticmethod
-    def _tag_number(head: Fragment, number: Number) -> Fragment:
+    def _tag_number(head: Fragment, number: GrammaticalNumber) -> Fragment:
         """Tag the head leaf with the phrase's number.
 
-        >>> DeterminerProcessor._tag_number(WordFragment(text="Robot"), Number.PLURAL).number
-        <Number.PLURAL: 'plural'>
+        >>> DeterminerProcessor._tag_number(WordFragment(text="Robot"), GrammaticalNumber.PLURAL).number
+        <GrammaticalNumber.PLURAL: 'plural'>
         """
         if isinstance(head, (WordFragment, RoleFragment)):
             return replace(head, number=number)
@@ -106,7 +106,7 @@ class DeterminerProcessor(RewritePass):
 
     @staticmethod
     def _determiner(
-        definiteness: Definiteness, number: Number, article_anchor: Fragment
+        definiteness: Definiteness, number: GrammaticalNumber, article_anchor: Fragment
     ) -> Optional[Fragment]:
         """:return: The determiner fragment for *(definiteness, number)*, or ``None`` (bare). The
         indefinite *a/an* agrees phonologically with *article_anchor* (the first surface word —
@@ -114,18 +114,21 @@ class DeterminerProcessor(RewritePass):
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> flatten_fragment_to_plain_text(
-        ...     DeterminerProcessor._determiner(Definiteness.INDEFINITE, Number.SINGULAR, WordFragment(text="hour")))
+        ...     DeterminerProcessor._determiner(Definiteness.INDEFINITE, GrammaticalNumber.SINGULAR, WordFragment(text="hour")))
         'an'
         >>> flatten_fragment_to_plain_text(
-        ...     DeterminerProcessor._determiner(Definiteness.DEFINITE, Number.SINGULAR, WordFragment(text="Robot")))
+        ...     DeterminerProcessor._determiner(Definiteness.DEFINITE, GrammaticalNumber.SINGULAR, WordFragment(text="Robot")))
         'the'
-        >>> DeterminerProcessor._determiner(Definiteness.INDEFINITE, Number.PLURAL, WordFragment(text="Robot")) is None
+        >>> DeterminerProcessor._determiner(Definiteness.INDEFINITE, GrammaticalNumber.PLURAL, WordFragment(text="Robot")) is None
         True
         """
         if definiteness is Definiteness.UNIQUE:
             return Articles.THE_UNIQUE.as_fragment()
         if definiteness is Definiteness.DEFINITE:
             return Articles.THE.as_fragment()
-        if definiteness is Definiteness.INDEFINITE and number is Number.SINGULAR:
+        if (
+            definiteness is Definiteness.INDEFINITE
+            and number is GrammaticalNumber.SINGULAR
+        ):
             return Articles.indefinite(flatten_fragment_to_plain_text(article_anchor))
         return None  # BARE, or INDEFINITE + PLURAL → the determiner-drop

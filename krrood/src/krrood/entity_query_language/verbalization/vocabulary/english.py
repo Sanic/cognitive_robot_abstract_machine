@@ -25,7 +25,7 @@ from krrood.entity_query_language.verbalization.vocabulary.words import (
     ChildForm,
     KeyWord,
     LogicalWord,
-    Number,
+    GrammaticalNumber,
     OperatorPhrase,
     OperatorWord,
     PlainWord,
@@ -90,14 +90,14 @@ class PluralExistential(PlainWord):
         """
         Build *"there are <plural_type_name>"*.
 
-        The noun is tagged :attr:`Number.PLURAL`; its surface inflection is realised by the later
+        The noun is tagged :attr:`GrammaticalNumber.PLURAL`; its surface inflection is realised by the later
         morphology pass.
 
         :param type_name: English noun in singular form; pluralised automatically.
         :return: Phrase fragment with pluralised type name.
 
         >>> PluralExistential("there are").build_phrase("Robot").parts[1].number
-        <Number.PLURAL: 'plural'>
+        <GrammaticalNumber.PLURAL: 'plural'>
         """
         return PhraseFragment(
             parts=[
@@ -105,7 +105,7 @@ class PluralExistential(PlainWord):
                 RoleFragment(
                     text=type_name,
                     role=SemanticRole.VARIABLE,
-                    number=Number.PLURAL,
+                    number=GrammaticalNumber.PLURAL,
                 ),
             ],
         )
@@ -123,9 +123,9 @@ class FallbackNounWord(PlainWord):
         """:return: A noun fragment tagged plural (e.g. ``"entity"`` → ``"entities"``).
 
         >>> FallbackNounWord("entity").plural_fragment().number
-        <Number.PLURAL: 'plural'>
+        <GrammaticalNumber.PLURAL: 'plural'>
         """
-        return WordFragment(text=self.text, number=Number.PLURAL)
+        return WordFragment(text=self.text, number=GrammaticalNumber.PLURAL)
 
 
 @dataclass(frozen=True)
@@ -151,7 +151,7 @@ class CommonGroupKeyWord(PlainWord):
                 self.as_fragment(),
                 WordFragment(text=field_name),
                 Prepositions.OF_THE.as_fragment(),
-                WordFragment(text=root, number=Number.PLURAL),
+                WordFragment(text=root, number=GrammaticalNumber.PLURAL),
             ],
         )
 
@@ -236,19 +236,19 @@ class Aggregations(VocabEnum):
         return self.value.child_form is not ChildForm.NONE
 
     @property
-    def child_number(self) -> Number:
+    def child_number(self) -> GrammaticalNumber:
         """:return: The grammatical number the complement is rendered in — plural for a
         population (*"sum of amounts"*), singular otherwise (*"maximum of the amount"*).
 
         >>> Aggregations.SUM.child_number
-        <Number.PLURAL: 'plural'>
+        <GrammaticalNumber.PLURAL: 'plural'>
         >>> Aggregations.MAX.child_number
-        <Number.SINGULAR: 'singular'>
+        <GrammaticalNumber.SINGULAR: 'singular'>
         """
         return (
-            Number.PLURAL
+            GrammaticalNumber.PLURAL
             if self.value.child_form is ChildForm.PLURAL
-            else Number.SINGULAR
+            else GrammaticalNumber.SINGULAR
         )
 
     def complement(self, child: Fragment) -> List[Fragment]:
@@ -296,12 +296,12 @@ class Copulas(VocabEnum):
     ARE_NOT = OperatorWord("are not")
 
     @classmethod
-    def for_number(cls, number: Number) -> RoleFragment:
+    def for_number(cls, number: GrammaticalNumber) -> RoleFragment:
         """:return: The copula tagged with *number* for a directly-built leaf; the morphology
         pass agrees it (*is* / *are*).
 
-        >>> Copulas.for_number(Number.PLURAL).number
-        <Number.PLURAL: 'plural'>
+        >>> Copulas.for_number(GrammaticalNumber.PLURAL).number
+        <GrammaticalNumber.PLURAL: 'plural'>
         """
         return RoleFragment(text=cls.IS.text, role=SemanticRole.OPERATOR, number=number)
 
@@ -386,15 +386,15 @@ class Absence(VocabEnum):
     HAVE_NO = OperatorWord("have no")
 
     @classmethod
-    def for_number(cls, number: Number) -> "Absence":
+    def for_number(cls, number: GrammaticalNumber) -> "Absence":
         """:return: ``HAVE_NO`` for a plural owner, else ``HAS_NO``.
 
-        >>> Absence.for_number(Number.PLURAL).text
+        >>> Absence.for_number(GrammaticalNumber.PLURAL).text
         'have no'
-        >>> Absence.for_number(Number.SINGULAR).text
+        >>> Absence.for_number(GrammaticalNumber.SINGULAR).text
         'has no'
         """
-        return cls.HAVE_NO if number is Number.PLURAL else cls.HAS_NO
+        return cls.HAVE_NO if number is GrammaticalNumber.PLURAL else cls.HAS_NO
 
 
 class NonExistence(VocabEnum):
@@ -406,15 +406,19 @@ class NonExistence(VocabEnum):
     DO_NOT_EXIST = OperatorWord("do not exist")
 
     @classmethod
-    def for_number(cls, number: Number) -> "NonExistence":
+    def for_number(cls, number: GrammaticalNumber) -> "NonExistence":
         """:return: ``DO_NOT_EXIST`` for a plural subject, else ``DOES_NOT_EXIST``.
 
-        >>> NonExistence.for_number(Number.PLURAL).text
+        >>> NonExistence.for_number(GrammaticalNumber.PLURAL).text
         'do not exist'
-        >>> NonExistence.for_number(Number.SINGULAR).text
+        >>> NonExistence.for_number(GrammaticalNumber.SINGULAR).text
         'does not exist'
         """
-        return cls.DO_NOT_EXIST if number is Number.PLURAL else cls.DOES_NOT_EXIST
+        return (
+            cls.DO_NOT_EXIST
+            if number is GrammaticalNumber.PLURAL
+            else cls.DOES_NOT_EXIST
+        )
 
 
 class PassiveAbsence(VocabEnum):
@@ -427,15 +431,19 @@ class PassiveAbsence(VocabEnum):
     HAVE_NOT_BEEN = OperatorWord("have not been")
 
     @classmethod
-    def for_number(cls, number: Number) -> "PassiveAbsence":
+    def for_number(cls, number: GrammaticalNumber) -> "PassiveAbsence":
         """:return: ``HAVE_NOT_BEEN`` for a plural owner, else ``HAS_NOT_BEEN``.
 
-        >>> PassiveAbsence.for_number(Number.PLURAL).text
+        >>> PassiveAbsence.for_number(GrammaticalNumber.PLURAL).text
         'have not been'
-        >>> PassiveAbsence.for_number(Number.SINGULAR).text
+        >>> PassiveAbsence.for_number(GrammaticalNumber.SINGULAR).text
         'has not been'
         """
-        return cls.HAVE_NOT_BEEN if number is Number.PLURAL else cls.HAS_NOT_BEEN
+        return (
+            cls.HAVE_NOT_BEEN
+            if number is GrammaticalNumber.PLURAL
+            else cls.HAS_NOT_BEEN
+        )
 
 
 class Quantifiers(VocabEnum):
@@ -489,26 +497,26 @@ class Pronouns(VocabEnum):
     THEY = PronounWord("they")
 
     @classmethod
-    def possessive(cls, number: Number) -> "Pronouns":
+    def possessive(cls, number: GrammaticalNumber) -> "Pronouns":
         """:return: The possessive pronoun — ``THEIR`` for a plural subject, else ``ITS``.
 
-        >>> Pronouns.possessive(Number.PLURAL).text
+        >>> Pronouns.possessive(GrammaticalNumber.PLURAL).text
         'their'
-        >>> Pronouns.possessive(Number.SINGULAR).text
+        >>> Pronouns.possessive(GrammaticalNumber.SINGULAR).text
         'its'
         """
-        return cls.THEIR if number is Number.PLURAL else cls.ITS
+        return cls.THEIR if number is GrammaticalNumber.PLURAL else cls.ITS
 
     @classmethod
-    def nominative(cls, number: Number) -> "Pronouns":
+    def nominative(cls, number: GrammaticalNumber) -> "Pronouns":
         """:return: The nominative (subject) pronoun — ``THEY`` for a plural subject, else ``IT``.
 
-        >>> Pronouns.nominative(Number.PLURAL).text
+        >>> Pronouns.nominative(GrammaticalNumber.PLURAL).text
         'they'
-        >>> Pronouns.nominative(Number.SINGULAR).text
+        >>> Pronouns.nominative(GrammaticalNumber.SINGULAR).text
         'it'
         """
-        return cls.THEY if number is Number.PLURAL else cls.IT
+        return cls.THEY if number is GrammaticalNumber.PLURAL else cls.IT
 
 
 class RangePhrases(VocabEnum):
@@ -589,15 +597,15 @@ class ExistentialPhrase(VocabEnum):
     THERE_ARE = PluralExistential("there are")
 
     @classmethod
-    def for_number(cls, number: Number) -> ExistentialPhrase:
+    def for_number(cls, number: GrammaticalNumber) -> ExistentialPhrase:
         """:return: The existential frame agreeing with *number*: ``THERE_ARE`` / ``THERE_IS_A``.
 
-        >>> ExistentialPhrase.for_number(Number.PLURAL).text
+        >>> ExistentialPhrase.for_number(GrammaticalNumber.PLURAL).text
         'there are'
-        >>> ExistentialPhrase.for_number(Number.SINGULAR).text
+        >>> ExistentialPhrase.for_number(GrammaticalNumber.SINGULAR).text
         "there's"
         """
-        return cls.THERE_ARE if number is Number.PLURAL else cls.THERE_IS_A
+        return cls.THERE_ARE if number is GrammaticalNumber.PLURAL else cls.THERE_IS_A
 
     def build_phrase(
         self, type_name: str, referent_id: Optional[uuid.UUID] = None
@@ -630,7 +638,7 @@ class FallbackNouns(VocabEnum):
         """:return: A pluralised noun fragment (e.g. ``"entities"``).
 
         >>> FallbackNouns.ENTITY.plural_fragment().number
-        <Number.PLURAL: 'plural'>
+        <GrammaticalNumber.PLURAL: 'plural'>
         """
         return self.value.plural_fragment()
 
@@ -837,7 +845,10 @@ _OPERATOR_CALLABLE_MAP: Dict[Callable, Operators] = {
 
 
 def copula_with(
-    core: str, number: Number = Number.SINGULAR, *, negated: bool = False
+    core: str,
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
+    *,
+    negated: bool = False,
 ) -> Fragment:
     """
     Compose a predicative operator as an agreeing copula followed by an invariant core.
@@ -858,11 +869,11 @@ def copula_with(
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
     >>> from krrood.entity_query_language.verbalization.rendering.morphology_processor import MorphologyProcessor
     >>> realise = lambda fragment: flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
-    >>> realise(copula_with("greater than", Number.SINGULAR))
+    >>> realise(copula_with("greater than", GrammaticalNumber.SINGULAR))
     'is greater than'
-    >>> realise(copula_with("greater than", Number.PLURAL))
+    >>> realise(copula_with("greater than", GrammaticalNumber.PLURAL))
     'are greater than'
-    >>> realise(copula_with("", Number.PLURAL))
+    >>> realise(copula_with("", GrammaticalNumber.PLURAL))
     'are'
     """
     copula = RoleFragment(
@@ -875,7 +886,9 @@ def copula_with(
     return PhraseFragment(parts=[copula, RoleFragment.for_operator(core)])
 
 
-def predicative_operator(text: str, number: Number = Number.SINGULAR) -> Fragment:
+def predicative_operator(
+    text: str, number: GrammaticalNumber = GrammaticalNumber.SINGULAR
+) -> Fragment:
     """
     Factor a baked predicative operator surface into an agreeing copula and its invariant core.
 
@@ -895,9 +908,9 @@ def predicative_operator(text: str, number: Number = Number.SINGULAR) -> Fragmen
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
     >>> from krrood.entity_query_language.verbalization.rendering.morphology_processor import MorphologyProcessor
     >>> realise = lambda fragment: flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
-    >>> realise(predicative_operator("is greater than", Number.PLURAL))
+    >>> realise(predicative_operator("is greater than", GrammaticalNumber.PLURAL))
     'are greater than'
-    >>> realise(predicative_operator("contains", Number.PLURAL))
+    >>> realise(predicative_operator("contains", GrammaticalNumber.PLURAL))
     'contains'
     """
     tokens = text.split()

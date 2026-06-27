@@ -20,7 +20,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
     WordFragment,
 )
-from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.fragments.features import (
+    GrammaticalNumber,
+)
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 
 
@@ -56,29 +58,35 @@ def test_number_is_keyword_only_and_text_is_positional():
     assert _field(RoleFragment, "text").kw_only is False
     for cls in (WordFragment, RoleFragment, NounPhrase):
         assert _field(cls, "number").kw_only is True
-        assert _field(cls, "number").default is Number.SINGULAR
+        assert _field(cls, "number").default is GrammaticalNumber.SINGULAR
 
 
 def test_positional_construction_preserved():
     """The existing positional constructions still build (``text`` first), with the inherited
     ``number`` defaulting to SINGULAR."""
     assert WordFragment("the").text == "the"
-    assert WordFragment("the").number is Number.SINGULAR
+    assert WordFragment("the").number is GrammaticalNumber.SINGULAR
     role = RoleFragment("Robot", SemanticRole.VARIABLE)
     assert (role.text, role.role, role.number) == (
         "Robot",
         SemanticRole.VARIABLE,
-        Number.SINGULAR,
+        GrammaticalNumber.SINGULAR,
     )
 
 
 def test_number_passed_by_keyword():
     """``number=`` keyword construction reaches the inherited field on every fragment."""
-    assert WordFragment(text="x", number=Number.PLURAL).number is Number.PLURAL
     assert (
-        RoleFragment(text="a", role=SemanticRole.ATTRIBUTE, number=Number.PLURAL).number
-        is Number.PLURAL
+        WordFragment(text="x", number=GrammaticalNumber.PLURAL).number
+        is GrammaticalNumber.PLURAL
     )
     assert (
-        NounPhrase(head=WordFragment("x"), number=Number.PLURAL).number is Number.PLURAL
+        RoleFragment(
+            text="a", role=SemanticRole.ATTRIBUTE, number=GrammaticalNumber.PLURAL
+        ).number
+        is GrammaticalNumber.PLURAL
+    )
+    assert (
+        NounPhrase(head=WordFragment("x"), number=GrammaticalNumber.PLURAL).number
+        is GrammaticalNumber.PLURAL
     )

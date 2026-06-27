@@ -9,7 +9,9 @@ from krrood.entity_query_language.operators.aggregators import Aggregator
 from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
     SpecificityRule,
 )
-from krrood.entity_query_language.query.aggregation_structure import aggregation_source_root
+from krrood.entity_query_language.query.aggregation_structure import (
+    aggregation_source_root,
+)
 
 # ── restriction-subject rules (which variable does the WHERE restrict?) ──────
 

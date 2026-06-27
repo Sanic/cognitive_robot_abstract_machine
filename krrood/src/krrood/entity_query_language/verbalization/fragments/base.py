@@ -8,7 +8,7 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     Spacing,
-    Number,
+    GrammaticalNumber,
     Separator,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
@@ -61,7 +61,7 @@ class HasNumber:
     """Mixin contributing the grammatical ``number`` field shared by fragments whose own
     surface text is inflected for number."""
 
-    number: Number = field(default=Number.SINGULAR, kw_only=True)
+    number: GrammaticalNumber = field(default=GrammaticalNumber.SINGULAR, kw_only=True)
     """Grammatical number of this fragment's surface text."""
 
 
@@ -106,7 +106,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, Fragment):
         cls,
         label: str,
         expression: SymbolicExpression,
-        number: Number = Number.SINGULAR,
+        number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> RoleFragment:
         """
         Build a fragment for a variable, instantiated variable, or entity, linked to its type.
@@ -133,7 +133,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, Fragment):
         cls,
         owner: Optional[type],
         attribute_name: str,
-        number: Number = Number.SINGULAR,
+        number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         *,
         text: Optional[str] = None,
     ) -> RoleFragment:
@@ -169,7 +169,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, Fragment):
     def for_type(
         cls,
         type_: object,
-        number: Number = Number.SINGULAR,
+        number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         *,
         text: Optional[str] = None,
     ) -> RoleFragment:

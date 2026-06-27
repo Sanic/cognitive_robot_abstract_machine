@@ -8,7 +8,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     Fragment,
     WordFragment,
 )
-from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.fragments.features import (
+    GrammaticalNumber,
+)
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.rendering.passes import RewritePass
 from krrood.entity_query_language.verbalization.vocabulary.english import Copulas
@@ -47,7 +49,7 @@ class MorphologyProcessor(RewritePass):
         """:return: *leaf* with number and polarity realised, then reset; a leaf with no realisable
         feature is returned unchanged.
 
-        >>> MorphologyProcessor().rewrite(WordFragment(text="Robot", number=Number.PLURAL)).text
+        >>> MorphologyProcessor().rewrite(WordFragment(text="Robot", number=GrammaticalNumber.PLURAL)).text
         'Robots'
         >>> MorphologyProcessor().rewrite(WordFragment(text="Robot")).text
         'Robot'
@@ -58,10 +60,12 @@ class MorphologyProcessor(RewritePass):
             return self._realize_verb(leaf)
         if isinstance(leaf, RoleFragment) and leaf.role is SemanticRole.OPERATOR:
             return self._realize_copula(leaf)
-        if leaf.number is not Number.PLURAL:
+        if leaf.number is not GrammaticalNumber.PLURAL:
             return leaf
         return replace(
-            leaf, text=morphology.ensure_plural(leaf.text), number=Number.SINGULAR
+            leaf,
+            text=morphology.ensure_plural(leaf.text),
+            number=GrammaticalNumber.SINGULAR,
         )
 
     @staticmethod
@@ -72,13 +76,15 @@ class MorphologyProcessor(RewritePass):
         >>> MorphologyProcessor()._realize_verb(RoleFragment(text="work", role=SemanticRole.VERB)).text
         'works'
         """
-        plural = leaf.number is Number.PLURAL
+        plural = leaf.number is GrammaticalNumber.PLURAL
         if leaf.negated:
             auxiliary = "do not" if plural else "does not"
             text = f"{auxiliary} {leaf.text}"
         else:
             text = leaf.text if plural else morphology.third_person_singular(leaf.text)
-        return replace(leaf, text=text, number=Number.SINGULAR, negated=False)
+        return replace(
+            leaf, text=text, number=GrammaticalNumber.SINGULAR, negated=False
+        )
 
     @staticmethod
     def _realize_copula(leaf: RoleFragment) -> RoleFragment:
@@ -93,6 +99,8 @@ class MorphologyProcessor(RewritePass):
         text = leaf.text
         if leaf.negated:
             text = _COPULA_NEGATIVE.get(text, text)
-        if leaf.number is Number.PLURAL:
+        if leaf.number is GrammaticalNumber.PLURAL:
             text = _COPULA_PLURAL.get(text, text)
-        return replace(leaf, text=text, number=Number.SINGULAR, negated=False)
+        return replace(
+            leaf, text=text, number=GrammaticalNumber.SINGULAR, negated=False
+        )

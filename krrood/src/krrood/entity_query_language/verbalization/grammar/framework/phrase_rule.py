@@ -6,7 +6,9 @@ from typing_extensions import TYPE_CHECKING, Callable, ClassVar, Optional, Seque
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.fragments.base import Fragment
-from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.fragments.features import (
+    GrammaticalNumber,
+)
 from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
     most_specific,
     mro_depth,
@@ -38,7 +40,7 @@ class RenderOptions:
     inheriting the parent's).
     """
 
-    number: Number = Number.SINGULAR
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR
     """Grammatical number requested for this node.  A number-aware rule reads it to build a
     plural noun-phrase shape; every other rule ignores it (renders singular)."""
 
@@ -76,7 +78,7 @@ class RuleContext:
         self,
         node: SymbolicExpression,
         *,
-        number: Number = Number.SINGULAR,
+        number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         inline: bool = False,
         as_value: bool = False,
     ) -> Fragment:
@@ -97,7 +99,7 @@ class RuleContext:
         )
 
     @property
-    def number(self) -> Number:
+    def number(self) -> GrammaticalNumber:
         """:return: The grammatical number requested for this node."""
         return self.options.number
 

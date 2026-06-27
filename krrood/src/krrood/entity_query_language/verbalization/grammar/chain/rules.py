@@ -5,7 +5,9 @@ from krrood.entity_query_language.verbalization.fragments.base import Fragment
 from krrood.entity_query_language.verbalization.grammar.chain.assembler import (
     ChainAssembler,
 )
-from krrood.entity_query_language.verbalization.grammar.chain.planner import ChainPlanner
+from krrood.entity_query_language.verbalization.grammar.chain.planner import (
+    ChainPlanner,
+)
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     PhraseRule,
     RuleContext,

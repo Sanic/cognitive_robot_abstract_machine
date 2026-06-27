@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Iterable, Protocol, Union, runtime_checkable
 
-from krrood.entity_query_language.predicate import Field
+from krrood.entity_query_language.predicate import VerbalizationField
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.base import (
     Clause,
@@ -17,7 +17,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.microplanning.coordination import (
@@ -50,7 +50,7 @@ class ClauseElement(ABC):
 
 @dataclass(frozen=True)
 class Noun(ClauseElement):
-    """A noun constituent — a predicate :class:`~krrood.entity_query_language.predicate.Field`, an
+    """A noun constituent — a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`, an
     already-rendered fragment, or a literal noun given by its *head word only*."""
 
     content: Union[str, "ClauseConstituent"]
@@ -93,7 +93,7 @@ class Verb(ClauseElement):
     lemma: str
     """The verb's base form (*"work"*, *"contain"*, *"love"*)."""
 
-    number: Number = Number.SINGULAR
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR
     """The subject number the verb agrees with — ``PLURAL`` reads the bare *"work"* / *"have"* for a
     coordinated or plural subject."""
 
@@ -147,8 +147,8 @@ class OneOf(ClauseElement):
     surface a domain-constrained variable uses.
     """
 
-    members: Union[Iterable, Field]
-    """The admissible values — a predicate :class:`~krrood.entity_query_language.predicate.Field`
+    members: Union[Iterable, VerbalizationField]
+    """The admissible values — a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`
     bound to a collection, or a collection directly. Classes render as linked type references, other
     values as literals."""
 
@@ -162,7 +162,9 @@ class OneOf(ClauseElement):
         'one of Integer or Text'
         """
         members = list(
-            self.members.value if isinstance(self.members, Field) else self.members
+            self.members.value
+            if isinstance(self.members, VerbalizationField)
+            else self.members
         )
         are_types = bool(members) and all(
             isinstance(member, type) for member in members
@@ -198,14 +200,14 @@ class ClauseConstituent(Protocol):
     """The one contract every clause constituent satisfies: it renders itself to a :class:`Fragment`.
 
     A typed part-of-speech element (:class:`ClauseElement` — :class:`Noun` / :class:`Verb` / …), a
-    :class:`Preposition`, a predicate :class:`~krrood.entity_query_language.predicate.Field`, and a
+    :class:`Preposition`, a predicate :class:`~krrood.entity_query_language.predicate.VerbalizationField`, and a
     raw :class:`Fragment` all satisfy it structurally (each defines ``as_fragment``), so
     :func:`clause` depends on this single abstraction rather than enumerating concrete types — a new
     kind of constituent only has to implement the method (open/closed).
 
     This is a :class:`~typing.Protocol`, not a base class, because the constituents are
     deliberately heterogeneous: ``Preposition`` is an ``Enum`` (it cannot also inherit an ABC) and
-    ``Field`` is a core type (it must not depend on this verbalization layer). Structural typing
+    ``VerbalizationField`` is a core type (it must not depend on this verbalization layer). Structural typing
     unifies them without forcing inheritance.
     """
 

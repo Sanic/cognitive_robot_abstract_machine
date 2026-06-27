@@ -11,7 +11,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.grammar.aggregation.kinds import (
     AGGREGATION_KIND,
@@ -102,7 +102,7 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         """
         source = plan.aggregation_data.source
         source_fragment = (
-            self.context.child(source, number=Number.PLURAL)
+            self.context.child(source, number=GrammaticalNumber.PLURAL)
             if source is not None
             else FallbackNouns.ENTITY.plural_fragment()
         )

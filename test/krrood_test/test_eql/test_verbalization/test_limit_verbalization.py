@@ -233,7 +233,10 @@ def test_ranking_form_selection(n, direction, relation, expected):
     }[relation]
     count = 1 if direction == "n1" else 3
     plan = RankingPlan(
-        n=count, direction=direction_value, relation=relation_value, order_key=None
+        limit_number=count,
+        direction=direction_value,
+        relation=relation_value,
+        order_key=None,
     )
     form = RankingForm.most_applicable(RankingRequest(plan=plan))
     assert form.__name__ == expected

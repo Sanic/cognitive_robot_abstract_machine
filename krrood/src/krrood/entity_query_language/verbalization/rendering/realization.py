@@ -70,7 +70,9 @@ def realize_tree(
         CoreferenceProcessor(
             discourse=discourse,
             numbered_labels=dict(numbered_labels or {}),
-            previously_introduced_referents=tuple(previously_introduced_referents or ()),
+            previously_introduced_referents=tuple(
+                previously_introduced_referents or ()
+            ),
         ),
         *_LOWERING_PASSES,
     ]

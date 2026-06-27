@@ -11,12 +11,12 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 )
 from krrood.entity_query_language.verbalization.fragments.features import (  # noqa: F401  (re-export)
     Spacing,
-    Number,
+    GrammaticalNumber,
 )
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 
-# ``Number`` is defined in ``fragments.features`` (below both this lexicon and the fragment
-# tree, to avoid a cycle) and re-exported here for the ``for_number`` selectors and importers.
+# ``GrammaticalNumber`` is defined in ``fragments.features`` (below both this lexicon and the
+# fragment tree, to avoid a cycle) and re-exported here for the ``for_number`` selectors and importers.
 
 
 @dataclass(frozen=True)

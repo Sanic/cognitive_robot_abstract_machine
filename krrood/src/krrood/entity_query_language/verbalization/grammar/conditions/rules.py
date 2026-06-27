@@ -20,7 +20,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
-    Number,
+    GrammaticalNumber,
     Separator,
 )
 from krrood.entity_query_language.verbalization.grammar.chain.assembler import (
@@ -276,7 +276,7 @@ class SharedSubjectComparisonsRule(PhraseRule):
         return PhraseFragment(
             parts=[
                 context.child(node.subject_expression),
-                copula_with("", Number.SINGULAR),
+                copula_with("", GrammaticalNumber.SINGULAR),
                 Logicals.EITHER.as_fragment(),
                 oxford_comma(tails, Conjunctions.OR.as_fragment()),
             ]
@@ -347,9 +347,7 @@ class SharedSubjectConjunctionRule(PhraseRule):
                 compact=not lead,
             )
         value = context.child(tail.right, as_value=True)
-        core = comparator_operator(
-            tail, context.services, compact=False, copula=False
-        )
+        core = comparator_operator(tail, context.services, compact=False, copula=False)
         keeps_copula = (
             lead
             or tail.operation is operator.ne
@@ -430,7 +428,8 @@ class NotRule(PhraseRule):
 
 def _negation_wrap(child_fragment: Fragment) -> Fragment:
     """:return: *child_fragment* wrapped as *"not (<child>)"* — the fallback negation for a clause
-    that cannot be negated in place. The parens glue to the child via the orthography pass."""
+    that cannot be negated in place. The parens glue to the child via the orthography pass.
+    """
     return PhraseFragment(
         parts=[
             Logicals.NOT.as_fragment(),
@@ -577,7 +576,9 @@ class ForAllRule(PhraseRule):
         >>> verbalize_expression(for_all(robot, robot.battery > 0))
         'for all Robots, their batteries are greater than 0'
         """
-        variable_fragment = context.child(node.variable, number=Number.PLURAL)
+        variable_fragment = context.child(
+            node.variable, number=GrammaticalNumber.PLURAL
+        )
         condition_fragment = context.child(node.condition)
         return PhraseFragment(
             parts=[

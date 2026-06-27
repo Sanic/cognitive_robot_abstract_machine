@@ -34,7 +34,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     RoleFragment,
 )
-from krrood.entity_query_language.verbalization.fragments.features import Number
+from krrood.entity_query_language.verbalization.fragments.features import (
+    GrammaticalNumber,
+)
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 from krrood.entity_query_language.verbalization.grammar.chain.assembler import (
     ChainAssembler,
@@ -372,7 +374,7 @@ def comparator_operator(
     *,
     negated: bool = False,
     compact: Optional[bool] = None,
-    number: Number = Number.SINGULAR,
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     copula: bool = True,
 ) -> Fragment:
     """
@@ -430,7 +432,7 @@ def comparator_operator(
 
 
 def _operator_fragment(
-    word: OperatorWord, number: Number, *, compact: bool, copula: bool
+    word: OperatorWord, number: GrammaticalNumber, *, compact: bool, copula: bool
 ) -> Fragment:
     """:return: the operator surface for a selected *word* — the bare compact verb when *compact*,
     the bare predicative core (*"greater than"*) when ``not copula``, else the agreeing predicative
@@ -512,14 +514,16 @@ def coindexed_operator(operation) -> Fragment:
         if operation is operator.eq
         else Operators.from_callable(operation)
     )
-    return predicative_operator(phrase.value.standard, Number.PLURAL)
+    return predicative_operator(phrase.value.standard, GrammaticalNumber.PLURAL)
 
 
 # ── absence rendering (== None) ──────────────────────────────────────────────
 
 
 def render_absence(
-    comparator: Comparator, context: RuleContext, number: Number = Number.SINGULAR
+    comparator: Comparator,
+    context: RuleContext,
+    number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
 ) -> Fragment:
     """
     Render an ``<chain> == None`` comparison as an absence predicate rather than a value: an owned
