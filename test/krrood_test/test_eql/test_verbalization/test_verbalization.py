@@ -768,10 +768,9 @@ def test_verbalize_and_chain_flattening():
     x = variable(int, [])
     cond = and_(x > 1, x < 10, x != 5)
     text = verbalize_expression(cond)
-    assert "greater than" in text
-    assert "less than" in text
-    assert "is not" in text
-    assert ", and " in text
+    # The flattened conjuncts on one bare variable factor into a relative clause; the complementary
+    # bound pair folds to "between".
+    assert text == "an Integer that is between 1 and 10 and is not 5"
 
 
 def test_verbalize_and_stops_at_or():
@@ -1448,9 +1447,9 @@ def test_verbalize_condition_graph_example():
 
     assert "Item" in text
     assert "either" in text
-    assert "greater than" in text
-    assert "less than" in text
-    assert "is" in text
+    # The bare-variable bound pair folds to "between" inside its relative clause.
+    assert "between 5 and 10" in text
+    assert "is 11" in text
 
 
 def test_verbalize_has_type_with_exists():
