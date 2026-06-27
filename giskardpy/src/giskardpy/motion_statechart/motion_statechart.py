@@ -387,7 +387,7 @@ class MotionStatechart(SubclassJSONSerializer):
         return [
             debug_expression
             for node in self.nodes
-            for debug_expression in node._debug_expressions
+            for debug_expression in node.debug_expressions
         ]
 
     @property

@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
+from giskardpy.motion_statechart.exceptions import PlotterNotConfiguredError
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.plotters.debug_expression_trajectory_plotter import (
     DebugExpressionTrajectoryPlotter,
@@ -155,6 +156,8 @@ class Executor:
         if self.context.collision_manager.has_consumers():
             self.context.collision_manager.compute_collisions()
         self.motion_statechart.tick(self.context)
+        if self.debug_expression_plotter is not None:
+            self.debug_expression_plotter.debug_expression_trajectory.append(self.time)
         if self.qp_controller is None:
             return
         next_cmd = self.qp_controller.compute_command(
@@ -171,8 +174,6 @@ class Executor:
             self.trajectory_plotter.world_state_trajectory.append(
                 self.context.world.state, self.time
             )
-        if self.debug_expression_plotter is not None:
-            self.debug_expression_plotter.debug_expression_trajectory.append(self.time)
 
     def tick_until_end(self, timeout: int = 1_000):
         """
@@ -224,4 +225,6 @@ class Executor:
 
     def plot_debug_expressions(self, file_name: str = "./debug_expressions.pdf"):
         """Plot the recorded debug expressions to the given PDF file."""
+        if self.debug_expression_plotter is None:
+            raise PlotterNotConfiguredError("debug expression plotter")
         self.debug_expression_plotter.plot(file_name)

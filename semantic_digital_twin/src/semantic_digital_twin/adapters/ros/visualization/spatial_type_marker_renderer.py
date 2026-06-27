@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Type
+from typing import Type
 
 import numpy as np
 from builtin_interfaces.msg import Duration
@@ -13,7 +13,7 @@ from geometry_msgs.msg import (
     Vector3 as RosVector3,
 )
 from std_msgs.msg import ColorRGBA, Header
-from typing_extensions import Generic, TypeVar, get_args
+from typing_extensions import ClassVar, Generic, TypeVar, get_args
 from visualization_msgs.msg import Marker
 
 from krrood.exceptions import DataclassException
@@ -68,7 +68,7 @@ class SpatialTypeVisualization:
     marker_id_offset: int = 0
     """The base marker id. Renderers that emit several markers add small offsets to it."""
 
-    label: Optional[str] = None
+    label: str | None = None
     """An optional text label rendered alongside the markers."""
 
     lifetime_seconds: float = 0.0
@@ -91,18 +91,17 @@ class SpatialTypeMarkerRenderer(ABC, Generic[SpatialTypeInput]):
     """
 
     @classmethod
-    @property
-    def input_type(cls) -> Type[SpatialTypeInput]:
+    def input_type(cls) -> type[SpatialTypeInput]:
         """The spatial type category handled by this renderer."""
         return get_args(cls.__orig_bases__[0])[0]
 
     @classmethod
     def can_render(cls, spatial_type: SpatialType) -> bool:
         """Whether this renderer can render the given spatial type."""
-        return isinstance(spatial_type, cls.input_type)
+        return isinstance(spatial_type, cls.input_type())
 
     @classmethod
-    def renderer_for(cls, spatial_type: SpatialType) -> Type[SpatialTypeMarkerRenderer]:
+    def renderer_for(cls, spatial_type: SpatialType) -> type[SpatialTypeMarkerRenderer]:
         """Find the renderer responsible for the given spatial type."""
         for subclass in recursive_subclasses(cls):
             if subclass.can_render(spatial_type):
@@ -112,7 +111,7 @@ class SpatialTypeMarkerRenderer(ABC, Generic[SpatialTypeInput]):
     @classmethod
     def render(
         cls, request: SpatialTypeVisualization, root_frame_name: str
-    ) -> List[Marker]:
+    ) -> list[Marker]:
         """
         Render the requested spatial type into markers.
 
@@ -126,7 +125,7 @@ class SpatialTypeMarkerRenderer(ABC, Generic[SpatialTypeInput]):
     @abstractmethod
     def render_markers(
         cls, request: SpatialTypeVisualization, root_frame_name: str
-    ) -> List[Marker]:
+    ) -> list[Marker]:
         """Build the markers for the spatial type of the given request."""
         raise NotImplementedError
 
@@ -178,7 +177,7 @@ class Point3MarkerRenderer(SpatialTypeMarkerRenderer[Point3]):
     @classmethod
     def render_markers(
         cls, request: SpatialTypeVisualization, root_frame_name: str
-    ) -> List[Marker]:
+    ) -> list[Marker]:
         frame_id = cls._reference_frame_name(request.spatial_type, root_frame_name)
         position = request.spatial_type.evaluate()
         marker = cls._base_marker(request, 0, frame_id)
@@ -200,7 +199,7 @@ class Vector3MarkerRenderer(SpatialTypeMarkerRenderer[Vector3]):
     @classmethod
     def render_markers(
         cls, request: SpatialTypeVisualization, root_frame_name: str
-    ) -> List[Marker]:
+    ) -> list[Marker]:
         vector = request.spatial_type
         if vector.visualisation_frame is not None:
             frame_id = str(vector.visualisation_frame.name)
@@ -224,7 +223,7 @@ class Vector3MarkerRenderer(SpatialTypeMarkerRenderer[Vector3]):
 class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
     """Renders any orientation-carrying spatial type as an RGB axis triad with an optional label."""
 
-    _renderable_types: Tuple[Type[SpatialType], ...] = (
+    _renderable_types: ClassVar[tuple[type[SpatialType], ...]] = (
         Pose,
         Pose2D,
         HomogeneousTransformationMatrix,
@@ -240,7 +239,7 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
     @classmethod
     def render_markers(
         cls, request: SpatialTypeVisualization, root_frame_name: str
-    ) -> List[Marker]:
+    ) -> list[Marker]:
         frame_id = cls._reference_frame_name(request.spatial_type, root_frame_name)
         position, orientation = cls._position_and_orientation(request.spatial_type)
         pose = RosPose(
@@ -289,7 +288,7 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
     @staticmethod
     def _position_and_orientation(
         spatial_type: SpatialType,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Resolve the current position and orientation quaternion of the spatial type."""
         if isinstance(spatial_type, Quaternion):
             return np.zeros(3), spatial_type.evaluate()

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Iterable, List, Optional
+from typing import TYPE_CHECKING
 
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from visualization_msgs.msg import MarkerArray
 
+from krrood.exceptions import DataclassException
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer import (
     SpatialTypeMarkerRenderer,
     SpatialTypeVisualization,
@@ -16,7 +18,26 @@ from semantic_digital_twin.spatial_types.spatial_types import SpatialType
 from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:
+    from rclpy.publisher import Publisher
+
     from semantic_digital_twin.world import World
+
+
+@dataclass
+class WorldNotResolvableError(DataclassException):
+    """Raised when no world can be resolved for a spatial type that should be published."""
+
+    spatial_type: SpatialType = field(kw_only=True)
+    """The spatial type whose world could not be resolved."""
+
+    def error_message(self) -> str:
+        return (
+            "Cannot resolve a world: no world was given and the spatial type "
+            f"{self.spatial_type} has no reference frame to derive one from."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Pass the world explicitly or give the spatial type a reference frame."
 
 
 @dataclass(eq=False)
@@ -41,10 +62,10 @@ class SpatialTypePublisher(StateChangeCallback):
     )
     """The QoS profile of the publisher. Latched so RViz sees the last markers on connect."""
 
-    _requests: List[SpatialTypeVisualization] = field(init=False, default_factory=list)
+    _requests: list[SpatialTypeVisualization] = field(init=False, default_factory=list)
     """The spatial types that are re-evaluated and republished on every state change."""
 
-    publisher: Any = field(init=False)
+    publisher: Publisher = field(init=False)
     """The ROS2 marker array publisher."""
 
     def __post_init__(self):
@@ -74,6 +95,7 @@ class SpatialTypePublisher(StateChangeCallback):
         self.publish()
 
     def on_state_change(self, **kwargs) -> None:
+        """Republish all registered spatial types whenever the world state changes."""
         self.publish()
 
     def publish(self) -> None:
@@ -92,9 +114,9 @@ class SpatialTypePublisher(StateChangeCallback):
         *,
         spatial_type: SpatialType,
         node: Node,
-        color: Optional[Color] = None,
-        label: Optional[str] = None,
-        world: Optional[World] = None,
+        color: Color | None = None,
+        label: str | None = None,
+        world: World | None = None,
     ) -> SpatialTypePublisher:
         """
         Render and publish a single spatial type immediately.
@@ -102,9 +124,14 @@ class SpatialTypePublisher(StateChangeCallback):
         Convenience entry point for debugging: resolves the world from the spatial
         type's reference frame when not given. The returned publisher keeps tracking
         the spatial type until :meth:`stop` is called.
+
+        :raises WorldNotResolvableError: When no world is given and the spatial type has no reference frame.
         """
         if world is None:
-            world = spatial_type.reference_frame._world
+            reference_frame = spatial_type.reference_frame
+            if reference_frame is None:
+                raise WorldNotResolvableError(spatial_type=spatial_type)
+            world = reference_frame._world
         publisher = cls(node=node, _world=world)
         publisher.add(
             SpatialTypeVisualization(

@@ -70,6 +70,12 @@ class CartesianTask(Task, ABC):
     _fk_binding: ForwardKinematicsBinding = field(kw_only=True, init=False)
     """Binding for the goal pose."""
 
+    GOAL_COLOR: ClassVar[Color] = Color(R=0.0, G=1.0, B=0.0, A=1.0)
+    """The color of the goal debug expression marker (green)."""
+
+    CURRENT_COLOR: ClassVar[Color] = Color(R=1.0, G=0.0, B=0.0, A=1.0)
+    """The color of the current debug expression marker (red)."""
+
     def build(self, context: MotionStatechartContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
@@ -100,18 +106,22 @@ class CartesianTask(Task, ABC):
         artifacts: NodeArtifacts,
         goal: SpatialType,
         current: SpatialType,
-    ):
+    ) -> None:
         """
         Register a goal and a current spatial expression for visualization.
 
         The expressions are named ``<task name>/goal`` and ``<task name>/current``
         and colored green and red respectively, so they can be told apart in RViz.
+
+        :param artifacts: The node artifacts the debug expressions are appended to.
+        :param goal: The spatial expression describing the desired state.
+        :param current: The spatial expression describing the current state.
         """
         artifacts.debug_expressions.append(
-            DebugExpression(f"{self.name}/goal", goal, color=Color(0, 1, 0, 1))
+            DebugExpression(f"{self.name}/goal", goal, color=self.GOAL_COLOR)
         )
         artifacts.debug_expressions.append(
-            DebugExpression(f"{self.name}/current", current, color=Color(1, 0, 0, 1))
+            DebugExpression(f"{self.name}/current", current, color=self.CURRENT_COLOR)
         )
 
 
@@ -653,7 +663,7 @@ class CartesianPose(CartesianTask):
         self.add_goal_and_current_debug_expressions(
             artifacts,
             goal=self.root_T_goal_reference_frame @ self.goal_pose,
-            current=root_P_current,
+            current=root_T_current,
         )
         return artifacts
 

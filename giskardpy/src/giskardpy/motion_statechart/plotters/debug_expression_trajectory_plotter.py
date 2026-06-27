@@ -15,7 +15,6 @@ from giskardpy.motion_statechart.debug_expression_trajectory import (
     RecordedDebugExpression,
 )
 from giskardpy.motion_statechart.graph_node import DebugExpression
-from giskardpy.utils.utils import create_path
 
 
 @dataclass
@@ -157,6 +156,5 @@ class DebugExpressionTrajectoryPlotter:
         axes[-1].set_xticks(ticks)
         axes[-1].set_xlabel("Time [s]")
 
-        # create_path(file_name)
         plt.savefig(file_name, bbox_inches="tight")
         plt.close()

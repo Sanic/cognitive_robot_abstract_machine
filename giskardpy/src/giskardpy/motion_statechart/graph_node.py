@@ -324,6 +324,7 @@ class DebugExpression:
         | HomogeneousTransformationMatrix
         | Pose
     )
+    """The tracked expression; spatial types are additionally rendered as RViz markers."""
 
     color: Color = field(default_factory=lambda: Color(1, 0, 0, 1))
     """
@@ -468,6 +469,13 @@ class MotionStatechartNode(SubclassJSONSerializer):
         if self.parent_node_index is None:
             return None
         return self._motion_statechart.get_node_by_index(self.parent_node_index)
+
+    @property
+    def debug_expressions(self) -> List[DebugExpression]:
+        """
+        :return: The debug expressions registered by this node during build.
+        """
+        return self._debug_expressions
 
     @property
     def depth(self) -> int:

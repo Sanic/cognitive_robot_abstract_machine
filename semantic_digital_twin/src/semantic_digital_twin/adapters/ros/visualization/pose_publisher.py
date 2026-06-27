@@ -88,9 +88,13 @@ class PosePublisher(ModelChangeCallback):
         """
         Creates a MarkerArray to visualize the pose as an RGB axis triad, with an optional text label.
         """
+        reference_frame = self.pose.reference_frame
+        reference_frame_name = (
+            self.fixed_frame if reference_frame is None else str(reference_frame.name)
+        )
         request = SpatialTypeVisualization(
             spatial_type=self.pose,
-            namespace=f"pose/{self.pose.reference_frame.name}/{id(self)}",
+            namespace=f"pose/{reference_frame_name}/{id(self)}",
             label=self.text,
             lifetime_seconds=self._remaining_lifetime(),
         )

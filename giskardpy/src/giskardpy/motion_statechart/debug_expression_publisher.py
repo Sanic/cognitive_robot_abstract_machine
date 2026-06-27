@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from rclpy.node import Node
 
-from giskardpy.motion_statechart.graph_node import DebugExpression
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer import (
     SpatialTypeVisualization,
 )
@@ -15,6 +13,10 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher imp
 )
 from semantic_digital_twin.spatial_types.spatial_types import SpatialType, Vector3
 from semantic_digital_twin.world import World
+
+if TYPE_CHECKING:
+    from giskardpy.motion_statechart.graph_node import DebugExpression
+    from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 
 
 @dataclass
@@ -32,7 +34,7 @@ class DebugExpressionPublisher:
     node: Node
     """The ROS2 node used to create the marker publisher."""
 
-    _publisher: Optional[SpatialTypePublisher] = field(init=False, default=None)
+    _publisher: SpatialTypePublisher | None = field(init=False, default=None)
     """The underlying publisher that renders and republishes the debug expressions."""
 
     def attach(self, motion_statechart: MotionStatechart) -> None:

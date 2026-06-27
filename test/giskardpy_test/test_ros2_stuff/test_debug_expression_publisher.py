@@ -9,9 +9,10 @@ from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.ros_executor import Ros2Executor
 from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.world import World
 
 
-def align_planes_statechart(world) -> MotionStatechart:
+def align_planes_statechart(world: World) -> MotionStatechart:
     root = world.root
     tip = world.get_body_by_name("bot")
     motion_statechart = MotionStatechart()
@@ -27,7 +28,7 @@ def align_planes_statechart(world) -> MotionStatechart:
     return motion_statechart
 
 
-def build_align_planes_task(world) -> AlignPlanes:
+def build_align_planes_task(world: World) -> AlignPlanes:
     root = world.root
     tip = world.get_body_by_name("bot")
     task = AlignPlanes(
@@ -47,7 +48,7 @@ def test_align_planes_sets_visualisation_frame(cylinder_bot_world):
 
     current_normal = next(
         debug_expression
-        for debug_expression in task._debug_expressions
+        for debug_expression in task.debug_expressions
         if debug_expression.name == "align/current_normal"
     )
 
@@ -60,7 +61,7 @@ def test_attach_visualizes_spatial_debug_expressions_only(
     rclpy_node, cylinder_bot_world
 ):
     task = build_align_planes_task(cylinder_bot_world)
-    task._debug_expressions.append(
+    task.debug_expressions.append(
         DebugExpression(name="scalar_only", expression=sm.Scalar(1.0))
     )
     motion_statechart = MotionStatechart()
@@ -124,3 +125,23 @@ def test_executor_skips_debug_expressions_by_default(rclpy_node, cylinder_bot_wo
     executor.compile(align_planes_statechart(cylinder_bot_world))
 
     assert executor._debug_expression_publisher is None
+
+
+def test_recompile_stops_previous_debug_expression_publisher(
+    rclpy_node, cylinder_bot_world
+):
+    executor = Ros2Executor(
+        MotionStatechartContext(world=cylinder_bot_world),
+        ros_node=rclpy_node,
+        publish_debug_expressions=True,
+    )
+    executor.compile(align_planes_statechart(cylinder_bot_world))
+    previous_publisher = executor._debug_expression_publisher._publisher
+
+    executor.compile(align_planes_statechart(cylinder_bot_world))
+
+    callbacks = cylinder_bot_world.state.state_change_callbacks
+    assert all(callback is not previous_publisher for callback in callbacks)
+    current_publisher = executor._debug_expression_publisher._publisher
+    assert current_publisher is not previous_publisher
+    assert any(callback is current_publisher for callback in callbacks)

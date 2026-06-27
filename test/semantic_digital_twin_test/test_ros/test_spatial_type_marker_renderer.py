@@ -15,13 +15,16 @@ from semantic_digital_twin.spatial_types import (
     Quaternion,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import RotationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import (
+    RotationMatrix,
+    SpatialType,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 ROOT_FRAME_NAME = "map"
 
 
-def render(spatial_type, **kwargs):
+def render(spatial_type: SpatialType, **kwargs) -> list[Marker]:
     request = SpatialTypeVisualization(spatial_type=spatial_type, **kwargs)
     return SpatialTypeMarkerRenderer.render(request, ROOT_FRAME_NAME)
 
@@ -76,9 +79,10 @@ def test_homogeneous_matrix_renders_axis_triad():
     assert len(markers) == 3
     assert all(marker.type == Marker.ARROW for marker in markers)
     assert all(marker.header.frame_id == str(frame.name) for marker in markers)
-    assert markers[0].points[1].x == 0.5
-    assert markers[1].points[1].y == 0.5
-    assert markers[2].points[1].z == 0.5
+    arrow_length = SpatialTypeVisualization(spatial_type=pose).arrow_length
+    assert markers[0].points[1].x == arrow_length
+    assert markers[1].points[1].y == arrow_length
+    assert markers[2].points[1].z == arrow_length
 
 
 def test_pose_like_adds_text_marker_when_labeled():

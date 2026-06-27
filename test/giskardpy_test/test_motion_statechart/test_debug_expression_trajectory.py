@@ -69,10 +69,9 @@ class TestDebugExpressionRecording:
         executor = _build_executor(cylinder_bot_world)
         executor.tick_until_end()
 
-        file_name = str(tmp_path / "debug_expressions.pdf")
-        executor.plot_debug_expressions(file_name)
-
         output = tmp_path / "debug_expressions.pdf"
+        executor.plot_debug_expressions(str(output))
+
         assert output.exists()
         assert output.stat().st_size > 0
 

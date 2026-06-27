@@ -4570,9 +4570,6 @@ class SpatialTypeVisualizationDAO(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
     marker_id_offset: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-    label: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
     lifetime_seconds: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     arrow_length: Mapped[builtins.float] = mapped_column(use_existing_column=True)
     sphere_diameter: Mapped[builtins.float] = mapped_column(use_existing_column=True)
@@ -4618,6 +4615,32 @@ class Vector3MarkerRendererDAO(
         "inherit_condition": database_id == SpatialTypeMarkerRendererDAO.database_id,
         "polymorphic_load": "selectin",
     }
+
+
+class WorldNotResolvableErrorDAO(
+    Base,
+    DataAccessObject[
+        semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher.WorldNotResolvableError
+    ],
+):
+    __tablename__ = "WorldNotResolvableErrorDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        Integer, primary_key=True, use_existing_column=True
+    )
+
+    spatial_type_id: Mapped[int] = mapped_column(
+        ForeignKey("SpatialTypeDAO.database_id", use_alter=True),
+        nullable=True,
+        use_existing_column=True,
+    )
+
+    spatial_type: Mapped[SpatialTypeDAO] = relationship(
+        "SpatialTypeDAO",
+        uselist=False,
+        foreign_keys=[spatial_type_id],
+        post_update=True,
+    )
 
 
 class FetchWorldServerDAO(

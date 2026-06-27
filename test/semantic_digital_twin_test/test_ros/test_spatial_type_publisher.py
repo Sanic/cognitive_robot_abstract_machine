@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import List
 
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -10,13 +9,15 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher imp
     SpatialTypePublisher,
 )
 from semantic_digital_twin.spatial_types import Point3
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 
 @dataclass
 class FakeMarkerPublisher:
     """Captures published marker arrays so tests can assert without a live RViz."""
 
-    published: List[MarkerArray] = field(default_factory=list)
+    published: list[MarkerArray] = field(default_factory=list)
 
     def publish(self, marker_array: MarkerArray) -> None:
         self.published.append(marker_array)
@@ -28,7 +29,7 @@ def capture(publisher: SpatialTypePublisher) -> FakeMarkerPublisher:
     return fake
 
 
-def first_moving_dof(world):
+def first_moving_dof(world: World) -> DegreeOfFreedom:
     return world.active_degrees_of_freedom[0]
 
 
@@ -85,6 +86,42 @@ def test_set_requests_replaces_previous(rclpy_node, cylinder_bot_world):
     markers = fake.published[-1].markers
     assert len(markers) == 1
     assert markers[0].ns == "b"
+
+
+def test_add_all_publishes_all_requests(rclpy_node, cylinder_bot_world):
+    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    fake = capture(publisher)
+
+    publisher.add_all(
+        [
+            SpatialTypeVisualization(
+                spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root),
+                namespace="a",
+            ),
+            SpatialTypeVisualization(
+                spatial_type=Point3(1, 1, 1, reference_frame=cylinder_bot_world.root),
+                namespace="b",
+            ),
+        ]
+    )
+
+    markers = fake.published[-1].markers
+    assert {marker.ns for marker in markers} == {"a", "b"}
+
+
+def test_clear_publishes_empty_marker_array(rclpy_node, cylinder_bot_world):
+    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    publisher.add(
+        SpatialTypeVisualization(
+            spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root)
+        )
+    )
+    fake = capture(publisher)
+
+    publisher.clear()
+
+    assert fake.published[-1].markers == []
+    assert publisher._requests == []
 
 
 def test_stop_deregisters_from_state_callbacks(rclpy_node, cylinder_bot_world):
