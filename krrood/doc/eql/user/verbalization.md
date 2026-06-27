@@ -31,7 +31,7 @@ from krrood.entity_query_language.factories import variable, entity, an
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 from krrood.entity_query_language.verbalization.example_domain import Robot
 
-robots = [Robot("R2D2", 95), Robot("C3PO", 20), Robot("BB8", 80)]
+robots = [Robot("R2D2", 95, True), Robot("C3PO", 20, False), Robot("BB8", 80, True)]
 r = variable(Robot, domain=robots)
 
 query = an(entity(r).where(r.battery > 50))
@@ -297,6 +297,9 @@ A `set_of` that *computes* an aggregate is a calculation, so it opens with "Repo
 code-like parentheses:
 
 ```{code-cell} ipython3
+from krrood.entity_query_language.factories import a, set_of
+from krrood.entity_query_language.verbalization.example_domain import Employee
+
 employee = variable(Employee, domain=None)
 print(verbalize_expression(a(set_of(eql.sum(employee.salary)))))
 # Report the sum of salaries of Employees
@@ -441,6 +444,13 @@ two different robots read *"Robot 1"* / *"Robot 2"* rather than two indistinguis
 — and a repeat of either reduces to its numbered label:
 
 ```{code-cell} ipython3
+from dataclasses import dataclass
+
+@dataclass
+class Pair:
+    primary: Mission
+    secondary: Mission
+
 pair = variable(Pair, domain=None)
 query = an(entity(pair).where(
     pair.primary.assigned_to.battery > 5,
@@ -676,14 +686,15 @@ from krrood.entity_query_language.verbalization.rendering.formatter import HTMLF
 from krrood.entity_query_language.verbalization.rendering.renderer import HierarchicalRenderer
 from krrood.entity_query_language.verbalization.rendering.source_link_resolver import AutoAPIResolver
 
-vd_robots = [Robot("R2D2", 95), Robot("C3PO", 20)]
+vd_robots = [Robot("R2D2", 95, True), Robot("C3PO", 20, False)]
 vd_missions = [Mission(vd_robots[0], 3)]
 r = variable(Robot, domain=vd_robots)
 m = variable(Mission, domain=vd_missions)
 linked_query = an(entity(r).where(m.assigned_to == r, m.priority > 2))
 
-# Local — requires docs to be built first: sphinx-build doc doc/_build/html
-resolver = AutoAPIResolver.for_package("krrood")
+# GitHub Pages mode — resolves against the published AutoAPI, so it needs no local build
+# (the Local `AutoAPIResolver.for_package("krrood")` mode is equivalent once the docs are built).
+resolver = AutoAPIResolver(base_url="https://cram2.github.io/cognitive_robot_abstract_machine/krrood")
 HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter(), resolver)).verbalize(linked_query))
 ```
 
