@@ -1494,9 +1494,10 @@ def test_verbalize_custom_predicate_employee_domain():
     assert "Department" in text
 
 
-def test_verbalize_predicate_without_fragment_raises():
-    """A predicate that supplies no verbalization fragment is an error — there is no name-based
-    string fallback; fragments are required."""
+def test_verbalize_predicate_without_fragment_uses_name_based_default():
+    """A predicate that supplies no verbalization fragment reads through the inherited name-based
+    default clause (``HasHighSalary`` → *"… has high salary …"*), so a sensible surface needs no
+    per-predicate fragment."""
 
     @dataclass(eq=False)
     class HasHighSalary(Predicate):
@@ -1507,11 +1508,15 @@ def test_verbalize_predicate_without_fragment_raises():
             return self.employee.salary > self.threshold
 
     employee = variable(Employee, [])
-    with pytest.raises(PredicateFragmentRequiredError):
+    assert (
         verbalize_expression(HasHighSalary(employee, 50000.0))
+        == "an Employee has high salary 50000.0"
+    )
 
 
-def test_verbalize_predicate_without_fragment_no_args_raises():
+def test_verbalize_copular_predicate_without_fragment_uses_name_based_default():
+    """A copular ``Is…`` predicate with no fragment reads as *"<subject> is <complement>"*."""
+
     @dataclass(eq=False)
     class IsActive(Predicate):
         entity: Any
@@ -1520,8 +1525,7 @@ def test_verbalize_predicate_without_fragment_no_args_raises():
             return True
 
     employee = variable(Employee, [])
-    with pytest.raises(PredicateFragmentRequiredError):
-        verbalize_expression(IsActive(employee))
+    assert verbalize_expression(IsActive(employee)) == "an Employee is active"
 
 
 # ── Aggregator coreference & HAVING compact form ──────────────────────────────
@@ -1829,9 +1833,9 @@ def test_verbalize_triple():
     assert text.index("Body") < text.index("Handle")
 
 
-def test_verbalize_1arg_predicate_without_fragment_raises():
-    """A 1-arg predicate without a verbalization fragment is an error — fragments are required, with
-    no generic name-based fallback."""
+def test_verbalize_1arg_predicate_without_fragment_uses_name_based_default():
+    """A 1-arg predicate without a verbalization fragment reads through the inherited name-based
+    default clause rather than raising — fragments are optional, overriding only a wrong reading."""
 
     @dataclass(eq=False)
     class IsActive(Predicate):
@@ -1841,8 +1845,7 @@ def test_verbalize_1arg_predicate_without_fragment_raises():
             return True
 
     employee = variable(Employee, [])
-    with pytest.raises(PredicateFragmentRequiredError):
-        verbalize_expression(IsActive(employee))
+    assert verbalize_expression(IsActive(employee)) == "an Employee is active"
 
 
 # ── Same-type variable disambiguation ─────────────────────────────────────────

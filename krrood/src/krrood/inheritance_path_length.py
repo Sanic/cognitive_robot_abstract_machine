@@ -1,32 +1,40 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 from inspect import isclass
 from typing import Type, Optional
 
-from krrood.entity_query_language.predicate import symbolic_function
+from krrood.entity_query_language.predicate import SymbolicFunction, functional_form
 
 
-@lru_cache
-@symbolic_function
-def inheritance_path_length(child_class: Type, parent_class: Type) -> Optional[int]:
+@dataclass(eq=False)
+class InheritancePathLength(SymbolicFunction):
+    """The inheritance path length between two classes, as a value operation.
+
+    Every inheritance level that lies between :attr:`child_class` and :attr:`parent_class` increases
+    the length by one. For multiple inheritance the length is computed per branch and the minimum is
+    returned; ``None`` means no path exists.
     """
-    Calculate the inheritance path length between two classes.
-    Every inheritance level that lies between `child_class` and `parent_class` increases the length by one.
-    In case of multiple inheritance, the path length is calculated for each branch and the minimum is returned.
 
-    :param child_class: The child class.
-    :param parent_class: The parent class.
-    :return: The minimum path length between `child_class` and `parent_class` or None if no path exists.
-    """
-    if not (
-        isclass(child_class)
-        and isclass(parent_class)
-        and issubclass(child_class, parent_class)
-    ):
-        return None
+    child_class: Type
+    """The child class."""
 
-    return _inheritance_path_length(child_class, parent_class, 0)
+    parent_class: Type
+    """The parent class."""
+
+    def __call__(self) -> Optional[int]:
+        if not (
+            isclass(self.child_class)
+            and isclass(self.parent_class)
+            and issubclass(self.child_class, self.parent_class)
+        ):
+            return None
+
+        return _inheritance_path_length(self.child_class, self.parent_class, 0)
+
+
+inheritance_path_length = lru_cache(functional_form(InheritancePathLength))
 
 
 def _inheritance_path_length(

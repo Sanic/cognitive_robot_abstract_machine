@@ -6,12 +6,14 @@ from __future__ import annotations
 
 import inspect
 import operator
+from dataclasses import dataclass
 from inspect import isclass
 from uuid import UUID
 
-from typing_extensions import Iterable, List
+from typing_extensions import Any, Iterable, List, Optional, Tuple, Type
 
 from krrood.entity_query_language.core.base_expressions import (
+    Selectable,
     SymbolicExpression,
     TruthValueOperator,
     OperationResult,
@@ -49,7 +51,12 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 )
 from krrood.entity_query_language.operators.logical_quantifiers import ForAll, Exists
 from krrood.entity_query_language.predicate import *  # type: ignore
-from krrood.entity_query_language.predicate import symbolic_function
+from krrood.entity_query_language.predicate import (
+    Predicate,
+    SymbolicFunction,
+    functional_form,
+    symbolic_function,
+)
 from krrood.entity_query_language.query.match import (
     Match,
     MatchVariable,
@@ -736,46 +743,130 @@ def evaluate_condition(condition: ConditionType) -> bool:
     return any(condition.evaluate())
 
 
-@symbolic_function
-def node_id(node: SymbolicExpression) -> UUID:
-    return node._id_
+@dataclass(eq=False)
+class NodeId(SymbolicFunction):
+    """The stable identity of an EQL node, as a value operation."""
+
+    node: SymbolicExpression
+    """The node whose identity is read."""
+
+    def __call__(self) -> UUID:
+        return self.node._id_
 
 
-@symbolic_function
-def node_descendants(node: SymbolicExpression) -> Iterable[SymbolicExpression]:
-    return node._descendants_
+node_id = functional_form(NodeId)
 
 
-@symbolic_function
-def node_type(node: Selectable) -> Optional[Type]:
-    return getattr(node, "_type_", None)
+@dataclass(eq=False)
+class NodeDescendants(SymbolicFunction):
+    """The descendants of an EQL node, as a value operation."""
+
+    node: SymbolicExpression
+    """The node whose descendants are read."""
+
+    def __call__(self) -> Iterable[SymbolicExpression]:
+        return self.node._descendants_
 
 
-@symbolic_function
-def node_children(node: CanBehaveLikeAVariable) -> Iterable[SymbolicExpression]:
-    return node._children_
+node_descendants = functional_form(NodeDescendants)
 
 
-@symbolic_function
-def attribute_owner_class(node: Attribute) -> Type:
-    return node._owner_class_
+@dataclass(eq=False)
+class NodeType(SymbolicFunction):
+    """The selectable type of an EQL node, as a value operation."""
+
+    node: Selectable
+    """The node whose type is read."""
+
+    def __call__(self) -> Optional[Type]:
+        return getattr(self.node, "_type_", None)
 
 
-@symbolic_function
-def node_parents(node: SymbolicExpression) -> Iterable[SymbolicExpression]:
-    return node._parents_
+node_type = functional_form(NodeType)
 
 
-@symbolic_function
-def issubclass_(cls: Type, cls_or_tuple: Type | Tuple[Type, ...]) -> bool:
-    return issubclass(cls, cls_or_tuple)
+@dataclass(eq=False)
+class NodeChildren(SymbolicFunction):
+    """The children of an EQL node, as a value operation."""
+
+    node: CanBehaveLikeAVariable
+    """The node whose children are read."""
+
+    def __call__(self) -> Iterable[SymbolicExpression]:
+        return self.node._children_
 
 
-@symbolic_function
-def is_class(obj: Any) -> bool:
-    return isclass(obj)
+node_children = functional_form(NodeChildren)
 
 
-@symbolic_function
-def type_(obj: Any) -> Type:
-    return obj.__class__
+@dataclass(eq=False)
+class AttributeOwnerClass(SymbolicFunction):
+    """The class that owns an attribute, as a value operation."""
+
+    node: Attribute
+    """The attribute whose owner class is read."""
+
+    def __call__(self) -> Type:
+        return self.node._owner_class_
+
+
+attribute_owner_class = functional_form(AttributeOwnerClass)
+
+
+@dataclass(eq=False)
+class NodeParents(SymbolicFunction):
+    """The parents of an EQL node, as a value operation."""
+
+    node: SymbolicExpression
+    """The node whose parents are read."""
+
+    def __call__(self) -> Iterable[SymbolicExpression]:
+        return self.node._parents_
+
+
+node_parents = functional_form(NodeParents)
+
+
+@dataclass(eq=False)
+class IsSubclass(Predicate):
+    """Whether one class is a subclass of another class (or tuple of classes)."""
+
+    subclass: Type
+    """The candidate subclass."""
+
+    parent_or_parents: Type | Tuple[Type, ...]
+    """The class or tuple of classes checked against."""
+
+    def __call__(self) -> bool:
+        return issubclass(self.subclass, self.parent_or_parents)
+
+
+issubclass_ = functional_form(IsSubclass)
+
+
+@dataclass(eq=False)
+class IsClass(Predicate):
+    """Whether an object is a class."""
+
+    obj: Any
+    """The object checked."""
+
+    def __call__(self) -> bool:
+        return isclass(self.obj)
+
+
+is_class = functional_form(IsClass)
+
+
+@dataclass(eq=False)
+class RuntimeType(SymbolicFunction):
+    """The runtime class of an object, as a value operation."""
+
+    obj: Any
+    """The object whose runtime class is read."""
+
+    def __call__(self) -> Type:
+        return self.obj.__class__
+
+
+type_ = functional_form(RuntimeType)

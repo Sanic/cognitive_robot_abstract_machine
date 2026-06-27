@@ -283,3 +283,67 @@ def value_function_phrase(
         [operand.as_fragment() for operand in operands], Conjunctions.AND.as_fragment()
     )
     return possessive_path([PathStep(noun)], owner)
+
+
+_COPULA_LEMMA = "be"
+"""The lemma a copular predicate name's leading word reduces to (``is`` / ``are`` -> ``be``)."""
+
+_PREPOSITION_WORDS = frozenset(preposition.text for preposition in Prepositions)
+"""The one-word prepositions, so a copular name ending in one attaches its object (``is_supported_by``)."""
+
+
+def predicate_clause(
+    name: str, subject: ClauseConstituent, *objects: ClauseConstituent
+) -> Clause:
+    """Build a predicate clause from a predicate's *name* and its operands — the boolean counterpart
+    of :func:`value_function_phrase`.
+
+    The name (CamelCase or snake_case) is read as the predicate. A copular name — its leading word a
+    form of *"be"* (``IsReachable``) — uses the copula with the remaining words as the complement
+    (*"<subject> is reachable"*). Any other name reads verb-first, so a wrapping ``Not`` negates it
+    with do-support (``ConnectsTo`` → *"<subject> connects to <object>"*). The first operand is the
+    subject; any further operands are trailing objects.
+
+    A copular complement attaches trailing operands only through a final preposition
+    (``is_supported_by`` → *"… is supported by <object>"*). With none, an adjective/noun complement
+    cannot take them as objects and naming any single operand the subject would be a false claim, so
+    the condition is stated to *hold for* all operands: *"one month holds for the begin and the end"*.
+
+    :param name: The predicate's identifier — a class or function name.
+    :param subject: The first operand, rendered as the clause's subject.
+    :param objects: Any further operands, rendered as trailing objects.
+    :return: The predicate clause.
+
+    >>> from krrood.entity_query_language.verbalization.fragments.base import (
+    ...     flatten_fragment_to_plain_text, WordFragment,
+    ... )
+    >>> flatten_fragment_to_plain_text(
+    ...     predicate_clause("IsReachable", Noun(WordFragment(text="a Robot")))
+    ... )
+    'a Robot is reachable'
+    >>> flatten_fragment_to_plain_text(
+    ...     predicate_clause("ConnectsTo", Noun(WordFragment(text="a body")),
+    ...                      Noun(WordFragment(text="another body")))
+    ... )
+    'a body connect to another body'
+    """
+    head, *rest = camel_case_to_words(name).split()
+    complement = [WordFragment(text=word) for word in rest]
+    is_copular = morphology.verb_lemma(head) == _COPULA_LEMMA
+    if is_copular and objects and (not rest or rest[-1] not in _PREPOSITION_WORDS):
+        operands = oxford_comma(
+            [Noun(subject).as_fragment(), *(Noun(obj).as_fragment() for obj in objects)],
+            Conjunctions.AND.as_fragment(),
+        )
+        return clause(
+            Noun(PhraseFragment(parts=complement)),
+            Verb("hold"),
+            WordFragment(text="for"),
+            operands,
+        )
+    predicate = (
+        [Copula(), *complement]
+        if is_copular
+        else [Verb(morphology.verb_lemma(head)), *complement]
+    )
+    return clause(Noun(subject), *predicate, *(Noun(obj) for obj in objects))

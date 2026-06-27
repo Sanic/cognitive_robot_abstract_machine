@@ -266,6 +266,25 @@ class Predicate(SymbolicCallable, ABC):
         """
         return bool(self.__call__())
 
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """Default boolean surface — a clause read off the class name: copular for an ``Is…`` name
+        (``IsReachable`` → *"<subject> is reachable"*), verb-first otherwise (``ConnectsTo`` →
+        *"<subject> connects to <object>"*). The class-form counterpart of a boolean
+        ``@symbolic_function``'s reading, so a migrated predicate needs no per-class fragment.
+
+        ..warning:: This name-based default is a best guess — correct only when the class name reads as
+            the predicate. When it does not, override this method with a
+            :func:`~…vocabulary.parts_of_speech.clause` built from the part-of-speech vocabulary.
+        """
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            predicate_clause,
+        )
+
+        subject, *objects = fields.values()
+        return predicate_clause(cls.__name__, subject, *objects)
+
 
 @dataclass(eq=False)
 class SymbolicFunction(SymbolicCallable, ABC):
@@ -273,9 +292,8 @@ class SymbolicFunction(SymbolicCallable, ABC):
 
     Like :class:`Predicate` it is a self-verbalizing symbolic callable, but its :meth:`__call__`
     returns a value (not a truth value), so its :meth:`Verbalizable._verbalization_fragment_` names
-    that value as a NOUN PHRASE rather than a clause. Subclass it when the default
-    *"the <name> of <arguments>"* reading produced by the :func:`symbolic_function` decorator is not
-    the surface you want; for a plain value function the decorator remains the simplest form.
+    that value as a NOUN PHRASE rather than a clause. The default reads *"the <name> of <arguments>"*
+    off the class name; override it when that is not the surface you want.
     """
 
     @classmethod
@@ -284,6 +302,23 @@ class SymbolicFunction(SymbolicCallable, ABC):
         what it computes (exactly as a ``@symbolic_function`` is called), not the instance.
         """
         return cls._construct_normally_(**kwargs)()
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """Default value surface — the value noun phrase *"the <name> of <arguments>"* read off the
+        class name (a leading ``Get`` dropped). The class-form counterpart of a value
+        ``@symbolic_function``'s reading, so a migrated value function needs no per-class fragment.
+
+        ..warning:: This name-based default is a best guess — correct only when the class name reads as
+            the value. When it does not, override this method with a
+            :func:`~…vocabulary.parts_of_speech.value_function_phrase` (or another noun phrase).
+        """
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            value_function_phrase,
+        )
+
+        return value_function_phrase(cls.__name__, *fields.values())
 
     @abstractmethod
     def __call__(self) -> Any:
@@ -437,22 +472,16 @@ class HasTypes(HasType):
 
 @dataclass(eq=False)
 class Length(SymbolicFunction):
-    """The number of items in an iterable, as a value operation."""
+    """The number of items in an iterable, as a value operation.
+
+    Reads through :class:`SymbolicFunction`'s default value surface (*"the length of <iterable>"*).
+    """
 
     iterable: Sized
     """The iterable whose length is computed."""
 
     def __call__(self) -> int:
         return len(self.iterable)
-
-    @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
-        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            value_function_phrase,
-        )
-
-        return value_function_phrase(cls.__name__, *fields.values())
 
 
 length = functional_form(Length)
