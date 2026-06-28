@@ -124,10 +124,10 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         return items or [Keywords.TRUE.as_fragment()]
 
     def _antecedent(self, antecedent: AntecedentInformation) -> VerbalizationFragment:
-        """:return: The antecedent as a bulleted list entry whose conditions hang beneath it — the
-        existential intro woven with its conditions by the shared restriction machinery (the same
-        *"whose"* group / *"such that …"* form a query selection uses). Inline / in paragraph this
-        reads *"there's a <Type> whose a, and b"*; in hierarchical the conditions are sub-points.
+        """:return: The antecedent's existential intro as a head line with its conditions beneath it —
+        the intro woven with its conditions by the shared restriction machinery (the same per-clause
+        *"whose"* / *"such that …"* form a query selection uses). Inline / in paragraph this reads
+        *"there's a <Type> whose a, and whose b"*; in hierarchical each condition is its own sub-point.
 
         >>> from krrood.entity_query_language.factories import inference
         >>> connection = variable(FixedConnection, [])
@@ -210,13 +210,13 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
     # %% THEN clause
 
     def _then_items(self, structure: RuleStructure) -> List[VerbalizationFragment]:
-        """:return: The consequent as a single bulleted entry — *"there's a <Consequent>"* with its
-        field bindings under one *"whose"* group (the same form a query subject restriction uses):
-        *"whose <field> is <value>, and …"* inline / in paragraph, sub-points in hierarchical.
+        """:return: The consequent as a single entry — *"there's a <Consequent>"* head line with each
+        field binding prefixed by its own *"whose"* (the same form a query subject restriction uses):
+        *"whose <field> is <value>, and whose …"* inline / in paragraph, sub-points in hierarchical.
 
         Its contribution is the entire span beneath the *"then"* header: the *"there's a Drawer"*
-        intro plus the single *"whose container is …, and handle is …"* group that wraps the per-field
-        bindings, which is why every consequent field hangs off one shared *"whose"* in the result.
+        intro plus the per-field *"whose container is …, and whose handle is …"* bindings, which is
+        why every consequent field reads with its own repeated *"whose"* in the result.
 
         >>> from krrood.entity_query_language.factories import inference
         >>> connection = variable(FixedConnection, [])
