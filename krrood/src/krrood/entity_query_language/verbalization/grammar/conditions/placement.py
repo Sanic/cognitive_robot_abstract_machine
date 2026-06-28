@@ -16,6 +16,7 @@ from krrood.entity_query_language.verbalization.exceptions import (
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
+    PhraseFragment,
     VerbalizationFragment,
     oxford_comma,
 )
@@ -420,16 +421,18 @@ def as_subject_restrictions(
         place(Placement(item=item, subject=subject, number=number), context)
         for item in reduce_conjuncts(list(conditions))
     ]
-    grouped = [
-        item.fragment for item in placed if item.position is SurfacePosition.WHOSE
+    whose_clauses = [
+        PhraseFragment(parts=[Keywords.WHOSE.as_fragment(), item.fragment])
+        for item in placed
+        if item.position is SurfacePosition.WHOSE
     ]
     whose = (
         BlockFragment(
-            header=Keywords.WHOSE.as_fragment(),
-            items=grouped,
+            header=None,
+            items=whose_clauses,
             conjunction=Conjunctions.AND.as_fragment(),
         )
-        if grouped
+        if whose_clauses
         else None
     )
     return RestrictionFragments(

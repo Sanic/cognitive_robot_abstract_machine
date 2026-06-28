@@ -53,7 +53,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
     >>> connection = variable(FixedConnection, [])
     >>> drawer = inference(Drawer)(container=connection.parent, handle=connection.child)
     >>> verbalize_expression(entity(drawer).where(connection.parent == variable(Container, [])))
-    "If there's a FixedConnection whose parent is a Container, then there's a Drawer whose container is the parent of the FixedConnection, and handle is the child of the FixedConnection"
+    "If there's a FixedConnection whose parent is a Container, then there's a Drawer whose container is the parent of the FixedConnection, and whose handle is the child of the FixedConnection"
 
     Reference: :cite:t:`gatt2009simplenlg` — surface realisation.
     """
@@ -124,10 +124,10 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         return items or [Keywords.TRUE.as_fragment()]
 
     def _antecedent(self, antecedent: AntecedentInformation) -> VerbalizationFragment:
-        """:return: The antecedent as a bulleted list entry whose conditions hang beneath it — the
-        existential intro woven with its conditions by the shared restriction machinery (the same
-        *"whose"* group / *"such that …"* form a query selection uses). Inline / in paragraph this
-        reads *"there's a <Type> whose a, and b"*; in hierarchical the conditions are sub-points.
+        """:return: The antecedent's existential intro as a head line with its conditions beneath it —
+        the intro woven with its conditions by the shared restriction machinery (the same per-clause
+        *"whose"* / *"such that …"* form a query selection uses). Inline / in paragraph this reads
+        *"there's a <Type> whose a, and whose b"*; in hierarchical each condition is its own sub-point.
 
         >>> from krrood.entity_query_language.factories import inference
         >>> connection = variable(FixedConnection, [])
@@ -161,7 +161,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
             )
         if not items:
             return header
-        return BlockFragment(header=header, items=items, bulleted_header=True)
+        return BlockFragment(header=header, items=items, bulleted_header=False)
 
     def _antecedent_intro(
         self, antecedent: AntecedentInformation
@@ -211,13 +211,13 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
     # %% THEN clause
 
     def _then_items(self, structure: RuleStructure) -> List[VerbalizationFragment]:
-        """:return: The consequent as a single bulleted entry — *"there's a <Consequent>"* with its
-        field bindings under one *"whose"* group (the same form a query subject restriction uses):
-        *"whose <field> is <value>, and …"* inline / in paragraph, sub-points in hierarchical.
+        """:return: The consequent as a single entry — *"there's a <Consequent>"* head line with each
+        field binding prefixed by its own *"whose"* (the same form a query subject restriction uses):
+        *"whose <field> is <value>, and whose …"* inline / in paragraph, sub-points in hierarchical.
 
         Its contribution is the entire span beneath the *"then"* header: the *"there's a Drawer"*
-        intro plus the single *"whose container is …, and handle is …"* group that wraps the per-field
-        bindings, which is why every consequent field hangs off one shared *"whose"* in the result.
+        intro plus the per-field *"whose container is …, and whose handle is …"* bindings, which is
+        why every consequent field reads with its own repeated *"whose"* in the result.
 
         >>> from krrood.entity_query_language.factories import inference
         >>> connection = variable(FixedConnection, [])
@@ -229,18 +229,22 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         intro: VerbalizationFragment = ExistentialPhrase.for_number(
             GrammaticalNumber.SINGULAR
         ).build_phrase(structure.consequent_type)
-        bindings = [
-            self._binding_predicate(binding)
+        whose_clauses = [
+            PhraseFragment(
+                parts=[Keywords.WHOSE.as_fragment(), self._binding_predicate(binding)]
+            )
             for binding in structure.consequent_bindings
         ]
-        if not bindings:
+        if not whose_clauses:
             return [intro]
-        whose = BlockFragment(
-            header=Keywords.WHOSE.as_fragment(),
-            items=bindings,
-            conjunction=Conjunctions.AND.as_fragment(),
-        )
-        return [BlockFragment(header=intro, items=[whose], bulleted_header=True)]
+        return [
+            BlockFragment(
+                header=intro,
+                items=whose_clauses,
+                conjunction=Conjunctions.AND.as_fragment(),
+                bulleted_header=False,
+            )
+        ]
 
     def _binding_predicate(self, binding: ConsequentBinding) -> VerbalizationFragment:
         """:return: The bare *"<field> is/are <value>"* predicate for one consequent binding (the
@@ -271,7 +275,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         >>> container = variable(Container, [])
         >>> cabinet = inference(Cabinet)(container=container, drawers=variable(Drawer, []))
         >>> verbalize_expression(entity(cabinet).grouped_by(container))
-        "If true, then there's a Cabinet whose container is a Container, and drawers are the Drawers"
+        "If true, then there's a Cabinet whose container is a Container, and whose drawers are the Drawers"
         """
         if (
             binding.is_plural_field

@@ -1392,14 +1392,14 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
     assert (
         "there's a FixedConnection" in text
     ), f"Expected 'there's a FixedConnection' in: {text!r}"
-    # IF clause describes its conditions under one shared "whose …, and …" envelope
+    # IF clause describes its conditions, each prefixed by its own "whose …, and whose …"
     assert "whose parent is the child of a PrismaticConnection" in text
-    assert "and child is a Handle" in text
+    assert "and whose child is a Handle" in text
     # THEN clause introduces the Drawer
     assert "there's a Drawer" in text, f"Expected 'there's a Drawer' in: {text!r}"
-    # THEN clause gathers its bindings under one "whose …, and …" envelope
+    # THEN clause repeats "whose" per binding: "whose …, and whose …"
     assert "whose container is the parent of the FixedConnection" in text
-    assert "and handle is the child of the FixedConnection" in text
+    assert "and whose handle is the child of the FixedConnection" in text
 
 
 def test_verbalize_inference_rule_golden(doors_and_drawers_world):
@@ -1417,9 +1417,9 @@ def test_verbalize_inference_rule_golden(doors_and_drawers_world):
     )
     assert verbalize_expression(entity(drawer_var)) == (
         "If there's a FixedConnection whose parent is the child of a PrismaticConnection, "
-        "and child is a Handle, "
+        "and whose child is a Handle, "
         "then there's a Drawer whose container is the parent of the FixedConnection, "
-        "and handle is the child of the FixedConnection"
+        "and whose handle is the child of the FixedConnection"
     )
 
 
@@ -2005,10 +2005,10 @@ def test_cabinet_rule_verbalization(handles_and_containers_world):
     assert (
         "whose container is the common parent of the PrismaticConnections" in text
     ), f"Expected 'whose container is the common parent of the PrismaticConnections' in: {text!r}"
-    # aggregated plural binding (second in the shared "whose …, and …" envelope)
+    # aggregated plural binding (second clause, with its own repeated "whose")
     assert (
-        "and drawers are the Drawers" in text
-    ), f"Expected 'and drawers are the Drawers' in: {text!r}"
+        "and whose drawers are the Drawers" in text
+    ), f"Expected 'and whose drawers are the Drawers' in: {text!r}"
 
 
 def test_inference_planner_decomposes_rule_without_rendering(
@@ -2556,7 +2556,7 @@ def test_pr_example():
     )
 
     assert verbalize_expression(query) == (
-        "Find a BankTransaction whose amount is greater than 1000, and booking_date is between May 1, 2026"
+        "Find a BankTransaction whose amount is greater than 1000, and whose booking_date is between May 1, 2026"
         " and May 30, 2026"
     )
 

@@ -181,8 +181,7 @@ def test_ranking_hierarchical_rendering():
     text = VerbalizationPipeline(HierarchicalRenderer(PlainFormatter())).verbalize(q)
     assert text == (
         "Find the top three Employees by starting_salary\n"
-        "  whose\n"
-        "    - salaries are greater than 1000"
+        "  - whose salaries are greater than 1000"
     )
 
 

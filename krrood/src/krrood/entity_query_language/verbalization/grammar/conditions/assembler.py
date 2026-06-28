@@ -222,8 +222,8 @@ class ConditionAssembler(Assembler[Comparator, None]):
         """
         The bare *"<attribute> <copula> <value>"* predicate (the noun and copula agree with
         *number*), with no source link on the noun — for a field binding whose owner is implicit.
-        The caller gathers these under a shared *"whose …, and …"* envelope, exactly as a query
-        subject restriction does.
+        The caller prefixes each with its own *"whose"* and joins them *"whose …, and whose …"*,
+        exactly as a query subject restriction does.
 
         :param attribute_name: The attribute / field's name.
         :param number: The grammatical number the noun and copula agree with.
@@ -232,12 +232,12 @@ class ConditionAssembler(Assembler[Comparator, None]):
 
         Each *"<field> is <value>"* binding of an inference consequent is one such predicate: this
         method owns the *container is …* and *handle is …* spans of the example (noun plus copula plus
-        the caller's value), which the *whose …, and …* envelope then joins.
+        the caller's value), which the caller then prefixes with *"whose"* and joins.
 
         >>> connection = variable(FixedConnection, [])
         >>> drawer = inference(Drawer)(container=connection.parent, handle=connection.child)
         >>> verbalize_expression(entity(drawer))
-        "If true, then there's a Drawer whose container is the parent of a FixedConnection, and handle is its child"
+        "If true, then there's a Drawer whose container is the parent of a FixedConnection, and whose handle is its child"
         """
         return PhraseFragment(
             parts=[
@@ -261,6 +261,6 @@ class ConditionAssembler(Assembler[Comparator, None]):
         >>> connection = variable(FixedConnection, [])
         >>> drawer = inference(Drawer)(container=connection.parent, handle=connection.child)
         >>> verbalize_expression(entity(drawer))
-        "If true, then there's a Drawer whose container is the parent of a FixedConnection, and handle is its child"
+        "If true, then there's a Drawer whose container is the parent of a FixedConnection, and whose handle is its child"
         """
         return RoleFragment.for_attribute(None, name, number)

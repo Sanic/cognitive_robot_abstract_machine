@@ -131,11 +131,12 @@ class HierarchicalRenderer(FragmentRenderer):
 
     Example output (plain)::
 
-        If:
-          - there's a Handle
-          - there's a PrismaticConnection, whose child is …
-        Then:
-          - there's a Drawer
+        If
+          there's a Handle
+          there's a PrismaticConnection
+            - whose child is …
+        then
+          there's a Drawer
             - whose container is …
     """
 
@@ -158,8 +159,7 @@ class HierarchicalRenderer(FragmentRenderer):
         >>> tree = EQLVerbalizer().build(a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
         >>> print(HierarchicalRenderer().render(tree))
         Find a Robot
-          whose
-            - battery is between 50 and 90
+          - whose battery is between 50 and 90
         """
         match fragment:
             case BlockFragment(header=header, items=items):
@@ -174,17 +174,8 @@ class HierarchicalRenderer(FragmentRenderer):
                         self.formatted_indent * depth + bullet + self._inline(header)
                     )
                     depth = depth + 1
-                last = len(items) - 1
-                for index, item in enumerate(items):
-                    # The coordinating conjunction (when any) joins the last item — "… and c".
-                    conjunction = (
-                        fragment.conjunction
-                        if fragment.conjunction is not None
-                        and index == last
-                        and last > 0
-                        else None
-                    )
-                    lines.append(self._render_item(item, depth, conjunction))
+                for item in items:
+                    lines.append(self._render_item(item, depth))
                 return self.formatter.newline.join(lines)
             case _:
                 return self.formatted_indent * depth + self._inline(fragment)
@@ -198,27 +189,20 @@ class HierarchicalRenderer(FragmentRenderer):
         """
         return self.indent_size.value.replace(" ", self.formatter.space)
 
-    def _render_item(
-        self,
-        fragment: VerbalizationFragment,
-        depth: int,
-        conjunction: Optional[VerbalizationFragment] = None,
-    ) -> str:
-        """Render one item, prepending the bullet at its indentation level (and a coordinating
-        conjunction when this is the last item of a coordinated block).
+    def _render_item(self, fragment: VerbalizationFragment, depth: int) -> str:
+        """Render one item, prepending the bullet at its indentation level.
 
         Its contribution is the per-item dispatch: a *block* item recurses into :meth:`render` (no
         bullet of its own), a *leaf* item gets the ``- `` prefix. The output matches :meth:`render`
         because the top item here is the whole block (recursed), while the bullet it adds is visible
-        on the leaf line *"- battery is between 50 and 90"*:
+        on the leaf line *"- whose battery is between 50 and 90"*:
 
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> robot = variable(Robot, [])
         >>> tree = EQLVerbalizer().build(a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
         >>> print(HierarchicalRenderer()._render_item(tree, 0))
         Find a Robot
-          whose
-            - battery is between 50 and 90
+          - whose battery is between 50 and 90
         """
         match fragment:
             case BlockFragment():
@@ -229,12 +213,7 @@ class HierarchicalRenderer(FragmentRenderer):
                     + self.bullet.value
                     + self.formatter.space
                 )
-                content = self._inline(fragment)
-                if conjunction is not None:
-                    content = (
-                        f"{self._inline(conjunction)}{self.formatter.space}{content}"
-                    )
-                return prefix + content
+                return prefix + self._inline(fragment)
 
     def _inline(self, fragment: VerbalizationFragment) -> str:
         """Render a fragment as a flat inline string. A nested block is flattened to prose (its

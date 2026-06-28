@@ -639,10 +639,10 @@ def test_attribute_chain_owner_carries_variable_role(doors_and_drawers_world):
     assert any("FixedConnection" in t for t in variable_texts)
 
 
-def test_rule_if_antecedent_uses_one_whose_envelope(doors_and_drawers_world):
-    """An antecedent renders as one phrase — the existential intro woven with its conditions under a
-    single shared *"whose …, and …"* envelope (the query restriction form), not per-condition
-    sub-items."""
+def test_rule_if_antecedent_repeats_whose_per_condition(doors_and_drawers_world):
+    """An antecedent renders as one phrase — the existential intro woven with its conditions, each
+    condition prefixed with its own *"whose"* and joined *"whose …, and whose …"* (the query
+    restriction form)."""
     frag = _drawer_rule_fragment(doors_and_drawers_world)
     if_block = _find_block_with_keyword(frag, "If")
     assert if_block is not None
@@ -650,22 +650,22 @@ def test_rule_if_antecedent_uses_one_whose_envelope(doors_and_drawers_world):
     texts = [flatten_fragment_to_plain_text(item) for item in if_block.items]
     antecedent = next(t for t in texts if "FixedConnection" in t)
     assert antecedent.startswith("there's a FixedConnection whose")
-    assert ", and " in antecedent
-    # one shared "whose" envelope, not a "whose" per condition
-    assert antecedent.count("whose") == 1
+    assert ", and whose " in antecedent
+    # "whose" is repeated per condition, not shared
+    assert antecedent.count("whose") == 2
 
 
-def test_rule_then_consequent_uses_one_whose_envelope(doors_and_drawers_world):
-    """The THEN clause is a single consequent phrase: the existential intro with its field bindings
-    gathered under one *"whose …, and …"* envelope."""
+def test_rule_then_consequent_repeats_whose_per_binding(doors_and_drawers_world):
+    """The THEN clause is a single consequent phrase: the existential intro with each field binding
+    prefixed by its own *"whose"* and joined *"whose …, and whose …"*."""
     frag = _drawer_rule_fragment(doors_and_drawers_world)
     then_block = _find_block_with_keyword(frag, "then")
     assert then_block is not None
     assert len(then_block.items) == 1
     text = flatten_fragment_to_plain_text(then_block.items[0])
     assert text.startswith("there's a Drawer whose")
-    assert ", and " in text
-    assert text.count("whose") == 1
+    assert ", and whose " in text
+    assert text.count("whose") == 2
 
 
 # ── VerbalizationPipeline factories ───────────────────────────────────────────

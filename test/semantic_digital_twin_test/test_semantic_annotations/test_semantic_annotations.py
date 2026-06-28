@@ -7,7 +7,9 @@ from numpy.ma.testutils import (
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
-from krrood.entity_query_language.verbalization.rendering.renderer import HierarchicalRenderer
+from krrood.entity_query_language.verbalization.rendering.renderer import (
+    HierarchicalRenderer,
+)
 from krrood.entity_query_language.verbalization.pipeline import (
     verbalize_expression,
     VerbalizationPipeline,
@@ -281,7 +283,7 @@ def test_verbalize_query_that_inferred_semantic_annotations(_apartment_world_set
         "If there's a FixedConnection whose parent is the child of a PrismaticConnection,"
         " there's a Handle whose root is the child of the FixedConnection,"
         " then there's a Drawer whose root is the parent of the FixedConnection,"
-        " whose handle is the Handle"
+        " and whose handle is the Handle"
     )
     assert verbalization_hierarchical == (
         "If\n"
