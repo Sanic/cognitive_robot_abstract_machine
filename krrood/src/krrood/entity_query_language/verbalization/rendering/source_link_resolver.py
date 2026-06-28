@@ -82,9 +82,34 @@ class AutoAPIResolver:
         return url
 
     @classmethod
+    def for_in_site_docs(cls, levels_up: int = 2) -> AutoAPIResolver:
+        """Build a resolver for links rendered *inside* the documentation site itself.
+
+        The verbalization output is embedded in a docs page (e.g. ``eql/user/verbalization.html``),
+        and the AutoAPI tree is a sibling at the site root (``autoapi/…``). Emitting links relative
+        to the current page therefore resolves them correctly in *any* build or host — a standalone
+        ``_build/html``, a Pages preview, or the published aggregate — without baking in an absolute
+        URL. Prefer this over :meth:`for_package` (which targets a specific local IDE server) for
+        links that ship in the built docs.
+
+        :param levels_up: The current page's directory depth below the site root, i.e. how many
+            ``..`` segments reach the root. The verbalization pages live at ``eql/<section>/`` → 2.
+        :return: A resolver whose links are relative to a page *levels_up* directories deep.
+
+        >>> AutoAPIResolver.for_in_site_docs().base_url
+        '../..'
+        """
+        return cls(base_url="/".join([".."] * levels_up) or ".")
+
+    @classmethod
     def for_package(cls, package_name: str, port: int = 63342) -> AutoAPIResolver:
         """Build a resolver for *package_name*'s locally built Sphinx docs, with the base URL
         targeting the JetBrains IDE built-in HTTP server.
+
+        .. note::
+            This targets a live ``localhost`` IDE server, so it is for the local
+            preview-while-editing workflow only. For links that ship inside the built docs, use
+            :meth:`for_in_site_docs` instead (relative links that resolve on any host).
 
         :param package_name: The installed package whose docs to resolve against.
         :param port: Port of the JetBrains IDE built-in HTTP server.

@@ -435,7 +435,7 @@ A {py:class}`~krrood.entity_query_language.verbalization.rendering.source_link_r
 from krrood.entity_query_language.verbalization.rendering.source_link_resolver import AutoAPIResolver
 from krrood.entity_query_language.verbalization.pipeline import VerbalizationPipeline
 
-resolver = AutoAPIResolver.for_package("krrood")
+resolver = AutoAPIResolver.for_in_site_docs()
 pipeline = VerbalizationPipeline.html(link_resolver=resolver)
 ```
 

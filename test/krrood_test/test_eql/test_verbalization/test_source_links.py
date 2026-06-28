@@ -15,6 +15,7 @@ Coverage:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing_extensions import Optional
@@ -24,6 +25,7 @@ import pytest
 
 import krrood.entity_query_language.factories as eql
 from krrood.entity_query_language.factories import an, entity, variable
+from krrood.entity_query_language.verbalization.example_domain import Robot
 from krrood.entity_query_language.verbalization.fragments.base import (
     BlockFragment,
     PhraseFragment,
@@ -195,48 +197,152 @@ def test_autoapi_resolver_no_warning_when_page_exists(tmp_path):
     mock_warn.assert_not_called()
 
 
-# ── AutoAPIResolver.for_package ───────────────────────────────────────────────
+# %% AutoAPIResolver page/anchor ground truth (real sphinx-autoapi build)
 
-# Detect at module load whether the krrood docs are built so dependent tests
-# can be skipped cleanly in CI environments where Sphinx has not been run.
-_krrood_resolver: Optional[AutoAPIResolver] = None
-try:
-    _krrood_resolver = AutoAPIResolver.for_package("krrood")
-    _KRROOD_DOCS_AVAILABLE = True
-except (FileNotFoundError, ImportError):
-    _KRROOD_DOCS_AVAILABLE = False
+# A real sphinx-autoapi build over a minimal mirror of the krrood package gives ground truth for
+# the resolver: the generated page paths and class/attribute anchor ids the links must match.
 
-_requires_krrood_docs = pytest.mark.skipif(
-    not _KRROOD_DOCS_AVAILABLE,
-    reason="krrood Sphinx docs not built — run: sphinx-build doc doc/_build/html",
+
+@pytest.fixture(scope="session")
+def built_example_domain_autoapi(tmp_path_factory) -> Path:
+    """Build the Sphinx AutoAPI HTML for ``example_domain`` into a tmp dir and return the HTML root.
+
+    Only ``example_domain`` is mirrored (into its real
+    ``krrood/entity_query_language/verbalization`` package path) so the build is fast yet faithful:
+    the generated page path and anchor ids are exactly those of a full docs build, which is what the
+    resolver's URLs must point at.
+    """
+    pytest.importorskip("sphinx.application")
+    pytest.importorskip("autoapi")
+    from sphinx.application import Sphinx
+    import krrood.entity_query_language.verbalization.example_domain as example_domain
+
+    root = tmp_path_factory.mktemp("autoapi_build")
+    package_src = root / "package_src"
+    module_dir = package_src / "krrood" / "entity_query_language" / "verbalization"
+    module_dir.mkdir(parents=True)
+    for package in (
+        package_src / "krrood",
+        package_src / "krrood" / "entity_query_language",
+        module_dir,
+    ):
+        (package / "__init__.py").write_text("")
+    (module_dir / "example_domain.py").write_text(
+        Path(example_domain.__file__).read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    doc_src = root / "doc_src"
+    doc_src.mkdir()
+    (doc_src / "conf.py").write_text(
+        'extensions = ["autoapi.extension"]\n'
+        'autoapi_type = "python"\n'
+        f"autoapi_dirs = [{str(package_src)!r}]\n"
+        'master_doc = "index"\n'
+        'project = "autoapi_build"\n'
+    )
+    (doc_src / "index.rst").write_text("AutoAPI build\n=============\n")
+
+    html_root = root / "html"
+    Sphinx(
+        srcdir=str(doc_src),
+        confdir=str(doc_src),
+        outdir=str(html_root),
+        doctreedir=str(root / "doctrees"),
+        buildername="html",
+        status=None,
+        warning=None,
+    ).build()
+    return html_root
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        SourceReference(owner_type=Robot),
+        SourceReference(owner_type=Robot, attribute="battery"),
+    ],
+    ids=["class", "attribute"],
 )
+def test_resolver_url_points_to_existing_page_and_anchor(
+    built_example_domain_autoapi, reference
+):
+    """The page and ``#anchor`` the resolver builds must exist in the real AutoAPI output \u2014 the
+    regression guard for the resolver's path/anchor scheme."""
+    html_root = built_example_domain_autoapi
+    resolver = AutoAPIResolver(base_url=str(html_root), html_root=html_root)
+    url = resolver.resolve(reference)
+    assert url is not None
+    page_part, _, anchor = url.partition("#")
+    page = Path(page_part)
+    assert page.is_file(), f"AutoAPI page does not exist: {page}"
+    assert f'id="{anchor}"' in page.read_text(
+        encoding="utf-8"
+    ), f"anchor #{anchor} not found in {page}"
 
 
-@_requires_krrood_docs
-def test_autoapi_resolver_for_package_returns_resolver():
-    resolver = AutoAPIResolver.for_package("krrood")
-    assert isinstance(resolver, AutoAPIResolver)
+def test_in_site_docs_links_resolve_within_built_site(built_example_domain_autoapi):
+    """End-to-end regression for the 404: a verbalization rendered with the in-site resolver (as the
+    docs use it) produces relative links whose targets exist relative to the page's location.
+    """
+    html_root = built_example_domain_autoapi
+    resolver = AutoAPIResolver.for_in_site_docs()  # base_url="../.."
+    text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(
+        an(entity(variable(Robot, [])))
+    )
+    href = re.search(r'href="([^"]+)"', text)
+    assert href is not None, f"no hyperlink in output: {text!r}"
+    target_ref, _, anchor = href.group(1).partition("#")
+    assert target_ref.startswith("../../autoapi/"), target_ref
+    # The page is served at <root>/eql/user/verbalization.html; resolve the relative href from there.
+    page_directory = html_root / "eql" / "user"
+    target = (page_directory / target_ref).resolve()
+    assert target.is_file(), f"relative link target does not exist: {target}"
+    assert f'id="{anchor}"' in target.read_text(encoding="utf-8")
 
 
-@_requires_krrood_docs
-def test_autoapi_resolver_for_package_base_url_has_krrood_docs():
-    resolver = AutoAPIResolver.for_package("krrood")
-    assert "localhost" in resolver.base_url
-    assert "krrood" in resolver.base_url
-    assert "doc/_build/html" in resolver.base_url
+# %% AutoAPIResolver.for_in_site_docs
 
 
-@_requires_krrood_docs
-def test_autoapi_resolver_for_package_custom_port():
-    resolver = AutoAPIResolver.for_package("krrood", port=8080)
-    assert "localhost:8080" in resolver.base_url
+def test_for_in_site_docs_base_url():
+    assert AutoAPIResolver.for_in_site_docs().base_url == "../.."
+    assert AutoAPIResolver.for_in_site_docs(0).base_url == "."
+    assert AutoAPIResolver.for_in_site_docs(3).base_url == "../../.."
 
 
-@_requires_krrood_docs
-def test_autoapi_resolver_for_package_sets_html_root():
-    resolver = AutoAPIResolver.for_package("krrood")
-    assert resolver.html_root is not None
-    assert resolver.html_root.is_dir()
+def test_for_in_site_docs_emits_relative_url():
+    url = AutoAPIResolver.for_in_site_docs().resolve(
+        SourceReference(owner_type=_Sensor)
+    )
+    assert url is not None
+    assert url.startswith("../../autoapi/")
+    assert "#" in url
+
+
+# %% AutoAPIResolver.for_package (IDE-server workflow)
+
+
+def test_for_package_builds_localhost_resolver(tmp_path):
+    """for_package wires the base URL to the IDE server and points html_root at doc/_build/html."""
+    import types
+    import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
+
+    project = tmp_path / "project"
+    package_init = project / "src" / "mypkg" / "__init__.py"
+    package_init.parent.mkdir(parents=True)
+    package_init.write_text("")
+    (project / "pyproject.toml").write_text("")
+    (project / "doc" / "_build" / "html").mkdir(parents=True)
+    (project / ".git").mkdir()
+
+    fake_module = types.ModuleType("mypkg")
+    fake_module.__file__ = str(package_init)
+    with patch.object(_slr, "importlib") as mock_importlib:
+        mock_importlib.import_module.return_value = fake_module
+        resolver = AutoAPIResolver.for_package("mypkg", port=9999)
+
+    assert "localhost:9999" in resolver.base_url
+    assert resolver.html_root == project / "doc" / "_build" / "html"
+    assert "doc/_build/html" in resolver.base_url.replace("\\", "/")
 
 
 def test_autoapi_resolver_for_package_unknown_package_raises():
@@ -248,7 +354,6 @@ def test_autoapi_resolver_for_package_missing_docs_raises(tmp_path):
     """for_package raises FileNotFoundError when doc/_build/html is absent."""
     import types
     import krrood.entity_query_language.verbalization.rendering.source_link_resolver as _slr
-    from unittest.mock import patch as _patch
 
     pkg_src = tmp_path / "fakepkg" / "src" / "fakepkg"
     pkg_src.mkdir(parents=True)
@@ -259,57 +364,10 @@ def test_autoapi_resolver_for_package_missing_docs_raises(tmp_path):
     fake_mod = types.ModuleType("fakepkg")
     fake_mod.__file__ = str(init)
 
-    with _patch.object(_slr, "importlib") as mock_importlib:
+    with patch.object(_slr, "importlib") as mock_importlib:
         mock_importlib.import_module.return_value = fake_mod
         with pytest.raises(FileNotFoundError, match="_build"):
             AutoAPIResolver.for_package("fakepkg")
-
-
-@_requires_krrood_docs
-def test_autoapi_resolver_for_package_url_for_real_class():
-    """URL for a real krrood class has the correct module-path structure."""
-    from krrood.entity_query_language.query.query import Query
-
-    url = _krrood_resolver.resolve(SourceReference(owner_type=Query))
-    assert url is not None
-    assert "krrood/entity_query_language/query/query/index.html" in url
-    assert "#krrood.entity_query_language.query.query.Query" in url
-
-
-@_requires_krrood_docs
-def test_autoapi_resolver_for_package_html_file_exists():
-    """The HTML page for a real krrood class exists on disk after docs build."""
-    from krrood.entity_query_language.query.query import Query
-    from pathlib import Path
-    import importlib as _il, inspect as _ins
-
-    pkg_file = Path(_ins.getfile(_il.import_module("krrood"))).resolve()
-    for parent in pkg_file.parents:
-        if (parent / "pyproject.toml").exists():
-            module_path = Query.__module__.replace(".", "/")
-            html_file = (
-                parent
-                / "doc"
-                / "_build"
-                / "html"
-                / "autoapi"
-                / module_path
-                / "index.html"
-            )
-            assert html_file.exists(), f"Expected autoapi page at {html_file}"
-            return
-    pytest.fail("krrood package root not found")
-
-
-@_requires_krrood_docs
-def test_autoapi_resolver_for_package_end_to_end_html():
-    """Full pipeline with for_package() produces <a> tags pointing at the local docs."""
-    x = variable(EQLVerbalizer, [])
-    text = VerbalizationPipeline.html(link_resolver=_krrood_resolver).verbalize(
-        an(entity(x))
-    )
-    assert "localhost" in text
-    assert "EQLVerbalizer" in text
 
 
 # ── Formatter.wrap_link ────────────────────────────────────────────────────────

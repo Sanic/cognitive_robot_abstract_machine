@@ -692,15 +692,10 @@ r = variable(Robot, domain=vd_robots)
 m = variable(Mission, domain=vd_missions)
 linked_query = an(entity(r).where(m.assigned_to == r, m.priority > 2))
 
-# GitHub Pages mode — resolves against the published AutoAPI, so it needs no local build
-# (the Local `AutoAPIResolver.for_package("krrood")` mode is equivalent once the docs are built).
-resolver = AutoAPIResolver(base_url="https://cram2.github.io/cognitive_robot_abstract_machine/krrood")
-HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter(), resolver)).verbalize(linked_query))
-```
-
-```{code-cell} ipython3
-# GitHub Pages — always available, no local build needed.
-resolver = AutoAPIResolver(base_url="https://cram2.github.io/cognitive_robot_abstract_machine/krrood")
+# `for_in_site_docs()` emits links relative to this page (which lives at eql/user/), so they
+# resolve to the sibling AutoAPI tree in any build — a local _build/html, a Pages preview, or the
+# published site — without hard-coding a host.
+resolver = AutoAPIResolver.for_in_site_docs()
 HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter(), resolver)).verbalize(linked_query))
 ```
 
