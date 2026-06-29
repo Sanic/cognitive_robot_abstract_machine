@@ -1,4 +1,4 @@
-"""Analysis engine for simulated RGB-D input from SemDT RayTracer with Query finctionality.
+"""Analysis engine for simulated RGB-D input from SemDT RayTracer with query functionality.
 
 This pipeline mirrors the standard tabletop segmentation flow but uses the
 `semdt_raytracer` camera descriptor, which renders color/depth images from a

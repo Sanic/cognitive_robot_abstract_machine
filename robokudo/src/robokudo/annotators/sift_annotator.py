@@ -59,7 +59,6 @@ class SIFTAnnotator(ThreadedAnnotator):
         for i, oh in enumerate(ohs):
             roi = oh.roi.roi.get_corner_points()
 
-            # Get ROI image and mask
             roi_image = grey_image[roi[1] : roi[3], roi[0] : roi[2]]
             if oh.roi.mask.shape[:2] != roi_image.shape[:2]:
                 roi_mask = oh.roi.mask[roi[1] : roi[3], roi[0] : roi[2]]
@@ -68,7 +67,6 @@ class SIFTAnnotator(ThreadedAnnotator):
 
             keypoints, descriptors = self._sift.detectAndCompute(roi_image, roi_mask)
 
-            # Correct keypoint coordinates to full image
             for k in keypoints:
                 k.pt = (k.pt[0] + roi[0], k.pt[1] + roi[1])
 

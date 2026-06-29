@@ -174,9 +174,6 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 f"{self.__class__.__name__}.update(): New CAS id={pipeline.cas.cas_id}"
             )
 
-            # Create a fresh world
-            # world.clear_world()
-
             cam_config = self.descriptor.parameters.camera_config
             if issubclass(type(cam_config), TfComponent):
                 cas = self.get_cas()

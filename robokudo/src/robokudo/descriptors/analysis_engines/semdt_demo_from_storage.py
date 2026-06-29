@@ -3,8 +3,6 @@ from robokudo.io.ros import get_node
 from robokudo.world import world_instance
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
-# from robokudo.annotators.clip_annotator import ClipAnnotator
-
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -27,8 +25,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline that does tabletop segmentation and integrates primary navigation
-        using a YOLO annotator.
+        Create a tabletop segmentation pipeline that synchronizes detections to SemDT.
         """
         tf_publisher = TFPublisher(_world=world_instance(), node=get_node())
 
@@ -46,9 +43,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterColorHistogramAnnotator(),
                 OutlierRemovalOnObjectHypothesisAnnotator(),
                 ClusterPoseBBAnnotator(),
-                # ClipAnnotator(),
                 SemanticDigitalTwinConnector(),
-                # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
             ]
         )
         return seq

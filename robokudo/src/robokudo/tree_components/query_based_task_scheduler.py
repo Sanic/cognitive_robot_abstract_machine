@@ -84,6 +84,5 @@ class QueryBasedScheduler(
             return None
 
         job_elements = self.tasks[task_key]
-        # p = job_elements.parent
         add_child_to_parent(new_job, job_elements)
         return new_job

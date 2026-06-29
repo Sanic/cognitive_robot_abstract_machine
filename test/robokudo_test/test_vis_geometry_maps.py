@@ -14,7 +14,7 @@ RANDOM_SEED = 42
 def get_random_mesh(
     mesh_type: Type, rng: np.random.Generator
 ) -> Union[o3d.geometry.TriangleMesh, o3d.geometry.TetraMesh]:
-    """Get a random open3d mesh of he given type.
+    """Get a random open3d mesh of the given type.
 
     Accepted types:
 
@@ -464,9 +464,6 @@ class TestVisGeometryMaps(object):
                 rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
             )
             material.emissive_color = rng.random(4)
-            # material.generic_imgs =
-            # material.generic_params =
-            # material.gradient =
             material.ground_plane_axis = rng.random()
             material.has_alpha = rng.random() > 0.5
             material.metallic_img = o3d.geometry.Image(

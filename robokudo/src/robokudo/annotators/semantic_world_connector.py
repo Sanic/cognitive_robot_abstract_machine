@@ -84,9 +84,7 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         if len(object_hypotheses) == 0:
             return []
 
-        # We assume that this Annotator is the final part of your pipeline, which will select
-        # the best poses of multiple pose candidates. The best pose will be transformed
-        # to the world frame for comparison with the belief state
+        # Association uses the newest pose annotation from each hypothesis.
         self.add_world_pose_annotations(object_hypotheses, cas)
 
         if len(object_beliefs) == 0:
