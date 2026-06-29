@@ -4,7 +4,7 @@ import ast
 import inspect
 import textwrap
 
-from typing_extensions import Dict, Optional
+from typing_extensions import Dict, Optional, Any
 
 from krrood.entity_query_language.verbalization.fragments.source_reference import (
     SourceReference,
@@ -12,7 +12,7 @@ from krrood.entity_query_language.verbalization.fragments.source_reference impor
 from krrood.patterns.caching import weak_key_cache
 
 
-def first_docstring_line(documented_object: object) -> Optional[str]:
+def first_docstring_line(documented_object: Any) -> Optional[str]:
     """:return: The first non-empty line of *documented_object*'s docstring, or ``None``."""
     if documented_object is None:
         return None
@@ -28,23 +28,24 @@ def first_docstring_line(documented_object: object) -> Optional[str]:
 
 def _annotated_target_name(node: ast.AST) -> Optional[str]:
     """:return: The target name when *node* is an annotated assignment with a simple name target."""
-    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-        return node.target.id
-    return None
+    if not isinstance(node, ast.AnnAssign) or not isinstance(node.target, ast.Name):
+        return None
+    return node.target.id
 
 
 def _string_expression_first_line(node: ast.AST) -> Optional[str]:
     """:return: The first stripped line when *node* is a bare string expression (a PEP 257
     attribute docstring), else ``None``."""
     if (
-        isinstance(node, ast.Expr)
-        and isinstance(node.value, ast.Constant)
-        and isinstance(node.value.value, str)
+        not isinstance(node, ast.Expr)
+        or not isinstance(node.value, ast.Constant)
+        or not isinstance(node.value.value, str)
     ):
-        for line in node.value.value.splitlines():
-            stripped = line.strip()
-            if stripped:
-                return stripped
+        return None
+    for line in node.value.value.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
     return None
 
 
@@ -67,10 +68,12 @@ def _attribute_docstrings(cls: type) -> Dict[str, str]:
     docstrings: Dict[str, str] = {}
     for current, following in zip(body, body[1:]):
         name = _annotated_target_name(current)
-        if name is not None:
-            line = _string_expression_first_line(following)
-            if line is not None:
-                docstrings[name] = line
+        if name is None:
+            continue
+        line = _string_expression_first_line(following)
+        if line is None:
+            continue
+        docstrings[name] = line
     return docstrings
 
 
@@ -85,8 +88,8 @@ def docstring_for_source_ref(source_reference: SourceReference) -> Optional[str]
     """
     if source_reference.attribute is None:
         return first_docstring_line(source_reference.owner_type)
-    for klass in source_reference.owner_type.__mro__:
-        line = _attribute_docstrings(klass).get(source_reference.attribute)
+    for clazz in source_reference.owner_type.__mro__:
+        line = _attribute_docstrings(clazz).get(source_reference.attribute)
         if line is not None:
             return line
     return None

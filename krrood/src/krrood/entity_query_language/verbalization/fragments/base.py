@@ -183,7 +183,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
     @classmethod
     def for_type(
         cls,
-        type_: object,
+        type_: Any,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         *,
         text: Optional[str] = None,

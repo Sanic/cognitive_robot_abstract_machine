@@ -146,10 +146,11 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         )
 
         child = self._child_
-        if isinstance(child, MappedVariable):
-            path = child._access_path_
-            if path and isinstance(path[-1], Attribute):
-                return path[-1]
+        if not isinstance(child, MappedVariable):
+            return None
+        path = child._access_path_
+        if path and isinstance(path[-1], Attribute):
+            return path[-1]
         return None
 
 

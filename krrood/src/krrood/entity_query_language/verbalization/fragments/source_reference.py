@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import Optional
+from typing_extensions import Optional, Any
 
 
 @dataclass(frozen=True)
@@ -21,16 +21,16 @@ class SourceReference:
     to the class itself (e.g. for type-name labels like *"Robot"*)."""
 
     @classmethod
-    def for_type(cls, t: object) -> Optional[SourceReference]:
+    def for_type(cls, type_: Any) -> Optional[SourceReference]:
         """
-        :param t: Candidate type (any value accepted; non-types return ``None``).
+        :param type_: Candidate type (any value accepted; non-types return ``None``).
         :return: A source reference for the class when *t* is a real ``type``, else ``None``.
         """
-        return cls(owner_type=t) if isinstance(t, type) else None
+        return cls(owner_type=type_) if isinstance(type_, type) else None
 
     @classmethod
     def for_attribute(
-        cls, owner: object, attribute_name: str
+        cls, owner: Any, attribute_name: str
     ) -> Optional[SourceReference]:
         """
         :param owner: Candidate owner class (any value; non-types return ``None``).
