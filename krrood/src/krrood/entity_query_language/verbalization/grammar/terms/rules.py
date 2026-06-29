@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import itertools
+from dataclasses import fields, is_dataclass
 
 from typing_extensions import Any, List, Optional
 
@@ -18,6 +19,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
     PhraseFragment,
     RoleFragment,
 )
+from krrood.patterns.field_metadata import KRROODFieldMetadata
 from krrood.entity_query_language.verbalization.fragments.features import (
     Definiteness,
     GrammaticalNumber,
@@ -40,9 +42,9 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Specificity,
 )
 
-#: Field names tried, in order, to identify a concrete object when its class declares no
-#: ``_identifying_attributes_`` — the first one present names it (*"a specific Body with name
-#: 'door'"*). Conventional identity fields, so the heuristic is deterministic, not a guess.
+#: Field names tried, in order, to identify a concrete object whose class marks no field with
+#: :attr:`KRROODFieldMetadata.is_identifying_attribute` — the first one present names it (*"a specific
+#: Body with name 'door'"*). Conventional identity fields, so the heuristic is deterministic.
 _CONVENTIONAL_ID_FIELDS = ("name", "id", "label", "key", "uuid")
 
 #: Only scalar identifying values are shown — a nested object would re-open the very ``repr`` blow-up
@@ -180,8 +182,8 @@ class LiteralRule(PhraseRule):
     ) -> VerbalizationFragment:
         """:return: *"a specific <Type>"* for a concrete object literal — identity, not its (possibly
         huge) repr — qualified by its identifying field(s) when any are known (*"a specific Body with
-        name 'door'"*). The fields come from the class's ``_identifying_attributes_`` if it declares
-        any, else the first present :data:`conventional identity field <_CONVENTIONAL_ID_FIELDS>`.
+        name 'door'"*). The fields are those marked with :attr:`KRROODFieldMetadata.is_identifying_attribute`,
+        else the first present :data:`conventional identity field <_CONVENTIONAL_ID_FIELDS>`.
 
         This method builds the whole *"a specific Robot with name 'R2D2'"* noun phrase — the
         identity head plus the qualifying detail :meth:`_identifying_fields` supplies:
@@ -217,9 +219,9 @@ class LiteralRule(PhraseRule):
 
     @staticmethod
     def _identifying_fields(value: Any) -> List[tuple]:
-        """:return: The ``(name, value)`` pairs that identify *value* for display — the class's
-        declared ``_identifying_attributes_`` (a name or iterable of names) if present, else the first
-        present conventional identity field — keeping only scalar values.
+        """:return: The ``(name, value)`` pairs that identify *value* for display — the attributes a
+        :class:`HasIdentifyingAttributes` declares, else the first present conventional identity
+        field — keeping only scalar values.
 
         Its contribution is just the identifying detail: it returns ``[("name", "R2D2")]`` here, which
         is what becomes the *"with name 'R2D2'"* qualifier (drop it and the phrase is the bare *"a
@@ -229,23 +231,36 @@ class LiteralRule(PhraseRule):
         >>> verbalize_expression(a(entity(robot).where(robot == Robot("R2D2", 80, True))))
         "Find a Robot such that the Robot is a specific Robot with name 'R2D2'"
         """
-        declared = getattr(type(value), "_identifying_attributes_", None)
-        if callable(declared):
-            try:
-                declared = declared()
-            except TypeError:
-                declared = None
-        if isinstance(declared, str):
-            names: List[str] = [declared]
-        elif declared:
-            names = list(declared)
-        else:
-            names = [f for f in _CONVENTIONAL_ID_FIELDS if hasattr(value, f)][:1]
+        names = LiteralRule._declared_identifying_names(value)
         return [
             (name, getattr(value, name))
             for name in names
             if hasattr(value, name)
             and isinstance(getattr(value, name), _SCALAR_ID_TYPES)
+        ]
+
+    @staticmethod
+    def _declared_identifying_names(value: Any) -> List[str]:
+        """:return: The identifying attribute names for *value* — the dataclass fields its class marks
+        with :attr:`KRROODFieldMetadata.is_identifying_attribute`, else the first present conventional
+        identity field."""
+        marked = LiteralRule._identifying_attribute_fields(value)
+        return (
+            marked
+            or [name for name in _CONVENTIONAL_ID_FIELDS if hasattr(value, name)][:1]
+        )
+
+    @staticmethod
+    def _identifying_attribute_fields(value: Any) -> List[str]:
+        """:return: The names of *value*'s dataclass fields marked as identifying attributes, in
+        declaration order (empty when *value* is not a dataclass or marks none)."""
+        if not is_dataclass(value):
+            return []
+        return [
+            data_field.name
+            for data_field in fields(value)
+            if (metadata := KRROODFieldMetadata.of_field(data_field)) is not None
+            and metadata.is_identifying_attribute
         ]
 
 

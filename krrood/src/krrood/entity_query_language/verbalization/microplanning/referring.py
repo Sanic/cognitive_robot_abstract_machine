@@ -22,6 +22,49 @@ from krrood.entity_query_language.query.aggregation_structure import (
 )
 
 
+@dataclass
+class _CanonicalReferentGrouping:
+    """Numberable referent ids grouped under their canonical entity (``==``-unified referents
+    collapse to one), recording each type's canonicals in encounter order so they can be numbered.
+    """
+
+    canonicals_by_type: Dict[str, List[uuid.UUID]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    """Each type's canonical entities, in first-encounter order — a type with two or more is numbered."""
+
+    members_by_canonical: Dict[uuid.UUID, List[uuid.UUID]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    """Every original referent id that maps to a given canonical entity."""
+
+    _type_of_canonical: Dict[uuid.UUID, str] = field(default_factory=dict)
+    """The type a canonical was first registered under (guards against re-listing it)."""
+
+    def add(self, referent_id: uuid.UUID, canonical: uuid.UUID, type_name: str) -> None:
+        """Record *referent_id* as a member of *canonical*, registering *canonical* under *type_name*
+        on first sight."""
+        if canonical not in self._type_of_canonical:
+            self._type_of_canonical[canonical] = type_name
+            self.canonicals_by_type[type_name].append(canonical)
+        self.members_by_canonical[canonical].append(referent_id)
+
+    def labels(self) -> Tuple[Dict[uuid.UUID, str], Dict[uuid.UUID, str]]:
+        """:return: ``(labels, numbered)`` — every referent id mapped to its display label, and the
+        subset whose label was numbered (its type had several distinct canonicals)."""
+        labels: Dict[uuid.UUID, str] = {}
+        numbered: Dict[uuid.UUID, str] = {}
+        for type_name, canonicals in self.canonicals_by_type.items():
+            is_numbered = len(canonicals) > 1
+            for ordinal, canonical in enumerate(canonicals, 1):
+                label = f"{type_name} {ordinal}" if is_numbered else type_name
+                for member in self.members_by_canonical[canonical]:
+                    labels[member] = label
+                    if is_numbered:
+                        numbered[member] = label
+        return labels, numbered
+
+
 @dataclass(frozen=True)
 class NumberedLabel:
     """A variable's disambiguation label and whether it was numbered (*"Robot"* vs *"Robot 2"*)."""
@@ -113,37 +156,26 @@ class ReferringExpressions:
         """
         if isinstance(expression, Query):
             expression.build()
+        return cls._group_referents_by_canonical(expression).labels()
 
+    @classmethod
+    def _group_referents_by_canonical(
+        cls, expression: SymbolicExpression
+    ) -> _CanonicalReferentGrouping:
+        """:return: Every numberable referent grouped under its canonical entity, in type-then-
+        encounter order. Literal nodes, already-seen ids, and aggregation sources are skipped; an
+        ``==``-unified pair shares one canonical (so it is named once)."""
         suppressed = cls._aggregation_source_ids(expression)
         aliases = referent_aliases(expression)
-
-        members_by_canonical: Dict[uuid.UUID, List[uuid.UUID]] = defaultdict(list)
-        canonicals_by_type: Dict[str, List[uuid.UUID]] = defaultdict(list)
-        type_of_canonical: Dict[uuid.UUID, str] = {}
-        seen_ids: Set[uuid.UUID] = set()
-
+        grouping = _CanonicalReferentGrouping()
+        seen: Set[uuid.UUID] = set()
         for node in expression._all_expressions_:
             type_name = cls._numberable_type_name(node)
-            if type_name is None or node._id_ in suppressed or node._id_ in seen_ids:
+            if type_name is None or node._id_ in suppressed or node._id_ in seen:
                 continue
-            seen_ids.add(node._id_)
-            canonical = aliases.get(node._id_, node._id_)
-            if canonical not in type_of_canonical:
-                type_of_canonical[canonical] = type_name
-                canonicals_by_type[type_name].append(canonical)
-            members_by_canonical[canonical].append(node._id_)
-
-        labels: Dict[uuid.UUID, str] = {}
-        numbered: Dict[uuid.UUID, str] = {}
-        for type_name, canonicals in canonicals_by_type.items():
-            is_numbered = len(canonicals) > 1
-            for ordinal, canonical in enumerate(canonicals, 1):
-                label = f"{type_name} {ordinal}" if is_numbered else type_name
-                for member in members_by_canonical[canonical]:
-                    labels[member] = label
-                    if is_numbered:
-                        numbered[member] = label
-        return labels, numbered
+            seen.add(node._id_)
+            grouping.add(node._id_, aliases.get(node._id_, node._id_), type_name)
+        return grouping
 
     @staticmethod
     def _aggregation_source_ids(expression: SymbolicExpression) -> Set[uuid.UUID]:

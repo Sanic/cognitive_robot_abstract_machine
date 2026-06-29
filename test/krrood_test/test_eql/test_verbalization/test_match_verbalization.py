@@ -12,7 +12,7 @@ is a value to generate → folded into the header (*"… and predict its x, y, a
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from krrood.entity_query_language.factories import (
     match_variable,
@@ -23,6 +23,7 @@ from krrood.entity_query_language.verbalization.pipeline import (
     VerbalizationPipeline,
     verbalize_expression,
 )
+from krrood.patterns.field_metadata import KRROODFieldMetadata
 from krrood.entity_query_language.verbalization.rendering.formatter import (
     PlainFormatter,
 )
@@ -281,12 +282,10 @@ class _NamedThing:
 
 @dataclass
 class _Coded:
-    serial: int
-    name: str
-
-    @classmethod
-    def _identifying_attributes_(cls):
-        return ("serial",)
+    serial: int = field(
+        metadata=KRROODFieldMetadata.as_field_metadata(is_identifying_attribute=True)
+    )
+    name: str = ""
 
 
 def test_concrete_object_qualified_by_conventional_name_field():
@@ -298,7 +297,7 @@ def test_concrete_object_qualified_by_conventional_name_field():
 
 
 def test_concrete_object_uses_declared_identifying_attributes():
-    """A class declaring ``_identifying_attributes_`` controls which field identifies it."""
+    """A field marked ``is_identifying_attribute`` controls which field identifies the object."""
     text = verbalize_expression(
         underspecified(_Widget)(owner=_Coded(serial=7, name="x"))
     )

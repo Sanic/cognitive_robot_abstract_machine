@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from dataclasses import Field, dataclass
+
+from typing_extensions import ClassVar, Dict, Optional
+
+
+@dataclass(frozen=True)
+class KRROODFieldMetadata:
+    """Krrood-specific metadata carried inside a dataclass field's ``metadata`` mapping.
+
+    Attach it to a field with :meth:`as_field_metadata` so krrood can read per-field hints (such as
+    which field identifies an instance) without the owning class implementing any protocol.
+    """
+
+    METADATA_KEY: ClassVar[str] = "krrood_field_metadata"
+    """The key this metadata is stored under inside a field's ``metadata`` mapping."""
+
+    is_identifying_attribute: bool = False
+    """``True`` when this field identifies its instance for verbalization
+    (*"a specific <Type> with <field> '<value>'"*)."""
+
+    @classmethod
+    def as_field_metadata(
+        cls, *, is_identifying_attribute: bool = False
+    ) -> Dict[str, KRROODFieldMetadata]:
+        """:return: A dataclass-field ``metadata`` mapping carrying a :class:`KRROODFieldMetadata`
+        with the given hints under :attr:`METADATA_KEY`, ready to pass to ``field(metadata=...)``.
+        """
+        return {
+            cls.METADATA_KEY: cls(is_identifying_attribute=is_identifying_attribute)
+        }
+
+    @classmethod
+    def of_field(cls, field: Field) -> Optional[KRROODFieldMetadata]:
+        """:return: The :class:`KRROODFieldMetadata` attached to *field*, or ``None`` when it carries
+        none."""
+        return field.metadata.get(cls.METADATA_KEY)
