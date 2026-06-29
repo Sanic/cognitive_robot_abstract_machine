@@ -92,6 +92,9 @@ def create_cube_shape(extents: Tuple[float, float, float]) -> bullet.BoxShape:
 def create_cylinder_shape(diameter: float, height: float) -> bullet.CylinderShape:
     """
     Creates a bullet cylinder shape.
+    .. note:: we are using an obj, because the cylinder primitive of bullet produces wrong contact points sometimes.
+              The obj is scaled by 0.996 because it is slightly too large. The number was determined by comparing results
+              to fcl.
     :param diameter: the diameter of the cylinder.
     :param height: the height of the cylinder.
     :return: the bullet cylinder shape.
@@ -105,7 +108,7 @@ def create_cylinder_shape(diameter: float, height: float) -> bullet.CylinderShap
     return bullet.load_convex_shape(
         cylinder_mesh,
         single_shape=True,
-        scaling=bullet.Vector3(diameter, diameter, height),
+        scaling=bullet.Vector3(diameter, diameter, height) * 0.996,
     )
 
 

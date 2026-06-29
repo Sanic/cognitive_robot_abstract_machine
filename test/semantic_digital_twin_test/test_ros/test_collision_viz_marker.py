@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from time import sleep
 
+from rclpy.node import Node
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.connections import OmniDrive
 from visualization_msgs.msg import Marker, MarkerArray
 
 from semantic_digital_twin.adapters.ros.visualization.collision_viz_marker import (
@@ -17,10 +20,12 @@ from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 
 @dataclass
 class MarkerArrayRecorder:
+    namespace: str
     last_msg: MarkerArray = field(init=False, default=None)
 
     def __call__(self, msg: MarkerArray):
-        self.last_msg = msg
+        if msg.markers[0].ns == self.namespace:
+            self.last_msg = msg
 
 
 def _avoid_robot_environment_collisions(world):
@@ -43,7 +48,7 @@ def _avoid_robot_environment_collisions(world):
     return collision_manager
 
 
-def _wait_for_message(recorder):
+def _wait_for_message(recorder: MarkerArrayRecorder):
     for _ in range(30):
         if recorder.last_msg is not None:
             break
@@ -52,8 +57,8 @@ def _wait_for_message(recorder):
         assert False, "Callback timed out"
 
 
-def _subscribe(node, publisher):
-    recorder = MarkerArrayRecorder()
+def _subscribe(node: Node, publisher: CollisionVisualizationMarkerPublisher):
+    recorder = MarkerArrayRecorder(namespace=publisher.namespace)
     node.create_subscription(
         msg_type=MarkerArray,
         topic=publisher.topic_name,
@@ -65,8 +70,9 @@ def _subscribe(node, publisher):
 
 def test_publishes_line_list_on_collision_check(rclpy_node, cylinder_bot_world):
     collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
-    publisher = CollisionVisualizationMarkerPublisher(node=rclpy_node)
-    collision_manager.add_collision_consumer(publisher)
+    publisher = CollisionVisualizationMarkerPublisher(
+        node=rclpy_node, world=cylinder_bot_world
+    )
     recorder = _subscribe(rclpy_node, publisher)
 
     collisions = collision_manager.compute_collisions()
@@ -81,13 +87,12 @@ def test_publishes_line_list_on_collision_check(rclpy_node, cylinder_bot_world):
     assert len(marker.colors) == len(marker.points)
 
 
-def test_color_depends_on_distance(rclpy_node, cylinder_bot_world):
+def test_color_green_when_below_buffer_threshold(rclpy_node, cylinder_bot_world):
     collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
     # Threshold above every contact distance, so all contacts must be red.
     publisher = CollisionVisualizationMarkerPublisher(
-        node=rclpy_node, collision_distance_threshold=100.0
+        node=rclpy_node, world=cylinder_bot_world
     )
-    collision_manager.add_collision_consumer(publisher)
     recorder = _subscribe(rclpy_node, publisher)
 
     collision_manager.compute_collisions()
@@ -97,17 +102,47 @@ def test_color_depends_on_distance(rclpy_node, cylinder_bot_world):
     assert colors
     for color in colors:
         assert color.r == 1.0
-        assert color.g == 0.0
+        assert color.g == 1.0
+        assert color.b == 0.0
+        assert color.a == 1.0
 
 
-def test_color_green_when_above_threshold(rclpy_node, cylinder_bot_world):
+def test_color_green_when_below_violated_threshold(rclpy_node, cylinder_bot_world):
+    collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
+    # Threshold above every contact distance, so all contacts must be red.
+    publisher = CollisionVisualizationMarkerPublisher(
+        node=rclpy_node, world=cylinder_bot_world
+    )
+    recorder = _subscribe(rclpy_node, publisher)
+
+    cylinder_bot_world.get_connections_by_type(OmniDrive)[0].origin = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+    )
+
+    collision_manager.compute_collisions()
+
+    _wait_for_message(recorder)
+    colors = recorder.last_msg.markers[0].colors
+    assert colors
+    for color in colors:
+        if color.r == 1.0 and color.g == 0.0 and color.b == 0.0 and color.a == 1.0:
+            break
+    else:
+        assert False, "No red color found"
+
+
+def test_color_green_when_above_buffer_threshold(rclpy_node, cylinder_bot_world):
     collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
     # Threshold below every contact distance, so all contacts must be green.
     publisher = CollisionVisualizationMarkerPublisher(
-        node=rclpy_node, collision_distance_threshold=-100.0
+        node=rclpy_node, world=cylinder_bot_world
     )
-    collision_manager.add_collision_consumer(publisher)
     recorder = _subscribe(rclpy_node, publisher)
+
+    # put robot to 10.3 to be above buffer threshold but close enough to still get checked.
+    cylinder_bot_world.get_connections_by_type(OmniDrive)[0].origin = (
+        HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
+    )
 
     collision_manager.compute_collisions()
 
@@ -117,12 +152,15 @@ def test_color_green_when_above_threshold(rclpy_node, cylinder_bot_world):
     for color in colors:
         assert color.r == 0.0
         assert color.g == 1.0
+        assert color.b == 0.0
+        assert color.a == 1.0
 
 
 def test_throttle_publishes_every_nth_check(rclpy_node, cylinder_bot_world):
     collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
-    publisher = CollisionVisualizationMarkerPublisher(node=rclpy_node, throttle=2)
-    collision_manager.add_collision_consumer(publisher)
+    publisher = CollisionVisualizationMarkerPublisher(
+        node=rclpy_node, throttle=2, world=cylinder_bot_world
+    )
     recorder = _subscribe(rclpy_node, publisher)
 
     collision_manager.compute_collisions()
@@ -136,7 +174,8 @@ def test_throttle_publishes_every_nth_check(rclpy_node, cylinder_bot_world):
 def test_with_collision_visualization_wires_consumer(rclpy_node, cylinder_bot_world):
     collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
     viz = VizMarkerPublisher(_world=cylinder_bot_world, node=rclpy_node)
-    publisher = viz.with_collision_visualization()
+    viz.with_collision_visualization()
+    publisher = viz._collision_publisher
 
     assert publisher in collision_manager.collision_consumers
     recorder = _subscribe(rclpy_node, publisher)

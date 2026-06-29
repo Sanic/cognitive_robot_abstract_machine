@@ -5294,6 +5294,9 @@ class CollisionVisualizationMarkerPublisherDAO(
     topic_name: Mapped[builtins.str] = mapped_column(
         sqlalchemy.sql.sqltypes.Text, use_existing_column=True
     )
+    namespace: Mapped[builtins.str] = mapped_column(
+        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
+    )
     throttle: Mapped[builtins.int] = mapped_column(use_existing_column=True)
     line_width: Mapped[builtins.float] = mapped_column(use_existing_column=True)
 
