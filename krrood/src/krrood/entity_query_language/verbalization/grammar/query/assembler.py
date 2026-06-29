@@ -475,7 +475,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         'For each department, report the sum of salaries of Employees'
         """
         header = (
-            self._for_each_header(report.group_keys)
+            self._for_each_header(report.group_keys, node)
             if report.is_grouped
             else self._sentence_initial(Keywords.REPORT.as_fragment())
         )
@@ -518,7 +518,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             plan,
             selection,
             where_items=[self._where_clause(plan)],
-            find_header=self._for_each_header(report.group_keys),
+            find_header=self._for_each_header(report.group_keys, node),
         )
 
     def _distinct_keys(self, keys: List[SymbolicExpression]) -> VerbalizationFragment:
@@ -541,9 +541,12 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             ]
         )
 
-    def _for_each_header(self, keys: List[SymbolicExpression]) -> VerbalizationFragment:
+    def _for_each_header(
+        self, keys: List[SymbolicExpression], node: Query
+    ) -> VerbalizationFragment:
         """:return: the fronted *"For each <key>, report"* frame — the grouping first (it is the row
-        dimension of the result), the keys as bare singular labels, then the lowercase verb.
+        dimension of the result), the keys as bare singular labels, then the lowercase verb. A HAVING
+        filter is woven onto the key as a *"whose <aggregate> is …"* group restriction.
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(a(set_of(employee.department, sum(employee.salary)).grouped_by(
@@ -553,10 +556,18 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         labels = oxford_comma(
             [self._group_label(key) for key in keys], Conjunctions.AND.as_fragment()
         )
+        having = node._having_expression_
+        key_phrase = labels
+        if having is not None:
+            with self.context.configuration.possessive_aggregate_scope():
+                having_fragment = self.context.child(having.condition)
+            key_phrase = PhraseFragment(
+                parts=[labels, Keywords.WHOSE.as_fragment(), having_fragment]
+            )
         return PhraseFragment(
             parts=[
                 Keywords.FOR_EACH.as_fragment(),
-                labels,
+                key_phrase,
                 Punctuation.COMMA.as_fragment(),
                 Keywords.REPORT.as_fragment(),
             ]
@@ -847,7 +858,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         fronts_grouping = plan.report is not None and plan.report.is_grouped
         return [
             None if fronts_grouping else composer.grouped_by(node),
-            composer.having(node),
+            # A grouped report fronts its HAVING onto the group key ("For each department whose …"),
+            # so the trailing filter would repeat it.
+            None if fronts_grouping else composer.having(node),
             None if ranked else composer.ordered_by(node),
         ]
 

@@ -76,17 +76,11 @@ class ClauseComposer:
         return GroupedByAssembler(self.context).clause(node)
 
     def having(self, node: Query) -> Optional[VerbalizationFragment]:
-        """:return: The *"where …"* group-filter clause, or ``None`` when the query has no HAVING.
+        """:return: The trailing *"where …"* HAVING clause, or ``None`` when the query has no HAVING.
 
-        It routes to the having assembler, which contributes only the trailing *"where the sum is
-        greater than 30000"* span appended after the report body:
-
-        >>> employee = variable(Employee, [])
-        >>> total = sum(employee.salary)
-        >>> verbalize_expression(
-        ...     a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
-        ... )
-        'For each department, report the sum of salaries of Employees where the sum is greater than 30000'
+        It routes to the having assembler for the trailing *"where the sum is greater than 30000"*
+        span. A grouped report fronts its HAVING onto the group key instead (*"For each department
+        whose …"*), so this trailing form is used for a constrained aggregation scope.
         """
         return HavingAssembler(self.context).clause(node)
 

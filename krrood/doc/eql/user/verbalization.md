@@ -339,15 +339,16 @@ The same agreement applies wherever the subject is plural — including a `limit
 
 A `limit` is the exception: it ranks (*"Find the top three …"*), a distinct count-bearing form.
 
-A reported aggregate is a *computed quantity*: named in full where it is first reported, a later
-mention of the same aggregate (in `having`, or an ordering) reduces to its bare head:
+A grouped query's `having` filter is fronted onto the group key as a *"whose <aggregate> is …"*
+restriction (the aggregate a determiner-less possession of the group), so it is unambiguous which
+group the condition filters:
 
 ```{code-cell} ipython3
 total = eql.sum(employee.salary)
 print(verbalize_expression(
     a(set_of(employee.department, total).grouped_by(employee.department).having(total > 30000))
 ))
-# For each department, report the sum of salaries of Employees where the sum is greater than 30000
+# For each department whose sum of salaries of Employees is greater than 30000, report the sum of salaries of Employees
 ```
 
 A plain (non-aggregating, unordered) `set_of` stays a search and also drops the parentheses.
@@ -515,10 +516,10 @@ query = a(
 print(verbalize_expression(query))
 ```
 
-The HAVING clause reads as a full *"where <aggregate> is greater than 30000"* group filter — a
-clause rather than a bare *"having …"* participle, so it is unambiguous that the condition filters
-the groups, not the reported population.  The GROUP BY clause states only the grouping key without
-restating the full selection tuple.
+The HAVING clause is fronted onto the group key as *"For each department whose <aggregate> is
+greater than 30000"* — attaching the filter to the group it restricts, rather than a trailing
+*"having …"* participle that misparses as modifying the reported population.  The GROUP BY clause
+states only the grouping key without restating the full selection tuple.
 
 ## Colored Terminal Output
 

@@ -926,15 +926,15 @@ def test_min_multi_level_attribute_chain():
     ), f"Got: {text!r}"
 
 
-def test_max_re_mention_in_having_reduces_to_the_head():
-    """MAX is a computed quantity, so its HAVING re-mention is anaphoric: named in full as the
-    reported column, then reduced to the bare 'the maximum' (not repeated whole)."""
+def test_grouped_having_on_max_fronts_onto_group_key():
+    """A MAX HAVING fronts onto the group key as a determiner-less possession (*"whose maximum of …"*);
+    the reported column restates it in full (*"the maximum of …"*)."""
     t = variable(BankTransaction, domain=None)
     max_amount = eql.max(t.amount_details.amount)
     query = a(set_of(max_amount).grouped_by(t.amount_details).having(max_amount > 100))
     text = verbalize_expression(query)
-    assert text.count("the maximum of") == 1  # the column names it in full, once
-    assert "where the maximum is greater than 100" in text  # the re-mention reduces
+    assert text.startswith("For each amount_details whose maximum of")
+    assert "is greater than 100, report the maximum of" in text
 
 
 # ── Nested sub-queries as values (the imperative "Find" is reserved for the top level) ──
@@ -1254,17 +1254,20 @@ def test_verbalize_complex_having(departments_and_employees_fixture):
     assert "department" in text
     assert "average" in text
     assert "salaries" in text
-    assert "For each department, report" in text  # a report, fronted by its grouping
+    assert (
+        "For each department whose" in text
+    )  # report fronted, HAVING on the group key
     assert "grouped by" not in text
     assert (
-        "where the average is greater than" in text
-    )  # HAVING as a group-filter clause
+        "is greater than" in text
+    )  # HAVING woven as a "whose <aggregate> is …" filter
     assert "30000" in text
 
 
-def test_grouped_having_reduces_the_repeated_aggregate():
-    """The reported aggregate is a computed quantity: named in full as the column, its HAVING
-    re-mention reduces to the bare 'the sum' rather than repeating the whole phrase."""
+def test_grouped_having_fronts_aggregate_onto_group_key():
+    """A grouped HAVING fronts onto the group key as *"For each department whose <aggregate> is …"* —
+    the aggregate a determiner-less possession of the group — then the report restates it in full.
+    """
     employee = variable(Employee, domain=None)
     total = eql.sum(employee.salary)
     query = a(
@@ -1273,11 +1276,10 @@ def test_grouped_having_reduces_the_repeated_aggregate():
         .having(total > 30000)
     )
     text = verbalize_expression(query)
-    assert (
-        text
-        == "For each department, report the sum of salaries of Employees where the sum is greater than 30000"
+    assert text == (
+        "For each department whose sum of salaries of Employees is greater than 30000, "
+        "report the sum of salaries of Employees"
     )
-    assert text.count("the sum of salaries of Employees") == 1
 
 
 def test_grouped_selection_equal_to_key_reports_distinct():
@@ -1524,10 +1526,10 @@ def test_aggregator_coreference_second_mention_is_the(
     assert "the average of" in text
 
 
-def test_having_renders_as_where_clause_with_copula(departments_and_employees_fixture):
-    """The per-group HAVING filter reads as a full *"where <aggregate> is <op> <value>"* clause, so
-    the group condition is unambiguous rather than the bare *"having the sum greater than …"* that
-    misparses as modifying the reported population."""
+def test_grouped_having_fronts_onto_group_key(departments_and_employees_fixture):
+    """A grouped HAVING is woven onto the group key as a *"For each department whose <aggregate> is
+    <op> <value>"* filter, so the group condition is unambiguous rather than the bare *"having the sum
+    greater than …"* that misparses as modifying the reported population."""
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1538,8 +1540,9 @@ def test_having_renders_as_where_clause_with_copula(departments_and_employees_fi
     )
     text = verbalize_expression(query)
 
-    where_part = text[text.index("where") :]
-    assert "is greater than" in where_part
+    assert text.startswith("For each department whose ")
+    whose_part = text[text.index("whose") :]
+    assert "is greater than" in whose_part
 
 
 def test_where_keeps_is_copula(departments_and_employees_fixture):
@@ -1556,7 +1559,7 @@ def test_where_keeps_is_copula(departments_and_employees_fixture):
 def test_having_compound_condition_renders_full_clauses(
     departments_and_employees_fixture,
 ):
-    """AND/OR inside the HAVING *where* clause: every comparator reads as a full *"is <op> …"* clause."""
+    """AND/OR inside the fronted HAVING *whose* clause: every comparator reads as a full *"is <op> …"* clause."""
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1568,15 +1571,15 @@ def test_having_compound_condition_renders_full_clauses(
     )
     text = verbalize_expression(query)
 
-    where_part = text[text.index("where") :]
-    assert "is greater than" in where_part
-    assert "is at least" in where_part
+    whose_part = text[text.index("whose") :]
+    assert "is greater than" in whose_part
+    assert "is at least" in whose_part
 
 
 def test_having_negated_comparator_renders_full_clause(
     departments_and_employees_fixture,
 ):
-    """NOT over a comparator inside the HAVING *where* clause reads as *"is not <op> …"*."""
+    """NOT over a comparator inside the fronted HAVING *whose* clause reads as *"is not <op> …"*."""
     _, _ = departments_and_employees_fixture
     employee = variable(Employee, domain=None)
     avg_salary = eql.average(employee.salary)
@@ -1587,8 +1590,8 @@ def test_having_negated_comparator_renders_full_clause(
     )
     text = verbalize_expression(query)
 
-    where_part = text[text.index("where") :]
-    assert "is not greater than" in where_part
+    whose_part = text[text.index("whose") :]
+    assert "is not greater than" in whose_part
 
 
 def test_set_of_grouped_by_reports_without_restating_the_key(
@@ -1607,13 +1610,13 @@ def test_set_of_grouped_by_reports_without_restating_the_key(
     )
     text = verbalize_expression(query)
 
-    assert text.startswith("For each department, report ")
+    assert text.startswith("For each department whose ")
     assert text.count("report") == 1  # no double header
     assert "Find" not in text and "grouped by" not in text
     assert (
         text.count("department") == 1
     )  # named once in "For each department", not restated
-    assert "where" in text and "30000" in text
+    assert "whose" in text and "30000" in text
 
 
 # ── Comparator "is" form ──────────────────────────────────────────────────────
@@ -1639,8 +1642,9 @@ def test_verbalize_not_comparator_ne():
 
 
 def test_verbalize_having_eq_uses_is_copula():
-    """The HAVING *where* clause renders ``==`` with the copula like any other clause — *"the number
-    is equal to 2"* — not the copula-less *"equals"* the old compact HAVING form used.
+    """The fronted HAVING *whose* clause renders ``==`` with the copula like any other clause —
+    *"whose number of Employees is equal to 2"* — not the copula-less *"equals"* the old compact
+    HAVING form used.
     """
     employee = variable(Employee, domain=None)
     count_emp = eql.count(employee)
@@ -1650,8 +1654,8 @@ def test_verbalize_having_eq_uses_is_copula():
         .having(count_emp == 2)
     )
     text = verbalize_expression(query)
-    where_part = text[text.index("where") :]
-    assert "is equal to 2" in where_part
+    whose_part = text[text.index("whose") :]
+    assert "is equal to 2" in whose_part
 
 
 # ── Non-predicate InstantiatedVariable natural-English form ───────────────────
@@ -2608,7 +2612,8 @@ def test_verbalize_expression_html_hierarchical_handles_constrained_aggregation(
     result = VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(
         query
     )
+    # The grouped report fronts its HAVING onto the group key, so it is a single prose line (no
+    # block <br>); the HTML wrapper and coloured content still render end-to-end.
     assert "<span" in result
-    assert "<br>" in result
     assert "Employee" in result
     assert "average" in result

@@ -36,6 +36,16 @@ class AggregatorRule(PhraseRule):
         if not kind.has_child:
             return kind.as_fragment()  # childless aggregate, e.g. "count of all"
         child_fragment = context.child(node._child_, number=kind.child_number)
+        # In a fronted *"whose <aggregate> is …"* group filter the aggregate is a possession of the
+        # group key, so it drops its determiner (*"sum of salaries"*) and does not register for
+        # coreference — the reported column stays the canonical full mention.
+        if context.configuration.possessive_aggregate:
+            return NounPhrase(
+                head=kind.as_fragment(),
+                definiteness=Definiteness.BARE,
+                modifiers=kind.complement(child_fragment),
+                subject_of_modifiers=False,
+            )
         # A computed quantity is a referring expression: named in full when first introduced (the
         # reported column), a later mention of the same aggregate (a HAVING / ordering on it) is the
         # general repeat-reduction's job — "the sum of salaries of Employees" → "the sum".
