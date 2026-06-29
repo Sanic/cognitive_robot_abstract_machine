@@ -17,7 +17,7 @@ Things to note:
 * Make sure to always have ROS in your environment by executing `source /opt/ros/jazzy/setup,bash` in every new shell or
   adding the line to your `~/.bashrc`
 * Use UV instead of poetry. Make sure to `workon cram-env` before calling uv.
-* `robokudo_ros` will be installed when following the README mentioned above. The repository is located at
+* To install `robokudo_ros`, follow the ROS Workspace setup step in the CRAM README mentioned above. The `robokudo_ros` repository is located at
   `https://github.com/cram2/cram_ros2_packages`
 * If you want to use the `--symlink-install` option you have to rebuild your workspace as follows:
   ```bash
