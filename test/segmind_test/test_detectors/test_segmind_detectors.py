@@ -58,26 +58,25 @@ def test_contact_detector(_simple_apartment_setup):
     segmind_executor.compile(statechart)
     segmind_executor.tick()
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 0.94)
-    segmind_executor.tick()
+    assert len(events_of(segmind_context, ContactEvent)) == 0
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
     segmind_executor.tick()
-    assert len(events_of(segmind_context, LossOfContactEvent)) == 1
+    assert len(events_of(segmind_context, LossOfContactEvent)) == 0
 
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box1.global_pose.x, box1.global_pose.y, box1.global_pose.z)
+    segmind_executor.tick()
+    assert len(events_of(segmind_context, ContactEvent)) == 1
+    assert len(events_of(segmind_context, LossOfContactEvent)) == 0
+
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x, box2.global_pose.y, box2.global_pose.z)
     segmind_executor.tick()
     assert len(events_of(segmind_context, ContactEvent)) == 2
     assert len(events_of(segmind_context, LossOfContactEvent)) == 1
 
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(box2.global_pose.x, box2.global_pose.y, box2.global_pose.z)
-    segmind_executor.tick()
-    assert len(events_of(segmind_context, ContactEvent)) == 3
-    assert len(events_of(segmind_context, LossOfContactEvent)) == 2
-
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(z=1)
     segmind_executor.tick()
-    assert len(events_of(segmind_context, LossOfContactEvent)) == 3
+    assert len(events_of(segmind_context, LossOfContactEvent)) == 2
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
 def test_support_detector(_simple_apartment_setup):
