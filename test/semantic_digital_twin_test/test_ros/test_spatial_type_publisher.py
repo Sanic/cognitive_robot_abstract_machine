@@ -84,8 +84,10 @@ def test_set_requests_replaces_previous(rclpy_node, cylinder_bot_world):
     )
 
     markers = fake.published[-1].markers
-    assert len(markers) == 1
-    assert markers[0].ns == "b"
+    added = [marker for marker in markers if marker.action == Marker.ADD]
+    deleted = [marker for marker in markers if marker.action == Marker.DELETE]
+    assert [marker.ns for marker in added] == ["b"]
+    assert [marker.ns for marker in deleted] == ["a"]
 
 
 def test_add_all_publishes_all_requests(rclpy_node, cylinder_bot_world):
@@ -109,19 +111,55 @@ def test_add_all_publishes_all_requests(rclpy_node, cylinder_bot_world):
     assert {marker.ns for marker in markers} == {"a", "b"}
 
 
-def test_clear_publishes_empty_marker_array(rclpy_node, cylinder_bot_world):
+def test_clear_deletes_previously_published_markers(rclpy_node, cylinder_bot_world):
     publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    fake = capture(publisher)
     publisher.add(
         SpatialTypeVisualization(
             spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root)
         )
     )
-    fake = capture(publisher)
+    published_identities = {
+        (marker.ns, marker.id) for marker in fake.published[-1].markers
+    }
 
     publisher.clear()
 
-    assert fake.published[-1].markers == []
+    markers = fake.published[-1].markers
+    assert all(marker.action == Marker.DELETE for marker in markers)
+    assert {(marker.ns, marker.id) for marker in markers} == published_identities
     assert publisher._requests == []
+
+
+def test_publish_deletes_only_removed_request_markers(rclpy_node, cylinder_bot_world):
+    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    fake = capture(publisher)
+    publisher.add_all(
+        [
+            SpatialTypeVisualization(
+                spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root),
+                namespace="keep",
+            ),
+            SpatialTypeVisualization(
+                spatial_type=Point3(1, 1, 1, reference_frame=cylinder_bot_world.root),
+                namespace="drop",
+            ),
+        ]
+    )
+
+    publisher.set_requests(
+        [
+            SpatialTypeVisualization(
+                spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root),
+                namespace="keep",
+            )
+        ]
+    )
+
+    markers = fake.published[-1].markers
+    deleted = {marker.ns for marker in markers if marker.action == Marker.DELETE}
+    assert deleted == {"drop"}
+    assert all(marker.action == Marker.ADD for marker in markers if marker.ns == "keep")
 
 
 def test_stop_deregisters_from_state_callbacks(rclpy_node, cylinder_bot_world):

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
-from visualization_msgs.msg import MarkerArray
+from visualization_msgs.msg import Marker, MarkerArray
 
 from semantic_digital_twin.adapters.ros.visualization.exceptions import (
     WorldNotResolvableError,
@@ -23,6 +23,17 @@ if TYPE_CHECKING:
     from rclpy.publisher import Publisher
 
     from semantic_digital_twin.world import World
+
+
+@dataclass(frozen=True)
+class MarkerIdentity:
+    """Identifies a published marker by the fields RViz uses to track it."""
+
+    namespace: str
+    """The marker namespace (``Marker.ns``)."""
+
+    marker_id: int
+    """The marker id within the namespace (``Marker.id``)."""
 
 
 @dataclass(eq=False)
@@ -53,6 +64,11 @@ class SpatialTypePublisher(StateChangeCallback):
     publisher: Publisher = field(init=False)
     """The ROS2 marker array publisher."""
 
+    _published_marker_identities: set[MarkerIdentity] = field(
+        init=False, default_factory=set
+    )
+    """Identities of the markers published on the previous call, used to delete stale ones."""
+
     def __post_init__(self):
         super().__post_init__()
         self.publisher = self.node.create_publisher(
@@ -75,7 +91,7 @@ class SpatialTypePublisher(StateChangeCallback):
         self.publish()
 
     def clear(self) -> None:
-        """Remove all registered spatial types and publish an empty marker array."""
+        """Remove all registered spatial types and delete their markers."""
         self._requests = []
         self.publish()
 
@@ -84,14 +100,33 @@ class SpatialTypePublisher(StateChangeCallback):
         self.publish()
 
     def publish(self) -> None:
-        """Render all registered spatial types and publish them as a single marker array."""
+        """Render all registered spatial types and publish them as a single marker array.
+
+        Markers published on the previous call that are no longer rendered are
+        appended as ``DELETE`` markers so RViz removes them.
+        """
         root_frame_name = str(self._world.root.name)
         marker_array = MarkerArray()
         for request in self._requests:
             marker_array.markers.extend(
                 SpatialTypeMarkerRenderer.render(request, root_frame_name)
             )
+        current_identities = {
+            MarkerIdentity(marker.ns, marker.id) for marker in marker_array.markers
+        }
+        for identity in self._published_marker_identities - current_identities:
+            marker_array.markers.append(self._delete_marker(identity))
         self.publisher.publish(marker_array)
+        self._published_marker_identities = current_identities
+
+    @staticmethod
+    def _delete_marker(identity: MarkerIdentity) -> Marker:
+        """Build a marker that deletes the previously published marker with this identity."""
+        marker = Marker()
+        marker.action = Marker.DELETE
+        marker.ns = identity.namespace
+        marker.id = identity.marker_id
+        return marker
 
     @classmethod
     def publish_once(
