@@ -662,9 +662,9 @@ def test_two_distinct_relational_referents_are_numbered():
         )
     )
     assert text == (
-        "Find a _NavPair such that the battery of _NavRobot 1 to which its primary is "
-        "assigned is greater than 5, the power of _NavRobot 1 is greater than 1, and the "
-        "battery of _NavRobot 2 to which its secondary is assigned is greater than 3"
+        "Find a _NavPair such that the battery of _NavRobot 1, to which its primary is "
+        "assigned, is greater than 5, the power of _NavRobot 1 is greater than 1, and the "
+        "battery of _NavRobot 2, to which its secondary is assigned, is greater than 3"
     )
 
 

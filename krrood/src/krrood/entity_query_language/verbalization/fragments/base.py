@@ -304,6 +304,13 @@ class NounPhrase(HasNumber, VerbalizationFragment):
     """A qualifier placed between the determiner and the head (*"the [first two] Robots"*), e.g. a
     ``limit`` ranking phrase. Pre-nominal, so distinct from the post-nominal :attr:`modifiers`."""
 
+    relative_clause: bool = False
+    """``True`` when the :attr:`modifiers` form a relative clause (*"to which its primary is
+    assigned"*). Such modifiers are set off by commas when the head is independently identified — a
+    disambiguation number (*"Robot 1, to which …"*) makes the clause non-restrictive — but stay
+    comma-less while the clause itself identifies the head (*"the Robot to which a Mission is
+    assigned"*)."""
+
 
 @dataclass
 class PossessiveChain(VerbalizationFragment):

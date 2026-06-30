@@ -460,9 +460,9 @@ query = an(entity(pair).where(
     pair.secondary.assigned_to.battery > 3,
 ))
 print(verbalize_expression(query))
-# Find a Pair such that the battery of Robot 1 to which its primary is assigned is
-# greater than 5, the power of Robot 1 is greater than 1, and the battery of Robot 2
-# to which its secondary is assigned is greater than 3
+# Find a Pair such that the battery of Robot 1, to which its primary is assigned, is
+# greater than 5, the power of Robot 1 is greater than 1, and the battery of Robot 2,
+# to which its secondary is assigned, is greater than 3
 ```
 
 ## Custom Predicates

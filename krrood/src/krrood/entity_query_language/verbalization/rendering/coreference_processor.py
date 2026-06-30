@@ -31,7 +31,10 @@ from krrood.entity_query_language.verbalization.rendering.discourse import (
     DiscourseView,
     EMPTY_DISCOURSE,
 )
-from krrood.entity_query_language.verbalization.vocabulary.english import Pronouns
+from krrood.entity_query_language.verbalization.vocabulary.english import (
+    Pronouns,
+    Punctuation,
+)
 from krrood.entity_query_language.verbalization.rendering.passes import RealizationPass
 
 
@@ -524,7 +527,7 @@ class CoreferenceProcessor(RealizationPass):
     def _noun_phrase(self, noun_phrase: NounPhrase) -> VerbalizationFragment:
         """Every mention (singular or plural) marks its referent introduced.  A repeat **singular**
         mention is reduced to its head — dropping the first-mention modifiers and keeping the head
-        label (*"a Robot, where …"* → *"the Robot"*, *"Robot 1 to which …"* → *"Robot 1"*).  A
+        label (*"a Robot, where …"* → *"the Robot"*, *"Robot 1, to which …,"* → *"Robot 1"*).  A
         plural mention (*"Robots"*) only introduces the referent (it never carries an article).
         Relational referents are first numbered (*"Robot 1"*) when their type collides.
 
@@ -567,11 +570,31 @@ class CoreferenceProcessor(RealizationPass):
         label = self.numbered_labels.get(noun_phrase.referent_id)
         if label is None or noun_phrase.definiteness is Definiteness.BARE:
             return noun_phrase
+        # A numbered head is identified by its number, so a relative clause on it is non-restrictive
+        # and is set off by commas. The trailing comma never dangles: numbering requires two same-type
+        # relational referents, which only arise inside a predicate (genitive owner / "is <attribute>"
+        # subject), so following text always supplies the post-comma space.
+        modifiers = (
+            self._comma_framed(noun_phrase.modifiers)
+            if noun_phrase.relative_clause
+            else noun_phrase.modifiers
+        )
         return replace(
             noun_phrase,
             head=replace(noun_phrase.head, text=label),
             definiteness=Definiteness.BARE,
+            modifiers=modifiers,
         )
+
+    @staticmethod
+    def _comma_framed(
+        modifiers: List[VerbalizationFragment],
+    ) -> List[VerbalizationFragment]:
+        """:return: *modifiers* set off by a leading and trailing comma, so a non-restrictive relative
+        clause reads *"Robot 1, to which its primary is assigned, is …"*. The comma's
+        :attr:`Spacing.LEFT` lets the orthography pass hug it to the preceding token."""
+        comma = Punctuation.COMMA.as_fragment()
+        return [comma, *modifiers, comma]
 
     def _reduced(self, noun_phrase: NounPhrase) -> VerbalizationFragment:
         """:return: A repeat mention reduced to its head — the first-mention modifiers dropped — as a

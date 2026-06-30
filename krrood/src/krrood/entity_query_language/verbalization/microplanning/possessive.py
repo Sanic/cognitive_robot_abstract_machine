@@ -116,6 +116,7 @@ def _relative_clause(
             ),
         ],
         referent_id=relation.referent_id,
+        relative_clause=True,
     )
 
 
