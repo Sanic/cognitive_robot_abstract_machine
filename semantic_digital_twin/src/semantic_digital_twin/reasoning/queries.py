@@ -1,5 +1,5 @@
 
-from krrood.inheritance_path_length import nearest_common_ancestor, inheritance_path_length
+from krrood.inheritance_path_length import nearest_common_ancestor, inheritance_path_length, inheritance_distance
 
 from krrood.entity_query_language.factories import not_, set_of, type_
 import math
@@ -111,17 +111,8 @@ def goal_surface_of_object(
         supporting_surfaces, object_of_interest._world
     ))
 
-    @symbolic_function
-    def inheritance_distance(obj_: SemanticAnnotation) -> int:
-        """Calculate inheritance distance, returning infinity for unrelated types."""
-        common_ancestor = nearest_common_ancestor(type(object_of_interest), type_(obj_))
-        if common_ancestor is None:
-            return math.inf
-        path_length = inheritance_path_length(type(object_of_interest), common_ancestor)
-        return path_length if path_length is not None else math.inf
-
     query = set_of(obj, supporting_surface).where(
-        (distance := inheritance_distance(obj)) <= threshold,
+        (distance := inheritance_distance(object_of_interest, type_(obj))) <= threshold,
         is_supported_by(obj.bodies[0], supporting_body)
     ).ordered_by(distance)
     return next(query[supporting_surface].evaluate(), next(non_supporting_table.evaluate(), None))

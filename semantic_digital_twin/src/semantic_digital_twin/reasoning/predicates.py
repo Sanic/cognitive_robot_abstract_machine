@@ -306,28 +306,6 @@ def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -
     return False
 
 
-
-
-
-@symbolic_function
-def inheritance_path_length_(child_class: Type, parent_class: Type) -> Optional[int]:
-    """
-    Calculates the inheritance path length between a child class and a parent class.
-
-    :param child_class: The class for which the inheritance path length will be calculated.
-    :param parent_class: The class to which the inheritance path length is calculated.
-
-    :return: The inheritance path length as an integer, None if not found.
-    """
-    result = None
-    for t in parent_class.__mro__:
-        result = inheritance_path_length(child_class, t)
-        if result is not None:
-            break
-    return result if result is not None else math.inf
-
-
-
 @symbolic_function
 def is_body_in_region(body: Body, region: Region) -> float:
     """

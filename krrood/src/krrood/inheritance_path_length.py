@@ -51,6 +51,23 @@ def _inheritance_path_length(
             if issubclass(base, parent_class)
         )
 
+@symbolic_function
+def inheritance_distance(child_class: type, parent_class: type) -> int:
+    """
+    Calculate the inheritance path length between two classes.
+    Every inheritance level that lies between `child_class` and `parent_class` increases the length by one.
+    In case of multiple inheritance, the path length is calculated for each branch and the minimum is returned.
+
+    :param child_class: The child class.
+    :param parent_class: The parent class.
+    :return: The minimum path length between `child_class` and `parent_class` or infinity if no path exists.
+    """
+    common_ancestor = nearest_common_ancestor(type(child_class), parent_class)
+    if common_ancestor is None:
+        return math.inf
+    path_length = inheritance_path_length(type(child_class), common_ancestor)
+    return path_length if path_length is not None else math.inf
+
 def nearest_common_ancestor(
     child_class: Type, parent_class: Type
 ) -> Type:
@@ -72,12 +89,3 @@ def nearest_common_ancestor(
         (ancestor for ancestor in parent_class.__mro__ if issubclass(child_class, ancestor)),
         None,
     )
-
-# @symbolic_function
-# def inheritance_distance(child_class: Type, parent_class: Type) -> int:
-#     """Calculate inheritance distance, returning infinity for unrelated types."""
-#     common_ancestor = nearest_common_ancestor(child_class, parent_class)
-#     if common_ancestor is None:
-#         return math.inf
-#     path_length = inheritance_path_length(child_class, common_ancestor)
-#     return path_length if path_length is not None else math.inf

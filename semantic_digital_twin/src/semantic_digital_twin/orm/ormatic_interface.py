@@ -18572,208 +18572,6 @@ class CheezeItDAO(
     }
 
 
-class GelatinBoxDAO(
-    FoodDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.GelatinBox
-    ],
-):
-    __tablename__ = "GelatinBoxDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "GelatinBoxDAO",
-        "inherit_condition": database_id == FoodDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class MilkDAO(
-    FoodDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Milk
-    ],
-):
-    __tablename__ = "MilkDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "MilkDAO",
-        "inherit_condition": database_id == FoodDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class NoodlesDAO(
-    FoodDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Noodles
-    ],
-):
-    __tablename__ = "NoodlesDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    class_label: Mapped[typing.Optional[builtins.str]] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "NoodlesDAO",
-        "inherit_condition": database_id == FoodDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class PringlesDAO(
-    FoodDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Pringles
-    ],
-):
-    __tablename__ = "PringlesDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PringlesDAO",
-        "inherit_condition": database_id == FoodDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class ProduceDAO(
-    FoodDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Produce
-    ],
-):
-    __tablename__ = "ProduceDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "ProduceDAO",
-        "inherit_condition": database_id == FoodDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class FruitDAO(
-    ProduceDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Fruit
-    ],
-):
-    __tablename__ = "FruitDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ProduceDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "FruitDAO",
-        "inherit_condition": database_id == ProduceDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class AppleDAO(
-    FruitDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Apple
-    ],
-):
-    __tablename__ = "AppleDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FruitDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "AppleDAO",
-        "inherit_condition": database_id == FruitDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class BananaDAO(
-    FruitDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Banana
-    ],
-):
-    __tablename__ = "BananaDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FruitDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "BananaDAO",
-        "inherit_condition": database_id == FruitDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class OrangeDAO(
-    FruitDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Orange
-    ],
-):
-    __tablename__ = "OrangeDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FruitDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "OrangeDAO",
-        "inherit_condition": database_id == FruitDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class TomatoDAO(
-    FruitDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Tomato
-    ],
-):
-    __tablename__ = "TomatoDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FruitDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "TomatoDAO",
-        "inherit_condition": database_id == FruitDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class VegetableDAO(
-    ProduceDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Vegetable
 class ForkDAO(
     CuttleryDAO,
     DataAccessObject[
@@ -18803,121 +18601,6 @@ class FurnitureDAO(
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(SemanticAnnotationDAO.database_id),
-        ForeignKey(VegetableDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "CarrotDAO",
-        "inherit_condition": database_id == VegetableDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class LettuceDAO(
-    VegetableDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Lettuce
-    ],
-):
-    __tablename__ = "LettuceDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(VegetableDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "LettuceDAO",
-        "inherit_condition": database_id == VegetableDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class PotatoDAO(
-    VegetableDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
-    ],
-):
-    __tablename__ = "PotatoDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(VegetableDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PotatoDAO",
-        "inherit_condition": database_id == VegetableDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class SaltDAO(
-    FoodDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Salt
-    ],
-):
-    __tablename__ = "SaltDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "SaltDAO",
-        "inherit_condition": database_id == FoodDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class TomatoSoupDAO(
-    FoodDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.TomatoSoup
-    ],
-):
-    __tablename__ = "TomatoSoupDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "TomatoSoupDAO",
-        "inherit_condition": database_id == FoodDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class TunaCanDAO(
-    FoodDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.TunaCan
-    ],
-):
-    __tablename__ = "TunaCanDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(FoodDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "TunaCanDAO",
-        "inherit_condition": database_id == FoodDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
-class GarbageBinDAO(
-    HasRootBodyDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.GarbageBin
-    ],
-):
-    __tablename__ = "GarbageBinDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(HasRootBodyDAO.database_id),
         primary_key=True,
         use_existing_column=True,
     )
@@ -19878,25 +19561,6 @@ class OrangeDAO(
     }
 
 
-class PotatoDAO(
-    ProduceDAO,
-    DataAccessObject[
-        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
-    ],
-):
-    __tablename__ = "PotatoDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(ProduceDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "PotatoDAO",
-        "inherit_condition": database_id == ProduceDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class RoomDAO(
     SemanticAnnotationDAO,
     DataAccessObject[
@@ -20619,6 +20283,25 @@ class LettuceDAO(
 
     __mapper_args__ = {
         "polymorphic_identity": "LettuceDAO",
+        "inherit_condition": database_id == VegetableDAO.database_id,
+        "polymorphic_load": "selectin",
+    }
+
+
+class PotatoDAO(
+    VegetableDAO,
+    DataAccessObject[
+        semantic_digital_twin.semantic_annotations.semantic_annotations.Potato
+    ],
+):
+    __tablename__ = "PotatoDAO"
+
+    database_id: Mapped[builtins.int] = mapped_column(
+        ForeignKey(VegetableDAO.database_id), primary_key=True, use_existing_column=True
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PotatoDAO",
         "inherit_condition": database_id == VegetableDAO.database_id,
         "polymorphic_load": "selectin",
     }
