@@ -59,8 +59,8 @@ class PersonInRoleAndOntology(HasName, Symbol):
         """A factory classmethod detected via its ``-> Self`` return annotation."""
         return cls(name=name)
 
-    @classmethod
     @factory_method
+    @classmethod
     def spawn(cls):
         """A factory classmethod detected only via the ``@factory_method`` marker."""
         return cls(name="spawned")
