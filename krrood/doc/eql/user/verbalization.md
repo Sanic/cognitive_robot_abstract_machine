@@ -204,7 +204,7 @@ print(verbalize_expression(m.assigned_to == robots[0]))   # robots[0] is Robot("
 ```
 
 The identifying field(s) are the dataclass fields marked with
-`KRROODFieldMetadata.is_identifying_attribute` (via `field(metadata=KRROODFieldMetadata.as_field_metadata(is_identifying_attribute=True))`),
+`KRROODFieldMetadata.is_identifying_attribute` (via `field(metadata=KRROODFieldMetadata.as_dict(is_identifying_attribute=True))`),
 otherwise the first present of `name` / `id` / `label` / `key` / `uuid` (`Robot` has `name`, so this
 reads *"a specific Robot with name 'R2D2'"*). With none of those, it falls back to a bare *"a
 specific Robot"*.

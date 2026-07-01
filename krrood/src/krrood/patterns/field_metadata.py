@@ -9,7 +9,7 @@ from typing_extensions import ClassVar, Dict, Optional
 class KRROODFieldMetadata:
     """Krrood-specific metadata carried inside a dataclass field's ``metadata`` mapping.
 
-    Attach it to a field with :meth:`as_field_metadata` so krrood can read per-field hints (such as
+    Attach it to a field with :meth:`as_dict` so krrood can read per-field hints (such as
     which field identifies an instance) without the owning class implementing any protocol.
     """
 
@@ -20,15 +20,24 @@ class KRROODFieldMetadata:
     """``True`` when this field identifies its instance for verbalization
     (*"a specific <Type> with <field> '<value>'"*)."""
 
+    is_part_whole_relationship: bool = False
+    """``True`` when this field holds a structural *part* of its owner (the part-whole relation)."""
+
     @classmethod
-    def as_field_metadata(
-        cls, *, is_identifying_attribute: bool = False
+    def as_dict(
+        cls,
+        *,
+        is_identifying_attribute: bool = False,
+        is_part_whole_relationship: bool = False,
     ) -> Dict[str, KRROODFieldMetadata]:
         """:return: A dataclass-field ``metadata`` mapping carrying a :class:`KRROODFieldMetadata`
         with the given hints under :attr:`METADATA_KEY`, ready to pass to ``field(metadata=...)``.
         """
         return {
-            cls.METADATA_KEY: cls(is_identifying_attribute=is_identifying_attribute)
+            cls.METADATA_KEY: cls(
+                is_identifying_attribute=is_identifying_attribute,
+                is_part_whole_relationship=is_part_whole_relationship,
+            )
         }
 
     @classmethod

@@ -283,7 +283,7 @@ class _NamedThing:
 @dataclass
 class _Coded:
     serial: int = field(
-        metadata=KRROODFieldMetadata.as_field_metadata(is_identifying_attribute=True)
+        metadata=KRROODFieldMetadata.as_dict(is_identifying_attribute=True)
     )
     name: str = ""
 
