@@ -9,7 +9,7 @@ from krrood.patterns.role import Role
 
 
 @dataclass(eq=False)
-class IsSameEntity(Predicate):
+class IsSameSemanticEntity(Predicate):
     """
     Predicate asserting that two operands refer to the same underlying entity.
 

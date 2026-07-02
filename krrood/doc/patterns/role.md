@@ -74,36 +74,37 @@ print(alice)
 ## Defining a Role
 
 A role is a dataclass that inherits from `Role[T]`, where `T` is the type of its role taker.
-The role taker is stored in a single field that you mark with `role_taker_field()`.
+The role taker is the inherited keyword-only `role_taker` field; a role declares only its own
+fields and never re-declares the taker.
 
 ```{code-cell} ipython3
-from krrood.patterns.role import Role, role_taker_field
+from krrood.patterns.role import Role
 
 
 @dataclass(eq=False)
 class CEO(Role[Person]):
     """The role of being the chief executive of a company."""
 
-    person: Person = role_taker_field()
     head_of: Optional[Company] = None
 ```
 
 Notice that `CEO` inherits from `Role[Person]` — it does **not** inherit from
 `Person`. The role and its taker are entirely separate classes connected only through the
-`role_taker_field`.
+`role_taker` field.
 
 ## Constructing a Role
 
-Role construction is explicit. You pass the role taker as a keyword argument to the role's
-constructor, just like any other dataclass field.
+Role construction is explicit. You pass the role taker as the keyword-only `role_taker`
+argument to the role's constructor, alongside any role-specific fields.
 
 ```{code-cell} ipython3
 acme = Company(name="ACME")
-ceo = CEO(person=alice, head_of=acme)
+ceo = CEO(role_taker=alice, head_of=acme)
 print(ceo)
 ```
 
-The role registers itself with the `RoleRegistry` during `__post_init__`, which is what enables role lookup.
+Constructing a role registers it against its taker, which is what makes the role discoverable by the
+lookups below.
 
 ## Distinct Identity
 
@@ -209,12 +210,11 @@ its own identity, but all of them resolve to the same underlying entity.
 class Professor(Role[Person]):
     """The role of being an academic who teaches courses."""
 
-    person: Person = role_taker_field()
     teaches: List[Course] = field(default_factory=list, kw_only=True)
 
 
 cs_101 = Course(name="CS 101")
-professor = Professor(person=alice, teaches=[cs_101])
+professor = Professor(role_taker=alice, teaches=[cs_101])
 
 print("ceo == professor:", ceo == professor)
 print("IsSameEntity(ceo, professor):", bool(IsSameEntity(ceo, professor)))
@@ -236,7 +236,7 @@ them collapsing into one. Each is retrievable from the taker and keeps its own d
 
 ```{code-cell} ipython3
 globex = Company(name="Globex")
-ceo_of_globex = CEO(person=alice, head_of=globex)
+ceo_of_globex = CEO(role_taker=alice, head_of=globex)
 
 # Both CEO roles are kept and returned
 same_type_roles = Role.roles_for(alice, CEO)
@@ -258,11 +258,10 @@ context onto the same entity.
 class Representative(Role[CEO]):
     """The role of a CEO acting as a representative of their company."""
 
-    ceo: CEO = role_taker_field()
     represents: Optional[Company] = None
 
 
-rep = Representative(ceo=ceo, represents=acme)
+rep = Representative(role_taker=ceo, represents=acme)
 
 print("rep == ceo:", rep == ceo)
 print("IsSameEntity(rep, ceo):", bool(IsSameEntity(rep, ceo)))
@@ -286,25 +285,12 @@ print("rep.role_taker:", rep.role_taker)
 print("rep.root_persistent_entity:", rep.root_persistent_entity)
 print("root type:", Representative.get_root_role_taker_type())
 ```
-
-## The `from_role_taker` Factory
-
-When you do not have extra role-specific data to supply at construction time, you can use the
-`from_role_taker` class method. It constructs the role by passing only the role taker.
-
-```{code-cell} ipython3
-# Equivalent to CEO(person=alice) when no role-native fields need values up front
-new_ceo = CEO.from_role_taker(alice)
-print("new_ceo:", new_ceo)
-```
-
 ## Available Features
 
 | Feature | How to use it |
 |---|---|
-| Define a role class | Inherit from `Role[T]`, mark the taker field with `role_taker_field()` |
-| Construct a role | `MyRole(taker_field=taker_instance, ...)` — always explicit |
-| Construct without extra data | `MyRole.from_role_taker(taker_instance)` |
+| Define a role class | Inherit from `Role[T]` and add role-specific fields; the `role_taker` field is inherited |
+| Construct a role | `MyRole(role_taker=taker_instance, ...)` — always explicit |
 | Check whether a taker has a role | `Role.has_role(taker, MyRole)` |
 | Retrieve roles of a type | `Role.roles_for(taker, MyRole)` |
 | Retrieve all roles | `Role.roles_for(taker)` |
@@ -358,9 +344,8 @@ flowchart TD
 ## Learn More
 
 - **Developer guide**: {doc}`developer/role` — design decisions, architecture, and extension points.
-- **API reference**: `krrood.patterns.role` — `Role`, `role_taker_field`,
-  `RoleTakerFieldNotFound`; `krrood.patterns.role_registry` — `RoleRegistry`;
-  `krrood.patterns.role_predicates` — `IsSameEntity`.
+- **API reference**: `krrood.patterns.role` — `Role`; `krrood.patterns.role_registry` —
+  `RoleRegistry`; `krrood.patterns.role_predicates` — `IsSameEntity`.
 - **Source**: `krrood/src/krrood/patterns/role.py`
 - **Tests**: `test/krrood_test/test_patterns/test_role.py` and the dataset under
   `test/krrood_test/dataset/role_and_ontology/`.
