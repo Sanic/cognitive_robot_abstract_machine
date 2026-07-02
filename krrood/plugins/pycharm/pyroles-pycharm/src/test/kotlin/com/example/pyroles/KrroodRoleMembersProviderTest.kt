@@ -10,9 +10,9 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
  * Unlike [RoleMembersProviderTest], which defines an inline single-file `Role(Generic[T])`,
  * each test here adds a separate `krrood/patterns/role.py` module (so an imported `Role`
  * carries the qualified name `krrood.patterns.role.Role` and the `Symbol, SubClassSafeGeneric[T]`
- * base hierarchy), then a consumer file that **imports** that `Role` across files, declares its
- * taker with `role_taker_field()`, and accesses a delegated member. Completion offering the
- * taker's members only happens if the provider resolved the taker from this krrood-style code.
+ * base hierarchy), then a consumer file that **imports** that `Role` across files, parameterises
+ * it with `Role[Taker]`, and accesses a delegated member. Completion offering the taker's
+ * members only happens if the provider resolved the taker from this krrood-style code.
  */
 class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
 
@@ -20,7 +20,8 @@ class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
      * Adds a faithful-but-minimal `krrood.patterns.role` package. Only PSI / type resolution
      * matters to the provider, so the runtime machinery (SymbolGraph, delegation bodies) is
      * omitted; what is reproduced is the qualified name, the `Symbol, SubClassSafeGeneric[T]`
-     * bases, the `__getattr__` delegation signal, and the `role_taker_field()` factory.
+     * bases, the `__getattr__` delegation signal, and the inherited keyword-only `role_taker`
+     * field that every role takes its taker through.
      */
     private fun addKrroodRoleModule() {
         myFixture.addFileToProject("krrood/__init__.py", "")
@@ -34,35 +35,32 @@ class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
 
             T = TypeVar("T")
 
-            def role_taker_field(**kwargs: Any) -> Any:
-                return field(**kwargs)
-
             class Symbol: ...
 
             class SubClassSafeGeneric(Generic[T]): ...
 
             @dataclass(eq=False)
             class Role(Symbol, SubClassSafeGeneric[T]):
+                role_taker: T = field(kw_only=True)
                 def __getattr__(self, item: str) -> Any: ...
             """.trimIndent(),
         )
     }
 
-    /** `class Kitchen(Role[Room])` with `room: Room = role_taker_field()` — the production form. */
+    /** `class Kitchen(Role[Room])` — the production form; the taker comes from the generic. */
     fun testConcreteGenericRoleDelegatesTakerMembers() {
         addKrroodRoleModule()
         myFixture.configureByText(
             "kitchen.py",
             """
             from __future__ import annotations
-            from krrood.patterns.role import Role, role_taker_field
+            from krrood.patterns.role import Role
 
             class Room:
                 floor: int
                 def area(self) -> float: ...
 
             class Kitchen(Role[Room]):
-                room: Room = role_taker_field()
                 appliances: list
 
             kitchen = Kitchen()
@@ -75,21 +73,20 @@ class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
         assertContainsElements(members, "floor", "area", "appliances")
     }
 
-    /** Bare `class Kitchen(Role)` — taker known only from `role_taker_field()`, no `Role[...]`. */
-    fun testRoleTakerFieldDelegatesWithoutGenericArgument() {
+    /** A bare `class Kitchen(Role)` has no generic argument, so no taker can be resolved. */
+    fun testBareRoleWithoutGenericArgumentDelegatesNoTakerMembers() {
         addKrroodRoleModule()
         myFixture.configureByText(
             "bare_kitchen.py",
             """
             from __future__ import annotations
-            from krrood.patterns.role import Role, role_taker_field
+            from krrood.patterns.role import Role
 
             class Room:
                 floor: int
                 def area(self) -> float: ...
 
             class Kitchen(Role):
-                room: Room = role_taker_field()
                 appliances: list
 
             kitchen = Kitchen()
@@ -98,7 +95,10 @@ class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
         )
         myFixture.completeBasic()
         val members = myFixture.lookupElementStrings ?: emptyList()
-        assertContainsElements(members, "floor", "area", "appliances")
+        // The role's own field is still offered; the taker's members are not, since the taker
+        // type is unknown without a `Role[Room]` generic argument.
+        assertContainsElements(members, "appliances")
+        assertDoesntContain(members, "floor", "area")
     }
 
     /** `class CEO(Role[TPerson])` where `TPerson = TypeVar("TPerson", bound=Person)`. */
@@ -109,7 +109,7 @@ class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
             """
             from __future__ import annotations
             from typing import TypeVar
-            from krrood.patterns.role import Role, role_taker_field
+            from krrood.patterns.role import Role
 
             class Person:
                 name: str
@@ -118,7 +118,6 @@ class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
             TPerson = TypeVar("TPerson", bound=Person)
 
             class CEO(Role[TPerson]):
-                person: TPerson = role_taker_field()
                 perks: list
 
             ceo = CEO()

@@ -5,6 +5,7 @@ import sys
 import weakref
 from collections import defaultdict
 from dataclasses import InitVar, dataclass, field
+from enum import StrEnum, auto
 
 from rustworkx import PyDiGraph
 from typing_extensions import (
@@ -27,16 +28,29 @@ if TYPE_CHECKING:
         InferenceExplanation,
     )
 
-from krrood import logger
 from krrood.class_diagrams.class_diagram import ClassDiagram
-from krrood.class_diagrams.exceptions import ClassIsUnMappedInClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 from krrood.singleton import SingletonMeta
 from krrood.utils import recursive_subclasses
+
+
+class GraphType(StrEnum):
+    """
+    Graph type for symbol graphs.
+    """
+    CLASS = "class"
+    """
+    Refers to the class diagram graph.
+    """
+    INSTANCE = "instance"
+    """
+    Refers to the instances graph in the SymbolGraph.
+    """
 
 
 @dataclass(eq=False)
@@ -68,7 +82,7 @@ TSymbol = TypeVar("TSymbol", bound=Symbol)
 
 
 @dataclass
-class PredicateClassRelation(SubClassSafeGeneric[TSymbol]):
+class PredicateClassRelation(Generic[TSymbol], SubClassSafeGeneric):
     """
     Edge data representing a predicate-based relation between two wrapped instances.
 
@@ -122,7 +136,7 @@ class PredicateClassRelation(SubClassSafeGeneric[TSymbol]):
 
 
 @dataclass
-class WrappedInstance(SubClassSafeGeneric[TSymbol]):
+class WrappedInstance(Generic[TSymbol], SubClassSafeGeneric):
     """
     A node wrapper around a concrete Symbol instance used in the instance graph.
     """
@@ -265,33 +279,10 @@ class SymbolGraph(metaclass=SingletonMeta):
             )
         ]
 
-    def _build_class_diagram(self, extra_classes: Iterable[Type] = ()) -> ClassDiagram:
-        """Build a class diagram from the currently known ``Symbol`` subclasses.
-
-        :param extra_classes: Classes to include in addition to the collected symbols, even if the
-            package filter would otherwise exclude them.
-        """
+    def _build_class_diagram(self) -> ClassDiagram:
+        """Build a class diagram from the currently known ``Symbol`` subclasses."""
         classes = self._collect_symbol_classes()
-        for clazz in extra_classes:
-            if clazz not in classes:
-                classes.append(clazz)
         return ClassDiagram(classes, introspector=DescriptorAwareIntrospector())
-
-    def ensure_class_in_class_diagram(self, clazz: Type) -> None:
-        """Ensure *clazz* is represented in the class diagram, rebuilding it if necessary.
-
-        The class diagram is built lazily on first use, so ``Symbol`` subclasses (for example role
-        classes) defined afterwards would otherwise never be registered, which silently disables
-        graph-backed features such as the role registry.
-
-        :param clazz: The class that must be present in the class diagram.
-        """
-        try:
-            self._class_diagram.get_wrapped_class(clazz)
-            return
-        except ClassIsUnMappedInClassDiagram:
-            pass
-        self._class_diagram = self._build_class_diagram(extra_classes=(clazz,))
 
     @property
     def class_diagram(self) -> ClassDiagram:
@@ -497,7 +488,7 @@ class SymbolGraph(metaclass=SingletonMeta):
         self,
         filepath: str,
         format_="svg",
-        graph_type="instance",
+        graph_type: GraphType = GraphType.INSTANCE,
         without_inherited_associations: bool = True,
     ) -> None:
         """
@@ -505,12 +496,10 @@ class SymbolGraph(metaclass=SingletonMeta):
 
         :param filepath: The path to the dot file.
         :param format_: The format of the dot file (svg, png, ...).
-        :param graph_type: The type of the graph to generate (instance, type).
+        :param graph_type: The type of the graph to generate (instance, class).
         :param without_inherited_associations: Whether to include inherited associations in the graph.
         """
-        import pydot
-
-        if graph_type == "type":
+        if graph_type == GraphType.CLASS:
             if without_inherited_associations:
                 graph = self.class_diagram.to_subdiagram_without_inherited_associations(
                     True
@@ -519,26 +508,4 @@ class SymbolGraph(metaclass=SingletonMeta):
                 graph = self.class_diagram._dependency_graph
         else:
             graph = self._instance_graph
-        if not filepath.endswith(f".{format_}"):
-            filepath += f".{format_}"
-        dot_str = graph.to_dot(
-            lambda node: dict(
-                color="black",
-                fillcolor="lightblue",
-                style="filled",
-                label=node.name,
-            ),
-            lambda edge: dict(color=edge.color, style="solid", label=str(edge)),
-            dict(rankdir="LR"),
-        )
-        dot = pydot.graph_from_dot_data(dot_str)[0]
-        try:
-            dot.write(filepath, format=format_)
-        except FileNotFoundError:
-            tmp_filepath = filepath.replace(f".{format_}", ".dot")
-            dot.write(tmp_filepath, format="raw")
-            try:
-                os.system(f"/usr/bin/dot -T{format_} {tmp_filepath} -o {filepath}")
-                os.remove(tmp_filepath)
-            except Exception as e:
-                logger.error(e)
+        ClassDiagram.graph_to_dot(filepath=filepath, graph=graph, format_=format_)

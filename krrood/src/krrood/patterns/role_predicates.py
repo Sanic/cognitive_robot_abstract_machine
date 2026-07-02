@@ -9,7 +9,7 @@ from krrood.patterns.role import Role
 
 
 @dataclass(eq=False)
-class IsSameEntity(Predicate):
+class IsSameSemanticEntity(Predicate):
     """
     Predicate asserting that two operands refer to the same underlying entity.
 
@@ -25,7 +25,10 @@ class IsSameEntity(Predicate):
     """
 
     entity_1: Any
+    """The first operand; unwrapped to its root persistent entity when it is a role."""
+
     entity_2: Any
+    """The second operand; unwrapped to its root persistent entity when it is a role."""
 
     def __call__(self) -> bool:
         return self._root_of(self.entity_1) is self._root_of(self.entity_2)
