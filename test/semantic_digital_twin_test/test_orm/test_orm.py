@@ -216,7 +216,7 @@ def test_part_whole_relationship_field_survives_deepcopy():
 
         # The marked-field discovery still resolves the same part-whole relationship fields.
         discovered = {
-            spec.wrapped_field.name
+            spec.field.name
             for spec in _wrapped_part_whole_relationship_fields(type(copied_drawer))
         }
         assert {"handle", "mechanical_joint"} <= discovered
@@ -307,7 +307,7 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
 
     # The marked-field discovery still resolves the same part-whole relationship fields.
     discovered = {
-        spec.wrapped_field.name
+        spec.field.name
         for spec in _wrapped_part_whole_relationship_fields(type(reconstructed_drawer))
     }
     assert {"handle", "mechanical_joint"} <= discovered
