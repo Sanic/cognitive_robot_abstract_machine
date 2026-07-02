@@ -9,7 +9,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
  *
  * Unlike [RoleMembersProviderTest], which defines an inline single-file `Role(Generic[T])`,
  * each test here adds a separate `krrood/patterns/role.py` module (so an imported `Role`
- * carries the qualified name `krrood.patterns.role.Role` and the `Symbol, SubClassSafeGeneric[T]`
+ * carries the qualified name `krrood.patterns.role.Role` and the `Symbol, Generic[T], SubClassSafeGeneric`
  * base hierarchy), then a consumer file that **imports** that `Role` across files, parameterises
  * it with `Role[Taker]`, and accesses a delegated member. Completion offering the taker's
  * members only happens if the provider resolved the taker from this krrood-style code.
@@ -19,7 +19,7 @@ class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
     /**
      * Adds a faithful-but-minimal `krrood.patterns.role` package. Only PSI / type resolution
      * matters to the provider, so the runtime machinery (SymbolGraph, delegation bodies) is
-     * omitted; what is reproduced is the qualified name, the `Symbol, SubClassSafeGeneric[T]`
+     * omitted; what is reproduced is the qualified name, the `Symbol, Generic[T], SubClassSafeGeneric`
      * bases, the `__getattr__` delegation signal, and the inherited keyword-only `role_taker`
      * field that every role takes its taker through.
      */
@@ -32,15 +32,18 @@ class KrroodRoleMembersProviderTest : BasePlatformTestCase() {
             from __future__ import annotations
             from dataclasses import dataclass, field
             from typing import Any, Generic, TypeVar
+            from abc import ABC
 
             T = TypeVar("T")
 
+            @dataclass
             class Symbol: ...
 
-            class SubClassSafeGeneric(Generic[T]): ...
+            @dataclass
+            class SubClassSafeGeneric(ABC): ...
 
             @dataclass(eq=False)
-            class Role(Symbol, SubClassSafeGeneric[T]):
+            class Role(Symbol, Generic[T], SubClassSafeGeneric):
                 role_taker: T = field(kw_only=True)
                 def __getattr__(self, item: str) -> Any: ...
             """.trimIndent(),

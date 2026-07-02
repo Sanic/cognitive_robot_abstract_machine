@@ -12,7 +12,7 @@ from geometry_msgs.msg import (
     Vector3 as RosVector3,
 )
 from std_msgs.msg import ColorRGBA, Header
-from typing_extensions import ClassVar, TypeVar
+from typing_extensions import ClassVar, TypeVar, Generic
 from visualization_msgs.msg import Marker
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -68,7 +68,7 @@ class SpatialTypeVisualization:
 
 
 @dataclass
-class SpatialTypeMarkerRenderer(SubClassSafeGeneric[SpatialTypeInput], ABC):
+class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, ABC):
     """
     Renders a single category of spatial type into one or more RViz markers.
 
