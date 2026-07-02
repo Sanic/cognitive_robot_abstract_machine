@@ -1,3 +1,5 @@
+import os
+import signal
 import subprocess
 import threading
 import time
@@ -36,7 +38,8 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 giskard_process = subprocess.Popen(
-    ["ros2", "launch", "giskardpy_ros", "giskardpy_tracy_standalone.launch.py"]
+    ["ros2", "launch", "giskardpy_ros", "giskardpy_tracy_standalone.launch.py"],
+    start_new_session=True,
 )
 
 time.sleep(8)  # Wait for the launch file to start
@@ -56,7 +59,7 @@ thread.start()
 if execition_mode == ExecutionType.REAL:
     world = fetch_world_from_service(node=node)
 
-    WorldSynchronizer(_world=world, node=node, synchronous=True)
+    WorldSynchronizer(_world=world, node=node)
 elif execition_mode == ExecutionType.SIMULATED:
     world = URDFParser.from_file(Tracy.get_ros_file_path()).parse()
     Tracy.from_world(world)
@@ -176,5 +179,5 @@ try:
     with ExecutionEnvironment(execution_type=execition_mode, collision_avoidance=False):
         plan.perform()
 finally:
-    giskard_process.kill()
+    os.killpg(os.getpgid(giskard_process.pid), signal.SIGTERM)
     giskard_process.wait()

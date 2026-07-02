@@ -69,7 +69,7 @@ class Executable:
     """
 
     synchronize_time_delta: timedelta = field(
-        default=timedelta(seconds=0.5), kw_only=True
+        default=timedelta(seconds=1), kw_only=True
     )
     """
     Time delta that is waited between executables when executing on the real robot. Is done to prevent synchronization issues
