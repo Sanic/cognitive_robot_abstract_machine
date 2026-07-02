@@ -4,14 +4,19 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from typing_extensions import List, Dict, ClassVar, Optional, TYPE_CHECKING
 
 from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import LifeCycleValues
+from giskardpy.motion_statechart.data_types import (
+    LifeCycleValues,
+    ObservationStateValues,
+)
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
 )
+from giskardpy.motion_statechart.goals.templates import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -23,8 +28,18 @@ from coraplex.exceptions import (
     ConditionNotSatisfied,
     UnknownExecutionType,
 )
-from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    FixedConnection,
+)
 from semantic_digital_twin.world_description.world_entity import Body
+
+from giskardpy.motion_statechart.graph_node import CancelMotion
+from krrood.symbolic_math.symbolic_math import (
+    trinary_logic_and,
+    trinary_logic_not,
+    trinary_logic_or,
+)
 
 if TYPE_CHECKING:
     from giskardpy.middleware.ros2.python_interface import GiskardWrapper
@@ -53,11 +68,20 @@ class Executable:
     Coraplex context which should be used to execute this executable
     """
 
+    synchronize_time_delta: timedelta = field(
+        default=timedelta(seconds=0.5), kw_only=True
+    )
+    """
+    Time delta that is waited between executables when executing on the real robot. Is done to prevent synchronization issues
+    """
+
     def execute(self) -> None:
         """
         Executes the unit.
         """
         for executable in self.execution_list:
+            if GiskardExecutable.execution_type == ExecutionType.REAL:
+                time.sleep(self.synchronize_time_delta.seconds)
             executable.execute()
 
 
@@ -95,6 +119,8 @@ class GiskardExecutable(Executable):
     :py:class:`pycram.motion_executor.ExecutionEnvironment`.
     """
 
+    _current_motion_state_chart: MotionStatechart = field(init=False, default=None)
+
     @property
     def motion_state_chart(self) -> MotionStatechart:
         """
@@ -109,35 +135,108 @@ class GiskardExecutable(Executable):
         - a :class:`~giskardpy.motion_statechart.graph_node.CancelMotion` aborts
           the motion if either condition is observed to be false.
         """
-        from giskardpy.motion_statechart.graph_node import CancelMotion
-        from krrood.symbolic_math.symbolic_math import (
-            trinary_logic_and,
-            trinary_logic_not,
-            trinary_logic_or,
-        )
-        from coraplex.plans.condition_nodes import (
-            condition_monitor,
-            PlanNodeStatusMonitor,
-        )
+        self._current_motion_state_chart = MotionStatechart()
+        if self.execution_type.REAL:
+            self._current_motion_state_chart.add_node(
+                seq := Sequence(list(self.motion_mappings.values()))
+            )
+            self._current_motion_state_chart.add_node(EndMotion.when_true(seq))
+            return self._current_motion_state_chart
 
-        motion_state_chart = MotionStatechart()
-
-        plan_nodes = list(self.motion_mappings.keys())
         tasks = list(self.motion_mappings.values())
         for task in tasks:
-            motion_state_chart.add_node(task)
-
-        # Wire the tasks as an interruptible/pausable sequence. Each task carries
-        # two monitors bound to its originating plan node:
-        #
-        # - a pause monitor feeding the task's pause_condition, so the *active*
-        #   motion is held (and later resumed) when its plan node is paused;
-        # - an interrupt monitor gating the *next* task's start. An interrupt lets
-        #   the currently active motion finish but prevents the subsequent ones
-        #   from starting ("finish active, skip rest"). When a not-yet-started task
-        #   is reached while interrupted, the motion ends there.
+            self._current_motion_state_chart.add_node(task)
         first_task = tasks[0]
+
+        end_trigger = tasks[-1].observation_variable
+
+        if self.execution_type == ExecutionType.SIMULATED:
+            skip_end_conditions = self._add_pause_interrupt(tasks)
+
+            # The motion is done when the last task finished or the first skipped
+            # (interrupted) task is reached.
+            if skip_end_conditions:
+                end_trigger = trinary_logic_or(end_trigger, *skip_end_conditions)
+
+            self._add_condition_monitors(first_task, end_trigger)
+        if GiskardExecutable.collision_avoidance:
+            self._current_motion_state_chart.add_node(ExternalCollisionAvoidance())
+
+        end_motion = EndMotion()
+        end_motion.start_condition = end_trigger
+        self._current_motion_state_chart.add_node(end_motion)
+        return self._current_motion_state_chart
+
+    def _wire_up_motion_state_chart(self, tasks: List[Task]):
+        for index, task in enumerate(tasks[1:], start=1):
+            previous_done = tasks[index - 1].observation_variable
+            task.start_condition = previous_done
+
+    def _add_condition_monitors(
+        self, first_task: Task, end_trigger: ObservationStateValues
+    ):
+        """
+        Adds the pre -and postcondition nodes to the Motion state chart and wires them to the first task and the end
+        trigger of the motion state chart.
+
+        :param end_trigger: The trigger which ends the motion state chart.
+        """
+        from coraplex.plans.condition_nodes import condition_monitor
+
+        if self.pre_condition_node is not None and self.context.evaluate_conditions:
+            pre_monitor = condition_monitor(self.pre_condition_node)
+            self._current_motion_state_chart.add_node(pre_monitor)
+            # only start the motion once the pre-condition holds
+            first_task.start_condition = pre_monitor.observation_variable
+            # abort if the pre-condition is observed to be false
+            pre_cancel = CancelMotion(
+                exception=self._condition_not_satisfied(
+                    self.pre_condition_node,
+                    action_node=self.pre_condition_node.action_node.action,
+                )
+            )
+            pre_cancel.start_condition = trinary_logic_not(
+                pre_monitor.observation_variable
+            )
+            self._current_motion_state_chart.add_node(pre_cancel)
+
+        if self.post_condition_node is not None and self.context.evaluate_conditions:
+            post_monitor = condition_monitor(self.post_condition_node)
+            # only evaluate the post-condition once the motion is done
+            post_monitor.start_condition = end_trigger
+            self._current_motion_state_chart.add_node(post_monitor)
+            end_trigger = post_monitor.observation_variable
+            # abort if the post-condition is observed to be false
+            post_cancel = CancelMotion(
+                exception=self._condition_not_satisfied(
+                    self.post_condition_node,
+                    action_node=self.post_condition_node.action_node.action,
+                )
+            )
+            post_cancel.start_condition = trinary_logic_not(
+                post_monitor.observation_variable
+            )
+            self._current_motion_state_chart.add_node(post_cancel)
+
+    def _add_pause_interrupt(self, tasks: List[Task]) -> List[ObservationStateValues]:
+        """
+        Wire the tasks as an interruptible/pausable sequence. Each task carries
+        two monitors bound to its originating plan node:
+
+        - a pause monitor feeding the task's pause_condition, so the *active*
+          motion is held (and later resumed) when its plan node is paused;
+        - an interrupt monitor gating the *next* task's start. An interrupt lets
+          the currently active motion finish but prevents the subsequent ones
+          from starting ("finish active, skip rest"). When a not-yet-started task
+          is reached while interrupted, the motion ends there.
+
+        :param tasks: The list of tasks that are were added to the motion state chart
+        :returns: List of skip conditions for the case if a task is interrupted
+        """
+        from coraplex.plans.condition_nodes import PlanNodeStatusMonitor
+
         skip_end_conditions = []
+        plan_nodes = list(self.motion_mappings.keys())
         for index, (plan_node, task) in enumerate(zip(plan_nodes, tasks)):
             # a task is done once its own goal is observed (as giskard's Sequence does)
             task.end_condition = task.observation_variable
@@ -146,15 +245,14 @@ class GiskardExecutable(Executable):
                 predicate=lambda node=plan_node: node.is_paused,
                 name=f"paused#{index}",
             )
-            motion_state_chart.add_node(pause_monitor)
+            self._current_motion_state_chart.add_node(pause_monitor)
             task.pause_condition = pause_monitor.observation_variable
 
             interrupt_monitor = PlanNodeStatusMonitor(
                 predicate=lambda node=plan_node: node.is_interrupted,
                 name=f"interrupted#{index}",
             )
-            motion_state_chart.add_node(interrupt_monitor)
-
+            self._current_motion_state_chart.add_node(interrupt_monitor)
             if index > 0:
                 previous_done = tasks[index - 1].observation_variable
                 # start only once the previous motion finished and this one is not
@@ -169,55 +267,7 @@ class GiskardExecutable(Executable):
                         previous_done, interrupt_monitor.observation_variable
                     )
                 )
-
-        # The motion is done when the last task finished or the first skipped
-        # (interrupted) task is reached.
-        end_trigger = tasks[-1].observation_variable
-        if skip_end_conditions:
-            end_trigger = trinary_logic_or(end_trigger, *skip_end_conditions)
-
-        if self.pre_condition_node is not None and self.context.evaluate_conditions:
-            pre_monitor = condition_monitor(self.pre_condition_node)
-            motion_state_chart.add_node(pre_monitor)
-            # only start the motion once the pre-condition holds
-            first_task.start_condition = pre_monitor.observation_variable
-            # abort if the pre-condition is observed to be false
-            pre_cancel = CancelMotion(
-                exception=self._condition_not_satisfied(
-                    self.pre_condition_node,
-                    action_node=self.pre_condition_node.action_node.action,
-                )
-            )
-            pre_cancel.start_condition = trinary_logic_not(
-                pre_monitor.observation_variable
-            )
-            motion_state_chart.add_node(pre_cancel)
-
-        if self.post_condition_node is not None and self.context.evaluate_conditions:
-            post_monitor = condition_monitor(self.post_condition_node)
-            # only evaluate the post-condition once the motion is done
-            post_monitor.start_condition = end_trigger
-            motion_state_chart.add_node(post_monitor)
-            end_trigger = post_monitor.observation_variable
-            # abort if the post-condition is observed to be false
-            post_cancel = CancelMotion(
-                exception=self._condition_not_satisfied(
-                    self.post_condition_node,
-                    action_node=self.post_condition_node.action_node.action,
-                )
-            )
-            post_cancel.start_condition = trinary_logic_not(
-                post_monitor.observation_variable
-            )
-            motion_state_chart.add_node(post_cancel)
-
-        if GiskardExecutable.collision_avoidance:
-            motion_state_chart.add_node(ExternalCollisionAvoidance())
-
-        end_motion = EndMotion()
-        end_motion.start_condition = end_trigger
-        motion_state_chart.add_node(end_motion)
-        return motion_state_chart
+        return skip_end_conditions
 
     @staticmethod
     def _condition_not_satisfied(
@@ -307,28 +357,9 @@ class GiskardExecutable(Executable):
         """
         from giskardpy.middleware.ros2.python_interface import GiskardWrapper
 
-        giskard = GiskardWrapper(self.context.ros_node)
-
-        kill_event = threading.Event()
-        interrupt_thread = threading.Thread(
-            target=self._monitor_interrupt, args=(giskard, kill_event)
-        )
-        interrupt_thread.start()
+        giskard = GiskardWrapper(self.context.ros_node, world=self.context.world)
 
         giskard.execute(self.motion_state_chart)
-
-        kill_event.set()
-        interrupt_thread.join()
-
-    def _monitor_interrupt(
-        self, giskard_wrapper: GiskardWrapper, kill_event: threading.Event
-    ) -> None:
-        while not kill_event.is_set():
-            if self.is_paused:
-                raise NotImplementedError("Pause not implemented for real execution")
-            elif self.is_interrupted:
-                giskard_wrapper.cancel_goal_async()
-            time.sleep(0.01)
 
 
 @dataclass
@@ -381,11 +412,18 @@ class ModelChangeExecutable(Executable):
         )
         with self.context.world.modify_world():
             self.context.world.remove_connection(self.body.parent_connection)
-            connection = Connection6DoF.create_with_dofs(
-                parent=self.new_parent, child=self.body, world=self.context.world
+            # TODO: this shouldn't be fixed but 6DOF
+            connection = FixedConnection(
+                parent=self.new_parent,
+                child=self.body,
+                parent_T_connection_expression=obj_transform,
             )
+
+            # connection = Connection6DoF.create_with_dofs(
+            #     parent=self.new_parent, child=self.body, world=self.context.world, parent_T_connection_expression=obj_transform
+            # )
             self.context.world.add_connection(connection)
-            connection.origin = obj_transform
+            # connection.origin = obj_transform
 
 
 @dataclass
