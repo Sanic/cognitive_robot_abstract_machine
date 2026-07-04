@@ -29,18 +29,18 @@ def test_doc_match():
         battery: int
 
     robots = [Robot("R2D2", 100), Robot("C3PO", 0)]
-    query = an(Robot, domain=robots)(name="R2D2", battery=100)
+    query = an(Robot)(name="R2D2", battery=100).from_(robots)
     assert query.tolist()[0].name == "R2D2"
 
 
 def test_match(handles_and_containers_world):
     world = handles_and_containers_world
 
-    fixed_connection = an(FixedConnection, domain=world.connections)(
+    fixed_connection = an(FixedConnection)(
         parent=an(Container)(name="Container1"),
         child=an(Handle)(name="Handle1"),
-    )
-    fixed_connection_query = the(fixed_connection.expression)
+    ).from_(world.connections)
+    fixed_connection_query = the(fixed_connection)
 
     fc = variable(FixedConnection, domain=None)
     fixed_connection_query_manual = the(
@@ -66,13 +66,13 @@ def test_select(handles_and_containers_world):
     world = handles_and_containers_world
 
     # Method 1
-    fixed_connection = an(FixedConnection, domain=world.connections)(
+    fixed_connection = an(FixedConnection)(
         parent=an(Container)(name="Container1"), child=an(Handle)(name="Handle1")
-    )
+    ).from_(world.connections)
     container_and_handle = the(
         set_of(
-            container := fixed_connection.expression.parent,
-            handle := fixed_connection.expression.child,
+            container := fixed_connection.parent,
+            handle := fixed_connection.child,
         )
     )
 
@@ -104,14 +104,14 @@ def test_select_where(handles_and_containers_world):
     world = handles_and_containers_world
 
     # Method 1
-    fixed_connection = an(FixedConnection, domain=world.connections)(
+    fixed_connection = an(FixedConnection)(
         parent=an(Container),
         child=an(Handle),
-    )
+    ).from_(world.connections)
     container_and_handle = a(
         set_of(
-            container := fixed_connection.expression.parent,
-            handle := fixed_connection.expression.child,
+            container := fixed_connection.parent,
+            handle := fixed_connection.child,
         ).where(container.size > 1)
     )
     # Method 2
@@ -138,39 +138,65 @@ def test_select_where(handles_and_containers_world):
     assert answers[0][handle].name == "Handle3"
 
 
-def test_domain_match_is_a_match():
+def test_domain_carrying_an_is_a_select():
     @dataclass(unsafe_hash=True)
     class Robot:
         name: str
         battery: int
 
     robots = [Robot("R2D2", 100), Robot("C3PO", 0)]
-    # a domain-carrying an(...) is one Match: selectable now, generative-ready via a backend,
-    # not an eagerly collapsed Entity.
-    match = an(Robot, domain=robots)(name="R2D2", battery=100)
-    assert isinstance(match, Match)
-    assert match.tolist()[0].name == "R2D2"
+    # an(...)(kwargs).from_(domain) is a select over those instances: it returns a runnable
+    # Entity, not an unresolved construct Match.
+    query = an(Robot)(name="R2D2", battery=100).from_(robots)
+    assert not isinstance(query, Match)
+    assert is_underspecified(query) is False
+    assert query.tolist()[0].name == "R2D2"
 
 
-def test_is_underspecified_tracks_construction_not_object_type():
+def test_from_gives_symbolic_access(handles_and_containers_world):
+    world = handles_and_containers_world
+    fixed_connection = an(FixedConnection)(
+        parent=an(Container)(name="Container1"), child=an(Handle)(name="Handle1")
+    ).from_(world.connections)
+    # from_ returns the select Entity, so .parent / .child read the matched object's
+    # attributes symbolically and carry the match's conditions — no .expression needed.
+    container_and_handle = the(
+        set_of(container := fixed_connection.parent, handle := fixed_connection.child)
+    )
+    answers = container_and_handle.tolist()[0]
+    assert answers[container].name == "Container1"
+    assert answers[handle].name == "Handle1"
+
+
+def test_from_restricts_the_search():
+    @dataclass(unsafe_hash=True)
+    class Robot:
+        name: str
+
+    subset = [Robot("R2D2"), Robot("C3PO")]
+    # from_ selects only over the given domain.
+    selected = an(Robot)().from_(subset).tolist()
+    assert {robot.name for robot in selected} == {"R2D2", "C3PO"}
+
+
+def test_is_underspecified_distinguishes_construct_from_select():
     @dataclass(unsafe_hash=True)
     class Robot:
         name: str
         battery: int
 
     robots = [Robot("R2D2", 100)]
-    # A query constructs from scratch (underspecified) only when it carries no domain;
-    # a domain makes it a search over existing instances.
+    # A no-domain an(...) is a construct Match a backend must resolve; an(...).from_(domain)
+    # is already a concrete select; a plain instance is neither.
     assert is_underspecified(an(Robot)(name="R2D2")) is True
-    assert is_underspecified(an(Robot, domain=robots)(name="R2D2")) is False
+    assert is_underspecified(an(Robot)(name="R2D2").from_(robots)) is False
+    assert is_underspecified(Robot("R2D2", 100)) is False
 
 
-def test_domain_match_without_kwargs_selects_all(handles_and_containers_world):
+def test_from_without_kwargs_selects_all(handles_and_containers_world):
     world = handles_and_containers_world
-    # an(Type, domain=X) with no kwargs is a valid "any Type in X" match.
-    match = an(FixedConnection, domain=world.connections)()
-    assert isinstance(match, Match)
-    selected = match.tolist()
+    # an(Type)().from_(X) with no kwargs is a valid "any Type in X" select.
+    selected = an(FixedConnection)().from_(world.connections).tolist()
     assert selected
     assert all(isinstance(connection, FixedConnection) for connection in selected)
 
@@ -181,7 +207,7 @@ def test_match_with_list():
         KRROODPositions([KRROODPosition(1, 2, 3)], ["a"]),
     ]
 
-    q = an(KRROODPositions, domain=domain)(
+    q = an(KRROODPositions)(
         positions=[
             an(KRROODPosition)(
                 x=1,
@@ -190,7 +216,7 @@ def test_match_with_list():
             KRROODPosition(1, 2, 3),
         ],
         some_strings=["a", "b"],
-    )
+    ).from_(domain)
 
     r = q.tolist()
     assert r == [domain[0]]

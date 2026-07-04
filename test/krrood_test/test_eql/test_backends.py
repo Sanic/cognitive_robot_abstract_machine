@@ -19,7 +19,6 @@ from krrood.entity_query_language.factories import (
     an,
     variable_from,
 )
-from krrood.entity_query_language.query.match import Match
 from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.entity_query_language.core.variable import Variable as KRROODVariable
@@ -223,19 +222,3 @@ def test_generative_eql_backend():
     for result in results:
         assert isinstance(result.element, Element)
         assert result.type > result.charge
-
-
-def test_domain_match_is_generative_ready():
-    # A domain-carrying an(...) is one Match a generative backend constructs from, not an
-    # Entity it rejects: the domain leaves construction to the backend and is ignored here.
-    q = an(Atom, domain=[])(
-        element=...,
-        type=variable_from([0, 1, 2]),
-        charge=variable_from([0.0, 1.0, 2.0]),
-        timestamp=datetime.datetime.now(),
-    )
-    assert isinstance(q, Match)
-    q.resolve()
-    q.where(q.variable.type > q.variable.charge)
-    results = list(q.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
-    assert len(results) == 6

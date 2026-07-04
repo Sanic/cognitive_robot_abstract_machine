@@ -46,7 +46,6 @@ from krrood.entity_query_language.core.mapped_variable import (
 from krrood.entity_query_language.core.variable import Literal, DomainType, Variable
 from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
-    NoKwargsInMatchVar,
     CalledMatchMultipleTimes,
     MatchTypeCannotBeDetermined,
 )
@@ -302,7 +301,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
     def _resolve(
         self,
         variable: Optional[Selectable] = None,
-        parent: Optional[MatchVariable] = None,
+        parent: Optional[Match] = None,
     ):
         """
         Resolve the match by creating the variable and conditions expressions in-place.
@@ -329,7 +328,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
 
     def _create_attribute_match_and_resolve(
         self,
-        parent: MatchVariable,
+        parent: Match,
         attribute_name: str,
         assigned_value: Any,
         index_access: Optional[Any] = None,
@@ -355,7 +354,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         return attr_match
 
     def _resolve_list_like_value(
-        self, key: str, value: Union[list, tuple], parent: MatchVariable
+        self, key: str, value: Union[list, tuple], parent: Match
     ):
         """
         Resolves list-like values by iterating over their elements and creating attribute
@@ -434,6 +433,23 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         self.expression.build()
         return self
 
+    def from_(self, domain: DomainType) -> Entity[T]:
+        """Search the match over ``domain`` and return the resulting select query.
+
+        Fixing a domain turns the pattern into a *selection* over those instances, so this
+        materializes the match into its :class:`~krrood.entity_query_language.query.query.Entity`
+        and returns it directly. Symbolic attribute access (``.parent``/``.child``), ``the(...)``
+        and ``set_of(...)`` therefore work on the result without ``.expression``.
+
+        Terminal: it must come last, ``an(Type)(kwargs).from_(domain)``, since it returns the
+        Entity rather than the match.
+
+        :param domain: The instances the match ranges over.
+        :return: The select query over ``domain``.
+        """
+        self.domain = domain
+        return self.expression
+
     def _update_kwargs_from_literal_values(self):
         """
         Update the kwargs dictionary with values from this statements leaves.
@@ -458,27 +474,6 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
             return result[0]
         else:
             raise KeyError(f"Multiple variables with name {name}")
-
-
-@dataclass(eq=False)
-class MatchVariable(Match[T]):
-    """
-    An explicit search over a domain that eagerly resolves to its runnable query.
-
-    Unlike a plain :class:`Match` (which describes a pattern and is only materialized when
-    evaluated), calling a match variable returns the resolved :class:`Entity` directly and
-    requires at least one keyword argument. The ``domain`` field is inherited from
-    :class:`Match`.
-    """
-
-    def __call__(self, **kwargs) -> Union[Entity[T], T]:
-        """
-        Add kwargs constraints and return the resolved expression as An() instance.
-        """
-        if not kwargs:
-            raise NoKwargsInMatchVar(self)
-        super().__call__(**kwargs)
-        return self.expression
 
 
 @dataclass(eq=False)
@@ -667,10 +662,12 @@ def construct_graph_and_get_root(
 def is_underspecified(instance: Any) -> bool:
     """
     :param instance: The instance to check.
-    :return: Whether ``instance`` is an underspecified statement — a match that constructs from
-        scratch (no domain), rather than a search over existing instances (a domain, or an
-        explicit :class:`MatchVariable`).
+    :return: Whether ``instance`` is a :class:`Match` — a query still to be resolved by a
+        backend, as opposed to an already-concrete value.
+
+    .. note::
+        Whether resolving a match *selects* existing instances or *constructs* new ones is the
+        chosen backend's concern (the ``QueryBackend`` strategy), not a property of the match,
+        so this is a purely structural check.
     """
-    if not isinstance(instance, Match) or isinstance(instance, MatchVariable):
-        return False
-    return instance.domain is None
+    return isinstance(instance, Match)
