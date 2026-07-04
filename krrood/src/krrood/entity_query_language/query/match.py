@@ -208,7 +208,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         >>> @dataclass
         >>> class Drawer:
         >>>     body: Body
-        >>> drawer = an(Drawer, domain=world.views)(body=an(Body)(name="drawer_1"))
+        >>> drawer = an(Drawer)(body=an(Body)(name="drawer_1")).from_(world.views)
 
     .. warning::
         Match can take a factory as a mean to construct `T`. If the keyword argument names of the match are not
@@ -451,10 +451,16 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         Terminal: it must come last, ``an(Type)(kwargs).from_(domain)``, since it returns the
         Entity rather than the match.
 
+        .. note::
+            ``__call__`` eagerly creates a subject variable before the domain is known (and with
+            no domain that is a SymbolGraph-wide variable for Symbol types). The subject is rebuilt
+            here so the ``variable`` factory re-scopes the domain to instances of the match's type.
+
         :param domain: The instances the match ranges over.
         :return: The select query over ``domain``.
         """
         self.domain = domain
+        self.create_variable()
         return self.expression
 
     def _update_kwargs_from_literal_values(self):
