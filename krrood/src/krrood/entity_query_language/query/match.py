@@ -208,7 +208,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         >>> @dataclass
         >>> class Drawer:
         >>>     body: Body
-        >>> drawer = an(Drawer, domain=world.views)(body=an(Body)(name="drawer_1"))
+        >>> drawer = an(Drawer)(body=an(Body)(name="drawer_1")).from_(world.views)
 
     .. warning::
         Match can take a factory as a mean to construct `T`. If the keyword argument names of the match are not
@@ -433,22 +433,20 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         self.expression.build()
         return self
 
-    def from_(self, domain: DomainType) -> Entity[T]:
-        """Search the match over ``domain`` and return the resulting select query.
+    def from_(self, domain: DomainType) -> Self:
+        """Range the match over ``domain`` instead of over all instances of its type.
 
-        Fixing a domain turns the pattern into a *selection* over those instances, so this
-        materializes the match into its :class:`~krrood.entity_query_language.query.query.Entity`
-        and returns it directly. Symbolic attribute access (``.parent``/``.child``), ``the(...)``
-        and ``set_of(...)`` therefore work on the result without ``.expression``.
-
-        Terminal: it must come last, ``an(Type)(kwargs).from_(domain)``, since it returns the
-        Entity rather than the match.
+        A domain does not commit the match to selection: the chosen backend decides what to do
+        with it (a selective backend finds the matching existing instances, a generative backend
+        constructs or completes them), so this stays a :class:`Match`. Use :attr:`expression` to
+        get the lowered selection query when you need symbolic attribute access (``.parent`` /
+        ``.child``), ``the(...)`` or ``set_of(...)``.
 
         :param domain: The instances the match ranges over.
-        :return: The select query over ``domain``.
+        :return: This match, for chaining.
         """
         self.domain = domain
-        return self.expression
+        return self
 
     def _update_kwargs_from_literal_values(self):
         """

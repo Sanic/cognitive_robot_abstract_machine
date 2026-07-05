@@ -65,7 +65,7 @@ def drawer_explanation(doors_and_drawers_world) -> InferenceExplanation:
         parent=prismatic_conn.child, child=handle
     ).from_(world.connections)
     drawers = inference(Drawer)(
-        container=fixed_conn.parent, handle=fixed_conn.child
+        container=fixed_conn.expression.parent, handle=fixed_conn.expression.child
     ).tolist()
     assert drawers, "Drawer rule produced no results – check the world fixture"
     explanation = explain_inference(drawers[0])

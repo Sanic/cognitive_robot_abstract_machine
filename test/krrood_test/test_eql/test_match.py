@@ -40,7 +40,7 @@ def test_match(handles_and_containers_world):
         parent=an(Container)(name="Container1"),
         child=an(Handle)(name="Handle1"),
     ).from_(world.connections)
-    fixed_connection_query = the(fixed_connection)
+    fixed_connection_query = the(fixed_connection.expression)
 
     fc = variable(FixedConnection, domain=None)
     fixed_connection_query_manual = the(
@@ -71,8 +71,8 @@ def test_select(handles_and_containers_world):
     ).from_(world.connections)
     container_and_handle = the(
         set_of(
-            container := fixed_connection.parent,
-            handle := fixed_connection.child,
+            container := fixed_connection.expression.parent,
+            handle := fixed_connection.expression.child,
         )
     )
 
@@ -110,8 +110,8 @@ def test_select_where(handles_and_containers_world):
     ).from_(world.connections)
     container_and_handle = a(
         set_of(
-            container := fixed_connection.parent,
-            handle := fixed_connection.child,
+            container := fixed_connection.expression.parent,
+            handle := fixed_connection.expression.child,
         ).where(container.size > 1)
     )
     # Method 2
@@ -145,23 +145,26 @@ def test_domain_carrying_an_is_a_select():
         battery: int
 
     robots = [Robot("R2D2", 100), Robot("C3PO", 0)]
-    # an(...)(kwargs).from_(domain) is a select over those instances: it returns a runnable
-    # Entity, not an unresolved construct Match.
+    # an(...)(kwargs).from_(domain) stays one Match carrying the domain; the backend decides
+    # whether to select over it or generate from it, so from_ does not collapse it to an Entity.
     query = an(Robot)(name="R2D2", battery=100).from_(robots)
-    assert not isinstance(query, Match)
-    assert is_underspecified(query) is False
+    assert isinstance(query, Match)
+    assert query.domain is robots
     assert query.tolist()[0].name == "R2D2"
 
 
-def test_from_gives_symbolic_access(handles_and_containers_world):
+def test_expression_gives_symbolic_access(handles_and_containers_world):
     world = handles_and_containers_world
     fixed_connection = an(FixedConnection)(
         parent=an(Container)(name="Container1"), child=an(Handle)(name="Handle1")
     ).from_(world.connections)
-    # from_ returns the select Entity, so .parent / .child read the matched object's
-    # attributes symbolically and carry the match's conditions — no .expression needed.
+    # .expression lowers the domain match to its selection query, whose .parent / .child read
+    # the matched object's attributes symbolically and carry the match's conditions.
     container_and_handle = the(
-        set_of(container := fixed_connection.parent, handle := fixed_connection.child)
+        set_of(
+            container := fixed_connection.expression.parent,
+            handle := fixed_connection.expression.child,
+        )
     )
     answers = container_and_handle.tolist()[0]
     assert answers[container].name == "Container1"
@@ -179,17 +182,18 @@ def test_from_restricts_the_search():
     assert {robot.name for robot in selected} == {"R2D2", "C3PO"}
 
 
-def test_is_underspecified_distinguishes_construct_from_select():
+def test_is_underspecified_detects_deferred_match():
     @dataclass(unsafe_hash=True)
     class Robot:
         name: str
         battery: int
 
     robots = [Robot("R2D2", 100)]
-    # A no-domain an(...) is a construct Match a backend must resolve; an(...).from_(domain)
-    # is already a concrete select; a plain instance is neither.
+    # is_underspecified is a structural check: any Match is a deferred query a backend must
+    # resolve (whether it selects or generates over the domain is the backend's concern); a
+    # concrete instance is not.
     assert is_underspecified(an(Robot)(name="R2D2")) is True
-    assert is_underspecified(an(Robot)(name="R2D2").from_(robots)) is False
+    assert is_underspecified(an(Robot)(name="R2D2").from_(robots)) is True
     assert is_underspecified(Robot("R2D2", 100)) is False
 
 
