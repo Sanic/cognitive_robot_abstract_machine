@@ -200,47 +200,51 @@ def _report_world_leak(world_in_mem: int) -> None:
         name = type(candidate).__name__
         return not any(token in name for token in skip)
 
-    def is_root(candidate) -> bool:
-        """A node whose retention we treat as explained: a global, or a persistent owner."""
-        if isinstance(candidate, (_types_module.ModuleType, type)):
-            return True
-        return type(candidate).__name__ in (
-            "FixtureDef",
-            "Plan",
-            "PlanNode",
-            "ActionNode",
-            "DesignatorNode",
-            "Context",
+    def is_global_root(candidate) -> bool:
+        """A global whose retention ends the walk: a module, a class, or a pytest fixture cache."""
+        return isinstance(candidate, (_types_module.ModuleType, type)) or (
+            type(candidate).__name__ == "FixtureDef"
         )
 
-    # Walk one representative retention path from a leaked world up to a persistent owner. gc.get_referrers
-    # is fast here (~0.3s); only objgraph graph walks are forbidden. Following containers too lets the walk
-    # climb through __dict__/list holders to the owning object.
+    # Start from the leaked world's own suspended domain generator so the walk follows the leak path
+    # (the generator nest) rather than the world's Context, then climb to the global owner. Prefer
+    # generators/EQL wrappers at each step; gc.get_referrers is fast here so 25 hops is cheap.
+    def prefer_key(candidate) -> int:
+        if isinstance(candidate, _types_module.GeneratorType):
+            return 0
+        name = type(candidate).__name__
+        if name in ("ReEnterableLazyIterable", "filter", "Variable", "Entity", "SetOf"):
+            return 1
+        if not isinstance(candidate, (list, dict, tuple, set, frozenset)):
+            return 2
+        return 3
+
     seen_ids = {id(worlds)}
-    current = worlds[-1] if worlds else None
+    newest_world = worlds[-1] if worlds else None
+    current = None
+    if newest_world is not None:
+        for referrer in gc.get_referrers(newest_world):
+            if isinstance(referrer, _types_module.GeneratorType):
+                current = referrer
+                break
     emit(f"[world-leak] retention chain from newest world #{len(worlds) - 1}:")
     for _ in range(25):
         if current is None:
             break
         seen_ids.add(id(current))
+        emit(f"    at {describe(current)}")
         interesting = [
             holder
             for holder in gc.get_referrers(current)
             if id(holder) not in seen_ids and on_retention_path(holder)
         ]
-        emit(f"    -> {[describe(holder) for holder in interesting][:10]}")
-
-        roots = [holder for holder in interesting if is_root(holder)]
+        roots = [holder for holder in interesting if is_global_root(holder)]
         if roots:
-            emit(f"    reached owner: {describe(roots[0])}")
+            emit(f"    reached global owner: {[describe(root) for root in roots][:5]}")
             break
-        # Prefer a named owning object; fall back to a container to climb toward its owner.
-        named = [
-            holder
-            for holder in interesting
-            if not isinstance(holder, (list, dict, tuple, set, frozenset))
-        ]
-        current = (named or interesting or [None])[0]
+        interesting.sort(key=prefer_key)
+        emit(f"      held by {[describe(holder) for holder in interesting][:8]}")
+        current = interesting[0] if interesting else None
 
 
 #############################################
