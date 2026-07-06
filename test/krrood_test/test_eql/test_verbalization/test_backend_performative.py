@@ -13,7 +13,7 @@ from krrood.entity_query_language.backends import (
     EntityQueryLanguageBackend,
     ProbabilisticBackend,
 )
-from krrood.entity_query_language.factories import entity, underspecified, variable
+from krrood.entity_query_language.factories import entity, an, variable
 from krrood.entity_query_language.verbalization.pipeline import (
     directive_for_backend,
     verbalize_expression,
@@ -32,22 +32,18 @@ class Position:
 
 def test_match_without_backend_defaults_to_generate():
     """With no backend the query-type default holds: a match reads *"Generate"*."""
-    assert verbalize_expression(underspecified(Position)(x=1)).startswith("Generate")
+    assert verbalize_expression(an(Position)(x=1)).startswith("Generate")
 
 
 def test_match_with_selective_backend_reads_find():
     """A selective backend turns the match's verb into *"Find"* (it searches existing data)."""
-    text = verbalize_expression(
-        underspecified(Position)(x=1), backend=EntityQueryLanguageBackend()
-    )
+    text = verbalize_expression(an(Position)(x=1), backend=EntityQueryLanguageBackend())
     assert text.startswith("Find")
 
 
 def test_match_with_generative_backend_reads_generate():
     """A generative backend keeps the match's verb as *"Generate"*."""
-    text = verbalize_expression(
-        underspecified(Position)(x=1), backend=ProbabilisticBackend()
-    )
+    text = verbalize_expression(an(Position)(x=1), backend=ProbabilisticBackend())
     assert text.startswith("Generate")
 
 
