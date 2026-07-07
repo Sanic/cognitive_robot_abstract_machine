@@ -516,9 +516,10 @@ def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
     """A node used as the bare WHERE condition and reused inside a sibling branch must still anchor.
 
     ``drawer.correct`` is a shared node: it is the WHERE condition and also appears in the
-    ``alternative`` condition ``drawer.correct == False``. Building that comparator reassigns the
-    shared node's single ``_parent_`` pointer, so structural navigation that trusts ``_parent_``
-    loses the anchor. The rule tree must locate the anchor from the full parent structure instead.
+    ``alternative`` condition ``drawer.correct == False``. Building that comparator adds it as an
+    extra parent of the shared node. Its primary ``_parent_`` must stay the structural (WHERE)
+    parent so rule-tree splicing still finds the anchor; when the reuse overwrote ``_parent_``
+    the splice navigated from the comparator instead and failed.
     """
     correct_drawer = Drawer(
         handle=Handle("Handle1"), container=Container("Container1"), correct=True
