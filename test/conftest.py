@@ -151,8 +151,40 @@ def count_worlds():
     gc.collect()
     world_in_mem = objgraph.count("World")
     if world_in_mem > 30:
+        _report_remaining_world_holders(world_in_mem)
         raise MemoryError(
             "Something is leaking worlds, there are more than 20 worlds in memory after the test"
+        )
+
+
+def _report_remaining_world_holders(world_in_mem: int) -> None:
+    """Print a cheap holder-type histogram (a few gc.get_referrers scans) for the newest surviving
+    worlds, to confirm what still retains them after the domain-iteration fix."""
+    import sys
+
+    print(
+        f"\n[world-leak] {world_in_mem} World objects survived gc.collect()",
+        file=sys.stderr,
+        flush=True,
+    )
+    worlds = objgraph.by_type("World")
+    for index, world in reversed(list(enumerate(worlds))[-3:]):
+        holder_type_counts: dict[str, int] = {}
+        for referrer in gc.get_referrers(world):
+            if referrer is worlds:
+                continue
+            type_name = type(referrer).__name__
+            holder_type_counts[type_name] = holder_type_counts.get(type_name, 0) + 1
+        interesting = {
+            type_name: count
+            for type_name, count in holder_type_counts.items()
+            if type_name
+            not in ("list", "dict", "tuple", "set", "frozenset", "cell", "function")
+        }
+        print(
+            f"[world-leak] world #{index} non-container holders: {interesting}",
+            file=sys.stderr,
+            flush=True,
         )
 
 
