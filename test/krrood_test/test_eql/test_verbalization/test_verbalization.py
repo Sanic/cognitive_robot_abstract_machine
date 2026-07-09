@@ -1438,6 +1438,17 @@ def test_verbalize_has_type_tuple_of_types():
     assert "Body" in text
 
 
+def test_has_type_lists_a_tuple_of_types_disjunctively():
+    """``isinstance`` over a tuple holds when the value is ANY of the types, so the listing joins
+    with *"or"* — *"is of type Apple or Body"*, never the conjunctive *"and"* (a value cannot be of
+    both types at once)."""
+    fruit = variable(Body, [])
+    assert (
+        verbalize_expression(HasType(fruit, (Apple, Body)))
+        == "a Body is of type Apple or Body"
+    )
+
+
 def test_verbalize_contains_type():
     fruit_box = variable(FruitBox, [])
     predicate = ContainsType(fruit_box.fruits, Apple)
