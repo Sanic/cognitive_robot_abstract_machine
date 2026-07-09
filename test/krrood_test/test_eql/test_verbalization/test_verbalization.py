@@ -229,12 +229,12 @@ def test_verbalize_literal_tuple_of_types_is_a_value_not_membership():
 
 
 def test_verbalize_has_types_is_membership():
-    """The type-membership predicate reads as the bounded *"one of A, B, or C"* set — the same
-    surface a domain-constrained variable uses — over its admissible types."""
+    """The type-membership predicate reads through the same *"is of type A or B"* surface as
+    ``HasType``, its admissible types listed disjunctively."""
     subject = variable(Body, [])
     assert (
         verbalize_expression(HasTypes(subject, (Apple, Cabinet)))
-        == "a Body is one of Apple or Cabinet"
+        == "a Body is of type Apple or Cabinet"
     )
 
 
@@ -252,7 +252,7 @@ def test_verbalize_has_types_too_many_is_not_spelled():
     )
     text = verbalize_expression(HasTypes(subject, many))
     assert "Apple" not in text
-    assert text == "a Body is one of seven types"
+    assert text == "a Body is of seven possible types"
 
 
 # ── Unit tests: MappedVariable chain ──────────────────────────────────────────

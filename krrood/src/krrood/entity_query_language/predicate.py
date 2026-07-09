@@ -438,31 +438,49 @@ class HasType(Triple):
         return clause(
             Noun(fields["variable"]),
             Copula(),
-            Adjective("of type"),
-            cls._types_listing(fields["types_"]),
+            *cls._types_predicate(fields["types_"]),
         )
 
     @staticmethod
-    def _types_listing(types_field: VerbalizationField) -> Any:
-        """:return: the admissible types said DISJUNCTIVELY (*"Apple or Body"*) when the field holds
-        a tuple — ``isinstance`` over a tuple holds for any one of them, so *"and"* would claim an
-        impossible conjunction — else the field's own rendered fragment (a single type, or a
-        variable standing for one)."""
+    def _types_predicate(types_field: VerbalizationField) -> Any:
+        """:return: the *"of type …"* predicate tail. A tuple of admissible types is said
+        DISJUNCTIVELY (*"of type Apple or Body"*) — ``isinstance`` over a tuple holds for any one of
+        them, so *"and"* would claim an impossible conjunction. Past the membership cap the types
+        are summarised by count (*"of seven possible types"*) rather than spelled out. A single type
+        (or a variable standing for one) keeps the field's own rendered fragment."""
         # Imported locally to avoid the core → verbalization import cycle (see :class:`Triple`).
+        from krrood.entity_query_language.verbalization import morphology
         from krrood.entity_query_language.verbalization.fragments.base import (
             oxford_comma,
             RoleFragment,
+            WordFragment,
+        )
+        from krrood.entity_query_language.verbalization.microplanning.coordination import (
+            MAX_SET_MEMBERS,
         )
         from krrood.entity_query_language.verbalization.vocabulary.english import (
             Conjunctions,
         )
-
-        if not isinstance(types_field.value, tuple):
-            return types_field
-        return oxford_comma(
-            [RoleFragment.for_type(type_) for type_ in types_field.value],
-            Conjunctions.OR.as_fragment(),
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            Adjective,
+            Noun,
         )
+
+        value = types_field.value
+        if not isinstance(value, tuple):
+            return [Adjective("of type"), Noun(types_field)]
+        if len(value) > MAX_SET_MEMBERS:
+            return [
+                Adjective("of"),
+                WordFragment(text=f"{morphology.cardinal(len(value))} possible types"),
+            ]
+        return [
+            Adjective("of type"),
+            oxford_comma(
+                [RoleFragment.for_type(type_) for type_ in value],
+                Conjunctions.OR.as_fragment(),
+            ),
+        ]
 
 
 @dataclass(eq=False)
@@ -481,22 +499,6 @@ class HasTypes(HasType):
     """
     A tuple containing Type objects that are associated with this instance.
     """
-
-    @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
-        """Say membership over the admissible types — *"<variable> is one of A, B, or C"*. The
-        :class:`OneOf` element handles the bounded listing (linking, *"or"*, the count cap), so the
-        types are read from the field's value (an ``isinstance`` over the tuple is membership, not the
-        tuple value an equality would mean)."""
-        # Imported locally to avoid the core → verbalization import cycle (see :class:`Triple`).
-        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
-            clause,
-            Copula,
-            Noun,
-            OneOf,
-        )
-
-        return clause(Noun(fields["variable"]), Copula(), OneOf(fields["types_"]))
 
 
 @dataclass(eq=False)
