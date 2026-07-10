@@ -237,8 +237,9 @@ def test_verbalize_has_types_is_membership():
     )
 
 
-def test_verbalize_has_types_too_many_is_not_spelled():
-    """Past the membership cap the admissible types are summarised by count, not spelled out."""
+def test_verbalize_has_types_lists_all_admissible_types():
+    """Every admissible type is listed disjunctively -- ``isinstance`` over the tuple holds for ANY of
+    them -- joined by the :class:`Or` element with an oxford comma before the final *"or"*."""
     subject = variable(Body, [])
     many = (
         Apple,
@@ -250,8 +251,10 @@ def test_verbalize_has_types_too_many_is_not_spelled():
         PrismaticConnection,
     )
     text = verbalize_expression(HasTypes(subject, many))
-    assert "Apple" not in text
-    assert text == "a Body is of seven possible types"
+    assert text == (
+        "a Body is of type Apple, Cabinet, Container, Drawer, "
+        "FixedConnection, Handle, or PrismaticConnection"
+    )
 
 
 # ── Unit tests: MappedVariable chain ──────────────────────────────────────────
