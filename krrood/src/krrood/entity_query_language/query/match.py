@@ -208,7 +208,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         >>> @dataclass
         >>> class Drawer:
         >>>     body: Body
-        >>> drawer = an(Drawer)(body=an(Body)(name="drawer_1")).from_(world.views)
+        >>> drawer = a(Drawer)(body=a(Body)(name="drawer_1")).from_(world.views)
 
     .. warning::
         Match can take a factory as a mean to construct `T`. If the keyword argument names of the match are not
@@ -259,7 +259,7 @@ class Match(Evaluable, AbstractMatchExpression[T], HasFactoryAndKwargs[T]):
         elif ismethod(self.factory):
             self.type_ = self.factory.__class__
         elif isfunction(self.factory):
-            type_ = get_type_hints(self.factory)["return"]
+            type_ = get_type_hints_of_object(self.factory)["return"]
             if not isclass(type_):
                 raise MatchTypeCannotBeDetermined(self)
             self.type_ = type_
