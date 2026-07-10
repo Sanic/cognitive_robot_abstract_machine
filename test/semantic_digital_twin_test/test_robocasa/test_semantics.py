@@ -42,6 +42,12 @@ def test_fixture_resolver_returns_none_for_unknown_category():
     assert resolver.resolve("paper_towel_holder") is None
 
 
+def test_fixture_resolver_resolves_compound_class_name():
+    resolver = RoboCasaFixtureResolver()
+    assert resolver.resolve("HingeCabinet") is Cabinet
+    assert resolver.resolve("hinge_cabinet") is Cabinet
+
+
 def test_object_resolver_resolves_known_category():
     resolver = RoboCasaObjectResolver()
     assert resolver.resolve("apple") is Apple
@@ -121,3 +127,28 @@ def test_find_body_returns_none_for_missing_body():
         os.path.join(ROBOCASA_RESOURCES_DIR, "cabinet_fixture.xml")
     ).parse()
     assert RoboCasaDatasetLoader._find_body(world, "does_not_exist") is None
+
+
+def test_find_body_falls_back_to_prefix_match():
+    world = MJCFParser(
+        os.path.join(ROBOCASA_RESOURCES_DIR, "cabinet_fixture.xml")
+    ).parse()
+
+    body = RoboCasaDatasetLoader._find_body(world, "hinge_cabinet")
+
+    assert body is not None
+    assert body.name.name == "hinge_cabinet_main"
+
+
+def test_apply_object_semantics_annotates_body_with_collision_not_root():
+    world = MJCFParser(
+        os.path.join(ROBOCASA_RESOURCES_DIR, "cabinet_fixture.xml")
+    ).parse()
+
+    loader = RoboCasaDatasetLoader()
+    loader._apply_object_semantics(world, "cabinet")
+
+    annotations = world.get_semantic_annotations_by_type(Cabinet)
+    assert len(annotations) == 1
+    assert annotations[0].root.name.name == "hinge_cabinet_main"
+    assert annotations[0].root != world.root

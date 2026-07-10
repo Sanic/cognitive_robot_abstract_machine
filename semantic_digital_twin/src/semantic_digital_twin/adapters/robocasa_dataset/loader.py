@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,14 +21,19 @@ from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
+from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
 
 try:
-    import robocasa
-    import robosuite
+    import yaml
+    from robocasa.models.arenas.kitchen_arena import KitchenArena
+    from robocasa.models.objects.kitchen_objects import OBJ_CATEGORIES
+    from robocasa.models.scenes import scene_builder, scene_registry
+    from robocasa.models.scenes.scene_builder import FIXTURES
+    from robosuite.models.tasks import ManipulationTask
 except ImportError:
     logger.warning(
         "robocasa/robosuite are required for RoboCasa dataset loading. Install robosuite from git "
@@ -39,16 +45,29 @@ except ImportError:
 
 def _mjcf_document_from_element(element: ET.Element) -> str:
     """
-    Wrap a single MJCF XML element (for example one fixture's geometry) into a minimal standalone
-    MJCF document so it can be parsed on its own.
+    Wrap a copy of a single MJCF XML element (for example one fixture's geometry) into a minimal
+    standalone MJCF document so it can be parsed on its own. A copy is used so the original element
+    is not reparented out of whatever tree RoboCasa still holds it in.
 
     :param element: The XML element to wrap, typically a RoboCasa fixture's underlying body element.
     :return: The MJCF document as a string.
     """
     root = ET.Element("mujoco")
     worldbody = ET.SubElement(root, "worldbody")
-    worldbody.append(element)
+    worldbody.append(copy.deepcopy(element))
     return ET.tostring(root, encoding="unicode")
+
+
+def _category_from_class_name(class_name: str) -> str:
+    """
+    Convert a RoboCasa Fixture subclass name (upper camel case, for example ``"HingeCabinet"``) into
+    a lower snake case category string (for example ``"hinge_cabinet"``) suitable for
+    :meth:`~semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaCategoryResolver.resolve`.
+
+    :param class_name: The RoboCasa Fixture subclass name.
+    :return: The lower snake case category string.
+    """
+    return "_".join(token.lower() for token in camel_case_split(class_name))
 
 
 @dataclass
@@ -68,7 +87,8 @@ class RoboCasaDatasetLoader:
     .. note::
         RoboCasa does not version its internal Python module layout as a stable public API. The import
         paths used here match the module layout at the time this loader was written; if they no longer
-        match the installed version, adjust the imports inside the affected method accordingly.
+        match the installed version, adjust the module-level imports at the top of this file
+        accordingly.
     """
 
     directory: Path = field(
@@ -97,29 +117,29 @@ class RoboCasaDatasetLoader:
         self,
         layout_id: LayoutType,
         style_id: StyleType,
-        rng: Optional[numpy.random.Generator] = None,
+        random_number_generator: Optional[numpy.random.Generator] = None,
     ) -> World:
         """
         Compose a full RoboCasa kitchen scene and parse it into a World.
 
         :param layout_id: A member of ``robocasa.models.scenes.scene_registry.LayoutType``.
         :param style_id: A member of ``robocasa.models.scenes.scene_registry.StyleType``.
-        :param rng: The random number generator used for the (deterministic, non-physical) fixture
-            placement within the layout. Defaults to RoboCasa's own default generator.
+        :param random_number_generator: The random number generator used for the (deterministic,
+            non-physical) fixture placement within the layout. Defaults to RoboCasa's own default
+            generator.
         :return: The composed world, with a SemanticAnnotation attached to each fixture's root body.
         """
-        import yaml
-        from robocasa.models.arenas.kitchen_arena import KitchenArena
-        from robocasa.models.scenes import scene_builder, scene_registry
-        from robosuite.models.tasks import ManipulationTask
-
         with open(scene_registry.get_layout_path(layout_id)) as layout_file:
             layout_config = yaml.safe_load(layout_file)
         with open(scene_registry.get_style_path(style_id)) as style_file:
             style_config = yaml.safe_load(style_file)
 
-        arena = KitchenArena(layout_id=layout_id, style_id=style_id, rng=rng)
-        fixtures = scene_builder.create_fixtures(layout_config, style_config, rng=rng)
+        arena = KitchenArena(
+            layout_id=layout_id, style_id=style_id, rng=random_number_generator
+        )
+        fixtures = scene_builder.create_fixtures(
+            layout_config, style_config, rng=random_number_generator
+        )
 
         task = ManipulationTask(
             mujoco_arena=arena,
@@ -140,8 +160,6 @@ class RoboCasaDatasetLoader:
         :param fixture_kwargs: Extra keyword arguments forwarded to the fixture's constructor.
         :return: The loaded world, with a SemanticAnnotation attached to the fixture's root body.
         """
-        from robocasa.models.scenes.scene_builder import FIXTURES
-
         fixture_class = FIXTURES[category]
         fixture = fixture_class(name=category, **fixture_kwargs)
 
@@ -160,8 +178,6 @@ class RoboCasaDatasetLoader:
         :param instance_index: Which of the category's downloaded asset instances to load.
         :return: The loaded world, with a SemanticAnnotation attached to the object's root body.
         """
-        from robocasa.models.objects.kitchen_objects import OBJ_CATEGORIES
-
         if category not in OBJ_CATEGORIES:
             raise ValueError(
                 f"Unknown RoboCasa object category '{category}'. "
@@ -175,8 +191,14 @@ class RoboCasaDatasetLoader:
                 f"{self.directory / 'objects' / category}. "
                 "Run 'python -m robocasa.scripts.download_kitchen_assets' first."
             )
+        if instance_index >= len(model_files):
+            raise IndexError(
+                f"Requested instance_index {instance_index} for object category '{category}', "
+                f"but only {len(model_files)} downloaded instance(s) were found in "
+                f"{self.directory / 'objects' / category}."
+            )
 
-        world = MJCFParser.from_file(str(model_files[instance_index])).parse()
+        world = MJCFParser(str(model_files[instance_index])).parse()
         self._apply_object_semantics(world, category)
         return world
 
@@ -200,13 +222,19 @@ class RoboCasaDatasetLoader:
 
     def _apply_object_semantics(self, world: World, category: str) -> None:
         """
-        Attach a SemanticAnnotation to the root body of a loaded object.
+        Attach a SemanticAnnotation to the root body of a loaded object. The object's own body is the
+        first body in the world with collision geometry: MJCFParser.parse() always creates an empty
+        placeholder root body named after the MJCF worldbody, distinct from the loaded content.
 
         :param world: The world the object was parsed into.
         :param category: The RoboCasa object category the object belongs to.
         """
-        body = world.root
-        self._attach_semantic_annotation(world, body, category)
+        bodies_with_collision = world.bodies_with_collision
+        if not bodies_with_collision:
+            raise ValueError(
+                f"No body with collision geometry found for object category '{category}'."
+            )
+        self._attach_semantic_annotation(world, bodies_with_collision[0], category)
 
     def _attach_semantic_annotation(self, world: World, body: Body, category: str) -> None:
         """
@@ -234,30 +262,18 @@ class RoboCasaDatasetLoader:
     @staticmethod
     def _find_body(world: World, name: str) -> Optional[Body]:
         """
-        Look up a body by name, returning None instead of raising if it is not present.
+        Look up a body by name, returning None instead of raising if it is not present. Falls back to
+        the first body whose name starts with ``name`` if no exact match exists, since robosuite may
+        rename a merged object's root body (for example to ``f"{name}_main"``).
 
         :param world: The world to search.
         :param name: The name of the body to look up.
-        :return: The body, or None if no body with this name exists in the world.
+        :return: The body, or None if no matching body exists in the world.
         """
         try:
             return world.get_body_by_name(name)
         except WorldEntityNotFoundError:
-            return None
+            pass
 
-
-def _category_from_class_name(class_name: str) -> str:
-    """
-    Convert a RoboCasa Fixture subclass name (upper camel case, for example ``"HingeCabinet"``) into a
-    lower snake case category string (for example ``"hinge_cabinet"``) suitable for
-    :meth:`RoboCasaFixtureResolver.resolve`.
-
-    :param class_name: The RoboCasa Fixture subclass name.
-    :return: The lower snake case category string.
-    """
-    snake_case_characters = []
-    for index, character in enumerate(class_name):
-        if character.isupper() and index > 0:
-            snake_case_characters.append("_")
-        snake_case_characters.append(character.lower())
-    return "".join(snake_case_characters)
+        matching_bodies = [body for body in world.bodies if body.name.name.startswith(name)]
+        return matching_bodies[0] if matching_bodies else None
