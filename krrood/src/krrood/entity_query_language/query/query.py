@@ -241,6 +241,9 @@ class Query(
         next :meth:`build` recomputes them. Called by every modifier method.
         """
         self._dirty_ = True
+        # ``_group_`` and ``_distinct_on_ids_`` are cached_property values stored in ``__dict__``;
+        # popping the keys invalidates them so they recompute from the new modifier state on next
+        # access. Assigning ``None`` would instead cache ``None`` and keep returning it.
         self.__dict__.pop("_group_", None)
         self.__dict__.pop("_distinct_on_ids_", None)
 
@@ -315,6 +318,7 @@ class Query(
         )
         return self
 
+    @modifies_query_structure
     def distinct(
         self,
         *on: TypingUnion[Selectable, Any],
@@ -326,10 +330,7 @@ class Query(
         :return: This query.
         """
         self._distinct_on = on if on else self._selected_variables_
-        # Mark dirty here rather than via ``modifies_query_structure`` so the cached
-        # ``_distinct_on_ids_`` is dropped before the seen-set below rebuilds it from the new keys.
-        self._mark_dirty_()
-        self._seen_results = SeenSet(keys=self._distinct_on_ids_)
+        self._seen_results = SeenSet(keys=tuple(v._id_ for v in self._distinct_on))
         self._results_mapping.append(self._get_distinct_results_)
         return self
 
