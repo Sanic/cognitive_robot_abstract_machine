@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import yaml
-    from robocasa.models.arenas.kitchen_arena import KitchenArena
+    from robocasa.models.scenes.kitchen_arena import KitchenArena
     from robocasa.models.scenes import scene_builder, scene_registry
     from robocasa.models.scenes.scene_builder import FIXTURES
     from robosuite.models.tasks import ManipulationTask
