@@ -230,7 +230,9 @@ class RoboCasaDatasetLoader:
             category = _category_from_class_name(type(fixture).__name__)
             self._attach_semantic_annotation(world, body, category)
 
-    def _apply_object_semantics(self, world: World, category: str) -> None:
+    def _apply_object_semantics(
+        self, world: World, category: RoboCasaObjectCategory
+    ) -> None:
         """
         Attach a SemanticAnnotation to the root body of a loaded object. The object's own body is the
         first body in the world with collision geometry: MJCFParser.parse() always creates an empty
@@ -276,41 +278,47 @@ class RoboCasaDatasetLoader:
         """
         Detect handle/door/drawer bodies already present under a fixture's root body (RoboCasa
         fixtures like cabinets ship these as real articulated sub-bodies in their own MJCF, not
-        something this adapter synthesizes) and record them as parts of ``parent_annotation`` by
-        their RoboCasa body-naming convention (mirroring the naming-convention detection
-        ``adapters/procthor/procthor_pipelines.py`` already uses for ProcTHOR dressers).
+        something this adapter synthesizes) and attach them as parts of the nearest enclosing
+        SemanticAnnotation by their RoboCasa body-naming convention (mirroring the naming-convention
+        detection ``adapters/procthor/procthor_pipelines.py`` already uses for ProcTHOR dressers).
 
-        The sub-bodies are already correctly connected in the kinematic structure by
-        :class:`~semantic_digital_twin.adapters.mjcf.MJCFParser`, respecting their real hinge/slide
-        joints. This intentionally sets the target field directly instead of calling
-        ``parent_annotation.add(...)``, which would re-parent the body via ``World.move_branch`` and
-        risk collapsing that real joint.
+        Each match is attached via :meth:`~semantic_digital_twin.semantic_annotations.mixins.PartWholeRelationship.add`,
+        the framework's normal part-whole mechanism, recursing into each direct child so that, for
+        example, a handle nested inside a door is attached to the door's annotation rather than the
+        enclosing cabinet's. This is safe: a sub-body is only ever offered to its own direct
+        kinematic parent, so ``World.move_branch`` (invoked by ``add()``'s default mount strategy) is
+        a no-op re-parent that leaves the body's real connection type and degree of freedom
+        untouched.
 
         :param world: The world ``parent_body`` belongs to.
-        :param parent_annotation: The SemanticAnnotation already attached to ``parent_body``.
-        :param parent_body: The fixture's root body to search for sub-part bodies under.
+        :param parent_annotation: The SemanticAnnotation of ``parent_body`` to attach newly found
+            direct sub-parts to.
+        :param parent_body: The body to search direct children of for sub-part bodies.
         """
-        for child_body in world.get_kinematic_structure_entities_of_branch(parent_body):
-            if child_body is parent_body or not isinstance(child_body, Body):
+        for child_body in parent_body.child_kinematic_structure_entities:
+            if not isinstance(child_body, Body):
                 continue
             child_name = child_body.name.name.lower()
+            child_annotation = parent_annotation
 
             if (
                 "handle" in child_name
                 and isinstance(parent_annotation, HasHandle)
                 and parent_annotation.handle is None
             ):
-                handle = Handle(root=child_body)
-                world.add_semantic_annotation(handle)
-                parent_annotation.handle = handle
+                child_annotation = Handle(root=child_body)
+                world.add_semantic_annotation(child_annotation)
+                parent_annotation.add(child_annotation)
             elif "door" in child_name and isinstance(parent_annotation, HasDoors):
-                door = Door(root=child_body)
-                world.add_semantic_annotation(door)
-                parent_annotation.doors.append(door)
+                child_annotation = Door(root=child_body)
+                world.add_semantic_annotation(child_annotation)
+                parent_annotation.add(child_annotation)
             elif "drawer" in child_name and isinstance(parent_annotation, HasDrawers):
-                drawer = Drawer(root=child_body)
-                world.add_semantic_annotation(drawer)
-                parent_annotation.drawers.append(drawer)
+                child_annotation = Drawer(root=child_body)
+                world.add_semantic_annotation(child_annotation)
+                parent_annotation.add(child_annotation)
+
+            self._attach_sub_part_annotations(world, child_annotation, child_body)
 
     @staticmethod
     def _find_body(world: World, name: str) -> Optional[Body]:
