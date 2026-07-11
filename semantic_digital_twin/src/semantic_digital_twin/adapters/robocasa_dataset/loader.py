@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
-    RoboCasaFixtureCategory,
-    RoboCasaFixtureResolver,
+    RoboCasaKitchenApplianceCategory,
+    RoboCasaKitchenApplianceResolver,
     RoboCasaObjectCategory,
     RoboCasaObjectResolver,
 )
@@ -59,9 +59,9 @@ except ImportError:
 
 def _mjcf_document_from_element_copy(element: ET.Element) -> str:
     """
-    Wrap a copy of a single MJCF XML element (for example one fixture's geometry) into a minimal
-    standalone MJCF document so it can be parsed on its own. A copy is used so the original element
-    is not reparented out of whatever tree RoboCasa still holds it in.
+    Wrap a copy of a single MJCF XML element (for example one kitchen appliance's geometry) into a
+    minimal standalone MJCF document so it can be parsed on its own. A copy is used so the original
+    element is not reparented out of whatever tree RoboCasa still holds it in.
 
     :param element: The XML element to wrap, typically a RoboCasa fixture's underlying body element.
     :return: The MJCF document as a string.
@@ -74,11 +74,12 @@ def _mjcf_document_from_element_copy(element: ET.Element) -> str:
 
 def _category_from_class_name(class_name: str) -> str:
     """
-    Convert a RoboCasa Fixture subclass name (upper camel case, for example ``"HingeCabinet"``) into
-    a lower snake case category string (for example ``"hinge_cabinet"``) suitable for
+    Convert a RoboCasa ``Fixture`` subclass name (upper camel case, for example
+    ``"HingeCabinet"``) into a lower snake case category string (for example
+    ``"hinge_cabinet"``) suitable for
     :meth:`~semantic_digital_twin.adapters.robocasa_dataset.semantics.RoboCasaCategoryResolver.resolve`.
 
-    :param class_name: The RoboCasa Fixture subclass name.
+    :param class_name: The RoboCasa ``Fixture`` subclass name.
     :return: The lower snake case category string.
     """
     return "_".join(token.lower() for token in camel_case_split(class_name))
@@ -87,12 +88,12 @@ def _category_from_class_name(class_name: str) -> str:
 @dataclass
 class RoboCasaDatasetLoader:
     """
-    Loader for objects, fixtures, and full kitchen scenes from the RoboCasa dataset
+    Loader for objects, kitchen appliances, and full kitchen scenes from the RoboCasa dataset
     (https://github.com/robocasa/robocasa).
 
     RoboCasa composes its assets with robosuite/MuJoCo. This loader drives RoboCasa's own Python
-    composition code to build the MJCF for a requested fixture or kitchen, and parses the resulting
-    MJCF with the existing :class:`~semantic_digital_twin.adapters.mjcf.MJCFParser`.
+    composition code to build the MJCF for a requested kitchen appliance or kitchen, and parses the
+    resulting MJCF with the existing :class:`~semantic_digital_twin.adapters.mjcf.MJCFParser`.
 
     For this to work, ``robocasa`` and ``robosuite`` (installed from git) must be available, and the
     RoboCasa fixture/object assets must be downloaded via
@@ -113,8 +114,8 @@ class RoboCasaDatasetLoader:
     ``python -m robocasa.scripts.download_kitchen_assets``.
     """
 
-    kitchen_appliance_annotator: RoboCasaFixtureResolver = field(
-        default_factory=RoboCasaFixtureResolver
+    kitchen_appliance_annotator: RoboCasaKitchenApplianceResolver = field(
+        default_factory=RoboCasaKitchenApplianceResolver
     )
     """
     Resolver mapping RoboCasa fixture category names to SemanticAnnotation subclasses.
@@ -141,7 +142,7 @@ class RoboCasaDatasetLoader:
         :param random_number_generator: The random number generator used for the (deterministic,
             non-physical) fixture placement within the layout. Defaults to RoboCasa's own default
             generator.
-        :return: The composed world, with a SemanticAnnotation attached to each fixture's root body.
+        :return: The composed world, with a SemanticAnnotation attached to each appliance's root body.
         """
         with open(scene_registry.get_layout_path(layout_id)) as layout_file:
             layout_config = yaml.safe_load(layout_file)
@@ -151,36 +152,42 @@ class RoboCasaDatasetLoader:
         arena = KitchenArena(
             layout_id=layout_id, style_id=style_id, rng=random_number_generator
         )
-        fixtures = scene_builder.create_fixtures(
+        kitchen_appliances = scene_builder.create_fixtures(
             layout_config, style_config, rng=random_number_generator
         )
 
         task = ManipulationTask(
             mujoco_arena=arena,
             mujoco_robots=[],
-            mujoco_objects=list(fixtures.values()),
+            mujoco_objects=list(kitchen_appliances.values()),
         )
 
         world = MJCFParser.from_xml_string(task.get_xml()).parse()
-        self._apply_fixture_semantics(world, fixtures)
+        self._apply_kitchen_appliance_semantics(world, kitchen_appliances)
         return world
 
-    def load_fixture(self, category: RoboCasaFixtureCategory, **fixture_kwargs) -> World:
+    def load_kitchen_appliance(
+        self, category: RoboCasaKitchenApplianceCategory, **kitchen_appliance_kwargs
+    ) -> World:
         """
-        Load a single RoboCasa fixture as a standalone world.
+        Load a single RoboCasa kitchen appliance (for example a cabinet or a microwave) as a
+        standalone world.
 
-        :param category: The fixture category, a key of
+        :param category: The appliance category, a key of
             ``robocasa.models.scenes.scene_builder.FIXTURES``.
-        :param fixture_kwargs: Extra keyword arguments forwarded to the fixture's constructor.
-        :return: The loaded world, with a SemanticAnnotation attached to the fixture's root body.
+        :param kitchen_appliance_kwargs: Extra keyword arguments forwarded to the appliance's
+            (RoboCasa ``Fixture`` subclass) constructor.
+        :return: The loaded world, with a SemanticAnnotation attached to the appliance's root body.
         """
-        fixture_class = FIXTURES[category]
-        fixture = fixture_class(name=category, **fixture_kwargs)
+        kitchen_appliance_class = FIXTURES[category]
+        kitchen_appliance = kitchen_appliance_class(
+            name=category, **kitchen_appliance_kwargs
+        )
 
         world = MJCFParser.from_xml_string(
-            _mjcf_document_from_element_copy(fixture._obj)
+            _mjcf_document_from_element_copy(kitchen_appliance._obj)
         ).parse()
-        self._apply_fixture_semantics(world, {category: fixture})
+        self._apply_kitchen_appliance_semantics(world, {category: kitchen_appliance})
         return world
 
     def load_object(
@@ -212,22 +219,23 @@ class RoboCasaDatasetLoader:
         self._apply_object_semantics(world, category)
         return world
 
-    def _apply_fixture_semantics(
-        self, world: World, fixtures: Dict[str, Any]
+    def _apply_kitchen_appliance_semantics(
+        self, world: World, kitchen_appliances: Dict[str, Any]
     ) -> None:
         """
-        Attach a SemanticAnnotation to the root body of each fixture, using the fixture resolver where
-        the fixture's category matches a known SemanticAnnotation subclass, and falling back to
-        NaturalLanguageWithTypeDescription otherwise.
+        Attach a SemanticAnnotation to the root body of each kitchen appliance, using the appliance
+        annotator where the appliance's category matches a known SemanticAnnotation subclass, and
+        falling back to NaturalLanguageWithTypeDescription otherwise.
 
-        :param world: The world the fixtures were parsed into.
-        :param fixtures: Mapping from fixture name to the RoboCasa Fixture instance it was built from.
+        :param world: The world the appliances were parsed into.
+        :param kitchen_appliances: Mapping from appliance name to the RoboCasa ``Fixture`` instance
+            it was built from.
         """
-        for fixture_name, fixture in fixtures.items():
-            body = self._find_body(world, fixture_name)
+        for appliance_name, kitchen_appliance in kitchen_appliances.items():
+            body = self._find_body(world, appliance_name)
             if body is None:
                 continue
-            category = _category_from_class_name(type(fixture).__name__)
+            category = _category_from_class_name(type(kitchen_appliance).__name__)
             self._attach_semantic_annotation(world, body, category)
 
     def _apply_object_semantics(
@@ -256,7 +264,7 @@ class RoboCasaDatasetLoader:
 
         :param world: The world ``body`` belongs to.
         :param body: The body to annotate.
-        :param category: The RoboCasa fixture or object category of ``body``.
+        :param category: The RoboCasa appliance or object category of ``body``.
         """
         annotation_class = self.kitchen_appliance_annotator.resolve(
             category
@@ -276,11 +284,12 @@ class RoboCasaDatasetLoader:
         self, world: World, parent_annotation: SemanticAnnotation, parent_body: Body
     ) -> None:
         """
-        Detect handle/door/drawer bodies already present under a fixture's root body (RoboCasa
-        fixtures like cabinets ship these as real articulated sub-bodies in their own MJCF, not
-        something this adapter synthesizes) and attach them as parts of the nearest enclosing
-        SemanticAnnotation by their RoboCasa body-naming convention (mirroring the naming-convention
-        detection ``adapters/procthor/procthor_pipelines.py`` already uses for ProcTHOR dressers).
+        Detect handle/door/drawer bodies already present under a kitchen appliance's root body
+        (RoboCasa appliances like cabinets ship these as real articulated sub-bodies in their own
+        MJCF, not something this adapter synthesizes) and attach them as parts of the nearest
+        enclosing SemanticAnnotation by their RoboCasa body-naming convention (mirroring the
+        naming-convention detection ``adapters/procthor/procthor_pipelines.py`` already uses for
+        ProcTHOR dressers).
 
         Each match is attached via :meth:`~semantic_digital_twin.semantic_annotations.mixins.PartWholeRelationship.add`,
         the framework's normal part-whole mechanism, recursing into each direct child so that, for

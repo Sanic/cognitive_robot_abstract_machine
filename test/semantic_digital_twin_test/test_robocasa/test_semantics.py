@@ -8,8 +8,8 @@ from semantic_digital_twin.adapters.robocasa_dataset.loader import (
     _mjcf_document_from_element_copy,
 )
 from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
-    RoboCasaFixtureCategory,
-    RoboCasaFixtureResolver,
+    RoboCasaKitchenApplianceCategory,
+    RoboCasaKitchenApplianceResolver,
     RoboCasaObjectCategory,
     RoboCasaObjectResolver,
 )
@@ -33,26 +33,26 @@ ROBOCASA_RESOURCES_DIR = (
 )
 
 
-def test_fixture_resolver_resolves_known_category():
-    resolver = RoboCasaFixtureResolver()
+def test_kitchen_appliance_resolver_resolves_known_category():
+    resolver = RoboCasaKitchenApplianceResolver()
     assert resolver.resolve("cabinet") is Cabinet
     assert resolver.resolve("MICROWAVE") is Microwave
 
 
-def test_fixture_resolver_returns_none_for_unknown_category():
-    resolver = RoboCasaFixtureResolver()
+def test_kitchen_appliance_resolver_returns_none_for_unknown_category():
+    resolver = RoboCasaKitchenApplianceResolver()
     assert resolver.resolve("paper_towel_holder") is None
 
 
-def test_fixture_resolver_resolves_compound_class_name():
-    resolver = RoboCasaFixtureResolver()
+def test_kitchen_appliance_resolver_resolves_compound_class_name():
+    resolver = RoboCasaKitchenApplianceResolver()
     assert resolver.resolve("HingeCabinet") is Cabinet
     assert resolver.resolve("hinge_cabinet") is Cabinet
 
 
-def test_fixture_resolver_resolves_enum_category():
-    resolver = RoboCasaFixtureResolver()
-    assert resolver.resolve(RoboCasaFixtureCategory.CABINET) is Cabinet
+def test_kitchen_appliance_resolver_resolves_enum_category():
+    resolver = RoboCasaKitchenApplianceResolver()
+    assert resolver.resolve(RoboCasaKitchenApplianceCategory.CABINET) is Cabinet
 
 
 def test_object_resolver_resolves_known_category():
@@ -119,7 +119,7 @@ def test_mjcf_document_from_element_copy_is_parseable_by_mjcf_parser():
     assert world.get_body_by_name("hinge_cabinet_main") is not None
 
 
-def test_attach_semantic_annotation_uses_fixture_resolver():
+def test_attach_semantic_annotation_uses_kitchen_appliance_resolver():
     world = MJCFParser(
         str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
     ).parse()

@@ -36,14 +36,14 @@ Objects, fixtures, and full kitchen scenes from [RoboCasa](https://github.com/ro
 ```python
 from semantic_digital_twin.adapters.robocasa_dataset.loader import RoboCasaDatasetLoader
 from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
-    RoboCasaFixtureCategory,
+    RoboCasaKitchenApplianceCategory,
     RoboCasaObjectCategory,
 )
 
 loader = RoboCasaDatasetLoader()
 
 kitchen_world = loader.load_kitchen(layout_id=..., style_id=...)  # a full kitchen scene
-fixture_world = loader.load_fixture(RoboCasaFixtureCategory.CABINET)  # a single fixture
+appliance_world = loader.load_kitchen_appliance(RoboCasaKitchenApplianceCategory.CABINET)  # a single appliance
 object_world = loader.load_object(RoboCasaObjectCategory.APPLE)  # a single object
 ```
 

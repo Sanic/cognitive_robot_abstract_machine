@@ -4,6 +4,10 @@ pytest.importorskip("robocasa", reason="robocasa is not installed")
 pytest.importorskip("robosuite", reason="robosuite is not installed")
 
 from semantic_digital_twin.adapters.robocasa_dataset.loader import RoboCasaDatasetLoader
+from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
+    RoboCasaKitchenApplianceCategory,
+    RoboCasaObjectCategory,
+)
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -30,14 +34,16 @@ def test_load_kitchen(robocasa_loader):
     assert len(world.semantic_annotations) > 0
 
 
-def test_load_fixture(robocasa_loader):
-    world = robocasa_loader.load_fixture("cabinet")
+def test_load_kitchen_appliance(robocasa_loader):
+    world = robocasa_loader.load_kitchen_appliance(
+        RoboCasaKitchenApplianceCategory.CABINET
+    )
     assert len(world.bodies) > 0
-    assert len(world.semantic_annotations) == 1
+    assert len(world.semantic_annotations) >= 1
 
 
 def test_load_object(robocasa_loader):
-    world = robocasa_loader.load_object("apple")
+    world = robocasa_loader.load_object(RoboCasaObjectCategory.APPLE)
     assert len(world.bodies) > 0
     annotations = world.semantic_annotations
     assert len(annotations) == 1

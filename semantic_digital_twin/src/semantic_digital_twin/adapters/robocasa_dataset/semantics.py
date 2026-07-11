@@ -39,7 +39,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.utils import camel_case_split
 
 
-class RoboCasaFixtureCategory(StrEnum):
+class RoboCasaKitchenApplianceCategory(StrEnum):
     """
     RoboCasa fixture categories that this adapter knows how to map to a SemanticAnnotation subclass.
     """
@@ -147,25 +147,27 @@ class RoboCasaCategoryResolver:
 
 
 @dataclass
-class RoboCasaFixtureResolver(RoboCasaCategoryResolver):
+class RoboCasaKitchenApplianceResolver(RoboCasaCategoryResolver):
     """
     Resolves RoboCasa fixture categories (the module names under ``robocasa.models.fixtures``, or
     the fixture's Python class name) to the matching SemanticAnnotation subclass.
     """
 
-    category_to_annotation_class: ClassVar[Dict[RoboCasaFixtureCategory, Type[HasRootBody]]] = {
-        RoboCasaFixtureCategory.CABINET: Cabinet,
-        RoboCasaFixtureCategory.DRAWER: Drawer,
-        RoboCasaFixtureCategory.FRIDGE: Fridge,
-        RoboCasaFixtureCategory.MICROWAVE: Microwave,
-        RoboCasaFixtureCategory.OVEN: Oven,
-        RoboCasaFixtureCategory.DISHWASHER: Dishwasher,
-        RoboCasaFixtureCategory.HOOD: Hood,
-        RoboCasaFixtureCategory.COUNTER: CounterTop,
-        RoboCasaFixtureCategory.SINK: Sink,
-        RoboCasaFixtureCategory.STOVE: Cooktop,
-        RoboCasaFixtureCategory.TOASTER: Toaster,
-        RoboCasaFixtureCategory.COFFEE_MACHINE: CoffeeMachine,
+    category_to_annotation_class: ClassVar[
+        Dict[RoboCasaKitchenApplianceCategory, Type[HasRootBody]]
+    ] = {
+        RoboCasaKitchenApplianceCategory.CABINET: Cabinet,
+        RoboCasaKitchenApplianceCategory.DRAWER: Drawer,
+        RoboCasaKitchenApplianceCategory.FRIDGE: Fridge,
+        RoboCasaKitchenApplianceCategory.MICROWAVE: Microwave,
+        RoboCasaKitchenApplianceCategory.OVEN: Oven,
+        RoboCasaKitchenApplianceCategory.DISHWASHER: Dishwasher,
+        RoboCasaKitchenApplianceCategory.HOOD: Hood,
+        RoboCasaKitchenApplianceCategory.COUNTER: CounterTop,
+        RoboCasaKitchenApplianceCategory.SINK: Sink,
+        RoboCasaKitchenApplianceCategory.STOVE: Cooktop,
+        RoboCasaKitchenApplianceCategory.TOASTER: Toaster,
+        RoboCasaKitchenApplianceCategory.COFFEE_MACHINE: CoffeeMachine,
     }
 
 
