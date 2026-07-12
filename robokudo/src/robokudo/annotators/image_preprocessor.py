@@ -26,7 +26,7 @@ from typing_extensions import TYPE_CHECKING, Optional
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing
-from robokudo.utils.annotator_helper import scale_cam_intrinsics
+from robokudo.utils.annotator_helper import scale_camera_intrinsics
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 
 if TYPE_CHECKING:
@@ -106,7 +106,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
 
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        self.cam_intrinsics = copy.deepcopy(
+        self.camera_intrinsics = copy.deepcopy(
             self.get_cas().get(CASViews.CAMERA_INTRINSIC)
         )
 
@@ -115,7 +115,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         else:
             self.get_annotator_output_struct().set_image(self.color)
 
-        scale_cam_intrinsics(self)
+        scale_camera_intrinsics(self)
 
         resized_color = None
         try:
@@ -148,10 +148,10 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         )
 
         cloud = o3d.geometry.PointCloud.create_from_rgbd_image(
-            rgbd_image, self.cam_intrinsics
+            rgbd_image, self.camera_intrinsics
         )
 
-        self.get_cas().set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, self.cam_intrinsics)
+        self.get_cas().set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, self.camera_intrinsics)
 
         self.get_cas().set_ref(CASViews.CLOUD, cloud)
         self.get_annotator_output_struct().set_geometries(

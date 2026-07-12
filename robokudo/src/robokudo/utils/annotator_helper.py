@@ -24,7 +24,7 @@ from robokudo.exceptions import ColorToDepthRatioMissing
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
-from robokudo.utils.o3d_helper import scale_o3d_cam_intrinsics
+from robokudo.utils.o3d_helper import scale_o3d_camera_intrinsics
 from robokudo.utils.transform import (
     get_transform_matrix_from_q,
     get_translation_from_transform_matrix,
@@ -37,7 +37,9 @@ if TYPE_CHECKING:
     from robokudo.cas import CAS
 
 
-def transform_pose_from_cam_to_world(cas: CAS, pose: PoseAnnotation) -> PoseAnnotation:
+def transform_pose_from_camera_to_world(
+    cas: CAS, pose: PoseAnnotation
+) -> PoseAnnotation:
     """Transform pose from camera to world coordinates.
 
     Uses transform from CAS to convert pose from camera frame to world frame.
@@ -49,9 +51,9 @@ def transform_pose_from_cam_to_world(cas: CAS, pose: PoseAnnotation) -> PoseAnno
     """
     pose_mat = get_transform_matrix_from_q(pose.rotation, pose.translation)
 
-    cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
+    camera_to_world_transform = get_camera_to_world_transform_matrix(cas)
 
-    pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
+    pose_in_world_mat = np.matmul(camera_to_world_transform, pose_mat)
 
     new_pose = PoseAnnotation()
     new_pose.rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
@@ -63,7 +65,9 @@ def transform_pose_from_cam_to_world(cas: CAS, pose: PoseAnnotation) -> PoseAnno
     return new_pose
 
 
-def transform_pose_from_world_to_cam(cas: CAS, pose: PoseAnnotation) -> PoseAnnotation:
+def transform_pose_from_world_to_camera(
+    cas: CAS, pose: PoseAnnotation
+) -> PoseAnnotation:
     """Transform pose from world to camera coordinates.
 
     Uses transform from CAS to convert pose from world frame to camera frame.
@@ -74,18 +78,20 @@ def transform_pose_from_world_to_cam(cas: CAS, pose: PoseAnnotation) -> PoseAnno
     :raises AssertionError: If camera-to-world transform not in CAS
     """
     pose_mat = get_transform_matrix_from_q(pose.rotation, pose.translation)
-    world_to_cam_transform = get_world_to_cam_transform_matrix(cas)
+    world_to_camera_transform = get_world_to_camera_transform_matrix(cas)
 
-    pose_in_cam_mat = np.matmul(world_to_cam_transform, pose_mat)
+    pose_in_camera_mat = np.matmul(world_to_camera_transform, pose_mat)
 
     new_pose = PoseAnnotation()
-    new_pose.rotation = list(get_quaternion_from_transform_matrix(pose_in_cam_mat))
-    new_pose.translation = list(get_translation_from_transform_matrix(pose_in_cam_mat))
+    new_pose.rotation = list(get_quaternion_from_transform_matrix(pose_in_camera_mat))
+    new_pose.translation = list(
+        get_translation_from_transform_matrix(pose_in_camera_mat)
+    )
 
     return new_pose
 
 
-def transform_cloud_from_cam_to_world(
+def transform_cloud_from_camera_to_world(
     cas: CAS, cloud: o3d.geometry.PointCloud, transform_inplace: bool = False
 ) -> o3d.geometry.PointCloud:
     """Transform point cloud from camera to world coordinates.
@@ -98,14 +104,14 @@ def transform_cloud_from_cam_to_world(
     :return: Transformed point cloud in world coordinates
     :raises KeyError: If camera-to-world transform not in CAS
     """
-    t = get_cam_to_world_transform_matrix(cas)
+    t = get_camera_to_world_transform_matrix(cas)
 
     if transform_inplace:
         return cloud.transform(t)
     return deepcopy(cloud).transform(t)
 
 
-def transform_cloud_from_world_to_cam(
+def transform_cloud_from_world_to_camera(
     cas: CAS, cloud: o3d.geometry.PointCloud, transform_inplace: bool = False
 ) -> o3d.geometry.PointCloud:
     """Transform point cloud from world to camera coordinates.
@@ -120,39 +126,39 @@ def transform_cloud_from_world_to_cam(
     :return: Transformed point cloud in camera coordinates
     :raises KeyError: If camera-to-world transform not in CAS
     """
-    t = get_world_to_cam_transform_matrix(cas)
+    t = get_world_to_camera_transform_matrix(cas)
 
     if transform_inplace:
         return cloud.transform(t)
     return deepcopy(cloud).transform(t)
 
 
-def get_cam_to_world_transform_matrix(cas: CAS) -> npt.NDArray:
+def get_camera_to_world_transform_matrix(cas: CAS) -> npt.NDArray:
     """Get camera-to-world transform matrix from CAS.
 
     :param cas: CAS containing camera-to-world transform
     :return: 4x4 camera-to-world transform matrix
     :raises KeyError: If camera-to-world transform not in CAS
     """
-    if cas.cam_to_world_transform is None:
+    if cas.camera_to_world_transform is None:
         raise KeyError(
             "Camera-to-world transform not found in CAS. "
             "Is lookup_viewpoint in camera config set to True? "
             "Or if reading from a database: Has the data been recorded with lookup_viewpoint set to true?"
         )
-    return cas.cam_to_world_transform.to_np()
+    return cas.camera_to_world_transform.to_np()
 
 
-def get_world_to_cam_transform_matrix(cas: CAS) -> npt.NDArray:
+def get_world_to_camera_transform_matrix(cas: CAS) -> npt.NDArray:
     """Get world-to-camera transform matrix from CAS.
 
     :param cas: CAS containing camera-to-world transform
     :return: 4x4 world-to-camera transform matrix
     :raises KeyError: If camera-to-world transform not in CAS
     """
-    world_to_cam_transform = np.linalg.inv(get_cam_to_world_transform_matrix(cas))
+    world_to_camera_transform = np.linalg.inv(get_camera_to_world_transform_matrix(cas))
 
-    return world_to_cam_transform
+    return world_to_camera_transform
 
 
 def draw_bounding_boxes_from_object_hypotheses(
@@ -190,14 +196,14 @@ def draw_bounding_boxes_from_object_hypotheses(
         )
 
 
-def scale_cam_intrinsics(annotator: BaseAnnotator) -> None:
+def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
     """Scale camera intrinsics based on color-to-depth ratio.
 
     If the color2depth ratio is not 1,1, we will usually scale the color image to the same size
-    the depth image has. This also requires an adjustment of the cam intrinsics.
+    the depth image has. This also requires an adjustment of the camera intrinsics.
 
-    If color2depth ratio is not 1,1, we'll scale the cam intrinsics in annotator.
-    You need to have a self.cam_intrinsics variable!
+    If color2depth ratio is not 1,1, we'll scale the camera intrinsics in annotator.
+    You need to have a self.camera_intrinsics variable!
 
     :param annotator: Annotator containing camera parameters
     """
@@ -205,8 +211,8 @@ def scale_cam_intrinsics(annotator: BaseAnnotator) -> None:
     c2d_ratio_x = color2depth_ratio[0]
     c2d_ratio_y = color2depth_ratio[1]
     if color2depth_ratio != (1, 1):
-        annotator.cam_intrinsics = scale_o3d_cam_intrinsics(
-            annotator.cam_intrinsics, c2d_ratio_x, c2d_ratio_y
+        annotator.camera_intrinsics = scale_o3d_camera_intrinsics(
+            annotator.camera_intrinsics, c2d_ratio_x, c2d_ratio_y
         )
 
 

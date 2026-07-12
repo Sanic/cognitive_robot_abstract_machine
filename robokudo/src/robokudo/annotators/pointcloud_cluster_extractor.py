@@ -50,7 +50,7 @@ DILATION_KERNEL = np.ones((3, 3), np.uint8)
 def generate_roi_with_mask_from_points(
     image_height: int,
     image_width: int,
-    pc_cam_intrinsics: o3d.camera.PinholeCameraIntrinsic,
+    pointcloud_camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
     cloud: o3d.geometry.PointCloud,
     color2depth_ratio: Tuple[int, int] = (1, 1),
 ) -> Tuple[ImageROI, npt.NDArray]:
@@ -64,7 +64,7 @@ def generate_roi_with_mask_from_points(
 
     :param image_height: Height of the target image
     :param image_width: Width of the target image
-    :param pc_cam_intrinsics: Camera intrinsic parameters
+    :param pointcloud_camera_intrinsics: Camera intrinsic parameters
     :param cloud: Point cloud to project
     :param color2depth_ratio: Scale ratio between color and depth images
     :return: Tuple of (ROI with mask, full image mask)
@@ -73,7 +73,7 @@ def generate_roi_with_mask_from_points(
 
     # Project 3D points to image plane for ROI generation
     # This will project the matched points into the full-size input image
-    k = pc_cam_intrinsics.intrinsic_matrix
+    k = pointcloud_camera_intrinsics.intrinsic_matrix
     cropped_3d_points = np.asarray(cloud.points)
     uvd = cropped_3d_points @ k.T
     x = (uvd[:, 0] / uvd[:, 2]).astype(int)
@@ -303,8 +303,12 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         self.rk_logger.info("PCE Start")
         cloud = self.get_cas().get(CASViews.CLOUD)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        pc_cam_intrinsics = self.get_cas().get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
-        assert isinstance(pc_cam_intrinsics, o3d.camera.PinholeCameraIntrinsic)
+        pointcloud_camera_intrinsics = self.get_cas().get(
+            CASViews.POINTCLOUD_CAMERA_INTRINSIC
+        )
+        assert isinstance(
+            pointcloud_camera_intrinsics, o3d.camera.PinholeCameraIntrinsic
+        )
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         height, width, d = color.shape
@@ -380,7 +384,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
                 generate_roi_with_mask_from_points(
                     image_height=height,
                     image_width=width,
-                    pc_cam_intrinsics=pc_cam_intrinsics,
+                    pointcloud_camera_intrinsics=pointcloud_camera_intrinsics,
                     cloud=cluster_cloud,
                     color2depth_ratio=color2depth_ratio,
                 )
@@ -494,8 +498,12 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        pc_cam_intrinsics = self.get_cas().get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
-        assert isinstance(pc_cam_intrinsics, o3d.camera.PinholeCameraIntrinsic)
+        pointcloud_camera_intrinsics = self.get_cas().get(
+            CASViews.POINTCLOUD_CAMERA_INTRINSIC
+        )
+        assert isinstance(
+            pointcloud_camera_intrinsics, o3d.camera.PinholeCameraIntrinsic
+        )
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         height, width, d = color.shape
@@ -552,7 +560,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
                 generate_roi_with_mask_from_points(
                     image_height=height,
                     image_width=width,
-                    pc_cam_intrinsics=pc_cam_intrinsics,
+                    pointcloud_camera_intrinsics=pointcloud_camera_intrinsics,
                     cloud=cluster_cloud,
                     color2depth_ratio=color2depth_ratio,
                 )

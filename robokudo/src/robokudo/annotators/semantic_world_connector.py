@@ -19,7 +19,7 @@ from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
     draw_bounding_boxes_from_object_hypotheses,
-    transform_pose_from_cam_to_world,
+    transform_pose_from_camera_to_world,
 )
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 from robokudo.world import world_instance
@@ -114,7 +114,7 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
         self, object_hypotheses: list[ObjectHypothesis], cas: CAS
     ) -> None:
         """Add world-frame stamped poses to hypotheses when a camera pose is available."""
-        if cas.cam_to_world_transform is None:
+        if cas.camera_to_world_transform is None:
             return
 
         for object_hypothesis in object_hypotheses:
@@ -122,7 +122,7 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
             if pose_annotation is None:
                 continue
 
-            pose_in_world = transform_pose_from_cam_to_world(cas, pose_annotation)
+            pose_in_world = transform_pose_from_camera_to_world(cas, pose_annotation)
             stamped_pose = StampedPoseAnnotation()
             stamped_pose.source = self.get_class_name()
             stamped_pose.translation = pose_in_world.translation

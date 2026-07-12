@@ -14,7 +14,7 @@ from geometry_msgs.msg import Vector3, PoseStamped
 from typing_extensions import TYPE_CHECKING, Type, Optional, TypeVar, Generic
 
 from robokudo_msgs.msg import ShapeSize
-from robokudo.utils.annotator_helper import transform_pose_from_cam_to_world
+from robokudo.utils.annotator_helper import transform_pose_from_camera_to_world
 from robokudo.defs import PACKAGE_NAME
 from robokudo.cas import CASViews
 from robokudo.types.annotation import (
@@ -172,8 +172,8 @@ class Classification2ODConverter(Annotation2ODConverter[Classification]):
 
 
 # class PoseBase2ODConverter(Annotation2ODConverter):
-#    def transform_cam_pose_to_world_pose(self, annotation: Annotation, cas: CAS) -> PoseAnnotation:
-#        return transform_pose_from_cam_to_world(cas, annotation)
+#    def transform_camera_pose_to_world_pose(self, annotation: Annotation, cas: CAS) -> PoseAnnotation:
+#        return transform_pose_from_camera_to_world(cas, annotation)
 #
 #    def pose_stamped_from_pose_annotation(self, pose_annotation: PoseAnnotation) -> PoseStamped:
 #        """
@@ -242,25 +242,25 @@ class Pose2ODConverter(Annotation2ODConverter[PoseAnnotation]):
         """Converts the data of the given annotation to data in the given object designator. Modifies the object designator in-place.
 
         Use `self.can_convert` to check whether the converter is able to convert the given annotation to an object designator.
-        Conversion requires a valid cam to world transform in the given CAS.
+        Conversion requires a valid camera to world transform in the given CAS.
 
         :param annotation: The annotation to convert.
         :param cas: The CAS to use for conversion.
         :param object_designator: The object designator to fill with the data of `annotation`
         """
-        use_cam_coords = cas.cam_to_world_transform is None
-        if use_cam_coords:
+        use_camera_coords = cas.camera_to_world_transform is None
+        if use_camera_coords:
             pose_annotation = annotation
         else:
-            pose_annotation = transform_pose_from_cam_to_world(cas, annotation)
+            pose_annotation = transform_pose_from_camera_to_world(cas, annotation)
 
         # First, convert the PoseAnnotation to a StampedPose
         spa = self.pose_converter.convert(pose_annotation)
         # Fill the missing header information
         spa.timestamp = cas.get(CASViews.CAMERA_INFO).header.stamp.sec
 
-        # For the frame, check if we should return cam or world coordinates based on the previous check
-        if use_cam_coords:
+        # For the frame, check if we should return camera or world coordinates based on the previous check
+        if use_camera_coords:
             spa.frame = cas.get(CASViews.CAMERA_INFO).header.frame_id
         else:
             spa.frame = "map"
@@ -284,7 +284,7 @@ class Position2ODConverter(Annotation2ODConverter[PositionAnnotation]):
         """Converts the data of the given annotation to data in the given object designator. Modifies the object designator in-place.
 
         Use `self.can_convert` to check whether the converter is able to convert the given annotation to an object designator.
-        Conversion requires a valid cam to world transform in the given CAS.
+        Conversion requires a valid camera to world transform in the given CAS.
 
         :param annotation: The annotation to convert.
         :param cas: The CAS to use for conversion.
@@ -301,7 +301,7 @@ class Position2ODConverter(Annotation2ODConverter[PositionAnnotation]):
         pos.rotation.insert(2, 0)
         pos.rotation.insert(3, 1)
 
-        pose_map = transform_pose_from_cam_to_world(cas, pos)
+        pose_map = transform_pose_from_camera_to_world(cas, pos)
 
         # Must be a PoseStamped due to type specification in ros message
         ps = PoseStamped()
@@ -337,7 +337,7 @@ class StampedPosition2ODConverter(Annotation2ODConverter[StampedPositionAnnotati
         """Converts the data of the given annotation to data in the given object designator. Modifies the object designator in-place.
 
         Use `self.can_convert` to check whether the converter is able to convert the given annotation to an object designator.
-        Conversion requires a valid cam to world transform in the given CAS.
+        Conversion requires a valid camera to world transform in the given CAS.
 
         :param annotation: The annotation to convert.
         :param cas: The CAS to use for conversion.
@@ -355,7 +355,7 @@ class StampedPosition2ODConverter(Annotation2ODConverter[StampedPositionAnnotati
         pos.rotation.insert(2, 0)
         pos.rotation.insert(3, 1)
 
-        pose_map = transform_pose_from_cam_to_world(cas, pos)
+        pose_map = transform_pose_from_camera_to_world(cas, pos)
 
         # Must be a PoseStamped due to type specification in ros message
         ps = PoseStamped()

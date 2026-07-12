@@ -22,7 +22,7 @@ class DepthComponent:
 class ColorComponent:
     """Camera component with configuration for color input data."""
 
-    topic_cam_info: str
+    topic_camera_info: str
     """ROS camera info topic name. Must be set by camera configs using this component."""
 
     topic_color: str

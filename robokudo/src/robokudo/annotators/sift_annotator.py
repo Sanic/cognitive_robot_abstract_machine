@@ -41,7 +41,7 @@ class SIFTAnnotator(ThreadedAnnotator):
         if len(ohs) == 0:
             return Status.FAILURE
 
-        intrinsic = cas.cam_intrinsic
+        intrinsic = cas.camera_intrinsic
         if intrinsic is None:
             return Status.FAILURE
 

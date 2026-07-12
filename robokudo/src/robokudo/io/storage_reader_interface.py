@@ -93,7 +93,7 @@ class StorageReaderInterface(CameraInterface):
             cas_frame,
             excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
         )
-        self._restore_cam_to_world_transform(cas_frame)
+        self._restore_camera_to_world_transform(cas_frame)
 
         # Bring flat CAS representation into the proper CAS class
         for view_name, view_content in cas_frame["views"].items():
@@ -107,35 +107,35 @@ class StorageReaderInterface(CameraInterface):
             # no depth image available
             AnnotatorPredefinedParameters.global_with_depth = False
 
-        # Compute the cam intrinsic from the cam info.
+        # Compute the camera intrinsic from the camera info.
         # this is harder to serialize and put transparently into mongo as of today, so we'll do it here
-        # Construct o3d camera intrinsics from cam info in CAS
+        # Construct o3d camera intrinsics from camera info in CAS
 
-        # TODO this can be unified with the cam intrinsic creation in the cam interface. Check
-        #  ROSCamInterface.set_o3d_cam_intrinsics_from_ros_cam_info
-        #  => type_conversion.o3d_cam_intrinsics_from_ros_cam_info(cam_info):
+        # TODO this can be unified with the camera intrinsic creation in the camera interface. Check
+        #  ROSCameraInterface.set_o3d_camera_intrinsics_from_ros_camera_info
+        #  => type_conversion.o3d_camera_intrinsics_from_ros_camera_info(camera_info):
         if "cam_info" in cas_frame["views"]:
-            cam_info = cas_frame["views"]["cam_info"]
+            camera_info = cas_frame["views"]["cam_info"]
 
-            if cam_info is None:
+            if camera_info is None:
                 # nothing to do
                 return
 
-            width = cam_info.width
+            width = camera_info.width
             height = 960  # we assume that the kinect right now only outputs 1280x... images with the 4:3 crop
-            fx = cam_info.k[0]
-            cx = cam_info.k[2]
-            fy = cam_info.k[4]
-            cy = cam_info.k[5]
-            cam_intrinsic = o3d.camera.PinholeCameraIntrinsic(
+            fx = camera_info.k[0]
+            cx = camera_info.k[2]
+            fy = camera_info.k[4]
+            cy = camera_info.k[5]
+            camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(
                 width, height, fx, fy, cx, cy
             )
-            cas.set(CASViews.CAMERA_INTRINSIC, cam_intrinsic)
+            cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
 
-    def _restore_cam_to_world_transform(self, cas_frame: dict) -> None:
+    def _restore_camera_to_world_transform(self, cas_frame: dict) -> None:
         """Restore the stored camera pose as a transform bound to the running world.
 
-        The serialized ``CAM_TO_WORLD_TRANSFORM`` may reference bodies from the
+        The serialized ``CAMERA_TO_WORLD_TRANSFORM`` may reference bodies from the
         recorded world. This method decodes the numeric transform, resolves the
         intended frame names, creates/updates the matching bodies in the current
         RoboKudo world, and stores the rebound transform in ``cas_frame["views"]``.
@@ -165,16 +165,16 @@ class StorageReaderInterface(CameraInterface):
             return
 
         stored_transform, world_frame, camera_frame = (
-            self._decode_stored_cam_to_world_transform(view_document, cas_frame)
+            self._decode_stored_camera_to_world_transform(view_document, cas_frame)
         )
-        rebound_transform = self._rebind_cam_to_world_transform(
+        rebound_transform = self._rebind_camera_to_world_transform(
             stored_transform=stored_transform,
             world_frame=world_frame,
             camera_frame=camera_frame,
         )
         cas_frame["views"][CASViews.CAMERA_TO_WORLD_TRANSFORM] = rebound_transform
 
-    def _decode_stored_cam_to_world_transform(
+    def _decode_stored_camera_to_world_transform(
         self, view_document: dict, cas_frame: dict
     ) -> tuple[HomogeneousTransformationMatrix, str, str]:
         """Decode a stored camera transform and determine its frame names.
@@ -210,7 +210,7 @@ class StorageReaderInterface(CameraInterface):
         return HomogeneousTransformationMatrix.from_json(payload_without_frames)
 
     @staticmethod
-    def _rebind_cam_to_world_transform(
+    def _rebind_camera_to_world_transform(
         stored_transform: HomogeneousTransformationMatrix,
         world_frame: str,
         camera_frame: str,

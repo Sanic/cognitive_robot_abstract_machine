@@ -32,10 +32,10 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _cam_info_k_values(cam_info):
-    if hasattr(cam_info, "k"):
-        return list(cam_info.k)
-    return list(cam_info.K)
+def _camera_info_k_values(camera_info):
+    if hasattr(camera_info, "k"):
+        return list(camera_info.k)
+    return list(camera_info.K)
 
 
 def _build_writer_pipeline(db_name: str) -> Pipeline:
@@ -128,21 +128,21 @@ class TestStorageRoundtripPipeline:
                 equal_nan=True,
             )
 
-            writer_cam_info = writer_pipeline.cas.get(CASViews.CAMERA_INFO)
-            reader_cam_info = reader_pipeline.cas.get(CASViews.CAMERA_INFO)
-            assert writer_cam_info.width == reader_cam_info.width
-            assert writer_cam_info.height == reader_cam_info.height
-            assert _cam_info_k_values(writer_cam_info) == _cam_info_k_values(
-                reader_cam_info
+            writer_camera_info = writer_pipeline.cas.get(CASViews.CAMERA_INFO)
+            reader_camera_info = reader_pipeline.cas.get(CASViews.CAMERA_INFO)
+            assert writer_camera_info.width == reader_camera_info.width
+            assert writer_camera_info.height == reader_camera_info.height
+            assert _camera_info_k_values(writer_camera_info) == _camera_info_k_values(
+                reader_camera_info
             )
 
-            writer_cam_intrinsic = writer_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
-            reader_cam_intrinsic = reader_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
-            assert writer_cam_intrinsic.width == reader_cam_intrinsic.width
-            assert writer_cam_intrinsic.height == reader_cam_intrinsic.height
+            writer_camera_intrinsic = writer_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
+            reader_camera_intrinsic = reader_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
+            assert writer_camera_intrinsic.width == reader_camera_intrinsic.width
+            assert writer_camera_intrinsic.height == reader_camera_intrinsic.height
             np.testing.assert_allclose(
-                writer_cam_intrinsic.intrinsic_matrix,
-                reader_cam_intrinsic.intrinsic_matrix,
+                writer_camera_intrinsic.intrinsic_matrix,
+                reader_camera_intrinsic.intrinsic_matrix,
             )
 
             assert writer_pipeline.cas.get(CASViews.COLOR2DEPTH_RATIO) == (

@@ -15,7 +15,7 @@ from robokudo.types.annotation import PoseAnnotation, TSDFAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.comparators import TranslationComparator
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
-from robokudo.utils.o3d_helper import scale_o3d_cam_intrinsics
+from robokudo.utils.o3d_helper import scale_o3d_camera_intrinsics
 from robokudo.utils.transform import get_transform_matrix_from_q
 
 if TYPE_CHECKING:
@@ -137,10 +137,12 @@ class TSDFAnnotator(ThreadedAnnotator):
         if len(oh_data) == 0:
             return Status.FAILURE
 
-        cam_intrinsic: o3d.camera.PinholeCameraIntrinsic = scale_o3d_cam_intrinsics(
-            cas.get(CASViews.CAMERA_INTRINSIC),
-            color2depth_ratio[0],
-            color2depth_ratio[1],
+        camera_intrinsic: o3d.camera.PinholeCameraIntrinsic = (
+            scale_o3d_camera_intrinsics(
+                cas.get(CASViews.CAMERA_INTRINSIC),
+                color2depth_ratio[0],
+                color2depth_ratio[1],
+            )
         )
         color_image: npt.NDArray[np.uint8] = get_scaled_color_image_for_depth_image(
             cas, copy.deepcopy(self.get_cas().get(CASViews.COLOR_IMAGE))
@@ -194,7 +196,9 @@ class TSDFAnnotator(ThreadedAnnotator):
                 )
             )
 
-            pose_in_cam = get_transform_matrix_from_q(pose.rotation, pose.translation)
+            pose_in_camera = get_transform_matrix_from_q(
+                pose.rotation, pose.translation
+            )
 
             tracked_object = self.find_tracked_object(pose)
             if tracked_object is not None:
@@ -213,16 +217,16 @@ class TSDFAnnotator(ThreadedAnnotator):
                     }
                 )
 
-            # Integrate with pose in cam
+            # Integrate with pose in camera coordinates
             volume.integrate(
                 rgbd_masked,
-                intrinsic=cam_intrinsic,
-                extrinsic=pose_in_cam,
+                intrinsic=camera_intrinsic,
+                extrinsic=pose_in_camera,
             )
 
             volume_an = TSDFAnnotation(source=self.name)
             volume_an.volume = volume
-            volume_an.transform = pose_in_cam
+            volume_an.transform = pose_in_camera
             oh.annotations.append(volume_an)
 
             vis_mode = self.descriptor.parameters.geometry_visualization_mode

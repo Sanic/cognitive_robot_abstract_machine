@@ -294,7 +294,7 @@ class TestStorage:
         with pytest.raises(TypeError):
             Storage.generate_dict_from_real_cas(cas)
 
-    def test_cam_to_world_transform_roundtrip_preserves_world_references(
+    def test_camera_to_world_transform_roundtrip_preserves_world_references(
         self, storage_instance, cas_data
     ):
         world_frame = f"map_{uuid.uuid4().hex[:8]}"
@@ -319,7 +319,7 @@ class TestStorage:
             child_frame=camera_body,
             reference_frame=world_body,
         )
-        cas_data.cam_to_world_transform = transform
+        cas_data.camera_to_world_transform = transform
 
         result = store_cas_in_storage(storage_instance, cas_data)
         assert result.acknowledged
@@ -357,7 +357,7 @@ class TestStorage:
         assert str(restored_transform.child_frame.name) == str(camera_body.name)
         assert str(restored_transform.reference_frame.name) == str(world_body.name)
 
-    def test_storage_reader_rebinds_cam_to_world_transform_to_running_world(
+    def test_storage_reader_rebinds_camera_to_world_transform_to_running_world(
         self, storage_instance, cas_data
     ):
         stored_world_frame = f"stored_map_{uuid.uuid4().hex[:8]}"
@@ -382,7 +382,7 @@ class TestStorage:
             child_frame=stored_camera_body,
             reference_frame=stored_world_body,
         )
-        cas_data.cam_to_world_transform = transform
+        cas_data.camera_to_world_transform = transform
 
         result = store_cas_in_storage(storage_instance, cas_data)
         assert result.acknowledged
@@ -403,7 +403,7 @@ class TestStorage:
             retrieved_cas_record,
             excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
         )
-        reader._restore_cam_to_world_transform(retrieved_cas_record)
+        reader._restore_camera_to_world_transform(retrieved_cas_record)
 
         restored_transform = retrieved_cas_record["views"][
             CASViews.CAMERA_TO_WORLD_TRANSFORM

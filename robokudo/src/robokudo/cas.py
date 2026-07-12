@@ -91,7 +91,7 @@ class CASViews(StrEnum):
     """Name of the camera frame."""
 
     VIEWPOINT_CAMERA_TO_WORLD = "viewpoint_cam_to_world"
-    """Deprecated: Use CAM_TO_WORLD_TRANSFORM instead.
+    """Deprecated: Use CAMERA_TO_WORLD_TRANSFORM instead.
     Camera to world transform.
     Type: robokudo.types.tf.StampedTransform"""
 
@@ -147,7 +147,7 @@ class CAS:
     views: Dict[str, Any] = field(default_factory=dict)
     """Dictionary storing view data, each view stores data that is typically singular for a single CAS.
     
-    Example: Sensor data, cam info and cloud which are read from the sensors.
+    Example: Sensor data, camera info and cloud which are read from the sensors.
     """
 
     annotations: List[Annotation] = field(default_factory=list)
@@ -187,27 +187,31 @@ class CAS:
         self.views[CASViews.COLOR2DEPTH_RATIO] = value
 
     @property
-    def cam_info(self) -> Optional[CameraInfo]:
+    def camera_info(self) -> Optional[CameraInfo]:
         return self.views.get(CASViews.CAMERA_INFO)
 
-    @cam_info.setter
-    def cam_info(self, value: CameraInfo) -> None:
+    @camera_info.setter
+    def camera_info(self, value: CameraInfo) -> None:
         self.views[CASViews.CAMERA_INFO] = value
 
     @property
-    def cam_intrinsic(self) -> Optional[o3d.camera.PinholeCameraIntrinsic]:
+    def camera_intrinsic(self) -> Optional[o3d.camera.PinholeCameraIntrinsic]:
         return self.views.get(CASViews.CAMERA_INTRINSIC)
 
-    @cam_intrinsic.setter
-    def cam_intrinsic(self, value: o3d.camera.PinholeCameraIntrinsic) -> None:
+    @camera_intrinsic.setter
+    def camera_intrinsic(self, value: o3d.camera.PinholeCameraIntrinsic) -> None:
         self.views[CASViews.CAMERA_INTRINSIC] = value
 
     @property
-    def pc_cam_intrinsic(self) -> Optional[o3d.camera.PinholeCameraIntrinsic]:
+    def pointcloud_camera_intrinsic(
+        self,
+    ) -> Optional[o3d.camera.PinholeCameraIntrinsic]:
         return self.views.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
 
-    @pc_cam_intrinsic.setter
-    def pc_cam_intrinsic(self, value: o3d.camera.PinholeCameraIntrinsic) -> None:
+    @pointcloud_camera_intrinsic.setter
+    def pointcloud_camera_intrinsic(
+        self, value: o3d.camera.PinholeCameraIntrinsic
+    ) -> None:
         self.views[CASViews.POINTCLOUD_CAMERA_INTRINSIC] = value
 
     @property
@@ -228,40 +232,40 @@ class CAS:
         self.views[CASViews.WORLD_FRAME] = value
 
     @property
-    def cam_frame(self) -> Optional[str]:
+    def camera_frame(self) -> Optional[str]:
         """Name of the camera frame."""
         return self.views.get(CASViews.CAMERA_FRAME)
 
-    @cam_frame.setter
-    def cam_frame(self, value: str) -> None:
+    @camera_frame.setter
+    def camera_frame(self, value: str) -> None:
         self.views[CASViews.CAMERA_FRAME] = value
 
     @property
-    def viewpoint_cam_to_world(self) -> Optional[StampedTransform]:
+    def viewpoint_camera_to_world(self) -> Optional[StampedTransform]:
         warnings.warn(
-            "CAS.viewpoint_cam_to_world is deprecated. "
-            "Use CAS.cam_to_world_transform instead.",
+            "CAS.viewpoint_camera_to_world is deprecated. "
+            "Use CAS.camera_to_world_transform instead.",
             DeprecationWarning,
             stacklevel=2,
         )
         return self.views.get(CASViews.VIEWPOINT_CAMERA_TO_WORLD)
 
-    @viewpoint_cam_to_world.setter
-    def viewpoint_cam_to_world(self, value: StampedTransform) -> None:
+    @viewpoint_camera_to_world.setter
+    def viewpoint_camera_to_world(self, value: StampedTransform) -> None:
         warnings.warn(
-            "CAS.viewpoint_cam_to_world is deprecated. "
-            "Use CAS.cam_to_world_transform instead.",
+            "CAS.viewpoint_camera_to_world is deprecated. "
+            "Use CAS.camera_to_world_transform instead.",
             DeprecationWarning,
             stacklevel=2,
         )
         self.views[CASViews.VIEWPOINT_CAMERA_TO_WORLD] = value
 
     @property
-    def cam_to_world_transform(self) -> Optional[HomogeneousTransformationMatrix]:
+    def camera_to_world_transform(self) -> Optional[HomogeneousTransformationMatrix]:
         return self.views.get(CASViews.CAMERA_TO_WORLD_TRANSFORM)
 
-    @cam_to_world_transform.setter
-    def cam_to_world_transform(self, value: HomogeneousTransformationMatrix) -> None:
+    @camera_to_world_transform.setter
+    def camera_to_world_transform(self, value: HomogeneousTransformationMatrix) -> None:
         self.views[CASViews.CAMERA_TO_WORLD_TRANSFORM] = value
 
     @property

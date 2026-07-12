@@ -29,7 +29,7 @@ from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.utils.type_conversion import ros_cam_info_to_dict
+from robokudo.utils.type_conversion import ros_camera_info_to_dict
 
 
 class FileWriter(BaseAnnotator):
@@ -134,7 +134,7 @@ class FileWriter(BaseAnnotator):
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        cam_info = self.get_cas().get(CASViews.CAMERA_INFO)
+        camera_info = self.get_cas().get(CASViews.CAMERA_INFO)
 
         cv2.imwrite(
             self.generate_full_file_path_(
@@ -149,7 +149,7 @@ class FileWriter(BaseAnnotator):
             depth,
         )
 
-        cam_info_dict = ros_cam_info_to_dict(cam_info)
+        camera_info_dict = ros_camera_info_to_dict(camera_info)
         with open(
             str(
                 self.generate_full_file_path_(
@@ -158,7 +158,7 @@ class FileWriter(BaseAnnotator):
             ),
             "w",
         ) as fp:
-            json.dump(cam_info_dict, fp)
+            json.dump(camera_info_dict, fp)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

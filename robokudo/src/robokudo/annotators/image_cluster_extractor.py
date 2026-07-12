@@ -29,7 +29,7 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing, ImageContourMissing
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.annotator_helper import scale_cam_intrinsics
+from robokudo.utils.annotator_helper import scale_camera_intrinsics
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
@@ -130,7 +130,7 @@ class ImageClusterExtractor(BaseAnnotator):
         self.color: Optional[npt.NDArray] = None
         self.depth: Optional[npt.NDArray] = None
         self.query = None
-        self.cam_intrinsics = None
+        self.camera_intrinsics = None
 
         # TODO Refactor this to new RPC method without using ROS
         # Add variables (name, description, default value, min, max, edit_method)
@@ -210,7 +210,7 @@ class ImageClusterExtractor(BaseAnnotator):
 
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        self.cam_intrinsics = copy.deepcopy(
+        self.camera_intrinsics = copy.deepcopy(
             self.get_cas().get(CASViews.CAMERA_INTRINSIC)
         )
 
@@ -220,7 +220,7 @@ class ImageClusterExtractor(BaseAnnotator):
             resized_color = get_scaled_color_image_for_depth_image(
                 self.get_cas(), self.color
             )
-            scale_cam_intrinsics(self)
+            scale_camera_intrinsics(self)
         except ColorToDepthRatioMissing:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
@@ -315,7 +315,7 @@ class ImageClusterExtractor(BaseAnnotator):
             )
 
             cloud = o3d.geometry.PointCloud.create_from_rgbd_image(
-                rgbd_image, self.cam_intrinsics
+                rgbd_image, self.camera_intrinsics
             )
 
             if self.descriptor.parameters.outlier_removal:

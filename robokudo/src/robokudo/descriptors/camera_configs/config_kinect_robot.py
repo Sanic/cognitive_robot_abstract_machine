@@ -38,7 +38,7 @@ class KinectCameraConfig(
     topic_color: str = "/kinect_head/rgb/image_color/compressed"
     """Overwrite RGBDComponent"""
 
-    topic_cam_info: str = "/kinect_head/rgb/camera_info"
+    topic_camera_info: str = "/kinect_head/rgb/camera_info"
     """Overwrite RGBDComponent"""
 
     color2depth_ratio: Tuple[float, float] = (0.5, 0.5)

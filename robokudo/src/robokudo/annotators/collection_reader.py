@@ -174,11 +174,11 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 f"{self.__class__.__name__}.update(): New CAS id={pipeline.cas.cas_id}"
             )
 
-            cam_config = self.descriptor.parameters.camera_config
-            if issubclass(type(cam_config), TfComponent):
+            camera_config = self.descriptor.parameters.camera_config
+            if issubclass(type(camera_config), TfComponent):
                 cas = self.get_cas()
-                cas.world_frame = cam_config.tf_to
-                cas.cam_frame = cam_config.tf_from
+                cas.world_frame = camera_config.tf_to
+                cas.camera_frame = camera_config.tf_from
 
             # Restore any existing queries
             if query:

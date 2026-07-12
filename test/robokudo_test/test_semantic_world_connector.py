@@ -63,7 +63,7 @@ def _attach_connector_to_pipeline(
     return pipeline
 
 
-def _set_cam_to_world_transform(
+def _set_camera_to_world_transform(
     cas: CAS,
     *,
     pos_x: float = 0.0,
@@ -72,8 +72,8 @@ def _set_cam_to_world_transform(
 ) -> None:
     sem_world = rk_world.world_instance()
     world_body = sem_world.get_body_by_name(cas.world_frame)
-    camera_body = sem_world.get_body_by_name(cas.cam_frame)
-    cas.cam_to_world_transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    camera_body = sem_world.get_body_by_name(cas.camera_frame)
+    cas.camera_to_world_transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=pos_x,
         pos_y=pos_y,
         pos_z=pos_z,
@@ -110,8 +110,8 @@ def semdt_cas() -> CAS:
 
     cas = CAS()
     cas.world_frame = "map"
-    cas.cam_frame = "camera"
-    _set_cam_to_world_transform(cas)
+    cas.camera_frame = "camera"
+    _set_camera_to_world_transform(cas)
 
     yield cas
 
@@ -155,7 +155,7 @@ class TestSemanticDigitalTwinConnector:
         )[0][1]
         assert len(_stamped_world_poses(previous_hypothesis)) == 1
 
-        _set_cam_to_world_transform(semdt_cas, pos_x=1.0)
+        _set_camera_to_world_transform(semdt_cas, pos_x=1.0)
         # Same world pose as the previous hypothesis, seen from a translated camera.
         matched_hypothesis = _make_hypothesis(
             roi=(10, 10, 12, 12), translation=(-1.0, 0.0, 1.0)

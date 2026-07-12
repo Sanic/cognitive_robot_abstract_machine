@@ -6,7 +6,7 @@ import numpy as np
 
 from robokudo.cas import CAS
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.annotator_helper import get_cam_to_world_transform_matrix
+from robokudo.utils.annotator_helper import get_camera_to_world_transform_matrix
 from robokudo.utils.transform import (
     get_transform_matrix_from_q,
     get_quaternion_from_transform_matrix,
@@ -198,13 +198,13 @@ def setup_world_for_camera_frame(
 
         connection_name = PrefixedName(name=f"{camera_frame}_T_{world_frame}")
         if len(rk_world.get_connections_by_name(connection_name)) == 0:
-            cam_T_world = Connection6DoF.create_with_dofs(
+            camera_T_world = Connection6DoF.create_with_dofs(
                 parent=world_body,
                 child=camera_body,
                 world=rk_world,
                 name=connection_name,
             )
-            rk_world.add_connection(cam_T_world)
+            rk_world.add_connection(camera_T_world)
 
 
 def update_connection_transform(
@@ -256,8 +256,8 @@ def _create_world_origin_and_scale_from_latest_bbox(
 
     pose_mat = get_transform_matrix_from_q(bb.pose.rotation, bb.pose.translation)
 
-    cam_to_world_transform = get_cam_to_world_transform_matrix(cas)
-    pose_in_world_mat = np.matmul(cam_to_world_transform, pose_mat)
+    camera_to_world_transform = get_camera_to_world_transform_matrix(cas)
+    pose_in_world_mat = np.matmul(camera_to_world_transform, pose_mat)
 
     rotation = list(get_quaternion_from_transform_matrix(pose_in_world_mat))
     translation = list(get_translation_from_transform_matrix(pose_in_world_mat))

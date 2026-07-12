@@ -69,14 +69,14 @@ class OpenCVCameraConfig(BaseCameraConfig):
     update_global_with_depth_parameter: bool = True
     """Flag to update global depth parameters"""
 
-    cam_info: Dict[str, Any] = None
+    camera_info: Dict[str, Any] = None
     """Camera config as dict"""
 
-    cam_intrinsic = None
+    camera_intrinsic = None
     """Camera intrinsic parameters"""
 
     color2depth_ratio: Tuple[float, float] = (1.0, 1.0)
     """If the resolution of the depth image differs from the color image, we need to define the factor for (x, y)."""
 
-    viewpoint_cam_to_world = None
+    viewpoint_camera_to_world = None
     """Camera to world transformation"""

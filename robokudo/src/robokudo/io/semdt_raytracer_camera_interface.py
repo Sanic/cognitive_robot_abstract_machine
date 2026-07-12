@@ -39,7 +39,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         camera_body = self._ensure_camera_body(world, world_frame_body)
         (
             render_camera_to_world,
-            optical_cam_to_world,
+            optical_camera_to_world,
         ) = self._set_camera_pose(world, world_frame_body, camera_body)
 
         resolution = int(self.camera_config.resolution)
@@ -50,7 +50,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         ray_tracer = world.ray_tracer
         segmentation, depth_m = self._render_segmentation_and_depth(
             ray_tracer=ray_tracer,
-            cam_to_world=render_camera_to_world,
+            camera_to_world=render_camera_to_world,
             resolution=resolution,
             fov_deg=fov_deg,
             min_distance=min_distance,
@@ -60,36 +60,36 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         color_bgr, object_color_map = self._render_color_image(
             world=world,
             ray_tracer=ray_tracer,
-            cam_to_world=render_camera_to_world,
+            camera_to_world=render_camera_to_world,
             segmentation=segmentation,
             resolution=resolution,
             fov_deg=fov_deg,
         )
         depth_mm = self._depth_m_to_mm(depth_m)
 
-        cam_info, cam_intrinsic = self._build_camera_models(
+        camera_info, camera_intrinsic = self._build_camera_models(
             frame_id=self.camera_config.camera_frame,
             resolution=resolution,
             fov_deg=fov_deg,
         )
 
         timestamp_ns = time.time_ns()
-        cam_info.header.stamp.sec = int(timestamp_ns // 1_000_000_000)
-        cam_info.header.stamp.nanosec = int(timestamp_ns % 1_000_000_000)
+        camera_info.header.stamp.sec = int(timestamp_ns // 1_000_000_000)
+        camera_info.header.stamp.nanosec = int(timestamp_ns % 1_000_000_000)
 
         cas.set(CASViews.COLOR_IMAGE, color_bgr)
         cas.set(CASViews.DEPTH_IMAGE, depth_mm)
-        cas.set(CASViews.CAMERA_INFO, cam_info)
-        cas.set(CASViews.CAMERA_INTRINSIC, cam_intrinsic)
+        cas.set(CASViews.CAMERA_INFO, camera_info)
+        cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
         cas.set(CASViews.OBJECT_IMAGE, segmentation)
         cas.set(CASViews.OBJECT_COLOR_MAP, object_color_map)
         # Shared SemDT ground-truth world for this frame. Consumers must treat as read-only.
         cas.set_ref(CASViews.GROUND_TRUTH_WORLD_REFERENCE, world)
 
-        cas.cam_to_world_transform = optical_cam_to_world
+        cas.camera_to_world_transform = optical_camera_to_world
         cas.data_timestamp = timestamp_ns
-        ROSCameraInterface.store_legacy_cam_to_world_transform_from_cas(cas)
+        ROSCameraInterface.store_legacy_camera_to_world_transform_from_cas(cas)
 
     def _load_runtime_world(self) -> World:
         world_descriptor = self.module_loader.load_world_descriptor(
@@ -190,7 +190,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
     @staticmethod
     def _render_segmentation_and_depth(
         ray_tracer,
-        cam_to_world: HomogeneousTransformationMatrix,
+        camera_to_world: HomogeneousTransformationMatrix,
         resolution: int,
         fov_deg: float,
         min_distance: float,
@@ -200,7 +200,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         depth_m = np.zeros((resolution, resolution), dtype=np.float32) - 1.0
 
         ray_origins, ray_directions, pixels = ray_tracer.create_camera_rays(
-            cam_to_world, resolution=resolution, fov=fov_deg
+            camera_to_world, resolution=resolution, fov=fov_deg
         )
         target_points = ray_origins + ray_directions * 10.0
         points, index_ray, bodies = ray_tracer.ray_test(
@@ -232,8 +232,8 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         points_h = np.concatenate(
             [points, np.ones((points.shape[0], 1), dtype=points.dtype)], axis=1
         )
-        points_cam = (world_to_camera @ points_h.T).T
-        z_depth = -points_cam[:, 2]
+        points_camera = (world_to_camera @ points_h.T).T
+        z_depth = -points_camera[:, 2]
         valid_depth = z_depth > 0.0
         pixel_ray = pixel_ray[valid_depth]
         z_depth = z_depth[valid_depth]
@@ -245,7 +245,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         self,
         world: World,
         ray_tracer,
-        cam_to_world: HomogeneousTransformationMatrix,
+        camera_to_world: HomogeneousTransformationMatrix,
         segmentation: np.ndarray,
         resolution: int,
         fov_deg: float,
@@ -254,7 +254,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         if rgb_mode == "trimesh":
             trimesh_image = self._try_render_trimesh_rgb(
                 ray_tracer=ray_tracer,
-                cam_to_world=cam_to_world,
+                camera_to_world=camera_to_world,
                 resolution=resolution,
                 fov_deg=fov_deg,
             )
@@ -272,14 +272,14 @@ class SemDTRayTracerCameraInterface(CameraInterface):
     def _try_render_trimesh_rgb(
         self,
         ray_tracer,
-        cam_to_world: HomogeneousTransformationMatrix,
+        camera_to_world: HomogeneousTransformationMatrix,
         resolution: int,
         fov_deg: float,
     ) -> np.ndarray | None:
         try:
             # Keep RayTracer camera pose/FOV/resolution in sync with this frame.
             ray_tracer.create_camera_rays(
-                cam_to_world, resolution=resolution, fov=fov_deg
+                camera_to_world, resolution=resolution, fov=fov_deg
             )
             png_data = ray_tracer.scene.save_image(
                 resolution=(resolution, resolution), visible=False
@@ -348,13 +348,13 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         cx = (width - 1.0) / 2.0
         cy = (height - 1.0) / 2.0
 
-        cam_info = CameraInfo()
-        cam_info.header.frame_id = frame_id
-        cam_info.width = width
-        cam_info.height = height
-        cam_info.distortion_model = "plumb_bob"
-        cam_info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
-        cam_info.k = [
+        camera_info = CameraInfo()
+        camera_info.header.frame_id = frame_id
+        camera_info.width = width
+        camera_info.height = height
+        camera_info.distortion_model = "plumb_bob"
+        camera_info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
+        camera_info.k = [
             float(focal),
             0.0,
             float(cx),
@@ -365,8 +365,8 @@ class SemDTRayTracerCameraInterface(CameraInterface):
             0.0,
             1.0,
         ]
-        cam_info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
-        cam_info.p = [
+        camera_info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        camera_info.p = [
             float(focal),
             0.0,
             float(cx),
@@ -381,8 +381,8 @@ class SemDTRayTracerCameraInterface(CameraInterface):
             0.0,
         ]
 
-        cam_intrinsic = o3d.camera.PinholeCameraIntrinsic(
+        camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(
             width, height, float(focal), float(focal), float(cx), float(cy)
         )
 
-        return cam_info, cam_intrinsic
+        return camera_info, camera_intrinsic

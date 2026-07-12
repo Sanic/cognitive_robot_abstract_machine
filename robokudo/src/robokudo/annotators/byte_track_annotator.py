@@ -76,7 +76,7 @@ class ByteTrackAnnotator(BaseAnnotator):
         masks = [oh.roi.mask for oh in ohs]
         masks = list(filter(lambda m: m is not None, masks))
         if len(masks) == len(rois_xyxy):
-            cam_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
+            camera_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
                 CASViews.CAMERA_INTRINSIC
             )
 
@@ -84,7 +84,7 @@ class ByteTrackAnnotator(BaseAnnotator):
             restored_masks = []
             for roi, mask in zip(rois_xyxy, masks):
                 restored_mask = np.zeros(
-                    (cam_intrinsic.height, cam_intrinsic.width), dtype=np.uint8
+                    (camera_intrinsic.height, camera_intrinsic.width), dtype=np.uint8
                 )
                 restored_mask[roi[1] : roi[3], roi[0] : roi[2]] = mask
                 restored_masks.append(restored_mask)
