@@ -1,13 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-# Generic, opt-in personal Claude Code notes hook.
+# Generic personal Claude Code notes hook.
 #
 # Populates CLAUDE.local.md (gitignored, never committed on any branch) from a
-# personal branch on `origin` that each contributor names for themselves via
-# local git config, so this stays a complete no-op for anyone who hasn't opted
-# in, and collision-free for multiple contributors sharing one origin remote
-# (each points at their own branch name instead of one hardcoded literal).
+# personal branch on `origin`. No-op in effect for anyone who never creates
+# that branch (default or overridden), and collision-free for multiple
+# contributors sharing one origin remote if each overrides the branch name via
+# local config instead of relying on the shared default.
 #
 # Works out of the box, zero config: it looks for a branch named
 # `claude/personal-notes` on `origin` and, if found, reads
