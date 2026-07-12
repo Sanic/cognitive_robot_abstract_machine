@@ -14,7 +14,7 @@ This module provides an annotator for:
 from __future__ import annotations
 
 import copy
-from enum import Enum
+from enum import StrEnum
 from timeit import default_timer
 
 import cv2
@@ -47,7 +47,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
        Requires properly configured camera intrinsics and color-to-depth ratio.
     """
 
-    class ViewMode(Enum):
+    class ViewMode(StrEnum):
         """Visualization mode enumeration."""
 
         COLOR = "color"
