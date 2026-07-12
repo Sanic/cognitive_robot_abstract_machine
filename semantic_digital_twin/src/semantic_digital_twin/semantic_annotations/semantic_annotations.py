@@ -1199,3 +1199,31 @@ class Cooktop(HasRootBody):
     """
     A cooktop surface for cooking.
     """
+
+
+@dataclass(eq=False)
+class Microwave(HasRootBody, HasDoors):
+    """
+    A microwave oven, a kitchen appliance with a door that heats food using microwave radiation.
+    """
+
+
+@dataclass(eq=False)
+class Hood(HasRootBody):
+    """
+    A range hood mounted above a cooktop that vents cooking fumes.
+    """
+
+
+@dataclass(eq=False)
+class Toaster(HasRootBody):
+    """
+    A countertop appliance for toasting slices of bread.
+    """
+
+
+@dataclass(eq=False)
+class CoffeeMachine(HasRootBody):
+    """
+    A countertop appliance that brews coffee.
+    """
