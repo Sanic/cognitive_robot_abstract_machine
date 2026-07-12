@@ -79,13 +79,13 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, color_bgr)
         cas.set(CASViews.DEPTH_IMAGE, depth_mm)
-        cas.set(CASViews.CAM_INFO, cam_info)
-        cas.set(CASViews.CAM_INTRINSIC, cam_intrinsic)
+        cas.set(CASViews.CAMERA_INFO, cam_info)
+        cas.set(CASViews.CAMERA_INTRINSIC, cam_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
         cas.set(CASViews.OBJECT_IMAGE, segmentation)
         cas.set(CASViews.OBJECT_COLOR_MAP, object_color_map)
         # Shared SemDT ground-truth world for this frame. Consumers must treat as read-only.
-        cas.set_ref(CASViews.GROUND_TRUTH_WORLD_REF, world)
+        cas.set_ref(CASViews.GROUND_TRUTH_WORLD_REFERENCE, world)
 
         cas.cam_to_world_transform = optical_cam_to_world
         cas.data_timestamp = timestamp_ns

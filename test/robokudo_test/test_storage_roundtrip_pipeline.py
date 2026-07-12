@@ -128,16 +128,16 @@ class TestStorageRoundtripPipeline:
                 equal_nan=True,
             )
 
-            writer_cam_info = writer_pipeline.cas.get(CASViews.CAM_INFO)
-            reader_cam_info = reader_pipeline.cas.get(CASViews.CAM_INFO)
+            writer_cam_info = writer_pipeline.cas.get(CASViews.CAMERA_INFO)
+            reader_cam_info = reader_pipeline.cas.get(CASViews.CAMERA_INFO)
             assert writer_cam_info.width == reader_cam_info.width
             assert writer_cam_info.height == reader_cam_info.height
             assert _cam_info_k_values(writer_cam_info) == _cam_info_k_values(
                 reader_cam_info
             )
 
-            writer_cam_intrinsic = writer_pipeline.cas.get(CASViews.CAM_INTRINSIC)
-            reader_cam_intrinsic = reader_pipeline.cas.get(CASViews.CAM_INTRINSIC)
+            writer_cam_intrinsic = writer_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
+            reader_cam_intrinsic = reader_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
             assert writer_cam_intrinsic.width == reader_cam_intrinsic.width
             assert writer_cam_intrinsic.height == reader_cam_intrinsic.height
             np.testing.assert_allclose(

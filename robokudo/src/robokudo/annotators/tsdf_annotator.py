@@ -138,7 +138,9 @@ class TSDFAnnotator(ThreadedAnnotator):
             return Status.FAILURE
 
         cam_intrinsic: o3d.camera.PinholeCameraIntrinsic = scale_o3d_cam_intrinsics(
-            cas.get(CASViews.CAM_INTRINSIC), color2depth_ratio[0], color2depth_ratio[1]
+            cas.get(CASViews.CAMERA_INTRINSIC),
+            color2depth_ratio[0],
+            color2depth_ratio[1],
         )
         color_image: npt.NDArray[np.uint8] = get_scaled_color_image_for_depth_image(
             cas, copy.deepcopy(self.get_cas().get(CASViews.COLOR_IMAGE))

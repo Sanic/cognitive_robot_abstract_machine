@@ -134,7 +134,7 @@ class FileWriter(BaseAnnotator):
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        cam_info = self.get_cas().get(CASViews.CAM_INFO)
+        cam_info = self.get_cas().get(CASViews.CAMERA_INFO)
 
         cv2.imwrite(
             self.generate_full_file_path_(
@@ -153,7 +153,7 @@ class FileWriter(BaseAnnotator):
         with open(
             str(
                 self.generate_full_file_path_(
-                    cas_view=CASViews.CAM_INFO, file_extension="json"
+                    cas_view=CASViews.CAMERA_INFO, file_extension="json"
                 )
             ),
             "w",

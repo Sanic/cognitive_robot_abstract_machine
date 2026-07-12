@@ -111,7 +111,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
 
         cloud = self.get_cas().get(CASViews.CLOUD)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        pc_cam_intrinsics = self.get_cas().get(CASViews.PC_CAM_INTRINSIC)
+        pc_cam_intrinsics = self.get_cas().get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
 
         #

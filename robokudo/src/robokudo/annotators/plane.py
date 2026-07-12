@@ -104,7 +104,7 @@ class PlaneAnnotator(ThreadedAnnotator):
         depth_image = self.get_cas().get(
             CASViews.DEPTH_IMAGE
         )  # shape [H, W], float or uint16
-        cam_intrinsics = self.get_cas().get(CASViews.CAM_INTRINSIC)
+        cam_intrinsics = self.get_cas().get(CASViews.CAMERA_INTRINSIC)
         # print(f"Loaded cloud with {len(cloud.points)} points")
 
         plane_model, inliers = cloud.segment_plane(

@@ -111,7 +111,7 @@ def get_2d_corner_points_from_3d_bb(
     :return: Array of 2D corner points
     """
     # Create the 2D Boundingbox/ROI based on the OBB
-    pc_cam_intrinsics = cas.get(CASViews.PC_CAM_INTRINSIC)
+    pc_cam_intrinsics = cas.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
     assert isinstance(pc_cam_intrinsics, o3d.camera.PinholeCameraIntrinsic)
     k = pc_cam_intrinsics.intrinsic_matrix
     corner_points = np.asarray(object_bb.get_box_points())
@@ -134,7 +134,7 @@ def project_points_to_image(
     cas: CAS, points_cam: npt.NDArray
 ) -> Tuple[npt.NDArray, npt.NDArray]:
     """Project 3D camera-frame points to 2D image pixels and validity mask."""
-    pc_cam_intrinsics = cas.get(CASViews.PC_CAM_INTRINSIC)
+    pc_cam_intrinsics = cas.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
     k = pc_cam_intrinsics.intrinsic_matrix
     uvd = points_cam @ k.T
     z = uvd[:, 2]

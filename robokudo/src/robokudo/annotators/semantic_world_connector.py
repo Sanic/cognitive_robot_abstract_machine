@@ -129,8 +129,8 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
             stamped_pose.rotation = pose_in_world.rotation
             if cas.world_frame is not None:
                 stamped_pose.frame = cas.world_frame
-            if cas.contains(CASViews.CAM_INFO):
-                stamped_pose.timestamp = cas.get(CASViews.CAM_INFO).header.stamp
+            if cas.contains(CASViews.CAMERA_INFO):
+                stamped_pose.timestamp = cas.get(CASViews.CAMERA_INFO).header.stamp
 
             object_hypothesis.annotations.append(stamped_pose)
 

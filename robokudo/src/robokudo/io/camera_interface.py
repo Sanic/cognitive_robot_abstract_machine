@@ -312,7 +312,7 @@ class ROSCameraInterface(CameraInterface):
         if cam_to_world_transform.reference_frame is not None:
             st.child_frame = str(cam_to_world_transform.reference_frame.name)
         st.timestamp = timestamp
-        cas.views[CASViews.VIEWPOINT_CAM_TO_WORLD] = st
+        cas.views[CASViews.VIEWPOINT_CAMERA_TO_WORLD] = st
 
     def set_o3d_cam_intrinsics_from_ros_cam_info(self) -> None:
         """Convert ROS camera info to Open3D camera intrinsics.
@@ -607,8 +607,8 @@ class KinectCameraInterface(ROSCameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, self.depth)
-        cas.set(CASViews.CAM_INFO, self.cam_info)
-        cas.set(CASViews.CAM_INTRINSIC, self.cam_intrinsic)
+        cas.set(CASViews.CAMERA_INFO, self.cam_info)
+        cas.set(CASViews.CAMERA_INTRINSIC, self.cam_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.color2depth_ratio)
 
         self.store_cam_to_world_transform(cas, self.timestamp)

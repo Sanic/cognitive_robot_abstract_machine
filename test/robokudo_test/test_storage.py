@@ -331,7 +331,11 @@ class TestStorage:
         transform_view_document = storage_instance.db[
             Storage.VIEW_COLLECTION_NAME
         ].find_one(
-            {"_id": retrieved_cas_record["view_ids"][CASViews.CAM_TO_WORLD_TRANSFORM]}
+            {
+                "_id": retrieved_cas_record["view_ids"][
+                    CASViews.CAMERA_TO_WORLD_TRANSFORM
+                ]
+            }
         )
         assert transform_view_document["metadata"]["reference_frame_name"] == str(
             world_body.name
@@ -343,7 +347,7 @@ class TestStorage:
         retrieved_cas_record["views"] = {}
         storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
         restored_transform = retrieved_cas_record["views"][
-            CASViews.CAM_TO_WORLD_TRANSFORM
+            CASViews.CAMERA_TO_WORLD_TRANSFORM
         ]
 
         assert isinstance(restored_transform, HomogeneousTransformationMatrix)
@@ -397,12 +401,12 @@ class TestStorage:
         retrieved_cas_record["views"] = {}
         storage_instance.load_views_from_mongo_in_cas(
             retrieved_cas_record,
-            excluded_view_names={CASViews.CAM_TO_WORLD_TRANSFORM},
+            excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
         )
         reader._restore_cam_to_world_transform(retrieved_cas_record)
 
         restored_transform = retrieved_cas_record["views"][
-            CASViews.CAM_TO_WORLD_TRANSFORM
+            CASViews.CAMERA_TO_WORLD_TRANSFORM
         ]
         assert isinstance(restored_transform, HomogeneousTransformationMatrix)
         np.testing.assert_allclose(restored_transform.to_np(), transform.to_np())

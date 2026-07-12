@@ -83,7 +83,7 @@ class TestUtilsAnnotationConversion(object):
         kinect_cam_info.k[2] = 1050.0
         kinect_cam_info.k[4] = 639.5
         kinect_cam_info.k[5] = 479.5
-        cas.set(CASViews.CAM_INFO, kinect_cam_info)
+        cas.set(CASViews.CAMERA_INFO, kinect_cam_info)
         return cas
 
     def test_pose_annotation_to_stamped_pose_annotation_can_convert(self):
@@ -217,7 +217,7 @@ class TestUtilsAnnotationConversion(object):
     def test_pose_2_od_converter_convert_in_cam(self, cas_with_tf: CAS):
         # cas_with_tf.set(CASViews.VIEWPOINT_CAM_TO_WORLD, None)
         cas_with_tf.cam_to_world_transform = None
-        kinect_cam_info = cas_with_tf.get(CASViews.CAM_INFO)
+        kinect_cam_info = cas_with_tf.get(CASViews.CAMERA_INFO)
 
         od = ObjectDesignator()
 
@@ -247,7 +247,7 @@ class TestUtilsAnnotationConversion(object):
 
     def test_pose_2_od_converter_convert_in_world(self, cas_with_tf: CAS):
         cam_to_world_quat = cas_with_tf.cam_to_world_transform.to_quaternion().to_list()
-        kinect_cam_info = cas_with_tf.get(CASViews.CAM_INFO)
+        kinect_cam_info = cas_with_tf.get(CASViews.CAMERA_INFO)
 
         od = ObjectDesignator()
 

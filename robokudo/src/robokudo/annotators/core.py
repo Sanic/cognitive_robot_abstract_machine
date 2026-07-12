@@ -416,7 +416,7 @@ class BaseAnnotator(Behaviour):
             # Create a joint state message to have a common data structure for all values
             msg = JointState()
             msg.header.stamp = (
-                self.get_cas().get(CASViews.CAM_INFO).header.stamp
+                self.get_cas().get(CASViews.CAMERA_INFO).header.stamp
             )  # This is always the time of recording the data.
 
             # msg.header.stamp = rospy.Time(self.get_cas().timestamp) # This might be the current time!

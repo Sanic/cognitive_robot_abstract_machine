@@ -91,7 +91,7 @@ class StorageReaderInterface(CameraInterface):
         cas_frame["views"] = {}
         self.storage.load_views_from_mongo_in_cas(
             cas_frame,
-            excluded_view_names={CASViews.CAM_TO_WORLD_TRANSFORM},
+            excluded_view_names={CASViews.CAMERA_TO_WORLD_TRANSFORM},
         )
         self._restore_cam_to_world_transform(cas_frame)
 
@@ -130,7 +130,7 @@ class StorageReaderInterface(CameraInterface):
             cam_intrinsic = o3d.camera.PinholeCameraIntrinsic(
                 width, height, fx, fy, cx, cy
             )
-            cas.set(CASViews.CAM_INTRINSIC, cam_intrinsic)
+            cas.set(CASViews.CAMERA_INTRINSIC, cam_intrinsic)
 
     def _restore_cam_to_world_transform(self, cas_frame: dict) -> None:
         """Restore the stored camera pose as a transform bound to the running world.
@@ -141,7 +141,7 @@ class StorageReaderInterface(CameraInterface):
         RoboKudo world, and stores the rebound transform in ``cas_frame["views"]``.
         """
         view_ids = cas_frame.get("view_ids", {})
-        view_id = view_ids.get(CASViews.CAM_TO_WORLD_TRANSFORM)
+        view_id = view_ids.get(CASViews.CAMERA_TO_WORLD_TRANSFORM)
         if view_id is None:
             return
 
@@ -150,7 +150,7 @@ class StorageReaderInterface(CameraInterface):
         )
         if not view_document:
             raise RuntimeError(
-                f"Couldn't find view '{CASViews.CAM_TO_WORLD_TRANSFORM}' with id={view_id}."
+                f"Couldn't find view '{CASViews.CAMERA_TO_WORLD_TRANSFORM}' with id={view_id}."
             )
 
         # Non-SemDT transform payloads are left to the regular codec path.
@@ -158,8 +158,10 @@ class StorageReaderInterface(CameraInterface):
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
                 view_document
             )
-            if decoded_view_name == CASViews.CAM_TO_WORLD_TRANSFORM:
-                cas_frame["views"][CASViews.CAM_TO_WORLD_TRANSFORM] = decoded_view_value
+            if decoded_view_name == CASViews.CAMERA_TO_WORLD_TRANSFORM:
+                cas_frame["views"][
+                    CASViews.CAMERA_TO_WORLD_TRANSFORM
+                ] = decoded_view_value
             return
 
         stored_transform, world_frame, camera_frame = (
@@ -170,7 +172,7 @@ class StorageReaderInterface(CameraInterface):
             world_frame=world_frame,
             camera_frame=camera_frame,
         )
-        cas_frame["views"][CASViews.CAM_TO_WORLD_TRANSFORM] = rebound_transform
+        cas_frame["views"][CASViews.CAMERA_TO_WORLD_TRANSFORM] = rebound_transform
 
     def _decode_stored_cam_to_world_transform(
         self, view_document: dict, cas_frame: dict
@@ -187,7 +189,7 @@ class StorageReaderInterface(CameraInterface):
 
         if world_frame is None or camera_frame is None:
             raise RuntimeError(
-                f"Stored {CASViews.CAM_TO_WORLD_TRANSFORM} is missing frame-name "
+                f"Stored {CASViews.CAMERA_TO_WORLD_TRANSFORM} is missing frame-name "
                 "metadata. Recreate the recording with the current storage format."
             )
 

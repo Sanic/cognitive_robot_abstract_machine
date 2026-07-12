@@ -77,7 +77,7 @@ class ByteTrackAnnotator(BaseAnnotator):
         masks = list(filter(lambda m: m is not None, masks))
         if len(masks) == len(rois_xyxy):
             cam_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
-                CASViews.CAM_INTRINSIC
+                CASViews.CAMERA_INTRINSIC
             )
 
             # Masks must be restored to full color image size

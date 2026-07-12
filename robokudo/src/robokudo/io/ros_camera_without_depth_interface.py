@@ -252,8 +252,8 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, None)
-        cas.set(CASViews.CAM_INFO, self.cam_info)
-        cas.set(CASViews.CAM_INTRINSIC, self.cam_intrinsic)
+        cas.set(CASViews.CAMERA_INFO, self.cam_info)
+        cas.set(CASViews.CAMERA_INTRINSIC, self.cam_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, (1, 1))
         self.store_cam_to_world_transform(cas, self.timestamp)
 

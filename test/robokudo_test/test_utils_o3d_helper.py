@@ -25,7 +25,7 @@ class TestUtilsO3DHelper(object):
     @pytest.fixture
     def cas(self, kinect_intrinsics: o3d.camera.PinholeCameraIntrinsic) -> CAS:
         cas = robokudo.cas.CAS()
-        cas.set(CASViews.PC_CAM_INTRINSIC, kinect_intrinsics)
+        cas.set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, kinect_intrinsics)
         cas.set(CASViews.COLOR2DEPTH_RATIO, (1.0, 1.0))
         return cas
 
@@ -290,7 +290,10 @@ class TestUtilsO3DHelper(object):
         ), f"unexpected corner points, did the camera intrinsics change? {result}"
 
     def test_get_2d_corner_points_from_3d_bb_invalid_intrinsics(self, cas: CAS):
-        cas.set(robokudo.cas.CASViews.PC_CAM_INTRINSIC, "anything but CameraIntrinsics")
+        cas.set(
+            robokudo.cas.CASViews.POINTCLOUD_CAMERA_INTRINSIC,
+            "anything but CameraIntrinsics",
+        )
 
         obb = o3d.geometry.OrientedBoundingBox(
             center=[0, 0, 1], R=np.eye(3), extent=[1, 1, 1]

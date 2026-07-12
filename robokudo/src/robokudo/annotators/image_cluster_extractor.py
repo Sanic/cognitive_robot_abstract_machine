@@ -210,7 +210,9 @@ class ImageClusterExtractor(BaseAnnotator):
 
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        self.cam_intrinsics = copy.deepcopy(self.get_cas().get(CASViews.CAM_INTRINSIC))
+        self.cam_intrinsics = copy.deepcopy(
+            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
+        )
 
         # Scale the image down so that it matches the depth image size
         resized_color = None

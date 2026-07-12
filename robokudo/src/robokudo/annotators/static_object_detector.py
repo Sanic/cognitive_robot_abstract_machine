@@ -358,7 +358,9 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
         self.cloud = self.get_cas().get(CASViews.CLOUD)
-        self.cam_intrinsics = copy.deepcopy(self.get_cas().get(CASViews.CAM_INTRINSIC))
+        self.cam_intrinsics = copy.deepcopy(
+            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
+        )
 
         world_frame_required = False
         world_to_cam_transform_matrix = None

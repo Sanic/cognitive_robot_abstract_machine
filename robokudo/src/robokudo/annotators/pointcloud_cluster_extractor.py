@@ -303,7 +303,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         self.rk_logger.info("PCE Start")
         cloud = self.get_cas().get(CASViews.CLOUD)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        pc_cam_intrinsics = self.get_cas().get(CASViews.PC_CAM_INTRINSIC)
+        pc_cam_intrinsics = self.get_cas().get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
         assert isinstance(pc_cam_intrinsics, o3d.camera.PinholeCameraIntrinsic)
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
@@ -494,7 +494,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        pc_cam_intrinsics = self.get_cas().get(CASViews.PC_CAM_INTRINSIC)
+        pc_cam_intrinsics = self.get_cas().get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
         assert isinstance(pc_cam_intrinsics, o3d.camera.PinholeCameraIntrinsic)
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)

@@ -106,7 +106,9 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
 
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        self.cam_intrinsics = copy.deepcopy(self.get_cas().get(CASViews.CAM_INTRINSIC))
+        self.cam_intrinsics = copy.deepcopy(
+            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
+        )
 
         if self.display_mode is self.ViewMode.DEPTH:
             self.get_annotator_output_struct().set_image(self.depth)
@@ -149,7 +151,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
             rgbd_image, self.cam_intrinsics
         )
 
-        self.get_cas().set(CASViews.PC_CAM_INTRINSIC, self.cam_intrinsics)
+        self.get_cas().set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, self.cam_intrinsics)
 
         self.get_cas().set_ref(CASViews.CLOUD, cloud)
         self.get_annotator_output_struct().set_geometries(

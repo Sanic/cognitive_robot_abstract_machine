@@ -257,11 +257,11 @@ class Pose2ODConverter(Annotation2ODConverter[PoseAnnotation]):
         # First, convert the PoseAnnotation to a StampedPose
         spa = self.pose_converter.convert(pose_annotation)
         # Fill the missing header information
-        spa.timestamp = cas.get(CASViews.CAM_INFO).header.stamp.sec
+        spa.timestamp = cas.get(CASViews.CAMERA_INFO).header.stamp.sec
 
         # For the frame, check if we should return cam or world coordinates based on the previous check
         if use_cam_coords:
-            spa.frame = cas.get(CASViews.CAM_INFO).header.frame_id
+            spa.frame = cas.get(CASViews.CAMERA_INFO).header.frame_id
         else:
             spa.frame = "map"
 
@@ -315,7 +315,7 @@ class Position2ODConverter(Annotation2ODConverter[PositionAnnotation]):
         ps.pose.orientation.w = pose_map.rotation[3]
 
         # We assume that the pose annotation is in CAMERA coordinates
-        ps.header = copy.deepcopy(cas.get(CASViews.CAM_INFO).header)
+        ps.header = copy.deepcopy(cas.get(CASViews.CAMERA_INFO).header)
         ps.header.frame_id = "map"
         object_designator.pose.append(ps)
 

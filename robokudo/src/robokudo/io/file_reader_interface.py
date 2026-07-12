@@ -223,7 +223,7 @@ class FileReaderInterface(CameraInterface):
                 if data is None:
                     raise Exception(f"OpenCV couldn't read {str(file_path)}")
                 self.loaded_data[matched_timestamp][matched_data_type] = data
-            elif matched_data_type == CASViews.CAM_INFO:
+            elif matched_data_type == CASViews.CAMERA_INFO:
                 with open(str(file_path)) as fp:
                     cam_info_json = json.load(fp)
                     self.loaded_data[matched_timestamp][matched_data_type] = (
@@ -283,14 +283,14 @@ class RGBDFileReaderInterface(FileReaderInterface):
         cas.set(CASViews.COLOR_IMAGE, data[CASViews.COLOR_IMAGE])
         cas.set(CASViews.DEPTH_IMAGE, data[CASViews.DEPTH_IMAGE])
 
-        cam_info = data[CASViews.CAM_INFO]
+        cam_info = data[CASViews.CAMERA_INFO]
         if self.camera_config.kinect_height_fix_mode:
             cam_info.height = 960  # Kinect hack ...
-        cas.set(CASViews.CAM_INFO, cam_info)
+        cas.set(CASViews.CAMERA_INFO, cam_info)
 
         cas.set(
-            CASViews.CAM_INTRINSIC,
-            o3d_cam_intrinsics_from_ros_cam_info(data[CASViews.CAM_INFO]),
+            CASViews.CAMERA_INTRINSIC,
+            o3d_cam_intrinsics_from_ros_cam_info(data[CASViews.CAMERA_INFO]),
         )
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
         self.store_static_camera_transform_if_configured(cas)

@@ -68,13 +68,13 @@ class CASViews(StrEnum):
     Example: 1280x960 RGB, 640x480 DEPTH -> 0.5 along X and Y
     """
 
-    CAM_INFO = "cam_info"
+    CAMERA_INFO = "cam_info"
     """ROS camera info message coming from ROS"""
 
-    CAM_INTRINSIC = "cam_intrinsic"
+    CAMERA_INTRINSIC = "cam_intrinsic"
     """Open3D pinhole camera intrinsic model for RGB to be set by the camera driver."""
 
-    PC_CAM_INTRINSIC = "pc_cam_intrinsic"
+    POINTCLOUD_CAMERA_INTRINSIC = "pc_cam_intrinsic"
     """Camera intrinsic that has been used for point cloud generation. This can be different, 
     because depth and RGB resolutions might mismatch."""
 
@@ -87,15 +87,15 @@ class CASViews(StrEnum):
     WORLD_FRAME = "world_frame"
     """Name of the world frame."""
 
-    CAM_FRAME = "camera_frame"
+    CAMERA_FRAME = "camera_frame"
     """Name of the camera frame."""
 
-    VIEWPOINT_CAM_TO_WORLD = "viewpoint_cam_to_world"
+    VIEWPOINT_CAMERA_TO_WORLD = "viewpoint_camera_to_world"
     """Deprecated: Use CAM_TO_WORLD_TRANSFORM instead.
     Camera to world transform.
     Type: robokudo.types.tf.StampedTransform"""
 
-    CAM_TO_WORLD_TRANSFORM = "cam_to_world_transform"
+    CAMERA_TO_WORLD_TRANSFORM = "camera_to_world_transform"
     """Camera to world. 
     Type: semantic_digital_twin.spatial_types.spatial_types.HomogeneousTransformationMatrix"""
 
@@ -116,7 +116,7 @@ class CASViews(StrEnum):
     OBJECT_COLOR_MAP = "object_color_map"
     """Object color mapping data which assigns objects visible in OBJECT_IMAGE to entity names."""
 
-    GROUND_TRUTH_WORLD_REF = "ground_truth_world_ref"
+    GROUND_TRUTH_WORLD_REFERENCE = "ground_truth_world_ref"
     """Read-only reference to the SemDT ground-truth world used for this CAS frame.
 
     This view is intended for in-process consumers only and should be written
@@ -188,27 +188,27 @@ class CAS:
 
     @property
     def cam_info(self) -> Optional[CameraInfo]:
-        return self.views.get(CASViews.CAM_INFO)
+        return self.views.get(CASViews.CAMERA_INFO)
 
     @cam_info.setter
     def cam_info(self, value: CameraInfo) -> None:
-        self.views[CASViews.CAM_INFO] = value
+        self.views[CASViews.CAMERA_INFO] = value
 
     @property
     def cam_intrinsic(self) -> Optional[o3d.camera.PinholeCameraIntrinsic]:
-        return self.views.get(CASViews.CAM_INTRINSIC)
+        return self.views.get(CASViews.CAMERA_INTRINSIC)
 
     @cam_intrinsic.setter
     def cam_intrinsic(self, value: o3d.camera.PinholeCameraIntrinsic) -> None:
-        self.views[CASViews.CAM_INTRINSIC] = value
+        self.views[CASViews.CAMERA_INTRINSIC] = value
 
     @property
     def pc_cam_intrinsic(self) -> Optional[o3d.camera.PinholeCameraIntrinsic]:
-        return self.views.get(CASViews.PC_CAM_INTRINSIC)
+        return self.views.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
 
     @pc_cam_intrinsic.setter
     def pc_cam_intrinsic(self, value: o3d.camera.PinholeCameraIntrinsic) -> None:
-        self.views[CASViews.PC_CAM_INTRINSIC] = value
+        self.views[CASViews.POINTCLOUD_CAMERA_INTRINSIC] = value
 
     @property
     def cloud(self) -> Optional[o3d.geometry.PointCloud]:
@@ -230,11 +230,11 @@ class CAS:
     @property
     def cam_frame(self) -> Optional[str]:
         """Name of the camera frame."""
-        return self.views.get(CASViews.CAM_FRAME)
+        return self.views.get(CASViews.CAMERA_FRAME)
 
     @cam_frame.setter
     def cam_frame(self, value: str) -> None:
-        self.views[CASViews.CAM_FRAME] = value
+        self.views[CASViews.CAMERA_FRAME] = value
 
     @property
     def viewpoint_cam_to_world(self) -> Optional[StampedTransform]:
@@ -244,7 +244,7 @@ class CAS:
             DeprecationWarning,
             stacklevel=2,
         )
-        return self.views.get(CASViews.VIEWPOINT_CAM_TO_WORLD)
+        return self.views.get(CASViews.VIEWPOINT_CAMERA_TO_WORLD)
 
     @viewpoint_cam_to_world.setter
     def viewpoint_cam_to_world(self, value: StampedTransform) -> None:
@@ -254,15 +254,15 @@ class CAS:
             DeprecationWarning,
             stacklevel=2,
         )
-        self.views[CASViews.VIEWPOINT_CAM_TO_WORLD] = value
+        self.views[CASViews.VIEWPOINT_CAMERA_TO_WORLD] = value
 
     @property
     def cam_to_world_transform(self) -> Optional[HomogeneousTransformationMatrix]:
-        return self.views.get(CASViews.CAM_TO_WORLD_TRANSFORM)
+        return self.views.get(CASViews.CAMERA_TO_WORLD_TRANSFORM)
 
     @cam_to_world_transform.setter
     def cam_to_world_transform(self, value: HomogeneousTransformationMatrix) -> None:
-        self.views[CASViews.CAM_TO_WORLD_TRANSFORM] = value
+        self.views[CASViews.CAMERA_TO_WORLD_TRANSFORM] = value
 
     @property
     def data_timestamp(self) -> Optional[int]:
@@ -290,11 +290,11 @@ class CAS:
 
     @property
     def ground_truth_world_ref(self) -> Optional[World]:
-        return self.views.get(CASViews.GROUND_TRUTH_WORLD_REF)
+        return self.views.get(CASViews.GROUND_TRUTH_WORLD_REFERENCE)
 
     @ground_truth_world_ref.setter
     def ground_truth_world_ref(self, value: World) -> None:
-        self.views[CASViews.GROUND_TRUTH_WORLD_REF] = value
+        self.views[CASViews.GROUND_TRUTH_WORLD_REFERENCE] = value
 
     def get(self, view_name: str) -> Any:
         """Get a view by name.
