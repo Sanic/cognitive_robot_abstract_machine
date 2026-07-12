@@ -10,8 +10,10 @@ set -euo pipefail
 # Usage (from anywhere inside the repo):
 #   ./.claude/hooks/create-personal-notes-branch.sh
 #
-# Override the branch/path if you don't want the defaults (matches the same
-# two variable names session-start.sh and configure-personal-notes.sh read):
+# Resolves the branch/path the same way session-start.sh does (git config >
+# environment variable > default), so it always targets whatever a fresh
+# session would actually read from. Override via the same two variable names
+# it and configure-personal-notes.sh read:
 #   CLAUDE_PERSONAL_NOTES_BRANCH=<branch> CLAUDE_PERSONAL_NOTES_PATH=<path> \
 #     ./.claude/hooks/create-personal-notes-branch.sh
 #
@@ -19,8 +21,8 @@ set -euo pipefail
 # origin, so it never overwrites existing notes. Does its work in a scratch
 # worktree, so it never touches your current branch or working tree.
 
-NOTES_BRANCH="${CLAUDE_PERSONAL_NOTES_BRANCH:-claude/personal-notes}"
-NOTES_PATH="${CLAUDE_PERSONAL_NOTES_PATH:-.claude/personal/cram-notes.md}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
 
 if git show-ref --verify --quiet "refs/heads/${NOTES_BRANCH}"; then
   echo "Branch '${NOTES_BRANCH}' already exists locally - not touching it." >&2

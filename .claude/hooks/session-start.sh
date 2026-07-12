@@ -34,6 +34,13 @@ set -euo pipefail
 # the configured (or default) branch or path isn't reachable (e.g. a fresh
 # clone, or a fork that never created it).
 #
+# Editing your notes: the written CLAUDE.local.md starts with a short header
+# (see below) naming the resolved branch/path and pointing at
+# ./save-personal-notes.sh. Since Claude Code loads CLAUDE.local.md as project
+# memory every session, that header is always in context - so asking Claude to
+# "edit my personal notes" needs no other setup: it edits the file below the
+# header, then runs the save script to push the change back.
+#
 # How this script gets invoked (see ../settings.json): Claude Code registers it
 # as a SessionStart hook via `$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh`.
 # CLAUDE_PROJECT_DIR is an env var Claude Code itself injects into every hook
@@ -48,14 +55,23 @@ set -euo pipefail
 # yourself. settings.json is strict JSON with no comment support, which is why
 # this explanation lives here instead of there.
 
-NOTES_BRANCH="$(git config --get claude.personalNotesBranch || true)"
-NOTES_BRANCH="${NOTES_BRANCH:-${CLAUDE_PERSONAL_NOTES_BRANCH:-claude/personal-notes}}"
-
-NOTES_PATH="$(git config --get claude.personalNotesPath || true)"
-NOTES_PATH="${NOTES_PATH:-${CLAUDE_PERSONAL_NOTES_PATH:-.claude/personal/cram-notes.md}}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
 
 git fetch origin "${NOTES_BRANCH}" --quiet 2>/dev/null || exit 0
 
 if git cat-file -e "origin/${NOTES_BRANCH}:${NOTES_PATH}" 2>/dev/null; then
-  git show "origin/${NOTES_BRANCH}:${NOTES_PATH}" > CLAUDE.local.md
+  {
+    cat <<HEADER
+<!--
+Personal notes, synced from '${NOTES_BRANCH}' (${NOTES_PATH}) by session-start.sh.
+To edit: change the notes below this line, then run
+  "\$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
+to push the change back to '${NOTES_BRANCH}'. This header is regenerated
+every session from git config/environment/default - editing it has no effect.
+-->
+<!-- END-PERSONAL-NOTES-HEADER -->
+HEADER
+    git show "origin/${NOTES_BRANCH}:${NOTES_PATH}"
+  } > CLAUDE.local.md
 fi

@@ -44,21 +44,42 @@ Once, from any clone with push access to `origin`:
 ```
 
 This creates `claude/personal-notes` on `origin` with a single empty
-`.claude/personal/cram-notes.md`, without touching your current branch or working tree. Then edit
-that file (see below) to add your own notes. Every new Claude Code session — local or fresh-clone —
-now runs the hook automatically and writes `CLAUDE.local.md` from that branch, with no further
-configuration needed.
+`.claude/personal/cram-notes.md`, without touching your current branch or working tree. Every new
+Claude Code session — local or fresh-clone — now runs the hook automatically and writes
+`CLAUDE.local.md` from that branch, with no further configuration needed.
 
-To edit your notes after the branch exists:
+## Editing your notes
+
+Just ask Claude, in any session: *"add \<X\> to my personal notes"* or *"edit my personal notes."*
+No extra setup or explanation is needed — `session-start.sh` writes a short header at the top of
+`CLAUDE.local.md` every session (see below), and since Claude Code already loads `CLAUDE.local.md`
+as project memory, that header is always in context. It names the resolved branch/path and points
+at [`save-personal-notes.sh`](./save-personal-notes.sh), so Claude edits the notes below the header
+and runs that script to push the change back — deterministically, with no guessing at where notes
+live or how to persist them.
+
+The header looks like this (regenerated every session — editing it has no effect):
+
+```
+<!--
+Personal notes, synced from 'claude/personal-notes' (.claude/personal/cram-notes.md) by session-start.sh.
+To edit: change the notes below this line, then run
+  "$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
+to push the change back to 'claude/personal-notes'. This header is regenerated
+every session from git config/environment/default - editing it has no effect.
+-->
+<!-- END-PERSONAL-NOTES-HEADER -->
+```
+
+To do it by hand instead: edit `CLAUDE.local.md` below that marker line, then run
 
 ```bash
-git fetch origin claude/personal-notes
-git worktree add /tmp/personal-notes origin/claude/personal-notes
-$EDITOR /tmp/personal-notes/.claude/personal/cram-notes.md
-git -C /tmp/personal-notes commit -am "update personal notes"
-git -C /tmp/personal-notes push origin HEAD:claude/personal-notes
-git worktree remove /tmp/personal-notes
+"$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
 ```
+
+It resolves the branch/path exactly like `session-start.sh` does, strips the header back out, and
+pushes only your actual notes content — in a scratch worktree, so your current branch and working
+tree are untouched, and as a no-op if nothing actually changed.
 
 ## Setup: overriding the default branch/path
 
@@ -135,9 +156,13 @@ directly:
   target): `git fetch` finds nothing, so nothing gets written.
 - Never merges anything: the hook only ever *reads* the resolved branch via `git show`. It never
   checks it out or merges it into your working branch.
-- `create-personal-notes-branch.sh` never touches your current branch or working tree either — it
-  does its work in a scratch worktree and refuses to run if the target branch already exists
-  locally or on `origin`.
+- `create-personal-notes-branch.sh` and `save-personal-notes.sh` never touch your current branch or
+  working tree either — both do their work in a scratch worktree.
+  `create-personal-notes-branch.sh` refuses to run if the target branch already exists locally or
+  on `origin`; `save-personal-notes.sh` is a no-op if there's nothing new to push.
+- The sync header `session-start.sh` writes is never itself pushed back: `save-personal-notes.sh`
+  strips everything up to and including the `END-PERSONAL-NOTES-HEADER` marker before committing,
+  so only your actual notes content ever lands on the notes branch.
 - `CLAUDE.local.md` is gitignored, so populated notes can't accidentally end up in a commit on any
   branch, including this one.
 - Safe to re-run: `session-start.sh` only ever overwrites `CLAUDE.local.md`, and does nothing if
