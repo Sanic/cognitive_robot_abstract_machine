@@ -38,7 +38,9 @@ class JSONPlayer(FilePlayer):
 
     obj_id_to_name: Optional[Dict[int, str]] = None
     """
-    Mapping from object ID to object name.
+    Mapping from object ID to object name. It also selects what is replayed: objects whose ID
+    is not in this mapping are ignored, since the file may contain objects that have no body
+    in the world.
     """
 
     data_object_names: Set[str] = field(default=None, init=False)
@@ -91,9 +93,12 @@ class JSONPlayer(FilePlayer):
         """
 
         objects_data = frame_data.objects_data
+        obj_id_to_name = self.obj_id_to_name or {}
         objects_poses: Dict[Body, Pose] = {}
         for obj_name, obj_data in objects_data.items():
-            if obj_name == "5" or obj_name == "2":
+            body_name = obj_id_to_name.get(int(obj_name))
+            if body_name is None:
+                logger.debug(f"Skipping object {obj_name}, it has no entry in obj_id_to_name.")
                 continue
             for det in obj_data:
                 R = det["R"]
@@ -111,7 +116,6 @@ class JSONPlayer(FilePlayer):
                     quat_w=orientation[3],
                 )
                 obj_pose.timestamp = det["time"]
-                body_name = self.obj_id_to_name[int(obj_name)]
                 body = self.world.get_body_by_name(body_name)
                 objects_poses[body] = obj_pose
 
