@@ -8,22 +8,23 @@ Python callable that performs it, so the node stays decoupled from the concrete 
 
 from __future__ import annotations
 
+import numbers
 import operator
 from dataclasses import dataclass
 from enum import Enum
 
-from typing_extensions import Any, Callable
+from typing_extensions import Callable
 
 
 @dataclass(frozen=True)
-class MathOperatorSpec:
+class MathOperatorSpecification:
     """
     The symbol and callable that make up one :class:`MathOperator`.
     """
 
     symbol: str
     """The mathematical symbol used when rendering the operator."""
-    function: Callable[..., Any]
+    function: Callable[..., numbers.Number]
     """The callable that performs the operation over already-resolved operand values."""
 
 
@@ -33,14 +34,14 @@ class MathOperator(Enum):
     callable that computes it over already-resolved operand values.
     """
 
-    ADD = MathOperatorSpec("+", operator.add)
-    SUBTRACT = MathOperatorSpec("-", operator.sub)
-    MULTIPLY = MathOperatorSpec("*", operator.mul)
-    DIVIDE = MathOperatorSpec("/", operator.truediv)
-    FLOOR_DIVIDE = MathOperatorSpec("//", operator.floordiv)
-    MODULO = MathOperatorSpec("%", operator.mod)
-    POWER = MathOperatorSpec("**", operator.pow)
-    NEGATE = MathOperatorSpec("-", operator.neg)
+    ADD = MathOperatorSpecification("+", operator.add)
+    SUBTRACT = MathOperatorSpecification("-", operator.sub)
+    MULTIPLY = MathOperatorSpecification("*", operator.mul)
+    DIVIDE = MathOperatorSpecification("/", operator.truediv)
+    FLOOR_DIVIDE = MathOperatorSpecification("//", operator.floordiv)
+    MODULO = MathOperatorSpecification("%", operator.mod)
+    POWER = MathOperatorSpecification("**", operator.pow)
+    NEGATE = MathOperatorSpecification("-", operator.neg)
 
     @property
     def symbol(self) -> str:
@@ -50,7 +51,7 @@ class MathOperator(Enum):
         return self.value.symbol
 
     @property
-    def function(self) -> Callable[..., Any]:
+    def function(self) -> Callable[..., numbers.Number]:
         """
         :return: The callable that performs this operation over already-resolved operand values.
         """

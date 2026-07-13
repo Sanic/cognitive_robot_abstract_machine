@@ -51,6 +51,12 @@ def test_unary_negation():
 # --- reflected / non-commutative operators preserve operand order ------------
 
 def test_reflected_non_commutative_operators():
+    """
+    A literal to the left of a variable (``10 - numbers``) must go through the operator's reflected
+    dunder (``__rsub__``, ``__rtruediv__``, ...) rather than the variable's normal one, and preserve
+    the literal-then-variable operand order - these operators give a different result the other way
+    round, so a wrong order would be caught by the expected values below.
+    """
     numbers = variable(int, domain=[2, 4])
     assert an(entity(10 - numbers)).tolist() == [8, 6]
     assert an(entity(10 / numbers)).tolist() == [5, 2.5]
@@ -60,6 +66,11 @@ def test_reflected_non_commutative_operators():
 
 
 def test_literal_operand_in_either_position():
+    """
+    ``+`` and ``*`` are commutative, so a literal operand must produce the same result whether it is
+    on the variable's right (the normal dunder, e.g. ``__add__``) or left (the reflected dunder, e.g.
+    ``__radd__``) - both call paths must be exercised, not just one.
+    """
     numbers = variable(int, domain=[2, 3])
     assert an(entity(numbers + 10)).tolist() == [12, 13]
     assert an(entity(10 + numbers)).tolist() == [12, 13]
