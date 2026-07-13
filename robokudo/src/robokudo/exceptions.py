@@ -103,6 +103,20 @@ class CVBridgeImageShapeError(RoboKudoError, ValueError):
 
 
 @dataclass
+class CVBridgeUnsupportedEncoding(RoboKudoError, ValueError):
+    """Raised when the cv_bridge workaround receives an unknown encoding."""
+
+    encoding: str
+    """Unsupported ROS image encoding."""
+
+    def error_message(self) -> str:
+        return f"Unsupported ROS image encoding '{self.encoding}'."
+
+    def suggest_correction(self) -> str:
+        return "use one of the ROS image encodings supported by CVBridgeWorkaround."
+
+
+@dataclass
 class StoredCameraTransformFrameMetadataMissing(RoboKudoError):
     """Raised when stored camera transform frame metadata is missing."""
 

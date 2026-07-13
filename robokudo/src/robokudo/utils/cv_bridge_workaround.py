@@ -23,7 +23,11 @@ import numpy as np
 from sensor_msgs.msg import Image
 from typing_extensions import TYPE_CHECKING, Tuple
 
-from robokudo.exceptions import CVBridgeImageConversionError, CVBridgeImageShapeError
+from robokudo.exceptions import (
+    CVBridgeImageConversionError,
+    CVBridgeImageShapeError,
+    CVBridgeUnsupportedEncoding,
+)
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -158,7 +162,7 @@ class CVBridgeWorkaround:
 
         match = cls._GENERIC_ENCODING_RE.match(normalized)
         if match is None:
-            raise ValueError(f"Unsupported ROS image encoding '{encoding}'")
+            raise CVBridgeUnsupportedEncoding(encoding=encoding)
 
         bits, kind, channels = match.groups()
         dtype_map = {
@@ -173,7 +177,7 @@ class CVBridgeWorkaround:
         }
         dtype = dtype_map.get((bits, kind.lower()))
         if dtype is None:
-            raise ValueError(f"Unsupported ROS image encoding '{encoding}'")
+            raise CVBridgeUnsupportedEncoding(encoding=encoding)
         return np.dtype(dtype), int(channels)
 
     @classmethod

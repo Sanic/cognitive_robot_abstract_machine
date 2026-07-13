@@ -9,6 +9,7 @@ from robokudo.exceptions import (
     ColorToDepthRatioMissing,
     CVBridgeImageConversionError,
     CVBridgeImageShapeError,
+    CVBridgeUnsupportedEncoding,
     EmptyPointCloud,
     ImageContourMissing,
     PlaneModelMissing,
@@ -75,6 +76,11 @@ class TestRoboKudoExceptions:
 
         assert "Expected 2D or 3D image array" in str(exception)
         assert "(1, 2, 3, 4)" in str(exception)
+
+    def test_cv_bridge_unsupported_encoding_message(self):
+        exception = CVBridgeUnsupportedEncoding(encoding="not_an_encoding")
+
+        assert "Unsupported ROS image encoding 'not_an_encoding'" in str(exception)
 
     def test_stored_camera_transform_frame_metadata_missing_message(self):
         exception = StoredCameraTransformFrameMetadataMissing()
