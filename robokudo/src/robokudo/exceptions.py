@@ -117,6 +117,20 @@ class CVBridgeUnsupportedEncoding(RoboKudoError, ValueError):
 
 
 @dataclass
+class CVBridgeUnsupportedTargetEncoding(RoboKudoError, ValueError):
+    """Raised when the cv_bridge workaround cannot produce an encoding."""
+
+    target_encoding: str
+    """Requested target image encoding."""
+
+    def error_message(self) -> str:
+        return f"Unsupported desired encoding '{self.target_encoding}'."
+
+    def suggest_correction(self) -> str:
+        return "request passthrough, bgr8, 32FC1, or add support for the desired conversion."
+
+
+@dataclass
 class StoredCameraTransformFrameMetadataMissing(RoboKudoError):
     """Raised when stored camera transform frame metadata is missing."""
 

@@ -6,6 +6,7 @@ from robokudo.exceptions import (
     CVBridgeImageConversionError,
     CVBridgeImageShapeError,
     CVBridgeUnsupportedEncoding,
+    CVBridgeUnsupportedTargetEncoding,
 )
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
@@ -153,7 +154,7 @@ class TestCVBridgeWorkaround(object):
             data=bgr.tobytes(),
         )
 
-        with pytest.raises(ValueError, match="Unsupported desired encoding"):
+        with pytest.raises(CVBridgeUnsupportedTargetEncoding):
             bridge.imgmsg_to_cv2(msg, desired_encoding="rgb8")
 
     def test_imgmsg_to_cv2_rejects_unsupported_source_encoding(self) -> None:

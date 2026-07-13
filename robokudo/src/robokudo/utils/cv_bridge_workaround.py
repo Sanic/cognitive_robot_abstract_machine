@@ -27,6 +27,7 @@ from robokudo.exceptions import (
     CVBridgeImageConversionError,
     CVBridgeImageShapeError,
     CVBridgeUnsupportedEncoding,
+    CVBridgeUnsupportedTargetEncoding,
 )
 
 if TYPE_CHECKING:
@@ -107,9 +108,7 @@ class CVBridgeWorkaround:
                 return image
             return image.astype(np.float32)
 
-        raise ValueError(
-            f"Unsupported desired encoding '{desired_encoding}' for ROS image conversion"
-        )
+        raise CVBridgeUnsupportedTargetEncoding(target_encoding=desired_encoding)
 
     def cv2_to_imgmsg(
         self, cv_image: npt.NDArray, encoding: str = "passthrough"
