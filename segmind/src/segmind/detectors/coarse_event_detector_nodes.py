@@ -74,7 +74,7 @@ class AbstractInteractionDetector(AbstractDetector):
                 if abs(secondary.timestamp - primary.timestamp) >= self.shift_threshold:
                     continue
 
-                key = (secondary.tracked_object.id, secondary.with_object.id)
+                key = (secondary_event_type, secondary.tracked_object.id, secondary.with_object.id)
                 if key in segmind_context.placing_pairs:
                     continue
 

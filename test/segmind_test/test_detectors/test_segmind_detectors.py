@@ -185,6 +185,57 @@ def test_placing(_simple_apartment_setup):
     assert len(events_of(segmind_context, PlacingEvent)) == 1
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
 
+def test_pickup_then_place_back_on_same_surface(_simple_apartment_setup):
+    segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
+    statechart = SegmindStatechart().build_statechart(
+        [PickUpDetector(), PlacingDetector(), SupportDetector(), LossOfSupportDetector(),
+         TranslationDetector(), StopTranslationDetector()])
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=box2.global_pose.x, y=box2.global_pose.y, z=box2.global_pose.z + 0.56,
+    )
+
+    segmind_executor.compile(statechart)
+    segmind_executor.tick()
+
+    assert len(events_of(segmind_context, SupportEvent)) == 1
+
+    # Pick the milk up off box2.
+    for i in range(5):
+        milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=box2.global_pose.x,
+            y=box2.global_pose.y,
+            z=box2.global_pose.z + 0.56 + i * 0.1,
+        )
+        segmind_executor.tick()
+
+    assert len(events_of(segmind_context, LossOfSupportEvent)) == 1
+    assert len(events_of(segmind_context, PickUpEvent)) == 1
+
+    for _ in range(5):
+        segmind_executor.tick()
+
+    # Place the milk back down onto the very same surface (box2) it was picked up from.
+    for i in range(5):
+        milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=box2.global_pose.x,
+            y=box2.global_pose.y,
+            z=box2.global_pose.z + 0.97 - i * 0.1,
+        )
+        segmind_executor.tick()
+
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=box2.global_pose.x,
+        y=box2.global_pose.y,
+        z=box2.global_pose.z + 0.56,
+    )
+    for _ in range(5):
+        segmind_executor.tick()
+
+    assert len(events_of(segmind_context, SupportEvent)) == 2
+    assert len(events_of(segmind_context, PlacingEvent)) == 1
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+
+
 def test_translation(_simple_apartment_setup):
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
     statechart = SegmindStatechart().build_statechart(
