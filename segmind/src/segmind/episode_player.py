@@ -79,9 +79,6 @@ class EpisodePlayer(PropagatingThread, ABC):
     Whether the episode player has been initialized.
     """
 
-    def __post_init__(self):
-        super().__post_init__()
-
     def __new__(cls, *args, **kwargs):
         if cls not in EpisodePlayer._instances:
             instance = super().__new__(cls)

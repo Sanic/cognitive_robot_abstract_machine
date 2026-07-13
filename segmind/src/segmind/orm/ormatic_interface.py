@@ -28,9 +28,6 @@ import pathlib
 import segmind.datastructures.event_plotter
 import segmind.datastructures.events
 import segmind.datastructures.object_tracker
-import segmind.demos.pouring_demo
-import segmind.demos.tiago_apartment_scene
-import segmind.demos.tiago_arm_demo
 import segmind.detectors.atomic_event_detectors_nodes
 import segmind.detectors.base
 import segmind.detectors.coarse_event_detector_nodes
@@ -517,81 +514,6 @@ class ObjectTrackerFactoryDAO(
     Base, DataAccessObject[segmind.datastructures.object_tracker.ObjectTrackerFactory]
 ):
     __tablename__ = "ObjectTrackerFactoryDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-
-class PouringDemoDAO(Base, DataAccessObject[segmind.demos.pouring_demo.PouringDemo]):
-    __tablename__ = "PouringDemoDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    source_cup_name: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    target_cup_name: Mapped[builtins.str] = mapped_column(
-        sqlalchemy.sql.sqltypes.Text, use_existing_column=True
-    )
-    pouring_angle: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    lift_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    cup_half_height: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-
-class PouringResultDAO(
-    Base, DataAccessObject[segmind.demos.pouring_demo.PouringResult]
-):
-    __tablename__ = "PouringResultDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    final_tilt_angle: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    cups_in_contact: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-    steps_executed: Mapped[builtins.int] = mapped_column(use_existing_column=True)
-
-
-class ApartmentSimulationDAO(
-    Base, DataAccessObject[segmind.demos.tiago_apartment_scene.ApartmentSimulation]
-):
-    __tablename__ = "ApartmentSimulationDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    headless: Mapped[builtins.bool] = mapped_column(use_existing_column=True)
-
-    world_id: Mapped[int] = mapped_column(
-        ForeignKey("WorldMappingDAO.database_id", use_alter=True),
-        nullable=True,
-        use_existing_column=True,
-    )
-
-    world: Mapped[WorldMappingDAO] = relationship(
-        "WorldMappingDAO", uselist=False, foreign_keys=[world_id], post_update=True
-    )
-
-
-class ArmTargetDAO(Base, DataAccessObject[segmind.demos.tiago_arm_demo.ArmTarget]):
-    __tablename__ = "ArmTargetDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        Integer, primary_key=True, use_existing_column=True
-    )
-
-    velocity: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-    position_tolerance: Mapped[builtins.float] = mapped_column(use_existing_column=True)
-
-
-class TiagoArmDemoDAO(
-    Base, DataAccessObject[segmind.demos.tiago_arm_demo.TiagoArmDemo]
-):
-    __tablename__ = "TiagoArmDemoDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         Integer, primary_key=True, use_existing_column=True
