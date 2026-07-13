@@ -171,7 +171,7 @@ class Verbalizable(ABC):
 class SymbolicCallable(Symbol, Verbalizable, ABC):
     """A user-defined, self-verbalizing symbolic operation.
 
-    It is CALLED with arguments, is represented as an :class:`InstantiatedVariable` in a query when
+    It is called with arguments, is represented as an :class:`InstantiatedVariable` in a query when
     any argument is symbolic, and renders itself through its required
     :meth:`Verbalizable._verbalization_fragment_`. :class:`Predicate` (a boolean operation) and
     :class:`SymbolicFunction` (a value operation) are its two concrete kinds, so the
@@ -241,11 +241,11 @@ class Predicate(SymbolicCallable, ABC):
 
 @dataclass(eq=False)
 class SymbolicFunction(SymbolicCallable, ABC):
-    """A user-defined operation that computes a VALUE, with its own verbalization.
+    """A user-defined operation that computes a value, with its own verbalization.
 
     Like :class:`Predicate` it is a self-verbalizing symbolic callable, but its :meth:`__call__`
     returns a value (not a truth value), so its :meth:`Verbalizable._verbalization_fragment_` names
-    that value as a NOUN PHRASE rather than a clause. Subclass it when the default
+    that value as a noun phrase rather than a clause. Subclass it when the default
     *"the <name> of <arguments>"* reading produced by the :func:`symbolic_function` decorator is not
     the surface you want; for a plain value function the decorator remains the simplest form.
     """
