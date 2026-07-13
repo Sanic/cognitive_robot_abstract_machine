@@ -351,3 +351,47 @@ def test_stop_rotation(_simple_apartment_setup):
         segmind_executor.tick()
     assert len([i for i in segmind_context.logger.get_events() if isinstance(i, StopRotationEvent)]) >= 1
 
+
+def test_slow_motion_with_all_motion_detectors(_simple_apartment_setup):
+    """
+    Runs every motion detector in one statechart on an object that drifts slowly.
+
+    Each step stays below distance_threshold and rotation_threshold; only the displacement
+    accumulated across the whole window exceeds them. Detecting this therefore requires every
+    detector to hold a pose window that spans window_size ticks. While the window lived on the
+    shared context, all four detectors appended to it on every tick, so it only ever spanned a
+    single tick and drift this slow was never reported.
+    """
+    segmind_executor, segmind_context, milk, box1, box2 = _build_executor(_simple_apartment_setup)
+    statechart = SegmindStatechart().build_statechart(
+        [TranslationDetector(), StopTranslationDetector(), RotationDetector(), StopRotationDetector()])
+    segmind_executor.compile(statechart)
+
+    # Move the object to its start pose and let the pose windows settle, so that the events
+    # triggered by that jump are not mistaken for the slow drift below.
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=-3, z=0.25)
+    for _ in range(8):
+        segmind_executor.tick()
+
+    translations = len(events_of(segmind_context, TranslationEvent))
+    rotations = len(events_of(segmind_context, RotationEvent))
+
+    # Per tick this is 0.002m and 0.04rad, both below their detection thresholds. Across the
+    # window it accumulates to more than 0.005m and 0.1rad, so it has to be reported.
+    for i in range(1, 9):
+        milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1 + i * 0.002, y=-3, z=0.25, roll=i * 0.04
+        )
+        segmind_executor.tick()
+
+    assert len(events_of(segmind_context, TranslationEvent)) > translations
+    assert len(events_of(segmind_context, RotationEvent)) > rotations
+
+    for _ in range(8):
+        segmind_executor.tick()
+
+    assert len(events_of(segmind_context, StopTranslationEvent)) >= 1
+    assert len(events_of(segmind_context, StopRotationEvent)) >= 1
+
+    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.07, yaw=np.pi)
+

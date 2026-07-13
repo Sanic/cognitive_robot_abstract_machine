@@ -12,7 +12,6 @@ from segmind.datastructures.events import MotionEvent, DetectionEvent, RotationE
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from segmind.event_logger import EventLogger
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
-from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -42,16 +41,6 @@ class SegmindContext(ContextExtension):
     between bodies in the simulation as well as the event logger.
     """
 
-    object_moving_status: Dict[Body, bool] = field(default_factory=dict)
-    """
-    Dictionary mapping each body to a boolean indicating if it is currently moving.
-    """
-
-    object_rotation_status: Dict[Body, bool] = field(default_factory=dict)
-    """
-    Dictionary mapping each body to a boolean indicating if it is currently rotating.
-    """
-
     latest_contact_bodies: IndexedBodyPairs = field(default_factory=dict)
     """
     Dictionary mapping each body to the set of bodies it is currently in contact with.
@@ -65,11 +54,6 @@ class SegmindContext(ContextExtension):
     latest_containments: IndexedBodyPairs = field(default_factory=dict)
     """
     Dictionary mapping each body to the set of bodies that currently contain it.
-    """
-
-    latest_poses: Dict[Body, List[Pose]] = field(default_factory=dict)
-    """
-    Dictionary mapping each body to a list of its recent poses (pose history).
     """
 
     latest_motion_events: Dict[Body, MotionEvent] = field(default_factory=dict)
