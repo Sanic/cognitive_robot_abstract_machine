@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass(frozen=True)
+@dataclass
 class CameraResolution:
     """
     Defines the horizontal and vertical pixel count used for camera ray generation.
@@ -51,7 +51,7 @@ class CameraResolution:
     @classmethod
     def from_value(cls, resolution: CameraResolutionValue) -> CameraResolution:
         """
-        Creates a camera resolution from a scalar or a width-height pair.
+        Creates a camera resolution from a camera resolution value.
         """
         if isinstance(resolution, CameraResolution):
             return resolution
@@ -68,7 +68,7 @@ class CameraResolution:
                 resolution=resolution,
                 reason="resolution pair must contain exactly two values.",
             )
-        return cls(width=resolution[0], height=resolution[1])
+        return cls(*resolution)
 
     def to_shape(self) -> tuple[int, int]:
         """
@@ -176,7 +176,7 @@ class RayTracer:
     def create_segmentation_mask(
         self,
         camera_pose: GenericSpatialType,
-        resolution: CameraResolutionValue = 512,
+        resolution: CameraResolutionValue = (512, 512),
         min_distance: float = 0,
         max_distance: float = np.inf,
     ) -> np.ndarray:
@@ -185,8 +185,8 @@ class RayTracer:
         in the mask corresponds to the index of a body in the scene or -1 if no body is hit at that pixel.
 
         :param camera_pose: The position of the camera.
-        :param resolution: The camera resolution. An integer creates a square image; a width-height pair creates a
-            rectangular image.
+        :param resolution: The camera resolution value. An integer creates a square image; a width-height pair creates
+            a rectangular image.
         :param min_distance: The minimum distance of a body to be considered a hit.
         :param max_distance: The maximum distance of a body to be considered a hit.
         :return: A segmentation mask as a numpy array.
@@ -225,7 +225,7 @@ class RayTracer:
     def create_depth_map(
         self,
         camera_pose: GenericSpatialType,
-        resolution: CameraResolutionValue = 512,
+        resolution: CameraResolutionValue = (512, 512),
         min_distance: float = 0,
         max_distance: float = np.inf,
     ) -> np.ndarray:
@@ -235,8 +235,8 @@ class RayTracer:
         no point is hit.
 
         :param camera_pose: The position of the camera.
-        :param resolution: The camera resolution. An integer creates a square image; a width-height pair creates a
-            rectangular image.
+        :param resolution: The camera resolution value. An integer creates a square image; a width-height pair creates
+            a rectangular image.
         :param min_distance: The minimum distance of a body to be considered a hit.
         :param max_distance: The maximum distance of a body to be considered a hit.
         :return: A depth map as a numpy array.
@@ -281,7 +281,7 @@ class RayTracer:
     def create_camera_rays(
         self,
         camera_pose: GenericSpatialType,
-        resolution: CameraResolutionValue = 512,
+        resolution: CameraResolutionValue = (512, 512),
         fov=90,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -289,8 +289,8 @@ class RayTracer:
         at the given position and orientation view of the camera is along the x-axis.
 
         :param camera_pose: The position of the camera as a 4x4 transformation matrix.
-        :param resolution: The camera resolution. An integer creates a square image; a width-height pair creates a
-            rectangular image.
+        :param resolution: The camera resolution value. An integer creates a square image; a width-height pair creates
+            a rectangular image.
         :param fov: The field of view of the camera in degrees.
         :return: The origin points of the rays, the direction vectors of the rays, and the pixel coordinates.
         """
