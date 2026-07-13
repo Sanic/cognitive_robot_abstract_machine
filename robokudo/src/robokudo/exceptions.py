@@ -83,6 +83,26 @@ class CVBridgeImageConversionError(RoboKudoError, ValueError):
 
 
 @dataclass
+class CVBridgeImageShapeError(RoboKudoError, ValueError):
+    """Raised when an image array shape cannot represent a ROS image."""
+
+    shape: tuple[int, ...]
+    """Image array shape."""
+
+    dimensions: int
+    """Number of image array dimensions."""
+
+    def error_message(self) -> str:
+        return (
+            f"Expected 2D or 3D image array, got shape {self.shape} "
+            f"with ndim={self.dimensions}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "provide a single-channel or multi-channel image array."
+
+
+@dataclass
 class StoredCameraTransformFrameMetadataMissing(RoboKudoError):
     """Raised when stored camera transform frame metadata is missing."""
 

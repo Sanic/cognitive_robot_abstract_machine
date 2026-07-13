@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from sensor_msgs.msg import Image
 
-from robokudo.exceptions import CVBridgeImageConversionError
+from robokudo.exceptions import CVBridgeImageConversionError, CVBridgeImageShapeError
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
 
@@ -123,6 +123,13 @@ class TestCVBridgeWorkaround(object):
         assert msg.encoding == "mono16"
         assert msg.step == image.strides[0]
         assert np.array_equal(restored, image)
+
+    def test_cv2_to_imgmsg_rejects_image_with_invalid_dimensions(self) -> None:
+        bridge = CVBridgeWorkaround()
+        image = np.zeros((1, 1, 1, 1), dtype=np.uint8)
+
+        with pytest.raises(CVBridgeImageShapeError):
+            bridge.cv2_to_imgmsg(image, encoding="passthrough")
 
     def test_cv2_to_imgmsg_rejects_encoding_mismatch(self) -> None:
         bridge = CVBridgeWorkaround()

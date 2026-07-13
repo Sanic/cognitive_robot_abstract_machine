@@ -23,7 +23,7 @@ import numpy as np
 from sensor_msgs.msg import Image
 from typing_extensions import TYPE_CHECKING, Tuple
 
-from robokudo.exceptions import CVBridgeImageConversionError
+from robokudo.exceptions import CVBridgeImageConversionError, CVBridgeImageShapeError
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -113,8 +113,9 @@ class CVBridgeWorkaround:
         """Convert a NumPy/OpenCV image to ROS ``sensor_msgs/Image``."""
         np_image = np.asarray(cv_image)
         if np_image.ndim not in (2, 3):
-            raise ValueError(
-                f"Expected 2D or 3D image array, got shape {np_image.shape} with ndim={np_image.ndim}"
+            raise CVBridgeImageShapeError(
+                shape=np_image.shape,
+                dimensions=np_image.ndim,
             )
 
         if not np_image.flags.c_contiguous:
@@ -218,8 +219,9 @@ class CVBridgeWorkaround:
         elif cv_image.ndim == 3:
             channel_count = int(cv_image.shape[2])
         else:
-            raise ValueError(
-                f"Expected 2D or 3D image array, got shape {cv_image.shape} with ndim={cv_image.ndim}"
+            raise CVBridgeImageShapeError(
+                shape=cv_image.shape,
+                dimensions=cv_image.ndim,
             )
 
         dtype = cv_image.dtype

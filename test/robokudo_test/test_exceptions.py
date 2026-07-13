@@ -8,6 +8,7 @@ from robokudo.exceptions import (
     CameraDataMissing,
     ColorToDepthRatioMissing,
     CVBridgeImageConversionError,
+    CVBridgeImageShapeError,
     EmptyPointCloud,
     ImageContourMissing,
     PlaneModelMissing,
@@ -68,6 +69,12 @@ class TestRoboKudoExceptions:
 
         assert "Cannot convert ROS image encoding 'bgr8' to '32FC1'" in str(exception)
         assert "source image is not single-channel" in str(exception)
+
+    def test_cv_bridge_image_shape_error_message(self):
+        exception = CVBridgeImageShapeError(shape=(1, 2, 3, 4), dimensions=4)
+
+        assert "Expected 2D or 3D image array" in str(exception)
+        assert "(1, 2, 3, 4)" in str(exception)
 
     def test_stored_camera_transform_frame_metadata_missing_message(self):
         exception = StoredCameraTransformFrameMetadataMissing()
