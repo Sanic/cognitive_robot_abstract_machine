@@ -15,6 +15,9 @@ from sensor_msgs.msg import CameraInfo
 import robokudo.world as rk_world
 from robokudo.cas import CASViews, CAS
 from robokudo.io.camera_interface import CameraInterface, ROSCameraInterface
+from robokudo.utils.camera_model import (
+    pinhole_camera_parameters_from_horizontal_field_of_view,
+)
 from robokudo.utils.module_loader import ModuleLoader
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
@@ -256,7 +259,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
             scene intersections.
         :param camera_to_world: Camera pose used by the RayTracer renderer.
         :param resolution: Square image resolution.
-        :param fov_deg: Horizontal and vertical camera field of view.
+        :param fov_deg: Horizontal camera field of view.
         :param min_distance: Minimum valid ray-hit distance.
         :param max_distance: Maximum valid ray-hit distance.
         :return: Segmentation indices and depth image in meters.
@@ -322,7 +325,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         :param camera_to_world: Camera pose used by the RayTracer renderer.
         :param segmentation: Body-index segmentation image.
         :param resolution: Square image resolution.
-        :param fov_deg: Horizontal and vertical camera field of view.
+        :param fov_deg: Horizontal camera field of view.
         :return: BGR image and optional RGB-to-object-name color map.
         """
         rgb_mode = str(self.camera_config.rgb_mode).strip().lower()
@@ -356,7 +359,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         :param ray_tracer: SemDT ray tracer that owns the Trimesh scene.
         :param camera_to_world: Camera pose used by the RayTracer renderer.
         :param resolution: Square image resolution.
-        :param fov_deg: Horizontal and vertical camera field of view.
+        :param fov_deg: Horizontal camera field of view.
         :return: BGR image when rendering succeeds, otherwise ``None``.
         """
         try:
@@ -444,42 +447,41 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
         :param frame_id: Camera frame name stored in the ROS camera info header.
         :param resolution: Square image resolution.
-        :param fov_deg: Horizontal and vertical camera field of view.
+        :param fov_deg: Horizontal camera field of view.
         :return: ROS camera info and matching Open3D intrinsic model.
         """
-        width = int(resolution)
-        height = int(resolution)
-        fov_rad = np.deg2rad(float(fov_deg))
-        focal = (0.5 * width) / np.tan(0.5 * fov_rad)
-        cx = (width - 1.0) / 2.0
-        cy = (height - 1.0) / 2.0
+        camera_parameters = pinhole_camera_parameters_from_horizontal_field_of_view(
+            width=int(resolution),
+            height=int(resolution),
+            horizontal_field_of_view_degrees=float(fov_deg),
+        )
 
         camera_info = CameraInfo()
         camera_info.header.frame_id = frame_id
-        camera_info.width = width
-        camera_info.height = height
+        camera_info.width = camera_parameters.width
+        camera_info.height = camera_parameters.height
         camera_info.distortion_model = "plumb_bob"
         camera_info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
         camera_info.k = [
-            float(focal),
+            camera_parameters.focal_length_x,
             0.0,
-            float(cx),
+            camera_parameters.center_x,
             0.0,
-            float(focal),
-            float(cy),
+            camera_parameters.focal_length_y,
+            camera_parameters.center_y,
             0.0,
             0.0,
             1.0,
         ]
         camera_info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         camera_info.p = [
-            float(focal),
+            camera_parameters.focal_length_x,
             0.0,
-            float(cx),
+            camera_parameters.center_x,
             0.0,
             0.0,
-            float(focal),
-            float(cy),
+            camera_parameters.focal_length_y,
+            camera_parameters.center_y,
             0.0,
             0.0,
             0.0,
@@ -488,7 +490,12 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         ]
 
         camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(
-            width, height, float(focal), float(focal), float(cx), float(cy)
+            camera_parameters.width,
+            camera_parameters.height,
+            camera_parameters.focal_length_x,
+            camera_parameters.focal_length_y,
+            camera_parameters.center_x,
+            camera_parameters.center_y,
         )
 
         return camera_info, camera_intrinsic
