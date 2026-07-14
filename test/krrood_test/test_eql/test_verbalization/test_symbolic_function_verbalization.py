@@ -1,10 +1,14 @@
-"""Symbolic-operation class hierarchy: a value :class:`SymbolicFunction` reads as a noun.
+"""
+Symbolic-operation class hierarchy: a value :class:`SymbolicFunction` reads as
+a noun.
 
-:class:`Predicate` (a boolean operation) and :class:`SymbolicFunction` (a value operation) share the
-:class:`SymbolicCallable` base, so the symbolic-construction machinery lives in one place. A
-``SymbolicFunction`` subclass names the value it computes through its own
-:meth:`Verbalizable._verbalization_fragment_` (a noun phrase) — the way a ``Predicate`` names its
-clause — and evaluates to that value through :meth:`__call__`.
+:class:`Predicate` (a boolean operation) and :class:`SymbolicFunction`
+(a value operation) share the :class:`SymbolicCallable` base, so the
+symbolic-construction machinery lives in one place. A
+``SymbolicFunction`` subclass names the value it computes through its
+own :meth:`Verbalizable._verbalization_fragment_` (a noun phrase) — the
+way a ``Predicate`` names its clause — and evaluates to that value
+through :meth:`__call__`.
 """
 
 from __future__ import annotations
@@ -27,13 +31,20 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 
 @dataclass(eq=False)
 class RemainingLoad(SymbolicFunction):
-    """A value ``SymbolicFunction`` with a custom noun surface, exercising the class form."""
+    """
+    A value ``SymbolicFunction`` with a custom noun surface, exercising the
+    class form.
+    """
 
     capacity: int
-    """The capacity it is computed from."""
+    """
+    The capacity it is computed from.
+    """
 
     load: int
-    """The load it is computed from."""
+    """
+    The load it is computed from.
+    """
 
     def __call__(self) -> int:
         return self.capacity - self.load
@@ -44,13 +55,19 @@ class RemainingLoad(SymbolicFunction):
 
 
 def test_symbolic_function_and_predicate_share_a_base():
-    """Both are self-verbalizing symbolic callables, so construction lives in one shared base."""
+    """
+    Both are self-verbalizing symbolic callables, so construction lives in one
+    shared base.
+    """
     assert issubclass(Predicate, SymbolicCallable)
     assert issubclass(SymbolicFunction, SymbolicCallable)
 
 
 def test_symbolic_function_subclass_uses_its_custom_fragment():
-    """A ``SymbolicFunction`` subclass names its value through its own noun-phrase fragment."""
+    """
+    A ``SymbolicFunction`` subclass names its value through its own noun-phrase
+    fragment.
+    """
     numbers = variable(int, [])
     assert (
         verbalize_expression(a(set_of(RemainingLoad(numbers, numbers))))
@@ -59,16 +76,23 @@ def test_symbolic_function_subclass_uses_its_custom_fragment():
 
 
 def test_symbolic_function_subclass_evaluates_via_call():
-    """Its :meth:`__call__` computes the value directly when constructed with concrete arguments."""
+    """
+    Its :meth:`__call__` computes the value directly when constructed with
+    concrete arguments.
+    """
     assert RemainingLoad._construct_normally_(capacity=10, load=3)() == 7
 
 
 @dataclass(eq=False)
 class Doubled(SymbolicFunction):
-    """A single-argument value ``SymbolicFunction``, exercising query evaluation."""
+    """
+    A single-argument value ``SymbolicFunction``, exercising query evaluation.
+    """
 
     number: int
-    """The number it doubles."""
+    """
+    The number it doubles.
+    """
 
     def __call__(self) -> int:
         return self.number * 2
@@ -79,8 +103,11 @@ class Doubled(SymbolicFunction):
 
 
 def test_symbolic_function_binds_its_computed_value_in_a_query():
-    """In a query a value ``SymbolicFunction`` binds what it COMPUTES (constructed AND called),
-    exactly like a ``@symbolic_function`` — not the constructed instance."""
+    """
+    In a query a value ``SymbolicFunction`` binds what it COMPUTES (constructed
+    AND called), exactly like a ``@symbolic_function`` — not the constructed
+    instance.
+    """
     numbers = variable(int, domain=[1, 2, 3])
     values = sorted(
         next(iter(row.values())) for row in a(set_of(Doubled(numbers))).tolist()
@@ -89,8 +116,10 @@ def test_symbolic_function_binds_its_computed_value_in_a_query():
 
 
 def test_migrated_length_reads_as_a_noun_phrase_and_keeps_its_value():
-    """``length`` is now ``class Length(SymbolicFunction)`` behind a ``symbolic_callable_to_function`` wrapper: it
-    reads through the default value surface (*"the length of ..."*) and still computes the length.
+    """
+    ``length`` is now ``class Length(SymbolicFunction)`` behind a
+    ``symbolic_callable_to_function`` wrapper: it reads through the default
+    value surface (*"the length of ..."*) and still computes the length.
     """
     assert issubclass(Length, SymbolicFunction)
     assert length([1, 2, 3]) == 3

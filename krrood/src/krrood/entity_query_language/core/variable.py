@@ -1,7 +1,9 @@
 """
-This module defines variable and literal representations for the Entity Query Language.
+This module defines variable and literal representations for the Entity Query
+Language.
 
-It contains classes for simple variables, constant literals, and variables that are instantiated from other expressions.
+It contains classes for simple variables, constant literals, and
+variables that are instantiated from other expressions.
 """
 
 from __future__ import annotations
@@ -62,8 +64,11 @@ class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
 
     _type_: Union[Type[T], Callable] = field(kw_only=True, default=None)
     """
-    The values type of the variable. (The value of `T`)
+    The values type of the variable.
+
+    (The value of `T`)
     """
+
     _domain_source_: Optional[DomainSource] = field(default=None, kw_only=True)
     """
     The source type of the domain (e.g., EXPLICIT, DEDUCED, ...etc.).
@@ -78,20 +83,25 @@ class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
 @dataclass(eq=False, repr=False)
 class Variable(CanHaveDomainSource[T]):
     """
-    An atomic expression of EQL that has a domain of possible values. It can be evaluated to yield values from its
-    domain.
+    An atomic expression of EQL that has a domain of possible values.
+
+    It can be evaluated to yield values from its domain.
     """
 
     _domain_: DomainType = field(default_factory=list)
     """
     The original domain value.
     """
+
     _re_enterable_domain_generator_: ReEnterableLazyIterable = field(
         init=False, default_factory=ReEnterableLazyIterable, repr=False
     )
     """
-    The re-enterable generator of values for this variable. This is created from the provided `_domain_`.
+    The re-enterable generator of values for this variable.
+
+    This is created from the provided `_domain_`.
     """
+
     _domain_source_: DomainSource = field(init=False, default=DomainSource.EXPLICIT)
     """
     The source of the domain for Variable is always EXPLICIT.
@@ -118,9 +128,9 @@ class Variable(CanHaveDomainSource[T]):
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
-        Fetch values from the domain values and yield an OperationResult for each.
+        Fetch values from the domain values and yield an OperationResult for
+        each.
         """
-
         for v in self._re_enterable_domain_generator_:
             bindings = sources.bindings | {self._id_: v}
             yield self._build_operation_result_and_update_truth_value_(
@@ -146,17 +156,23 @@ class Variable(CanHaveDomainSource[T]):
 @dataclass(eq=False, repr=False)
 class Literal(Variable[T]):
     """
-    Literals are variables that do not necessarily have a type but they must have a domain.
+    Literals are variables that do not necessarily have a type but they must
+    have a domain.
     """
 
     _value_: T = field(kw_only=True)
     """
     The value of the literal.
     """
+
     _domain_: List[T] = field(init=False, repr=False)
     """
-    The domain of the literal. It is constructed from the `_value_` and is always a singleton iterable.
+    The domain of the literal.
+
+    It is constructed from the `_value_` and is always a singleton
+    iterable.
     """
+
     _name__: Optional[str] = field(default=None, kw_only=True)
     """
     The name to use for the variable.
@@ -181,32 +197,42 @@ class InstantiatedVariable(
     MultiArityExpressionThatPerformsACartesianProduct, CanHaveDomainSource[T]
 ):
     """
-    A variable which does not have an explicit domain, but creates new instances using the `_type_` and `_kwargs_`
-    that are provided. The `_kwargs_` are variables that can be used to generate combinations of bindings to create
-    instances for each combination. By definition this variable is inferred. It also represents Predicates and symbolic
-    functions.
+    A variable which does not have an explicit domain, but creates new
+    instances using the `_type_` and `_kwargs_` that are provided.
+
+    The `_kwargs_` are variables that can be used to generate
+    combinations of bindings to create instances for each combination.
+    By definition this variable is inferred. It also represents
+    Predicates and symbolic functions.
     """
 
     _type_: Union[Type[T], Callable] = field(kw_only=True)
     """
-    The result type of the variable. (The value of `T`)
+    The result type of the variable.
+
+    (The value of `T`)
     """
+
     _kwargs_: Dict[str, Any] = field(default_factory=dict)
     """
     The properties of the variable as keyword arguments.
     """
+
     _child_vars_: Dict[str, SymbolicExpression] = field(
         default_factory=dict, init=False, repr=False
     )
     """
-    A dictionary mapping child variable names to variables, these are from the _kwargs_ dictionary. 
+    A dictionary mapping child variable names to variables, these are from the
+    _kwargs_ dictionary.
     """
+
     _child_var_id_name_map_: Dict[uuid.UUID, str] = field(
         default_factory=dict, init=False, repr=False
     )
     """
-    A dictionary mapping child variable ids to their names. 
+    A dictionary mapping child variable ids to their names.
     """
+
     _domain_source_: DomainSource = field(init=False, default=DomainSource.DEDUCTION)
     """
     The source of the domain for InstantiatedVariable is always DEDUCED.
@@ -240,7 +266,8 @@ class InstantiatedVariable(
         self, sources: OperationResult
     ) -> Iterator[OperationResult]:
         """
-        Create new instances of the variable type and using as keyword arguments the child variables values.
+        Create new instances of the variable type and using as keyword
+        arguments the child variables values.
         """
         for child_result in self._evaluate_product_(sources):
             # Build once: unwrapped hashed kwargs for already provided child vars
@@ -287,7 +314,6 @@ class InstantiatedVariable(
     def apply_mapping_on_external_root(self, *args, **kwargs: Dict[str, Any]) -> Any:
         """
         Same as `MappedVariable.apply_mapping_on_external_root`
-
         """
         return self._type_(*args, **kwargs)
 
@@ -295,8 +321,8 @@ class InstantiatedVariable(
 @dataclass(eq=False, repr=False)
 class ExternallySetVariable(CanHaveDomainSource[T]):
     """
-    A variable that is externally set by another expression or another part of the application and can be used in the
-     query language.
+    A variable that is externally set by another expression or another part of
+    the application and can be used in the query language.
     """
 
     def _replace_child_field_(
@@ -306,8 +332,12 @@ class ExternallySetVariable(CanHaveDomainSource[T]):
 
     def _evaluate__(self, sources: OperationResult) -> Iterable[OperationResult]:
         """
-        As this variable is externally set, it does not produce any results on its own, it just yields from an empty
-         list to indicate that it has no results. It's important to note that this function will only be called when
-         `_evaluate_` is called, and there's no value in the bindings `sources` for this variable.
+        As this variable is externally set, it does not produce any results on
+        its own, it just yields from an empty list to indicate that it has no
+        results.
+
+        It's important to note that this function will only be called
+        when `_evaluate_` is called, and there's no value in the
+        bindings `sources` for this variable.
         """
         yield from []
