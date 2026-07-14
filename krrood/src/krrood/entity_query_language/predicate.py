@@ -42,6 +42,7 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
 )
 from krrood.entity_query_language.core.base_expressions import Selectable
+from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import camel_case_to_words
 from krrood.patterns.code_parsing_utils import (
     get_accessed_attribute_name_in_return_statement_of_property,
@@ -185,10 +186,10 @@ class Verbalizable(ABC):
 
 
 @dataclass(eq=False)
-class SymbolicCallable(Symbol, Verbalizable, ABC):
+class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     """A user-defined, self-verbalizing symbolic operation.
 
-    It is CALLED with arguments, is represented as an :class:`InstantiatedVariable` in a query when
+    It is called with arguments, is represented as an :class:`InstantiatedVariable` in a query when
     any argument is symbolic, and renders itself through its required
     :meth:`Verbalizable._verbalization_fragment_`. :class:`Predicate` (a boolean operation) and
     :class:`SymbolicFunction` (a value operation) are its two concrete kinds, so the
@@ -269,7 +270,7 @@ class Predicate(SymbolicCallable, ABC):
 
 @dataclass(eq=False)
 class SymbolicFunction(SymbolicCallable, ABC):
-    """A user-defined operation that computes a VALUE, with its own verbalization.
+    """A user-defined operation that computes a value, with its own verbalization.
 
     Like :class:`Predicate` it is a self-verbalizing symbolic callable, but its :meth:`__call__`
     returns a value (not a truth value), so its :meth:`Verbalizable._verbalization_fragment_` names
