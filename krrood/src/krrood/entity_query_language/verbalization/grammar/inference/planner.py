@@ -44,7 +44,6 @@ class AggregationStatus(Enum):
     No grouping context in this query.
     """
 
-
 @dataclass
 class AntecedentInformation:
     """
@@ -79,7 +78,6 @@ class AntecedentInformation:
     form/slot is the condition-form registry's concern at render time, not the
     plan's.
     """
-
 
 @dataclass
 class ConsequentBinding:
@@ -295,7 +293,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
         >>> handle = variable(Handle, [])
         >>> prismatic = variable(PrismaticConnection, [])
-        >>> fixed = a(FixedConnection).from_([])(parent=prismatic.child, child=handle)
+        >>> fixed = a(FixedConnection)(parent=prismatic.child, child=handle).from_([])
         >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.expression.parent, handle=fixed.expression.child)))
         >>> _ = planner.node.build()
         >>> antecedents, unmatched = planner._plan_antecedents(frozenset())
@@ -314,7 +312,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
         >>> handle = variable(Handle, [])
         >>> prismatic = variable(PrismaticConnection, [])
-        >>> fixed = a(FixedConnection).from_([])(parent=prismatic.child, child=handle)
+        >>> fixed = a(FixedConnection)(parent=prismatic.child, child=handle).from_([])
         >>> planner = InferencePlanner(entity(inference(Drawer)(container=fixed.expression.parent, handle=fixed.expression.child)))
         >>> _ = planner.node.build()
         >>> [antecedent.type_name for antecedent in planner._discover_antecedents(frozenset())]

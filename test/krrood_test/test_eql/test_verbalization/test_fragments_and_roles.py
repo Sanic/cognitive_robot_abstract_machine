@@ -108,7 +108,7 @@ def test_constraint_fragment_preserves_variable_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer = inference(Drawer)(container=fc.expression.parent)
 
     frag = EQLVerbalizer().build(drawer)
@@ -131,7 +131,7 @@ def test_constraint_fragment_preserves_attribute_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -156,7 +156,7 @@ def test_binding_override_replaces_entity_ref_in_constraint(doors_and_drawers_wo
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -206,7 +206,7 @@ def test_such_that_keyword_has_keyword_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer = inference(Drawer)(container=fc.expression.parent)
 
     frag = EQLVerbalizer().build(drawer)
@@ -320,7 +320,7 @@ def test_where_clause_with_instantiated_var_preserves_roles(doors_and_drawers_wo
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -354,7 +354,7 @@ def test_double_nested_constraint_field_refs(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )

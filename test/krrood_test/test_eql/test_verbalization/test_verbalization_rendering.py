@@ -154,7 +154,7 @@ def test_rule_if_then_carry_keyword_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -238,7 +238,7 @@ def test_rule_is_block_fragment(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -586,7 +586,7 @@ def test_hierarchical_plain_rule_structure(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )
@@ -627,7 +627,7 @@ def _drawer_rule_fragment(doors_and_drawers_world) -> VerbalizationFragment:
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection).from_(world.connections)(parent=pc.child, child=handle)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fc.expression.parent, handle=fc.expression.child
     )

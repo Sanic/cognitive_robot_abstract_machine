@@ -1460,9 +1460,9 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = a(FixedConnection).from_(world.connections)(
+    fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    )
+    ).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fixed_connection.expression.parent,
         handle=fixed_connection.expression.child,
@@ -1499,9 +1499,9 @@ def test_verbalize_inference_rule_golden(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = a(FixedConnection).from_(world.connections)(
+    fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    )
+    ).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fixed_connection.expression.parent,
         handle=fixed_connection.expression.child,
@@ -1517,8 +1517,9 @@ def test_verbalize_inference_rule_golden(doors_and_drawers_world):
 def test_verbalize_inference_no_sub_query_golden(doors_and_drawers_world):
     """
     Exact surface for a plain-binding inference rule (no antecedent sub-query):
-    a noun phrase with appositive ``, where …`` bindings, no IF/THEN block, no
-    ``such that``.
+
+    a noun phrase with appositive ``, where …`` bindings, no IF/THEN
+    block, no ``such that``.
     """
     world = doors_and_drawers_world
     handle_variable = variable(Handle, world.bodies)
@@ -1882,9 +1883,9 @@ def test_verbalize_inference_repeated_entity_article(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = a(FixedConnection).from_(world.connections)(
+    fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    )
+    ).from_(world.connections)
     drawer = inference(Drawer)(
         container=fixed_connection.expression.parent,
         handle=fixed_connection.expression.child,
@@ -1930,9 +1931,9 @@ def test_verbalize_double_nested_constraint_stack(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = a(FixedConnection).from_(world.connections)(
+    fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    )
+    ).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fixed_connection.expression.parent,
         handle=fixed_connection.expression.child,
@@ -1967,9 +1968,9 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     prismatic_connection = variable(PrismaticConnection, world.connections)
-    fixed_connection = a(FixedConnection).from_(world.connections)(
+    fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    )
+    ).from_(world.connections)
     drawer_var = inference(Drawer)(
         container=fixed_connection.expression.parent,
         handle=fixed_connection.expression.child,
@@ -1978,7 +1979,7 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     # A second entity used directly by the outer Wrapper
     handle2 = variable(Handle, world.bodies)
     pc2 = variable(PrismaticConnection, world.connections)
-    fc2 = a(FixedConnection).from_(world.connections)(parent=pc2.child, child=handle2)
+    fc2 = a(FixedConnection)(parent=pc2.child, child=handle2).from_(world.connections)
 
     wrapper_var = inference(Wrapper)(
         drawer=drawer_var, connection=fc2.expression.parent
