@@ -7,7 +7,8 @@ set -euo pipefail
 # and pushes it - so session-start.sh has something to read out of the box,
 # with no config needed on your end.
 #
-# Usage (from anywhere inside the repo):
+# Usage (from anywhere - always operates on this repo specifically, see
+# resolve-personal-notes-config.sh):
 #   ./.claude/hooks/create-personal-notes-branch.sh
 #
 # Resolves the remote/branch/path the same way session-start.sh does (git

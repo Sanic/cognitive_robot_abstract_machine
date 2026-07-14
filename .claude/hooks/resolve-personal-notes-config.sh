@@ -1,7 +1,28 @@
-# Sourced (not executed) by session-start.sh, create-personal-notes-branch.sh
-# and save-personal-notes.sh, so all three resolve the personal-notes remote,
-# branch and path with the exact same precedence: git config > environment
-# variable > the zero-config default. See ./README.md.
+# Sourced (not executed) by session-start.sh, create-personal-notes-branch.sh,
+# save-personal-notes.sh and save-pr-progress.sh, so all four resolve the
+# personal-notes remote, branch and path with the exact same precedence: git
+# config > environment variable > the zero-config default. See ./README.md.
+
+# CLAUDE_LOCAL_MD: the one, deterministic path to CLAUDE.local.md, always the
+# project root regardless of the caller's current working directory. Derived
+# from this file's own location on disk (${BASH_SOURCE[0]}, which - inside a
+# sourced file - is that file's own path, not the sourcing script's) rather
+# than $CLAUDE_PROJECT_DIR or the caller's cwd: a SessionStart hook's cwd
+# isn't guaranteed to be the project root (see session-start.sh), and these
+# scripts are also run directly, outside any hook, where nothing guarantees
+# $CLAUDE_PROJECT_DIR is set at all. This file always lives at
+# <project-root>/.claude/hooks/resolve-personal-notes-config.sh, so two
+# levels up from its own directory is always the project root, unconditionally.
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${HOOKS_DIR}/../.." && pwd)"
+CLAUDE_LOCAL_MD="${PROJECT_ROOT}/CLAUDE.local.md"
+
+# Every caller also does `git` operations (config, fetch, worktree, branch)
+# that assume they're running inside this repo. Move there explicitly instead
+# of trusting the invoking cwd to already be inside it (or inside it at all) -
+# git itself would otherwise auto-discover a *different* repo if run from
+# inside some other one, or fail outright if run from outside any repo.
+cd "${PROJECT_ROOT}"
 
 NOTES_REMOTE="$(git config --get claude.personalNotesRemote || true)"
 NOTES_REMOTE="${NOTES_REMOTE:-${CLAUDE_PERSONAL_NOTES_REMOTE:-origin}}"

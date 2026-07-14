@@ -8,8 +8,13 @@ set -euo pipefail
 # asked to edit your notes: edit CLAUDE.local.md below its header, then run
 # this script.
 #
-# Usage (from the project root, after editing CLAUDE.local.md):
+# Usage (from anywhere, after editing CLAUDE.local.md):
 #   "$CLAUDE_PROJECT_DIR/.claude/hooks/save-personal-notes.sh"
+#
+# Always reads/writes the project root's CLAUDE.local.md specifically (see
+# CLAUDE_LOCAL_MD in ./resolve-personal-notes-config.sh), regardless of the
+# invoking cwd - not whatever CLAUDE.local.md a bare relative path might
+# happen to resolve to from wherever this is run.
 #
 # Resolves the remote/branch/path exactly like session-start.sh (git config >
 # environment variable > the zero-config default, plus the same
@@ -34,8 +39,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
 
-if [ ! -f CLAUDE.local.md ]; then
-  echo "No CLAUDE.local.md in the current directory - nothing to save." >&2
+if [ ! -f "${CLAUDE_LOCAL_MD}" ]; then
+  echo "No CLAUDE.local.md at the project root (${CLAUDE_LOCAL_MD}) - nothing to save." >&2
   exit 1
 fi
 
@@ -54,11 +59,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if grep -q '^<!-- BEGIN-PERSONAL-NOTES -->$' CLAUDE.local.md; then
+if grep -q '^<!-- BEGIN-PERSONAL-NOTES -->$' "${CLAUDE_LOCAL_MD}"; then
   awk '/^<!-- BEGIN-PERSONAL-NOTES -->$/{flag=1; next} /^<!-- END-PERSONAL-NOTES -->$/{flag=0} flag' \
-    CLAUDE.local.md > "${CONTENT_FILE}"
+    "${CLAUDE_LOCAL_MD}" > "${CONTENT_FILE}"
 else
-  cp CLAUDE.local.md "${CONTENT_FILE}"
+  cp "${CLAUDE_LOCAL_MD}" "${CONTENT_FILE}"
 fi
 
 git branch -D __save-personal-notes-tmp > /dev/null 2>&1 || true

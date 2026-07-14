@@ -262,6 +262,13 @@ directly:
   code path by which it could end up in a commit that gets merged.
 - `CLAUDE.local.md` is gitignored, so populated notes can't accidentally end up in a commit on any
   branch, including this one.
+- All four scripts always operate on *this* repo's project root specifically, never wherever they
+  happen to be invoked from: a `SessionStart` hook's cwd isn't guaranteed to be the project root,
+  and these scripts are also meant to be run directly. Each resolves its own location on disk
+  (`resolve-personal-notes-config.sh`'s own path, not `$CLAUDE_PROJECT_DIR` or the caller's cwd,
+  since neither is guaranteed) to find the project root deterministically, then both `cd`s there for
+  every git operation and reads/writes `CLAUDE.local.md` at that exact path — so it's never created
+  in, or read from, some other directory, even one that's a subdirectory of a *different* repo.
 - Safe to re-run: `session-start.sh` only ever overwrites `CLAUDE.local.md`, and does nothing if
   the resolved branch or path isn't reachable (e.g. a fresh clone, or a fork that never created
   it).

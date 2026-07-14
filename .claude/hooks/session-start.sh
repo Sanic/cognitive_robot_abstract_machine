@@ -9,6 +9,12 @@ set -euo pipefail
 # for multiple contributors sharing one remote if each overrides the branch
 # name via local config instead of relying on the shared default.
 #
+# Always writes to the project root, never wherever this happens to be
+# invoked from: a SessionStart hook's cwd isn't guaranteed to be the project
+# root, so a bare `CLAUDE.local.md` could silently land in the wrong place
+# (and Claude Code only auto-loads it from the root) - see CLAUDE_LOCAL_MD in
+# ./resolve-personal-notes-config.sh for how that's resolved deterministically.
+#
 # Works out of the box, zero config: it looks for a branch named
 # `claude/personal-notes` on `origin` and, if found, reads
 # `.claude/personal/cram-notes.md` off it into CLAUDE.local.md.
@@ -148,7 +154,7 @@ SCAFFOLD
 fi
 
 if [ "${WROTE_ANYTHING}" = "1" ]; then
-  mv "${OUTPUT_FILE}" CLAUDE.local.md
+  mv "${OUTPUT_FILE}" "${CLAUDE_LOCAL_MD}"
 else
   rm -f "${OUTPUT_FILE}"
 fi

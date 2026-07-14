@@ -10,8 +10,13 @@ set -euo pipefail
 # to update the plan: edit CLAUDE.local.md between the BEGIN-PR-PROGRESS /
 # END-PR-PROGRESS markers, then run this script.
 #
-# Usage (from the project root, after editing CLAUDE.local.md):
+# Usage (from anywhere, after editing CLAUDE.local.md):
 #   "$CLAUDE_PROJECT_DIR/.claude/hooks/save-pr-progress.sh"
+#
+# Always reads the project root's CLAUDE.local.md specifically (see
+# CLAUDE_LOCAL_MD in ./resolve-personal-notes-config.sh), regardless of the
+# invoking cwd - not whatever CLAUDE.local.md a bare relative path might
+# happen to resolve to from wherever this is run.
 #
 # Resolves the remote/branch exactly like session-start.sh and
 # save-personal-notes.sh (git config > environment variable > the zero-config
@@ -44,12 +49,12 @@ if [ -z "${PROGRESS_PATH}" ]; then
   exit 1
 fi
 
-if [ ! -f CLAUDE.local.md ]; then
-  echo "No CLAUDE.local.md in the current directory - nothing to save." >&2
+if [ ! -f "${CLAUDE_LOCAL_MD}" ]; then
+  echo "No CLAUDE.local.md at the project root (${CLAUDE_LOCAL_MD}) - nothing to save." >&2
   exit 1
 fi
 
-if ! grep -q '^<!-- BEGIN-PR-PROGRESS -->$' CLAUDE.local.md; then
+if ! grep -q '^<!-- BEGIN-PR-PROGRESS -->$' "${CLAUDE_LOCAL_MD}"; then
   echo "CLAUDE.local.md has no PR-progress section to extract." >&2
   echo "Run session-start.sh first, then edit the section it writes." >&2
   exit 1
@@ -72,7 +77,7 @@ cleanup() {
 trap cleanup EXIT
 
 awk '/^<!-- BEGIN-PR-PROGRESS -->$/{flag=1; next} /^<!-- END-PR-PROGRESS -->$/{flag=0} flag' \
-  CLAUDE.local.md > "${CONTENT_FILE}"
+  "${CLAUDE_LOCAL_MD}" > "${CONTENT_FILE}"
 
 git branch -D __save-pr-progress-tmp > /dev/null 2>&1 || true
 # FETCH_HEAD: see the note on FETCH_HEAD vs. "<remote>/<branch>" refs in
