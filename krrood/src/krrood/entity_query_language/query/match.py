@@ -722,17 +722,3 @@ def construct_graph_and_get_root(
         child_node = construct_graph_and_get_root(child, graph=graph)
         child_node.parent = node
     return node
-
-
-def is_underspecified(instance: Any) -> bool:
-    """
-    :param instance: The instance to check.
-    :return: Whether ``instance`` is a :class:`Match` — a query still to be resolved by a
-        backend, as opposed to an already-concrete value.
-
-    .. note::
-        Whether resolving a match *selects* existing instances or *constructs* new ones is the
-        chosen backend's concern (the ``QueryBackend`` strategy), not a property of the match,
-        so this is a purely structural check.
-    """
-    return isinstance(instance, Match)

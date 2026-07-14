@@ -12,7 +12,7 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.entity_query_language.exceptions import MatchTypeCannotBeDetermined
 from krrood.entity_query_language.predicate import HasType
-from krrood.entity_query_language.query.match import Match, is_underspecified
+from krrood.entity_query_language.query.match import Match
 from krrood.entity_query_language.core.base_expressions import UnificationDict
 from krrood.parametrization.random_events_translator import is_literal_comparator
 from ..dataset.example_classes import KRROODPositions, KRROODPosition
@@ -181,21 +181,6 @@ def test_from_restricts_the_search():
     # from_ selects only over the given domain.
     selected = an(Robot)().from_(subset).tolist()
     assert {robot.name for robot in selected} == {"R2D2", "C3PO"}
-
-
-def test_is_underspecified_detects_deferred_match():
-    @dataclass(unsafe_hash=True)
-    class Robot:
-        name: str
-        battery: int
-
-    robots = [Robot("R2D2", 100)]
-    # is_underspecified is a structural check: any Match is a deferred query a backend must
-    # resolve (whether it selects or generates over the domain is the backend's concern); a
-    # concrete instance is not.
-    assert is_underspecified(an(Robot)(name="R2D2")) is True
-    assert is_underspecified(an(Robot)(name="R2D2").from_(robots)) is True
-    assert is_underspecified(Robot("R2D2", 100)) is False
 
 
 def test_from_without_kwargs_selects_all(handles_and_containers_world):
