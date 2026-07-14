@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.entity_query_language.factories import a, set_of, variable
+from krrood.entity_query_language.factories import a, an, entity, set_of, variable
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.predicate import (
     Length,
@@ -109,9 +109,7 @@ def test_symbolic_function_binds_its_computed_value_in_a_query():
     instance.
     """
     numbers = variable(int, domain=[1, 2, 3])
-    values = sorted(
-        next(iter(row.values())) for row in a(set_of(Doubled(numbers))).tolist()
-    )
+    values = sorted(an(entity(Doubled(numbers))).tolist())
     assert values == [2, 4, 6]
 
 
