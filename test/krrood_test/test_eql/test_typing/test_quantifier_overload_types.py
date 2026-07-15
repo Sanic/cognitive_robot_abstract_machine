@@ -52,14 +52,14 @@ class MypyCheckResult:
 
 def _run_mypy_on_fixture(cache_dir: Path) -> MypyCheckResult:
     """
-    Type-check the fixture module with ``mypy``, resolving ``krrood`` as first- party
-    source.
+    Type-check the fixture module with ``mypy``, resolving ``krrood`` as a first-party
+    package.
 
     ``krrood`` ships no ``py.typed`` marker, so mypy resolves it through its editable
     install and skips analysing it ("missing library stubs or py.typed marker") by
     default. Pointing MYPYPATH at the source root (derived from the already-imported
-    package's own file, not a hardcoded relative path) makes mypy resolve it as first-
-    party source instead, exactly as it would once py.typed is added.
+    package's own file, not a hardcoded relative path) makes mypy treat it that way
+    anyway, exactly as it would once py.typed is added.
 
     :param cache_dir: A scratch directory for mypy's incremental cache, so repeated runs
         never write ``.mypy_cache`` into the repository.
