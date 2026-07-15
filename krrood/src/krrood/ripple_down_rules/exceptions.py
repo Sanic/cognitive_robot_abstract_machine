@@ -72,3 +72,24 @@ class NoLoadPathFoundForExpertAnswers(InputError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class NonInteractiveTerminalError(InputError):
+    """
+    Raised when the embedded Ipython expert shell is started without an interactive
+    terminal attached to stdin, since it would then have no way to prompt for input.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "Cannot start the embedded Ipython expert shell: stdin is not an interactive "
+            "terminal, so the shell cannot prompt for input."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Provide expert answers programmatically, e.g. via "
+            "Human(use_loaded_answers=True), instead of relying on an interactive prompt in "
+            "a non-interactive environment such as CI."
+        )
