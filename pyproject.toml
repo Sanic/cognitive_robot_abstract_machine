@@ -33,6 +33,7 @@ dev = [
     "pytest-xdist",
     "objgraph",
     "bokeh",
+    "mypy>=1.8",
 ]
 
 # Requirements for building the documentation of all sub-packages.
@@ -110,3 +111,4 @@ packages = []
 make-summary-multi-line = true
 pre-summary-newline = true
 close-quotes-on-newline = true
+black = true
