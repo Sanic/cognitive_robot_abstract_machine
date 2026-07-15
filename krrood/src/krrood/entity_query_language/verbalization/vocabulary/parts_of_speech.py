@@ -507,8 +507,10 @@ def predicate_clause(
     the condition is stated to *hold given* all operands: *"one month holds given the begin and the end"*.
 
     ..note:: The class name is only read as an English predicate when it happens to be a grammatical
-        verb phrase (``IsReachable``, ``ConnectsTo``); this is the opt-in :class:`NameVerbalized`
-        surface. A predicate whose name does not read that way supplies its own fragment instead.
+        verb phrase (``IsReachable``, ``ConnectsTo``). This surface is opt-in — a predicate uses it by
+        building its :meth:`~…predicate.Verbalizable._verbalization_fragment_` from this function; one
+        whose name does not read that way builds a custom clause from the :func:`clause` vocabulary
+        instead.
 
     :param predicate_class: The predicate's class; its name is read as the predicate.
     :param subject: The first operand, rendered as the clause's subject.
