@@ -100,6 +100,25 @@ class TestAlchemyRDR(TestCase):
         cat = scrdr.classify(result[50])
         assert cat == self.targets[50]
 
+    def test_get_fit_scrdr_does_not_mutate_committed_expert_answers_fixture(self):
+        """
+        Regression test for a parallel-unsafe race: get_fit_scrdr must never delete or
+        rewrite the shared, committed expert-answers fixture it loads from, since under
+        `pytest -n auto` a concurrent worker reading the same file would intermittently
+        observe it missing (FileNotFoundError).
+        """
+        filename = os.path.join(self.expert_answers_dir, "scrdr_expert_answers_fit.py")
+        with open(filename, "r") as f:
+            expert_answers_before = f.read()
+
+        get_fit_scrdr(
+            self.all_cases[:3], self.targets[:3], load_answers=True, save_answers=False
+        )
+
+        assert os.path.exists(filename)
+        with open(filename, "r") as f:
+            assert f.read() == expert_answers_before
+
     def test_fit_mcrdr_stop_only(self):
         use_loaded_answers = True
         draw_tree = False
