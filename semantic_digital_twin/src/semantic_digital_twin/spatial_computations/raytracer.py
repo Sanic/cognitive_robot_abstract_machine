@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from numbers import Integral
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 import numpy as np
 import trimesh
@@ -78,7 +78,7 @@ class CameraResolution:
         return self.width, self.height
 
 
-CameraResolutionValue = int | list[int] | tuple[int, int] | CameraResolution
+CameraResolutionValue: TypeAlias = int | list[int] | tuple[int, int] | CameraResolution
 
 
 class RayTracer:
