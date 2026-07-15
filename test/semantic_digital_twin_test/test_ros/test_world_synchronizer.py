@@ -30,6 +30,7 @@ from semantic_digital_twin.adapters.ros.messages import (
 )
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
     ModelReloadSynchronizer,
+    Synchronizer,
     WorldSynchronizer,
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -847,6 +848,98 @@ def test_synchronous_publish_blocks_until_receiver_acknowledges(rclpy_node):
         receiver_executor.shutdown()
         receiver_thread.join(timeout=2.0)
         receiver_node.destroy_node()
+
+
+class _SynchronizerWithNoOpSubscriptionHandling(Synchronizer):
+    """
+    Concrete :class:`Synchronizer` that ignores incoming messages, so tests can exercise
+    the base class's discovery/acknowledgment logic without a real message type.
+    """
+
+    def _subscription_callback(self, msg):
+        pass
+
+
+class _FakeSubscriptionInfo:
+    """
+    Stand-in for the objects ``Node.get_subscriptions_info_by_topic`` returns, exposing
+    only the ``node_name`` attribute :meth:`Synchronizer._snapshot_subscribers` reads.
+    """
+
+    def __init__(self, node_name: str):
+        self.node_name = node_name
+
+
+class _DiscoveryLaggingNode:
+    """
+    Fake ``rclpy`` node whose ``get_subscriptions_info_by_topic`` walks through a
+    caller-supplied sequence of subscriber counts, simulating ROS graph discovery
+    gradually catching up with a remote subscriber created moments earlier.
+    """
+
+    def __init__(self, own_name: str, subscriber_counts: List[int]):
+        self._own_name = own_name
+        self._remaining_subscriber_counts = list(subscriber_counts)
+        self._last_subscriber_count = 0
+
+    def create_subscription(self, *args, **kwargs):
+        return None
+
+    def create_publisher(self, *args, **kwargs):
+        return None
+
+    def get_name(self) -> str:
+        return self._own_name
+
+    def get_subscriptions_info_by_topic(self, topic_name: str):
+        if self._remaining_subscriber_counts:
+            self._last_subscriber_count = self._remaining_subscriber_counts.pop(0)
+        return [
+            _FakeSubscriptionInfo(node_name=f"remote_subscriber_{i}")
+            for i in range(self._last_subscriber_count)
+        ]
+
+
+def test_snapshot_subscribers_waits_for_discovery_to_stabilize():
+    """
+    Regression test: a subscriber count that is still climbing (discovery catching up
+    with a just-created remote subscriber) must not be treated as final on the first
+    read, since an under-count would silently break the synchronous-publish contract in
+    :meth:`Synchronizer.publish`.
+    """
+    node = _DiscoveryLaggingNode(own_name="sender_node", subscriber_counts=[0, 1, 1])
+    synchronizer = _SynchronizerWithNoOpSubscriptionHandling(
+        node=node, topic_name="/test_topic"
+    )
+    synchronizer._subscriber_discovery_grace_period = 1.0
+    synchronizer._subscriber_discovery_poll_interval = 0.01
+
+    count = synchronizer._snapshot_subscribers_after_discovery_settles()
+
+    assert count == 1
+
+
+def test_snapshot_subscribers_gives_up_after_grace_period_elapses():
+    """
+    If the subscriber count never stabilizes within the grace period, the settled
+    snapshot must fall back to the last observed sample instead of blocking
+    indefinitely.
+    """
+    node = _DiscoveryLaggingNode(
+        own_name="sender_node", subscriber_counts=list(range(1000))
+    )
+    synchronizer = _SynchronizerWithNoOpSubscriptionHandling(
+        node=node, topic_name="/test_topic"
+    )
+    synchronizer._subscriber_discovery_grace_period = 0.05
+    synchronizer._subscriber_discovery_poll_interval = 0.01
+
+    start = time.monotonic()
+    count = synchronizer._snapshot_subscribers_after_discovery_settles()
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 0.5
+    assert count >= 0
 
 
 def test_compute_state_changes_no_changes(rclpy_node):

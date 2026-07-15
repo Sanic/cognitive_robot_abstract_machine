@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -156,6 +157,19 @@ class Synchronizer(WorldEntityWithClassBasedID):
     / ``_received_acknowledgments``).
     """
 
+    _subscriber_discovery_grace_period: float = field(default=0.2, init=False)
+    """
+    Maximum time, in seconds, that :meth:`_snapshot_subscribers_after_discovery_settles`
+    waits for a just-created remote subscriber to be reflected in this node's ROS graph
+    cache before treating the observed subscriber count as final.
+    """
+
+    _subscriber_discovery_poll_interval: float = field(default=0.02, init=False)
+    """
+    Interval, in seconds, between subscriber-count samples taken while waiting for ROS
+    graph discovery to settle in :meth:`_snapshot_subscribers_after_discovery_settles`.
+    """
+
     def __post_init__(self):
         self.subscriber = self.node.create_subscription(
             std_msgs.msg.String,
@@ -267,6 +281,33 @@ class Synchronizer(WorldEntityWithClassBasedID):
         own_count = sum(1 for info in infos if info.node_name == own_name)
         return len(infos) - own_count
 
+    def _snapshot_subscribers_after_discovery_settles(self) -> int:
+        """
+        Snapshot the subscriber count, giving ROS graph discovery a short grace period
+        to settle first.
+
+        ROS graph discovery is asynchronous, so a remote subscriber created moments ago
+        may not yet be reflected in this node's local graph cache, making
+        :meth:`_snapshot_subscribers` under-count it. Publishing synchronously with an
+        under-counted expectation lets :meth:`publish` return as soon as the (too few)
+        expected acknowledgments arrive, silently breaking the synchronous contract for
+        subscribers discovery had not caught up with yet. Polling until two consecutive
+        samples agree, or the grace period elapses, narrows that window without adding
+        latency once discovery has already settled.
+
+        :return: The subscriber count once observed stable across two consecutive
+            samples, or the last sample once the grace period elapses.
+        """
+        deadline = time.monotonic() + self._subscriber_discovery_grace_period
+        previous_count = self._snapshot_subscribers()
+        while time.monotonic() < deadline:
+            time.sleep(self._subscriber_discovery_poll_interval)
+            current_count = self._snapshot_subscribers()
+            if current_count == previous_count:
+                return current_count
+            previous_count = current_count
+        return previous_count
+
     @abstractmethod
     def _subscription_callback(self, msg: message_type):
         """
@@ -286,7 +327,9 @@ class Synchronizer(WorldEntityWithClassBasedID):
 
         with self._publish_lock, self._acknowledge_condition_variable:
             self._current_publication_event_id = msg.publication_event_id
-            self._expected_acknowledgment_count = self._snapshot_subscribers()
+            self._expected_acknowledgment_count = (
+                self._snapshot_subscribers_after_discovery_settles()
+            )
             self._received_acknowledgments = set()
             self.publisher.publish(std_msgs.msg.String(data=json.dumps(to_json(msg))))
 
