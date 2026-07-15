@@ -16,22 +16,24 @@ Dependencies:
 
 from __future__ import annotations
 
+from typing import Callable, TypeVar
+
 import rclpy
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.decorators import OneShot
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from typing import Callable, TypeVar
 from typing_extensions import TYPE_CHECKING, Optional
 
 from robokudo.garden import grow_tree
-from robokudo.utils.tree import setup_with_descendants_rk
 from robokudo.identifier import BBIdentifier
+from robokudo.utils.tree import setup_with_descendants_rk
 
 if TYPE_CHECKING:
     from py_trees.behaviour import Behaviour
     from py_trees_ros.trees import BehaviourTree
+
     from robokudo.cas import CAS
 
 _T = TypeVar("_T")

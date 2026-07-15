@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 
 from __future__ import annotations
-from robokudo.io.ros import get_node
-from robokudo.world import world_instance
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 
 import argparse
 import logging
@@ -25,6 +20,9 @@ from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.executors import MultiThreadedExecutor, SingleThreadedExecutor
 from rclpy.parameter import Parameter
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from typing_extensions import TYPE_CHECKING
 
 # RoboKudo imports
@@ -32,10 +30,12 @@ from robokudo.annotators.query import QueryActionServer
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE, PACKAGE_NAME
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
-from robokudo.io.ros import init_node
+from robokudo.io.ros import get_node, init_node
+from robokudo.utils.args_parser import parse_args
 from robokudo.utils.logging_configuration import configure_logging
 from robokudo.utils.module_loader import ModuleLoader
 from robokudo.utils.tree import setup_with_descendants_rk
+from robokudo.world import world_instance
 
 if TYPE_CHECKING:
     from py_trees_ros.trees import BehaviourTree
@@ -100,54 +100,7 @@ def main() -> None:
     loading the requested Analysis Engine, and spinning the ROS executors.
     """
     # 1. Parse CLI arguments (prefix_chars='_'):
-    parser = argparse.ArgumentParser(prefix_chars="_")
-    parser.add_argument(
-        "_ae",
-        dest="ae",
-        type=str,
-        nargs="?",
-        const=1,
-        default="demo",
-        help="Analysis Engine to run (module name in descriptors/analysis_engines/).",
-    )
-    parser.add_argument(
-        "_ros_pkg",
-        dest="ros_pkg",
-        type=str,
-        nargs="?",
-        const=1,
-        default=PACKAGE_NAME,
-        help="ROS package name containing the AE (default: robokudo).",
-    )
-    parser.add_argument(
-        "_headless", action="store_true", help="If set, runs without a GUI."
-    )
-    parser.set_defaults(headless=False)
-    parser.add_argument(
-        "_nodesuffix",
-        dest="nodesuffix",
-        type=str,
-        nargs="?",
-        const=1,
-        default="",
-        help="A suffix to add to the ROS node name.",
-    )
-    parser.add_argument(
-        "_tickrate",
-        dest="tickrate",
-        type=int,
-        nargs="?",
-        const=1,
-        default=5,
-        help="Rate (Hz) to tick the Behavior Tree.",
-    )
-    parser.add_argument(
-        "_debugmode",
-        action="store_true",
-        help="If set, the rcply root logger will be set to DEBUG log level which will yield many ROS-related debug messages.",
-    )
-    parser.set_defaults(debugmode=False)
-    args = parser.parse_args()
+    args = parse_args()
 
     # 2. Initialize RCL
     rclpy.init(args=sys.argv)
@@ -214,7 +167,10 @@ def main() -> None:
     # 8. Build your Behavior Tree from the loaded AE
     #    (Assuming loaded_ae.implementation() returns a py_trees root or something similar)
     ae_root = grow_tree(
-        loaded_ae.implementation(), node=node1, include_gui=not args.headless
+        loaded_ae.implementation(),
+        node=node1,
+        include_gui=not args.headless,
+        visualizers=args.vis,
     )
 
     # If you have a custom version of `setup_with_descendants`, call it:

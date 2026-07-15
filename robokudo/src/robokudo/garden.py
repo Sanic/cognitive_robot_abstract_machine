@@ -16,18 +16,18 @@ The module is responsible for:
 from __future__ import annotations
 
 from py_trees.blackboard import Blackboard
-from py_trees.common import Duration, ParallelPolicy, OneShotPolicy
+from py_trees.common import Duration, OneShotPolicy, ParallelPolicy
 from py_trees.composites import Parallel
 from py_trees.decorators import OneShot
 from py_trees_ros.trees import BehaviourTree
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, List, Optional
 
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap
 from robokudo.vis.visualizer_manager import VisualizationManager
 
 if TYPE_CHECKING:
-    from rclpy.node import Node
     from py_trees.behaviour import Behaviour
+    from rclpy.node import Node
 
 
 def grow_tree(
@@ -35,6 +35,7 @@ def grow_tree(
     node: Node,
     include_gui: bool = True,
     run_once: bool = False,
+    visualizers: Optional[List[str]] = None,
 ) -> BehaviourTree:
     """Initialize a behavior tree with all required RoboKudo data structures.
 
@@ -46,6 +47,7 @@ def grow_tree(
     :param node: The ROS node to use for tree setup
     :param include_gui: Whether to include visualization support, defaults to True
     :param run_once: Whether to wrap tree in OneShot for single execution, defaults to False
+    :param visualizers: List of visualizers to use
     :return: The initialized behavior tree
     """
     blackboard = Blackboard()
@@ -74,7 +76,7 @@ def grow_tree(
             "RootNodeWithGUI",
             policy=ParallelPolicy.SuccessOnAll(synchronise=False),
         )
-        root.add_child(VisualizationManager("VisManager"))
+        root.add_child(VisualizationManager("VisManager", visualizers))
         root.add_child(tree)
 
         behavior_tree = BehaviourTree(root)

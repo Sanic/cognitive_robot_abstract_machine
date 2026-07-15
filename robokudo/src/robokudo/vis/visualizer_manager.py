@@ -14,16 +14,17 @@ import copy
 import logging
 from timeit import default_timer
 
-from py_trees.common import Status
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
-from typing_extensions import Dict, List, Type
+from py_trees.common import Status
+from typing_extensions import Dict, List, Optional, Type
 
 from robokudo.defs import PACKAGE_NAME
 from robokudo.pipeline import Pipeline
 from robokudo.vis.cv_visualizer import CVVisualizer
+from robokudo.vis.multiprocessed_o3d_visualizer import MultiprocessedO3DVisualizer
 from robokudo.vis.o3d_visualizer import O3DVisualizer
-from robokudo.vis.ros_visualizer import SharedROSVisualizer, AllAnnotatorROSVisualizer
+from robokudo.vis.ros_visualizer import AllAnnotatorROSVisualizer, SharedROSVisualizer
 from robokudo.vis.visualizer import Visualizer
 
 
@@ -46,7 +47,7 @@ class VisualizationManager(Behaviour):
         3. Post-tick: Cleanup and synchronization
     """
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, visualizers: Optional[List[str]] = None) -> None:
         """Initialize the visualization manager.
 
         :param name: Name of the behavior tree node
@@ -59,11 +60,29 @@ class VisualizationManager(Behaviour):
         self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
         """Logger instance for this class"""
 
-        self.visualizer_types: List[Type] = [
-            CVVisualizer,
-            O3DVisualizer,
-            SharedROSVisualizer,
-            AllAnnotatorROSVisualizer,
+        self.available_visualizers: Dict[str, Type[Visualizer]] = {
+            "cv": CVVisualizer,
+            "o3d": O3DVisualizer,
+            "o3d_mp": MultiprocessedO3DVisualizer,
+            "ros": SharedROSVisualizer,
+            "all_annotator_ros": AllAnnotatorROSVisualizer,
+        }
+
+        if visualizers is None:
+            visualizers = []
+
+        if "web" in visualizers:
+            try:
+                from robokudo_web.web.web_visualizer import WebVisualizer
+            except ImportError as e:
+                self.rk_logger.error(f"Import of the web visualizer failed: {e}")
+                raise e
+            self.available_visualizers["web"] = WebVisualizer
+
+        self.visualizer_types: List[Type[Visualizer]] = [
+            self.available_visualizers[visualizer]
+            for visualizer in visualizers
+            if visualizer in self.available_visualizers
         ]
         """List of available visualizer classes"""
 
