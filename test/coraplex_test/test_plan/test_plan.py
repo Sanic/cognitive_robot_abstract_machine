@@ -26,7 +26,8 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     variable_from,
-    underspecified,
+    a,
+    an,
     variable,
 )
 from krrood.parametrization.model_registries import (
@@ -533,22 +534,20 @@ def test_pause_holds_active_motion_until_resumed(immutable_model_world):
 
 def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     """
-    Parameterize a SequentialPlan using krrood parameterizer, create a fully-factorized
+    Parameterize a SequentialPlan using krrood parameterizer, create a fully- factorized
     distribution and assert the correctness of sampled values after conditioning and
     truncation.
     """
     world, robot_view, context = apartment_world_pr2_copy_with_context
     context.evaluate_conditions = False
 
-    target_location = underspecified(PoseMapping.from_point_mapping_quaternion_mapping)(
-        position=underspecified(Point3Mapping)(
-            x=..., y=..., z=0.0, reference_frame=None
-        ),
+    target_location = a(PoseMapping.from_point_mapping_quaternion_mapping)(
+        position=a(Point3Mapping)(x=..., y=..., z=0.0, reference_frame=None),
         orientation=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
         reference_frame=variable_from([robot_view.root]),
     )
 
-    navigate_action = underspecified(NavigateAction)(
+    navigate_action = a(NavigateAction)(
         target_location=target_location,
     )
     # navigate_action.resolve()
@@ -575,10 +574,10 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
 
     milk_variable = variable_from([milk])
 
-    pick_up_description = underspecified(PickUpAction)(
+    pick_up_description = a(PickUpAction)(
         object_designator=milk_variable,
         arm=...,
-        grasp_description=underspecified(GraspDescription)(
+        grasp_description=a(GraspDescription)(
             approach_direction=...,
             vertical_alignment=...,
             rotate_gripper=...,

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import rustworkx
 
-from krrood.entity_query_language.factories import underspecified, variable
+from krrood.entity_query_language.factories import a, an, variable
 from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
 from coraplex.datastructures.grasp import GraspDescription
 from coraplex.plans.factories import sequential
@@ -70,13 +70,13 @@ class Sage10kOpenDoor(ActionDescription):
             )
         )
 
-        reach_query = underspecified(MoveToReach)(
-            target_pose_offset_robot=underspecified(Pose2D)(
+        reach_query = a(MoveToReach)(
+            target_pose_offset_robot=a(Pose2D)(
                 x=..., y=..., yaw=..., reference_frame=None
             ),
             hip_rotation=0.0,
             target_pose_end_effector=pre_grasp_pose,
-            grasp_description=underspecified(GraspDescription)(
+            grasp_description=a(GraspDescription)(
                 approach_direction=ApproachDirection.FRONT,
                 vertical_alignment=VerticalAlignment.NoAlignment,
                 end_effector=variable(EndEffector, self.world.semantic_annotations),

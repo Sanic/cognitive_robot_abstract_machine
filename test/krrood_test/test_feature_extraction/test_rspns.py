@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from krrood.entity_query_language.factories import underspecified
+from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.helper import to_dao
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     CircuitNotFittedError,
@@ -52,10 +52,10 @@ def rpc(scenario):
 
 @pytest.fixture
 def room_query_4():
-    query = underspecified(SceneRoom)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
-        objects=[underspecified(SceneObject)(type=...) for _ in range(4)],
+    query = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[a(SceneObject)(type=...) for _ in range(4)],
     )
     query.resolve()
     return query
@@ -170,16 +170,16 @@ def test_monte_carlo_sample_count_controls_mixture_size(rpc, room_query_4):
 
 
 def test_ground_variable_count_scales_with_query_size(rpc):
-    query_2 = underspecified(SceneRoom)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
-        objects=[underspecified(SceneObject)(type=...) for _ in range(2)],
+    query_2 = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[a(SceneObject)(type=...) for _ in range(2)],
     )
     query_2.resolve()
-    query_4 = underspecified(SceneRoom)(
-        position=underspecified(KRROODPosition)(x=..., y=..., z=...),
-        orientation=underspecified(KRROODOrientation)(x=..., y=..., z=..., w=...),
-        objects=[underspecified(SceneObject)(type=...) for _ in range(4)],
+    query_4 = a(SceneRoom)(
+        position=a(KRROODPosition)(x=..., y=..., z=...),
+        orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+        objects=[a(SceneObject)(type=...) for _ in range(4)],
     )
     query_4.resolve()
     assert len(rpc.ground(query_4).variables) > len(rpc.ground(query_2).variables)

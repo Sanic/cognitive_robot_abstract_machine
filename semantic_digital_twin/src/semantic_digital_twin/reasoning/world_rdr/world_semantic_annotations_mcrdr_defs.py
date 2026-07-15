@@ -3,7 +3,6 @@ from krrood.entity_query_language.factories import (
     entity,
     inference,
     variable,
-    match_variable,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wardrobe,

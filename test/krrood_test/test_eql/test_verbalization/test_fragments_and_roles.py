@@ -22,7 +22,6 @@ from krrood.entity_query_language.factories import (
     entity,
     flat_variable,
     inference,
-    match_variable,
     variable,
 )
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -106,10 +105,8 @@ def test_constraint_fragment_preserves_variable_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(
-        parent=pc.child, child=handle
-    )
-    drawer = inference(Drawer)(container=fc.parent)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
+    drawer = inference(Drawer)(container=fc.expression.parent)
 
     frag = EQLVerbalizer().build(drawer)
 
@@ -131,10 +128,10 @@ def test_constraint_fragment_preserves_attribute_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(
-        parent=pc.child, child=handle
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
+    drawer = inference(Drawer)(
+        container=fc.expression.parent, handle=fc.expression.child
     )
-    drawer = inference(Drawer)(container=fc.parent, handle=fc.child)
 
     frag = EQLVerbalizer().build(drawer)
 
@@ -155,10 +152,10 @@ def test_binding_override_replaces_entity_ref_in_constraint(doors_and_drawers_wo
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(
-        parent=pc.child, child=handle
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
+    drawer = inference(Drawer)(
+        container=fc.expression.parent, handle=fc.expression.child
     )
-    drawer = inference(Drawer)(container=fc.parent, handle=fc.child)
 
     text = verbalize_expression(drawer)
 
@@ -204,10 +201,8 @@ def test_such_that_keyword_has_keyword_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(
-        parent=pc.child, child=handle
-    )
-    drawer = inference(Drawer)(container=fc.parent)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
+    drawer = inference(Drawer)(container=fc.expression.parent)
 
     frag = EQLVerbalizer().build(drawer)
 
@@ -320,10 +315,10 @@ def test_where_clause_with_instantiated_var_preserves_roles(doors_and_drawers_wo
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(
-        parent=pc.child, child=handle
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
+    drawer_var = inference(Drawer)(
+        container=fc.expression.parent, handle=fc.expression.child
     )
-    drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
 
     query = entity(drawer_var)
     frag = EQLVerbalizer().build(query)
@@ -354,10 +349,10 @@ def test_double_nested_constraint_field_refs(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = match_variable(FixedConnection, world.connections)(
-        parent=pc.child, child=handle
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(world.connections)
+    drawer_var = inference(Drawer)(
+        container=fc.expression.parent, handle=fc.expression.child
     )
-    drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     wrapper_var = inference(Wrapper)(drawer=drawer_var)
 
     text = verbalize_expression(wrapper_var)
