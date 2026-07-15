@@ -330,7 +330,7 @@ def _quantify_or_build_match(
     return match_
 
 
-SymbolicExpressionT = TypeVar("SymbolicExpressionT", bound=SymbolicExpression)
+TSymbolicExpression = TypeVar("TSymbolicExpression", bound=SymbolicExpression)
 """
 Bound to the concrete symbolic-expression subtype (``Entity[...]``,
 ``Query[...]``, ``SetOf``, an ``Attribute`` chain, ...) passed to
@@ -339,9 +339,10 @@ returns that same type instead of falling through to the ``Callable[..., T]``
 match-building overload.
 
 .. note::
-    Every symbolic expression is itself callable (see
-    :class:`~krrood.entity_query_language.core.mapped_variable.CanBehaveLikeAVariable`), so without
-    this overload taking priority it would structurally match ``Callable[..., T]`` first.
+    Not every symbolic expression is affected, but the ones that inherit ``__call__`` from
+    :class:`~krrood.entity_query_language.core.mapped_variable.CanBehaveLikeAVariable` (``Entity``,
+    ``Query``, ``Match``, ``Attribute``, ...) are, so without this overload taking priority they
+    would structurally match ``Callable[..., T]`` first.
 """
 
 
@@ -356,11 +357,11 @@ def an(
 
 @overload
 def an(
-    entity_: SymbolicExpressionT,
+    entity_: TSymbolicExpression,
     quantification: Optional[ResultQuantificationConstraint] = ...,
     *,
     target_type: None = ...,
-) -> SymbolicExpressionT: ...
+) -> TSymbolicExpression: ...
 
 
 @overload
@@ -417,11 +418,11 @@ def a(
 
 @overload
 def a(
-    entity_: SymbolicExpressionT,
+    entity_: TSymbolicExpression,
     quantification: Optional[ResultQuantificationConstraint] = ...,
     *,
     target_type: None = ...,
-) -> SymbolicExpressionT: ...
+) -> TSymbolicExpression: ...
 
 
 @overload
@@ -473,10 +474,10 @@ def the(
 
 @overload
 def the(
-    entity_: SymbolicExpressionT,
+    entity_: TSymbolicExpression,
     *,
     target_type: None = ...,
-) -> SymbolicExpressionT: ...
+) -> TSymbolicExpression: ...
 
 
 @overload

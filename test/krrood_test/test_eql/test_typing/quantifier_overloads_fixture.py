@@ -30,19 +30,19 @@ def make_robot(name: str = "R2") -> Robot:
     return Robot(name, battery=100)
 
 
-# ── Type[T] overload: builds a Match[T] from the type itself ─────────────────
+# %% Type[T] overload: builds a Match[T] from the type itself
 
 assert_type(an(Robot), Match[Robot])
 assert_type(a(Robot), Match[Robot])
 assert_type(the(Robot), Match[Robot])
 
-# ── Callable[..., T] overload: T inferred from the factory's own return annotation ──
+# %% Callable[..., T] overload: T inferred from the factory's own return annotation
 
 assert_type(an(make_robot), Match[Robot])
 assert_type(a(make_robot), Match[Robot])
 assert_type(the(make_robot), Match[Robot])
 
-# ── Callable[..., T] overload: explicit target_type when the factory can't be inferred ──
+# %% Callable[..., T] overload: explicit target_type when the factory can't be inferred
 
 untyped_factory: Callable[..., Any] = make_robot
 
@@ -51,7 +51,7 @@ assert_type(a(untyped_factory, target_type=Robot), Match[Robot])
 assert_type(the(untyped_factory, target_type=Robot), Match[Robot])
 
 
-# ── bare T overload: quantifying an existing symbolic expression preserves its type ──
+# %% bare T overload: quantifying an existing symbolic expression preserves its type
 
 
 def quantify_value(robot: Robot) -> None:
