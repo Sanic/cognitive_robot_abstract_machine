@@ -13,13 +13,13 @@ It handles:
 
 import cv2
 import numpy as np
-from cv_bridge import CvBridge
 from rclpy.node import Node
+from rclpy.publisher import Publisher
 from sensor_msgs.msg import Image
 from typing_extensions import Any, Dict
-from rclpy.publisher import Publisher
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.vis.visualizer import Visualizer
 
 
@@ -46,11 +46,12 @@ class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
             Image, f"{self.pipeline.name}/output_image", 10
         )
         """
-        Publisher for the image topic.
+        Publisher for the image topic
         """
-        self.ros_image_cv_bridge: CvBridge = CvBridge()
+
+        self.ros_image_cv_bridge: CVBridgeWorkaround = CVBridgeWorkaround()
         """
-        Bridge for converting between ROS and OpenCV image formats.
+        Bridge for converting between ROS and OpenCV image formats
         """
 
     def tick(self) -> None:
@@ -138,11 +139,12 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
 
         self.ros_image_publishers: Dict[str, Publisher] = {}
         """
-        Mapping of annotator names to ROS publishers.
+        Mapping of annotator names to ROS publishers
         """
-        self.ros_image_cv_bridge: CvBridge = CvBridge()
+
+        self.ros_image_cv_bridge: CVBridgeWorkaround = CVBridgeWorkaround()
         """
-        Bridge for converting between ROS and OpenCV image formats.
+        Bridge for converting between ROS and OpenCV image formats
         """
 
     def update_ros_image_publishers(self) -> None:

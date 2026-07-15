@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class O3DVisualizer(Visualizer, Visualizer.Observer):
+class MultiprocessedO3DVisualizer(Visualizer, Visualizer.Observer):
     """Open3D-based visualizer for 3D geometry data.
 
     This class provides visualization of 3D geometry data from pipeline annotators using
