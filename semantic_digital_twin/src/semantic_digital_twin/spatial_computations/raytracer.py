@@ -70,7 +70,8 @@ class CameraResolution:
             )
         return cls(*resolution)
 
-    def to_shape(self) -> tuple[int, int]:
+    @property
+    def shape(self) -> tuple[int, int]:
         """
         Returns the resolution in the axis order used by :mod:`trimesh`.
         """
@@ -306,7 +307,7 @@ class RayTracer:
         )
 
         self.scene.camera.fov = (fov, fov)
-        self.scene.camera.resolution = camera_resolution.to_shape()
+        self.scene.camera.resolution = camera_resolution.shape
         self.scene.graph[self.scene.camera.name] = camera_pose @ rotate_x @ rotate
 
         return self.scene.camera_rays()

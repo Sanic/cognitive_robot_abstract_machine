@@ -82,6 +82,7 @@ def test_create_camera_rays_with_rectangular_resolution(ray_test_world):
         resolution=resolution,
     )
 
+    assert resolution.shape == (resolution.width, resolution.height)
     assert ray_origins.shape == (resolution.width * resolution.height, 3)
     assert ray_directions.shape == (resolution.width * resolution.height, 3)
     assert pixels.shape == (resolution.width * resolution.height, 2)
