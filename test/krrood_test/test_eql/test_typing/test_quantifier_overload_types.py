@@ -1,12 +1,11 @@
 """
 Static type-checks for the ``an()``/``a()``/``the()`` overloads.
 
-Existing tests exercise these factories at runtime, but the overloads
-themselves are a purely static contract (:py:func:`typing.overload`
-bodies never execute) -- nothing catches a change that silently makes
-mypy infer the wrong static type while runtime behaviour stays correct.
-Running ``mypy`` against a fixture module full of ``assert_type`` calls
-closes that gap.
+Existing tests exercise these factories at runtime, but the overloads themselves are a
+purely static contract (:py:func:`typing.overload` bodies never execute) -- nothing
+catches a change that silently makes mypy infer the wrong static type while runtime
+behaviour stays correct. Running ``mypy`` against a fixture module full of
+``assert_type`` calls closes that gap.
 """
 
 from __future__ import annotations
@@ -18,6 +17,8 @@ from pathlib import Path
 from mypy import api as mypy_api
 
 import krrood
+
+from . import quantifier_overloads_fixture
 
 
 @dataclass
@@ -33,8 +34,7 @@ class MypyCheckResult:
 
     stderr: str
     """
-    ``mypy``'s own diagnostic output (e.g. internal errors), separate from
-    ``stdout``.
+    ``mypy``'s own diagnostic output (e.g. internal errors), separate from ``stdout``.
     """
 
     exit_status: int
@@ -52,22 +52,20 @@ class MypyCheckResult:
 
 def _run_mypy_on_fixture(cache_dir: Path) -> MypyCheckResult:
     """
-    Type-check the fixture module with ``mypy``, resolving ``krrood`` as first-
-    party source.
+    Type-check the fixture module with ``mypy``, resolving ``krrood`` as first- party
+    source.
 
-    ``krrood`` ships no ``py.typed`` marker, so mypy resolves it through
-    its editable install and skips analysing it ("missing library stubs
-    or py.typed marker") by default. Pointing MYPYPATH at the source
-    root (derived from the already-imported package's own file, not a
-    hardcoded relative path) makes mypy resolve it as first-party source
-    instead, exactly as it would once py.typed is added.
+    ``krrood`` ships no ``py.typed`` marker, so mypy resolves it through its editable
+    install and skips analysing it ("missing library stubs or py.typed marker") by
+    default. Pointing MYPYPATH at the source root (derived from the already-imported
+    package's own file, not a hardcoded relative path) makes mypy resolve it as first-
+    party source instead, exactly as it would once py.typed is added.
 
-    :param cache_dir: A scratch directory for mypy's incremental cache,
-        so repeated runs never write ``.mypy_cache`` into the
-        repository.
+    :param cache_dir: A scratch directory for mypy's incremental cache, so repeated runs
+        never write ``.mypy_cache`` into the repository.
     :return: The check's outcome.
     """
-    fixture_path = Path(__file__).parent / "quantifier_overloads_fixture.py"
+    fixture_path = Path(quantifier_overloads_fixture.__file__)
     krrood_src = Path(krrood.__file__).resolve().parent.parent
 
     previous_mypypath = os.environ.get("MYPYPATH")
