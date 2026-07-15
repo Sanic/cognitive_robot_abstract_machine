@@ -19,18 +19,24 @@ if TYPE_CHECKING:
 
 @dataclass(eq=False)
 class InheritancePathLength(SymbolicFunction):
-    """The inheritance path length between two classes, as a value operation.
+    """
+    The inheritance path length between two classes, as a value operation.
 
-    Every inheritance level that lies between :attr:`child_class` and :attr:`parent_class` increases
-    the length by one. For multiple inheritance the length is computed per branch and the minimum is
-    returned; ``None`` means no path exists.
+    Every inheritance level that lies between :attr:`child_class` and
+    :attr:`parent_class` increases the length by one. For multiple inheritance the
+    length is computed per branch and the minimum is returned; ``None`` means no path
+    exists.
     """
 
     child_class: Type
-    """The child class."""
+    """
+    The child class.
+    """
 
     parent_class: Type
-    """The parent class."""
+    """
+    The parent class.
+    """
 
     def __call__(self) -> Optional[int]:
         if not (
@@ -76,7 +82,6 @@ def _inheritance_path_length(
     :param current_length: The current length of the inheritance path.
     :return: The minimum path length between `child_class` and `parent_class`.
     """
-
     if child_class == parent_class:
         return current_length
     else:
