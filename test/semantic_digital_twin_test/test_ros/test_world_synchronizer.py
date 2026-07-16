@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 import rclpy
 import sqlalchemy
+import std_msgs.msg
 from rclpy.executors import SingleThreadedExecutor
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -988,6 +989,241 @@ def test_snapshot_subscribers_gives_up_after_grace_period_elapses():
 
     assert elapsed < 0.5
     assert count >= 0
+
+
+def test_synchronous_publish_settles_promptly_with_multiple_real_subscribers(
+    rclpy_node,
+):
+    """
+    Regression test against real ROS discovery (no fakes): with several concurrently
+    created real subscribers and no graph churn, the highest-observed-count fallback in
+    :meth:`Synchronizer._snapshot_subscribers_after_discovery_settles` must settle on the
+    true, stable subscriber count, so synchronous publication returns promptly instead of
+    paying the ``wait_for_synchronization_timeout`` wait.
+    """
+    w1 = create_dummy_world()
+    synchronizer_1 = WorldSynchronizer(
+        node=rclpy_node,
+        _world=w1,
+        synchronous=True,
+        wait_for_synchronization_timeout=2.0,
+    )
+
+    receiver_nodes = []
+    receiver_executors = []
+    receiver_threads = []
+    receiver_worlds = []
+    receiver_synchronizers = []
+    try:
+        for index in range(3):
+            node = rclpy.create_node(f"real_discovery_receiver_{index}")
+            executor = SingleThreadedExecutor()
+            executor.add_node(node)
+            thread = threading.Thread(target=executor.spin, daemon=True)
+            thread.start()
+            world = create_dummy_world()
+            synchronizer = WorldSynchronizer(node=node, _world=world)
+            receiver_nodes.append(node)
+            receiver_executors.append(executor)
+            receiver_threads.append(thread)
+            receiver_worlds.append(world)
+            receiver_synchronizers.append(synchronizer)
+
+        time.sleep(0.3)
+
+        w1.state._data[0, 0] = 1.0
+        start = time.monotonic()
+        w1.notify_state_change()
+        elapsed = time.monotonic() - start
+
+        assert elapsed < synchronizer_1.wait_for_synchronization_timeout, (
+            "With a stable, accurately discovered subscriber count, synchronous "
+            "publish must not pay the timeout wait"
+        )
+        for world in receiver_worlds:
+            assert world.state._data[0, 0] == 1.0
+
+        synchronizer_1.close()
+    finally:
+        for synchronizer in receiver_synchronizers:
+            synchronizer.close()
+        for executor in receiver_executors:
+            executor.shutdown()
+        for thread in receiver_threads:
+            thread.join(timeout=2.0)
+        for node in receiver_nodes:
+            node.destroy_node()
+
+
+def test_overcounted_expected_acknowledgments_times_out_but_recovers_on_next_publish(
+    rclpy_node,
+):
+    """
+    Addresses the PR #448 review concern: falling back to the *highest* observed
+    subscriber count could make ``_expected_acknowledgment_count`` exceed the number of
+    subscribers that will actually acknowledge, if the highest sample was a transient
+    discovery artifact rather than the true, settled count.
+
+    An over-count must never turn into a real deadlock. It can only ever cost the
+    existing, already-logged ``wait_for_synchronization_timeout`` wait on the single
+    affected publish - the call must still return, the message must still have been
+    delivered to the real subscriber, and the very next publish must recompute the count
+    fresh and return promptly instead of staying wedged.
+    """
+    receiver_node = rclpy.create_node("test_overcount_receiver")
+    receiver_executor = SingleThreadedExecutor()
+    receiver_executor.add_node(receiver_node)
+    receiver_thread = threading.Thread(
+        target=receiver_executor.spin, daemon=True, name="overcount-receiver"
+    )
+    receiver_thread.start()
+    time.sleep(0.1)
+
+    try:
+        w1 = create_dummy_world()
+        w2 = create_dummy_world()
+
+        synchronizer_1 = WorldSynchronizer(
+            node=rclpy_node,
+            _world=w1,
+            synchronous=True,
+            wait_for_synchronization_timeout=1.0,
+        )
+        synchronizer_2 = WorldSynchronizer(node=receiver_node, _world=w2)
+
+        time.sleep(0.2)
+
+        real_snapshot = synchronizer_1._snapshot_subscribers_after_discovery_settles
+
+        def snapshot_overcounted_by_one():
+            # Simulate a highest-sample fallback that overshoots the true, live
+            # subscriber count by one - exactly the scenario the reviewer raised.
+            return real_snapshot() + 1
+
+        synchronizer_1._snapshot_subscribers_after_discovery_settles = (
+            snapshot_overcounted_by_one
+        )
+
+        w1.state._data[0, 0] = 1.0
+        publish_done = threading.Event()
+
+        def do_publish():
+            w1.notify_state_change()
+            publish_done.set()
+
+        start = time.monotonic()
+        thread = threading.Thread(target=do_publish, daemon=True)
+        thread.start()
+        thread.join(timeout=synchronizer_1.wait_for_synchronization_timeout + 3.0)
+        elapsed = time.monotonic() - start
+
+        assert publish_done.is_set(), (
+            "An over-counted expected-acknowledgment-count must time out, not block "
+            "forever - this is the reviewer's deadlock concern"
+        )
+        assert elapsed >= synchronizer_1.wait_for_synchronization_timeout
+        assert elapsed < synchronizer_1.wait_for_synchronization_timeout + 3.0
+
+        # The real subscriber still received and applied the message - only the
+        # (phantom) extra acknowledgment was missing.
+        assert w1.state._data[0, 0] == w2.state._data[0, 0]
+
+        # Restore accurate counting and confirm the synchronizer self-heals: the very
+        # next publish must not pay the timeout again.
+        synchronizer_1._snapshot_subscribers_after_discovery_settles = real_snapshot
+
+        w1.state._data[0, 1] = 2.0
+        start = time.monotonic()
+        w1.notify_state_change()
+        elapsed = time.monotonic() - start
+
+        assert elapsed < 1.5, (
+            "A transient over-count must not permanently wedge the synchronizer - the "
+            "next publish recomputes the count fresh and should return promptly"
+        )
+        assert w1.state._data[0, 1] == w2.state._data[0, 1]
+
+        synchronizer_1.close()
+        synchronizer_2.close()
+    finally:
+        receiver_executor.shutdown()
+        receiver_thread.join(timeout=2.0)
+        receiver_node.destroy_node()
+
+
+def test_subscriber_disconnecting_during_discovery_grace_period_does_not_hang_forever(
+    rclpy_node,
+):
+    """
+    Exercises real ROS graph churn (no fakes): a subscriber that appears and then
+    disconnects again while :meth:`Synchronizer._snapshot_subscribers_after_discovery_settles`
+    is still polling can make the settled count reflect a subscriber that is no longer
+    actually there by the time :meth:`Synchronizer.publish` sends the message. Whether
+    this particular run manages to trigger an over-count depends on ROS discovery timing
+    and is intentionally not asserted directly; what must always hold is that publish is
+    bounded by ``wait_for_synchronization_timeout``, never blocks forever, and recovers
+    on the next publish once the graph has settled.
+    """
+    w1 = create_dummy_world()
+    synchronizer_1 = WorldSynchronizer(
+        node=rclpy_node,
+        _world=w1,
+        synchronous=True,
+        wait_for_synchronization_timeout=1.0,
+    )
+    synchronizer_1._subscriber_discovery_grace_period = timedelta(seconds=0.3)
+    synchronizer_1._subscriber_discovery_poll_interval = timedelta(seconds=0.02)
+
+    flapping_node = rclpy.create_node("flapping_subscriber")
+    flapping_subscription = flapping_node.create_subscription(
+        std_msgs.msg.String,
+        topic=synchronizer_1.topic_name,
+        callback=lambda msg: None,
+        qos_profile=10,
+    )
+
+    def disconnect_shortly_after_appearing():
+        time.sleep(0.05)
+        flapping_node.destroy_subscription(flapping_subscription)
+
+    flap_thread = threading.Thread(target=disconnect_shortly_after_appearing, daemon=True)
+    flap_thread.start()
+
+    try:
+        w1.state._data[0, 0] = 1.0
+        publish_done = threading.Event()
+
+        def do_publish():
+            w1.notify_state_change()
+            publish_done.set()
+
+        start = time.monotonic()
+        thread = threading.Thread(target=do_publish, daemon=True)
+        thread.start()
+        thread.join(timeout=synchronizer_1.wait_for_synchronization_timeout + 3.0)
+        elapsed = time.monotonic() - start
+
+        assert (
+            publish_done.is_set()
+        ), "Real ROS discovery churn must not hang publish() forever"
+        assert elapsed < synchronizer_1.wait_for_synchronization_timeout + 3.0
+
+        # Recovery: once the flapping subscriber is gone and the graph has settled, the
+        # next synchronous publish (with zero live subscribers now) must return quickly
+        # rather than paying another timeout.
+        flap_thread.join(timeout=2.0)
+        time.sleep(0.5)
+
+        w1.state._data[0, 1] = 2.0
+        start = time.monotonic()
+        w1.notify_state_change()
+        elapsed = time.monotonic() - start
+        assert elapsed < 1.5
+
+        synchronizer_1.close()
+    finally:
+        flap_thread.join(timeout=2.0)
+        flapping_node.destroy_node()
 
 
 def test_compute_state_changes_no_changes(rclpy_node):
