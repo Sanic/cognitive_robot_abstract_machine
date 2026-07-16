@@ -1,5 +1,5 @@
-import logging
 import os
+import sys
 from typing_extensions import Optional, List
 
 from IPython.core.magic import magics_class, Magics, line_magic
@@ -12,6 +12,7 @@ from krrood.ripple_down_rules.user_interface.template_file_creator import (
 )
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.datastructures.enums import PromptFor
+from krrood.ripple_down_rules.exceptions import NonInteractiveTerminalError
 from krrood.ripple_down_rules.utils import (
     contains_return_statement,
     extract_dependencies,
@@ -188,16 +189,16 @@ class IPythonShell:
 
     def run(self):
         """
-        Run the embedded shell.
+        Run the embedded shell once and capture the resulting user input.
+
+        :raises NonInteractiveTerminalError: if stdin is not attached to an interactive
+            terminal, since the embedded shell would then have no way to prompt for
+            input.
         """
-        while True:
-            try:
-                self.shell()
-                self.update_user_input_from_code_lines()
-                break
-            except Exception as e:
-                logging.error(e)
-                print(f"{Fore.RED}ERROR:: {e}{Style.RESET_ALL}")
+        if not sys.stdin.isatty():
+            raise NonInteractiveTerminalError()
+        self.shell()
+        self.update_user_input_from_code_lines()
 
     def update_user_input_from_code_lines(self):
         """
