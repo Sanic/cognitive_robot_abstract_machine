@@ -28,7 +28,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline which responds to a query
+        Create a pipeline which responds to a query.
         """
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 

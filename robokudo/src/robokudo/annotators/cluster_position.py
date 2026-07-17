@@ -1,4 +1,5 @@
-"""3D position estimation for object hypotheses.
+"""
+3D position estimation for object hypotheses.
 
 This module provides an annotator for:
 
@@ -32,7 +33,8 @@ from robokudo.types import annotation, scene
 
 
 class ClusterPositionAnnotator(BaseAnnotator):
-    """3D position estimation for object hypotheses.
+    """
+    3D position estimation for object hypotheses.
 
     This annotator:
 
@@ -47,24 +49,33 @@ class ClusterPositionAnnotator(BaseAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for position estimation."""
+        """
+        Configuration descriptor for position estimation.
+        """
 
         class Parameters:
-            """Parameters for configuring position estimation."""
+            """
+            Parameters for configuring position estimation.
+            """
 
             def __init__(self) -> None:
                 self.analysis_scope: Type = scene.ObjectHypothesis
-                """Type of data to perform position estimation on(e.g. ObjectHypothesis or CloudAnnotation)"""
-
+                """
+                Type of data to perform position estimation on(e.g. ObjectHypothesis or
+                CloudAnnotation)
+                """
                 self.visualizer_point_radius: float = 0.04
-                """Radius of centroid sphere markers in meters"""
+                """
+                Radius of centroid sphere markers in meters.
+                """
 
     def __init__(
         self,
         name: str = "ClusterPositionAnnotator",
         descriptor: ClusterPositionAnnotator.Descriptor | None = None,
     ) -> None:
-        """Initialize the position estimator.
+        """
+        Initialize the position estimator.
 
         :param name: Name of this annotator instance
         :param descriptor: Configuration descriptor
@@ -73,7 +84,8 @@ class ClusterPositionAnnotator(BaseAnnotator):
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
-        """Process object hypotheses and estimate positions.
+        """
+        Process object hypotheses and estimate positions.
 
         The method:
 
@@ -135,7 +147,8 @@ class ClusterPositionAnnotator(BaseAnnotator):
     def position_annotation_from_centroid(
         self, centroid: List[float]
     ) -> annotation.PositionAnnotation:
-        """Create position annotation from centroid.
+        """
+        Create position annotation from centroid.
 
         :param centroid: 3D centroid coordinates
         :return: Position annotation with centroid as translation
@@ -148,7 +161,8 @@ class ClusterPositionAnnotator(BaseAnnotator):
     def add_centroid_to_vis(
         self, centroid: List[float], centroids_to_visualize: List[List[float]]
     ) -> None:
-        """Add centroid visualization marker.
+        """
+        Add centroid visualization marker.
 
         Creates a colored sphere at the centroid position.
 

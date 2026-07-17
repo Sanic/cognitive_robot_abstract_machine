@@ -1,4 +1,5 @@
-"""World visualization for RoboKudo.
+"""
+World visualization for RoboKudo.
 
 This annotator visualizes predefined objects and regions from a world descriptor.
 """
@@ -23,7 +24,9 @@ from robokudo.world_descriptor import PredefinedObject
 
 
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
-    """Visualize predefined objects and regions from the shared world."""
+    """
+    Visualize predefined objects and regions from the shared world.
+    """
 
     class Descriptor(robokudo.annotators.core.BaseAnnotator.Descriptor):
         class Parameters:

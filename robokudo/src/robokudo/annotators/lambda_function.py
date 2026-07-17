@@ -29,15 +29,18 @@ class LambdaFunctionAnnotator(BaseAnnotator):
     """
     Annotator for executing arbitrary functions.
 
-    This annotator executes a provided function with configurable arguments,
-    allowing for dynamic behavior definition without creating new annotator classes.
+    This annotator executes a provided function with configurable arguments, allowing
+    for dynamic behavior definition without creating new annotator classes.
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for lambda function annotator."""
+        """
+        Configuration descriptor for lambda function annotator.
+        """
 
         class Parameters:
-            """Parameter container for function configuration.
+            """
+            Parameter container for function configuration.
 
             :type func: callable
             :type func_args: tuple
@@ -57,7 +60,8 @@ class LambdaFunctionAnnotator(BaseAnnotator):
         name: str = "LambdaFunctionAnnotator",
         descriptor: LambdaFunctionAnnotator.Descriptor | None = None,
     ):
-        """Initialize the lambda function annotator. Minimal one-time init!
+        """
+        Initialize the lambda function annotator.
 
         :param name: Annotator name
         :param descriptor: Configuration descriptor
@@ -66,10 +70,11 @@ class LambdaFunctionAnnotator(BaseAnnotator):
         self.logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
-        """Execute the configured function.
+        """
+        Execute the configured function.
 
-        The function is called with the annotator instance as first argument,
-        followed by any configured positional and keyword arguments.
+        The function is called with the annotator instance as first argument, followed
+        by any configured positional and keyword arguments.
 
         :return: SUCCESS status
         """

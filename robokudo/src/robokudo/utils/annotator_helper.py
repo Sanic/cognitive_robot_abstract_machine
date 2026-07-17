@@ -1,4 +1,5 @@
-"""Annotator utility functions for Robokudo.
+"""
+Annotator utility functions for Robokudo.
 
 This module provides helper functions for working with annotators and their data.
 It supports:
@@ -40,7 +41,8 @@ if TYPE_CHECKING:
 def transform_pose_from_camera_to_world(
     cas: CAS, pose: PoseAnnotation
 ) -> PoseAnnotation:
-    """Transform pose from camera to world coordinates.
+    """
+    Transform pose from camera to world coordinates.
 
     Uses transform from CAS to convert pose from camera frame to world frame.
 
@@ -68,7 +70,8 @@ def transform_pose_from_camera_to_world(
 def transform_pose_from_world_to_camera(
     cas: CAS, pose: PoseAnnotation
 ) -> PoseAnnotation:
-    """Transform pose from world to camera coordinates.
+    """
+    Transform pose from world to camera coordinates.
 
     Uses transform from CAS to convert pose from world frame to camera frame.
 
@@ -94,7 +97,8 @@ def transform_pose_from_world_to_camera(
 def transform_cloud_from_camera_to_world(
     cas: CAS, cloud: o3d.geometry.PointCloud, transform_inplace: bool = False
 ) -> o3d.geometry.PointCloud:
-    """Transform point cloud from camera to world coordinates.
+    """
+    Transform point cloud from camera to world coordinates.
 
     Uses transform from CAS to convert point cloud from camera frame to world frame.
 
@@ -114,15 +118,17 @@ def transform_cloud_from_camera_to_world(
 def transform_cloud_from_world_to_camera(
     cas: CAS, cloud: o3d.geometry.PointCloud, transform_inplace: bool = False
 ) -> o3d.geometry.PointCloud:
-    """Transform point cloud from world to camera coordinates.
+    """
+    Transform point cloud from world to camera coordinates.
 
     Uses transform from CAS to convert point cloud from world frame to camera frame.
 
     :param cas: CAS containing camera-to-world transform
     :param cloud: Point cloud in world coordinates
-    :param transform_inplace:  This bool will control if the given 'cloud' is deepcopied before the transformation is done.
-    Set this value to True, if it is OK that the given cloud variable is changed.
-    Set this to value to False (default), if a deepcopy should performed beforehand.
+    :param transform_inplace: This bool will control if the given 'cloud' is deepcopied
+        before the transformation is done. Set this value to True, if it is OK that the
+        given cloud variable is changed. Set this to value to False (default), if a
+        deepcopy should performed beforehand.
     :return: Transformed point cloud in camera coordinates
     :raises KeyError: If camera-to-world transform not in CAS
     """
@@ -134,7 +140,8 @@ def transform_cloud_from_world_to_camera(
 
 
 def get_camera_to_world_transform_matrix(cas: CAS) -> npt.NDArray:
-    """Get camera-to-world transform matrix from CAS.
+    """
+    Get camera-to-world transform matrix from CAS.
 
     :param cas: CAS containing camera-to-world transform
     :return: 4x4 camera-to-world transform matrix
@@ -150,7 +157,8 @@ def get_camera_to_world_transform_matrix(cas: CAS) -> npt.NDArray:
 
 
 def get_world_to_camera_transform_matrix(cas: CAS) -> npt.NDArray:
-    """Get world-to-camera transform matrix from CAS.
+    """
+    Get world-to-camera transform matrix from CAS.
 
     :param cas: CAS containing camera-to-world transform
     :return: 4x4 world-to-camera transform matrix
@@ -166,7 +174,8 @@ def draw_bounding_boxes_from_object_hypotheses(
     object_hypotheses: List[ObjectHypothesis],
     text_function: Callable[[ObjectHypothesis], str],
 ) -> None:
-    """Draw bounding boxes for object hypotheses on the image.
+    """
+    Draw bounding boxes for object hypotheses on the image.
 
     Draws rectangles and labels for each object hypothesis ROI.
 
@@ -174,7 +183,6 @@ def draw_bounding_boxes_from_object_hypotheses(
     :param object_hypotheses: List of object hypotheses
     :param text_function: Function to generate label text from hypothesis
     """
-
     for oh in object_hypotheses:
         if not isinstance(oh, ObjectHypothesis):
             continue
@@ -197,13 +205,15 @@ def draw_bounding_boxes_from_object_hypotheses(
 
 
 def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
-    """Scale camera intrinsics based on color-to-depth ratio.
+    """
+    Scale camera intrinsics based on color-to-depth ratio.
 
-    If the color2depth ratio is not 1,1, we will usually scale the color image to the same size
-    the depth image has. This also requires an adjustment of the camera intrinsics.
+    If the color2depth ratio is not 1,1, we will usually scale the color image to the
+    same size the depth image has. This also requires an adjustment of the camera
+    intrinsics.
 
-    If color2depth ratio is not 1,1, we'll scale the camera intrinsics in annotator.
-    You need to have a self.camera_intrinsics variable!
+    If color2depth ratio is not 1,1, we'll scale the camera intrinsics in annotator. You
+    need to have a self.camera_intrinsics variable!
 
     :param annotator: Annotator containing camera parameters
     """
@@ -217,16 +227,16 @@ def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
 
 
 def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
-    """Load and potentially resize the color image from the CAS.
+    """
+    Load and potentially resize the color image from the CAS.
 
-    This is useful, as the resolution of the RGB image might
-    differ from the resolution of the depth image. This function
-    resizes the color image to the resolution of the depth image.
+    This is useful, as the resolution of the RGB image might differ from the resolution
+    of the depth image. This function resizes the color image to the resolution of the
+    depth image.
 
-    This is important later on when we want to create a point cloud
-    from the depth image and the color image and crop the point cloud
-    to the bounding box of the object hypothesis, which is defined in
-    the color image coordinate system.
+    This is important later on when we want to create a point cloud from the depth image
+    and the color image and crop the point cloud to the bounding box of the object
+    hypothesis, which is defined in the color image coordinate system.
 
     :param annotator: Annotator to get image from
     :return: The resized color image.
@@ -250,12 +260,13 @@ def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
 
 
 def resize_mask(annotator: BaseAnnotator, mask: npt.NDArray) -> npt.NDArray:
-    """Resize mask to match color image resolution.
+    """
+    Resize mask to match color image resolution.
 
-    The mask is potentially created after the input image has been scaled down
-    (see get_scaled_color_image_for_depth_image, we usually scale the RGB down).
-    If that's the case, we have to bring it back to the original resolution.
-    This method checks some usual error cases and decides if we need to resize at all.
+    The mask is potentially created after the input image has been scaled down (see
+    get_scaled_color_image_for_depth_image, we usually scale the RGB down). If that's
+    the case, we have to bring it back to the original resolution. This method checks
+    some usual error cases and decides if we need to resize at all.
 
     :param annotator: Annotator containing resolution info
     :param mask: A binary image.
@@ -287,7 +298,8 @@ def resize_mask(annotator: BaseAnnotator, mask: npt.NDArray) -> npt.NDArray:
 
 
 def generate_source_name(annotator: BaseAnnotator) -> str:
-    """Helper to create the standard name for the 'source' field of Annotations.
+    """
+    Helper to create the standard name for the 'source' field of Annotations.
 
     :param annotator: The annotator to generate the source name for
     :return: The source name as string

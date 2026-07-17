@@ -1,5 +1,7 @@
-"""General methods to access the current World. Reasoning about alternate world states is done in the corresponding
-Annotators.
+"""
+General methods to access the current World.
+
+Reasoning about alternate world states is done in the corresponding Annotators.
 """
 
 import numpy as np
@@ -34,19 +36,26 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 this = sys.modules[__name__]
 
 this.world = World()
-"""RoboKudo's central world state."""
+"""
+RoboKudo's central world state.
+"""
 
 this.world_entity_tracker = WorldEntityWithIDKwargsTracker.from_world(this.world)
-"""RoboKudo's central entity tracker."""
+"""
+RoboKudo's central entity tracker.
+"""
 
 _rk_world_lock = Lock()
-"""Lock for safe creation of the central SemDT World and entity tracker."""
+"""
+Lock for safe creation of the central SemDT World and entity tracker.
+"""
 
 _tracked_objects: Dict[UUID, ObjectBeliefState] = {}
 
 
 def get_world_entity_tracker() -> WorldEntityWithIDKwargsTracker:
-    """Get the entity tracker instance of for the current world.
+    """
+    Get the entity tracker instance of for the current world.
 
     :return: The current entity tracker instance.
     """
@@ -54,7 +63,8 @@ def get_world_entity_tracker() -> WorldEntityWithIDKwargsTracker:
 
 
 def init_world_with_entity_tracker() -> WorldEntityWithIDKwargsTracker:
-    """Initialize the world and entity tracker and return the entity tracker.
+    """
+    Initialize the world and entity tracker and return the entity tracker.
 
     :return: The newly created entity tracker instance.
     """
@@ -69,7 +79,8 @@ def init_world_with_entity_tracker() -> WorldEntityWithIDKwargsTracker:
 def init_world_entity_tracker_from_world(
     world: World,
 ) -> WorldEntityWithIDKwargsTracker:
-    """Initialize the entity tracker from the given world and return the entity tracker.
+    """
+    Initialize the entity tracker from the given world and return the entity tracker.
 
     :return: The newly created entity tracker instance.
     """
@@ -79,7 +90,8 @@ def init_world_entity_tracker_from_world(
 
 
 def world_instance() -> World:
-    """Return the world state for the currently running perception pipeline.
+    """
+    Return the world state for the currently running perception pipeline.
 
     .. warning::
     This is NOT necessarily the belief state World based on the previous analysis results.
@@ -98,7 +110,8 @@ def world_instance() -> World:
 
 
 def set_world(world: World) -> None:
-    """Clear the world state safely by overwriting it with the given instance.
+    """
+    Clear the world state safely by overwriting it with the given instance.
 
     :param world: The new world state.
     """
@@ -107,7 +120,8 @@ def set_world(world: World) -> None:
 
 
 def unsafe_set_world(world: World) -> None:
-    """Unsafely set the world state without acquiring the lock.
+    """
+    Unsafely set the world state without acquiring the lock.
 
     .. warning::
         Always acquire the lock manually before calling this method. Take a look at `this.set_world()` or
@@ -119,13 +133,16 @@ def unsafe_set_world(world: World) -> None:
 
 
 def clear_world() -> None:
-    """Clear the world state by instantiating a new World."""
+    """
+    Clear the world state by instantiating a new World.
+    """
     with _rk_world_lock:
         this.unsafe_clear_world()
 
 
 def unsafe_clear_world() -> None:
-    """Unsafely clear the world state without acquiring the lock.
+    """
+    Unsafely clear the world state without acquiring the lock.
 
     .. warning::
         Always acquire the lock manually before calling this method. Take a look at `this.clear_world()` or
@@ -140,7 +157,8 @@ def unsafe_clear_world() -> None:
 
 
 def world_has_body_by_name(world: World, body_name: str) -> bool:
-    """Check whether a body with a given name exists in the given world.
+    """
+    Check whether a body with a given name exists in the given world.
 
     :param world: The world to check in.
     :param body_name: The body name to search for.
@@ -161,7 +179,8 @@ def setup_world_for_camera_frame(
     world_frame: str,
     camera_frame: str,
 ) -> None:
-    """Set up the world and camera frames if they do not exist yet.
+    """
+    Set up the world and camera frames if they do not exist yet.
 
     :param world_frame: The name of the world frame.
     :param camera_frame: The name of the camera frame.
@@ -212,7 +231,8 @@ def update_connection_transform(
     from_name: PrefixedName,
     transform: HomogeneousTransformationMatrix,
 ) -> None:
-    """Update the connection connecting from_name to to_name with the given transformation.
+    """
+    Update the connection connecting from_name to to_name with the given transformation.
 
     :param to_name: The connection target name.
     :param from_name: The connection source name.
@@ -229,7 +249,8 @@ def update_connection_transform(
 
 
 def get_object_belief_states() -> Dict[UUID, ObjectBeliefState]:
-    """Get all object belief states as a map of UUID to belief state.
+    """
+    Get all object belief states as a map of UUID to belief state.
 
     :return: A map of all UUIDs to their object belief states.
     """
@@ -237,7 +258,9 @@ def get_object_belief_states() -> Dict[UUID, ObjectBeliefState]:
 
 
 def _get_world_body_from_cas(cas: CAS, rk_world: World) -> Body | None:
-    """Return the world-frame body referenced by the CAS, if available."""
+    """
+    Return the world-frame body referenced by the CAS, if available.
+    """
     world_frame = cas.world_frame
     if world_frame is None:
         return None
@@ -249,7 +272,9 @@ def _create_world_origin_and_scale_from_latest_bbox(
     cas: CAS,
     world_body: Body,
 ) -> tuple[HomogeneousTransformationMatrix, Scale] | None:
-    """Convert the latest camera-frame bbox into a world-frame SemDT origin and scale."""
+    """
+    Convert the latest camera-frame bbox into a world-frame SemDT origin and scale.
+    """
     bb = object_belief.latest_bbox_3d
     if bb is None:
         return None
@@ -287,7 +312,9 @@ def _update_belief_body_from_latest_bbox(
     world_T_object_belief: Connection6DoF,
     replace_existing_visuals: bool,
 ) -> None:
-    """Update the SemDT body origin and box geometry from the latest bbox."""
+    """
+    Update the SemDT body origin and box geometry from the latest bbox.
+    """
     origin_and_scale = _create_world_origin_and_scale_from_latest_bbox(
         object_belief=object_belief,
         cas=cas,
@@ -309,7 +336,8 @@ def _update_belief_body_from_latest_bbox(
 def add_object_hypothesis_as_belief_state(
     object_hypothesis: ObjectHypothesis, cas: CAS
 ) -> ObjectBeliefState:
-    """Create a new object belief from the given hypothesis and add it to the world.
+    """
+    Create a new object belief from the given hypothesis and add it to the world.
 
     .. note::
         This currently assumes that all object hypotheses are rooted in the camera space.
@@ -352,7 +380,8 @@ def add_object_hypothesis_as_belief_state(
 def update_belief_state_with_object_hypothesis(
     object_belief: ObjectBeliefState, object_hypothesis: ObjectHypothesis, cas: CAS
 ) -> None:
-    """Update the given object belief state with the object hypothesis.
+    """
+    Update the given object belief state with the object hypothesis.
 
     .. note::
         This currently assumes that all object hypotheses are rooted in the camera space.
@@ -383,7 +412,8 @@ def update_belief_state_with_object_hypothesis(
 
 
 def get_object_belief_state(uuid: UUID) -> ObjectBeliefState:
-    """Get an object belief state by UUID.
+    """
+    Get an object belief state by UUID.
 
     :param uuid: The UUID of the object.
     :return: The object belief state corresponding to the given UUID.

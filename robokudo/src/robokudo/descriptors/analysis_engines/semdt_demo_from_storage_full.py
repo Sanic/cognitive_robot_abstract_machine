@@ -25,8 +25,8 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline that does tabletop segmentation and integrates primary navigation
-        using a YOLO annotator.
+        Create a pipeline that does tabletop segmentation and integrates primary
+        navigation using a YOLO annotator.
         """
         tf_publisher = TFPublisher(_world=world_instance(), node=get_node())
 

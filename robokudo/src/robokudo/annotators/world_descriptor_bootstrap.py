@@ -1,4 +1,6 @@
-"""Bootstrap static world descriptor content into the shared world."""
+"""
+Bootstrap static world descriptor content into the shared world.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +20,9 @@ from robokudo.world_descriptor import BaseWorldDescriptor
 
 @dataclass
 class _WorldEntitySnapshot:
-    """Entity IDs present in the runtime world before a descriptor merge."""
+    """
+    Entity IDs present in the runtime world before a descriptor merge.
+    """
 
     kinematic_structure_entity_ids: set[UUID] = field(default_factory=set)
     connection_object_ids: set[int] = field(default_factory=set)
@@ -28,7 +32,9 @@ class _WorldEntitySnapshot:
 
 @dataclass
 class _MergedDescriptorEntities:
-    """Entities that were added by the last descriptor merge."""
+    """
+    Entities that were added by the last descriptor merge.
+    """
 
     kinematic_structure_entity_ids: set[UUID] = field(default_factory=set)
     connections: list[Any] = field(default_factory=list)
@@ -36,14 +42,18 @@ class _MergedDescriptorEntities:
     semantic_annotation_ids: set[UUID] = field(default_factory=set)
 
     def clear(self) -> None:
-        """Forget tracked descriptor entities."""
+        """
+        Forget tracked descriptor entities.
+        """
         self.kinematic_structure_entity_ids.clear()
         self.connections.clear()
         self.degree_of_freedom_ids.clear()
         self.semantic_annotation_ids.clear()
 
     def is_empty(self) -> bool:
-        """Return whether no descriptor entities are currently tracked."""
+        """
+        Return whether no descriptor entities are currently tracked.
+        """
         return (
             len(self.kinematic_structure_entity_ids) == 0
             and len(self.connections) == 0
@@ -53,13 +63,19 @@ class _MergedDescriptorEntities:
 
 
 class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
-    """Augment the current shared world with descriptor-defined entities."""
+    """
+    Augment the current shared world with descriptor-defined entities.
+    """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for world descriptor bootstrap."""
+        """
+        Configuration descriptor for world descriptor bootstrap.
+        """
 
         class Parameters:
-            """Parameters for world descriptor bootstrap."""
+            """
+            Parameters for world descriptor bootstrap.
+            """
 
             def __init__(self) -> None:
                 self.world_descriptor_ros_package: str = "robokudo"
@@ -73,20 +89,26 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
         name: str = "WorldDescriptorBootstrap",
         descriptor: WorldDescriptorBootstrapAnnotator.Descriptor | None = None,
     ) -> None:
-        """Initialize the world descriptor bootstrap annotator."""
+        """
+        Initialize the world descriptor bootstrap annotator.
+        """
         super().__init__(name=name, descriptor=descriptor)
         self._last_augmented_world_id: int | None = None
         self._merged_descriptor_entities = _MergedDescriptorEntities()
 
     def _update_tracker_if_active(self) -> None:
-        """Keep tracker state synchronized after world augmentation."""
+        """
+        Keep tracker state synchronized after world augmentation.
+        """
         if rk_world.get_world_entity_tracker() is None:
             return
         rk_world.init_world_entity_tracker_from_world(rk_world.world_instance())
 
     @staticmethod
     def _snapshot_world_entities(world: Any) -> _WorldEntitySnapshot:
-        """Capture all entities present before merging a descriptor world."""
+        """
+        Capture all entities present before merging a descriptor world.
+        """
         return _WorldEntitySnapshot(
             kinematic_structure_entity_ids={
                 entity.id for entity in world.kinematic_structure_entities
@@ -102,7 +124,9 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
     def _entities_added_since(
         world: Any, before: _WorldEntitySnapshot
     ) -> _MergedDescriptorEntities:
-        """Return entities that were added after a snapshot was taken."""
+        """
+        Return entities that were added after a snapshot was taken.
+        """
         return _MergedDescriptorEntities(
             kinematic_structure_entity_ids={
                 entity.id
@@ -127,7 +151,9 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
         )
 
     def _remove_merged_descriptor_entities(self, runtime_world: Any) -> None:
-        """Remove only the entities added by the previous descriptor merge."""
+        """
+        Remove only the entities added by the previous descriptor merge.
+        """
         if self._merged_descriptor_entities.is_empty():
             return
 
@@ -171,7 +197,9 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
         self._merged_descriptor_entities.clear()
 
     def augment_world(self, world_descriptor: BaseWorldDescriptor) -> None:
-        """Merge descriptor entities into the current shared world."""
+        """
+        Merge descriptor entities into the current shared world.
+        """
         runtime_world = rk_world.world_instance()
         runtime_world_id = id(runtime_world)
         reload_on_update = self.descriptor.parameters.reload_on_update
@@ -199,7 +227,9 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
         self._last_augmented_world_id = runtime_world_id
 
     def update(self) -> Status:
-        """Load descriptor world and merge it into the current world."""
+        """
+        Load descriptor world and merge it into the current world.
+        """
         start_timer = default_timer()
         runtime_world_id = id(rk_world.world_instance())
         if (

@@ -1,8 +1,9 @@
-"""Utilities for fitting primitive shapes to 3D points.
+"""
+Utilities for fitting primitive shapes to 3D points.
 
-This module provides robust least-squares based fitting for sphere and
-cylinder models, plus a cuboid approximation based on oriented bounding boxes.
-The implementation is intended for segmented object-level point sets.
+This module provides robust least-squares based fitting for sphere and cylinder models,
+plus a cuboid approximation based on oriented bounding boxes. The implementation is
+intended for segmented object-level point sets.
 """
 
 from __future__ import annotations
@@ -21,7 +22,9 @@ MIN_ACCEPTABLE_CYLINDER_SCORE = 0.0
 
 @dataclass
 class SphereFit:
-    """Fitted sphere model with inlier and quality information."""
+    """
+    Fitted sphere model with inlier and quality information.
+    """
 
     center: np.ndarray
     radius: float
@@ -33,7 +36,9 @@ class SphereFit:
 
 @dataclass
 class CylinderFit:
-    """Fitted cylinder model with inlier and quality information."""
+    """
+    Fitted cylinder model with inlier and quality information.
+    """
 
     axis_center: np.ndarray
     axis_direction: np.ndarray
@@ -47,7 +52,9 @@ class CylinderFit:
 
 @dataclass
 class CuboidFit:
-    """Fitted cuboid model with inlier and quality information."""
+    """
+    Fitted cuboid model with inlier and quality information.
+    """
 
     center: np.ndarray
     rotation_matrix: np.ndarray
@@ -63,7 +70,9 @@ FittedShape = Union[SphereFit, CylinderFit, CuboidFit]
 
 @dataclass(frozen=True)
 class CylinderFitConstraints:
-    """Numerical constraints used during cylinder fitting and validation."""
+    """
+    Numerical constraints used during cylinder fitting and validation.
+    """
 
     distance_threshold: float
     robust_loss: str
@@ -76,7 +85,9 @@ class CylinderFitConstraints:
 
 @dataclass(frozen=True)
 class CylinderInitializationSettings:
-    """Search settings controlling cylinder multi-start initialization."""
+    """
+    Search settings controlling cylinder multi-start initialization.
+    """
 
     max_initializations: int
     consensus_trials: int
@@ -85,7 +96,9 @@ class CylinderInitializationSettings:
 
 @dataclass(frozen=True)
 class FixedAxisCylinderRadiusFit:
-    """Radius, residuals, and inliers for a fixed-axis cylinder refit."""
+    """
+    Radius, residuals, and inliers for a fixed-axis cylinder refit.
+    """
 
     radius: float
     absolute_residuals: np.ndarray
@@ -94,14 +107,18 @@ class FixedAxisCylinderRadiusFit:
 
 @dataclass(frozen=True)
 class FixedAxisCylinderExtent:
-    """Finite cylinder extent for a fixed-axis cylinder refit."""
+    """
+    Finite cylinder extent for a fixed-axis cylinder refit.
+    """
 
     axis_center: np.ndarray
     height: float
 
 
 def sphere_residuals(parameters: np.ndarray, points: np.ndarray) -> np.ndarray:
-    """Compute sphere residuals for optimization."""
+    """
+    Compute sphere residuals for optimization.
+    """
     center = parameters[:3]
     radius = max(float(parameters[3]), 1e-9)
     point_distances = np.linalg.norm(points - center, axis=1)
@@ -109,7 +126,9 @@ def sphere_residuals(parameters: np.ndarray, points: np.ndarray) -> np.ndarray:
 
 
 def cylinder_residuals(parameters: np.ndarray, points: np.ndarray) -> np.ndarray:
-    """Compute cylinder residuals for optimization."""
+    """
+    Compute cylinder residuals for optimization.
+    """
     axis_point = parameters[:3]
     axis_direction = _normalize_vector(parameters[3:6])
     radius = max(float(parameters[6]), 1e-9)
@@ -131,7 +150,9 @@ def fit_sphere(
     max_center_distance_to_bbox_diagonal_ratio: float = np.inf,
     min_inlier_ratio: float = 0.0,
 ) -> Optional[SphereFit]:
-    """Fit a sphere model and return model quality and inliers."""
+    """
+    Fit a sphere model and return model quality and inliers.
+    """
     if len(points) < 4:
         return None
     if max_radius <= 0.0:
@@ -239,7 +260,9 @@ def fit_cylinder(
     consensus_trials: int = 24,
     inlier_polishing_iterations: int = 0,
 ) -> Optional[CylinderFit]:
-    """Fit a cylinder model and return model quality and inliers."""
+    """
+    Fit a cylinder model and return model quality and inliers.
+    """
     cylinder_fit_constraints = CylinderFitConstraints(
         distance_threshold=distance_threshold,
         robust_loss=robust_loss,
@@ -338,7 +361,9 @@ def _fit_cylinder_from_initialization(
     constraints: CylinderFitConstraints,
     initialization_settings: CylinderInitializationSettings,
 ) -> Optional[CylinderFit]:
-    """Run one cylinder optimization from one initialization and validate the result."""
+    """
+    Run one cylinder optimization from one initialization and validate the result.
+    """
     optimization_result = least_squares(
         cylinder_residuals,
         x0=initial_parameters,
@@ -379,7 +404,9 @@ def _build_cylinder_fit_from_parameters(
     points: np.ndarray,
     constraints: CylinderFitConstraints,
 ) -> Optional[CylinderFit]:
-    """Validate one optimized cylinder parameter vector and construct a fit object."""
+    """
+    Validate one optimized cylinder parameter vector and construct a fit object.
+    """
     absolute_residuals = np.abs(cylinder_residuals(parameters, points))
     inlier_indices = np.where(absolute_residuals <= constraints.distance_threshold)[0]
     if len(inlier_indices) < 8:
@@ -455,7 +482,9 @@ def refit_cylinder_with_fixed_axis(
     constraints: CylinderFitConstraints,
     min_inlier_ratio: float,
 ) -> Optional[CylinderFit]:
-    """Refit cylinder radius and finite height while keeping axis direction fixed."""
+    """
+    Refit cylinder radius and finite height while keeping axis direction fixed.
+    """
     if len(points) < 8:
         return None
 
@@ -510,7 +539,9 @@ def _fit_fixed_axis_cylinder_radius(
     axis_direction: np.ndarray,
     constraints: CylinderFitConstraints,
 ) -> Optional[FixedAxisCylinderRadiusFit]:
-    """Fit and polish cylinder radius for a fixed axis."""
+    """
+    Fit and polish cylinder radius for a fixed axis.
+    """
     point_offsets = points - axis_point
     projected_offsets = np.outer(point_offsets @ axis_direction, axis_direction)
     radial_offsets = point_offsets - projected_offsets
@@ -552,7 +583,9 @@ def _fit_fixed_axis_cylinder_radius(
 def _fixed_axis_cylinder_inliers(
     radial_distances: np.ndarray, radius: float, distance_threshold: float
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Return absolute residuals and inliers for a fixed cylinder radius."""
+    """
+    Return absolute residuals and inliers for a fixed cylinder radius.
+    """
     absolute_residuals = np.abs(radial_distances - radius)
     inlier_indices = np.where(absolute_residuals <= distance_threshold)[0]
     return absolute_residuals, inlier_indices
@@ -564,7 +597,9 @@ def _fixed_axis_cylinder_extent(
     axis_direction: np.ndarray,
     max_height: float,
 ) -> Optional[FixedAxisCylinderExtent]:
-    """Return finite height and center along a fixed cylinder axis."""
+    """
+    Return finite height and center along a fixed cylinder axis.
+    """
     axis_coordinates = (points - axis_point) @ axis_direction
     minimum_axis_coordinate = float(axis_coordinates.min())
     maximum_axis_coordinate = float(axis_coordinates.max())
@@ -589,7 +624,9 @@ def _fixed_axis_cylinder_passes_geometry_limits(
     axis_direction: np.ndarray,
     constraints: CylinderFitConstraints,
 ) -> bool:
-    """Return whether a fixed-axis cylinder passes configured geometry gates."""
+    """
+    Return whether a fixed-axis cylinder passes configured geometry gates.
+    """
     bbox_diagonal = float(np.linalg.norm(points.max(axis=0) - points.min(axis=0)))
     if bbox_diagonal > 1e-9:
         if radius / bbox_diagonal > constraints.max_radius_to_bbox_diagonal_ratio:
@@ -626,7 +663,9 @@ def _fixed_axis_cylinder_fit_from_measurements(
     point_count: int,
     distance_threshold: float,
 ) -> CylinderFit:
-    """Build a fixed-axis cylinder fit from accepted measurements."""
+    """
+    Build a fixed-axis cylinder fit from accepted measurements.
+    """
     inlier_ratio = float(len(radius_fit.inlier_indices) / point_count)
     root_mean_square_error = float(
         np.sqrt(
@@ -657,7 +696,9 @@ def _generate_cylinder_initial_parameter_sets(
     constraints: CylinderFitConstraints,
     initialization_settings: CylinderInitializationSettings,
 ) -> List[np.ndarray]:
-    """Generate distinct initialization vectors for cylinder multi-start optimization."""
+    """
+    Generate distinct initialization vectors for cylinder multi-start optimization.
+    """
     centroid = points.mean(axis=0)
     median_point = np.median(points, axis=0)
 
@@ -720,7 +761,9 @@ def _consensus_axis_candidates(
     max_radius: float,
     trial_count: int,
 ) -> List[Tuple[np.ndarray, float, float]]:
-    """Return axis candidates ranked by provisional inlier ratio and residual error."""
+    """
+    Return axis candidates ranked by provisional inlier ratio and residual error.
+    """
     if trial_count <= 0 or len(points) < 8:
         return []
 
@@ -771,7 +814,9 @@ def _provisional_cylinder_axis_quality(
     radius: float,
     distance_threshold: float,
 ) -> Tuple[float, float]:
-    """Return provisional inlier ratio and error for one axis and radius hypothesis."""
+    """
+    Return provisional inlier ratio and error for one axis and radius hypothesis.
+    """
     axis = _normalize_vector(axis_direction)
     point_offsets = points - axis_point
     projected_offsets = np.outer(point_offsets @ axis, axis)
@@ -794,7 +839,9 @@ def _initial_cylinder_radius(
     axis_direction: np.ndarray,
     max_radius: float,
 ) -> Optional[float]:
-    """Estimate a robust initial cylinder radius for one axis hypothesis."""
+    """
+    Estimate a robust initial cylinder radius for one axis hypothesis.
+    """
     normalized_axis = _normalize_vector(axis_direction)
     point_offsets = points - axis_point
     projected_offsets = np.outer(point_offsets @ normalized_axis, normalized_axis)
@@ -812,7 +859,9 @@ def _append_axis_if_distinct(
     axis_direction: np.ndarray,
     min_angle_degrees: float = 8.0,
 ) -> None:
-    """Append a normalized axis direction unless it duplicates an existing direction."""
+    """
+    Append a normalized axis direction unless it duplicates an existing direction.
+    """
     normalized_axis = _normalize_vector(axis_direction)
     min_cosine = float(np.cos(np.deg2rad(min_angle_degrees)))
     for existing_axis in axis_candidates:
@@ -826,7 +875,9 @@ def _is_better_cylinder_fit(
     best_fit: CylinderFit,
     minimum_target_inlier_ratio: float,
 ) -> bool:
-    """Return whether one cylinder fit is better under inlier-target-aware ranking."""
+    """
+    Return whether one cylinder fit is better under inlier-target-aware ranking.
+    """
     candidate_meets_inlier_target = (
         candidate_fit.inlier_ratio >= minimum_target_inlier_ratio
     )
@@ -873,7 +924,9 @@ def fit_cuboid(
     max_extent: float = np.inf,
     min_inlier_ratio: float = 0.0,
 ) -> Optional[CuboidFit]:
-    """Fit a cuboid model and return model quality and inliers."""
+    """
+    Fit a cuboid model and return model quality and inliers.
+    """
     if len(points) < 8:
         return None
     if max_extent <= 0.0:
@@ -934,7 +987,9 @@ def refit_cuboid_with_fixed_orientation(
     max_extent: float = np.inf,
     min_inlier_ratio: float = 0.0,
 ) -> Optional[CuboidFit]:
-    """Refit cuboid center and extents while keeping rotation fixed."""
+    """
+    Refit cuboid center and extents while keeping rotation fixed.
+    """
     if len(points) < 8:
         return None
 
@@ -997,7 +1052,9 @@ def select_best_shape(
     cuboid_box_like_cross_section_asymmetry_threshold: float = 0.12,
     cuboid_box_like_cube_axis_similarity_tolerance: float = 0.12,
 ) -> Optional[FittedShape]:
-    """Return the best shape candidate with volume-aware tie-breaking."""
+    """
+    Return the best shape candidate with volume-aware tie-breaking.
+    """
     if len(candidates) == 0:
         return None
 
@@ -1052,7 +1109,9 @@ def point_to_oriented_box_surface_distance(
     rotation_matrix: np.ndarray,
     extents: np.ndarray,
 ) -> np.ndarray:
-    """Compute absolute distance from points to cuboid surface."""
+    """
+    Compute absolute distance from points to cuboid surface.
+    """
     half_extents = extents / 2.0
     local_points = (points - center) @ rotation_matrix
     absolute_local_points = np.abs(local_points)
@@ -1076,7 +1135,9 @@ def compute_fit_score(
     distance_threshold: float,
     complexity_penalty: float,
 ) -> float:
-    """Compute a scalar quality score for model comparison."""
+    """
+    Compute a scalar quality score for model comparison.
+    """
     normalization = max(distance_threshold, 1e-6)
     normalized_error = root_mean_square_error / normalization
     return inlier_ratio - 0.35 * normalized_error - complexity_penalty
@@ -1100,7 +1161,9 @@ def _normalize_vector(vector: np.ndarray) -> np.ndarray:
 
 
 def _fitted_shape_volume(candidate: FittedShape) -> float:
-    """Return primitive volume for volume-aware candidate comparison."""
+    """
+    Return primitive volume for volume-aware candidate comparison.
+    """
     if isinstance(candidate, SphereFit):
         return float((4.0 / 3.0) * np.pi * candidate.radius**3)
     if isinstance(candidate, CylinderFit):
@@ -1113,7 +1176,9 @@ def _cross_section_max_extent(
     axis_center: np.ndarray,
     axis_direction: np.ndarray,
 ) -> float:
-    """Return largest observed cross-section extent orthogonal to the cylinder axis."""
+    """
+    Return largest observed cross-section extent orthogonal to the cylinder axis.
+    """
     basis_a, basis_b = _orthogonal_basis(axis_direction)
     centered_points = points - axis_center
     coordinate_a = centered_points @ basis_a
@@ -1124,7 +1189,9 @@ def _cross_section_max_extent(
 
 
 def _orthogonal_basis(axis_direction: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Create two unit vectors orthogonal to the provided axis direction."""
+    """
+    Create two unit vectors orthogonal to the provided axis direction.
+    """
     axis = _normalize_vector(axis_direction)
     helper = np.asarray([1.0, 0.0, 0.0], dtype=np.float64)
     if abs(float(np.dot(helper, axis))) > 0.9:
@@ -1138,7 +1205,9 @@ def _orthogonal_basis(axis_direction: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
 
 def _point_cloud_max_extent(points: np.ndarray) -> float:
-    """Return largest principal-axis extent of a point cloud."""
+    """
+    Return largest principal-axis extent of a point cloud.
+    """
     if len(points) == 0:
         return 0.0
     if len(points) < 3:
@@ -1160,7 +1229,9 @@ def _is_box_like_extent_profile(
     cross_section_asymmetry_threshold: float,
     cube_axis_similarity_tolerance: float,
 ) -> bool:
-    """Return whether extents represent a box-like profile rather than axisymmetry."""
+    """
+    Return whether extents represent a box-like profile rather than axisymmetry.
+    """
     sorted_extents = np.sort(np.asarray(extents, dtype=np.float64))
     smallest_extent = float(sorted_extents[0])
     middle_extent = float(sorted_extents[1])

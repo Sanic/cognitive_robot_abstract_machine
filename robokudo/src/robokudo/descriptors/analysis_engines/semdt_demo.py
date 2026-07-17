@@ -26,10 +26,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline that does tabletop segmentation and integrates primary navigation
-        using a YOLO annotator.
+        Create a pipeline that does tabletop segmentation and integrates primary
+        navigation using a YOLO annotator.
         """
-
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         seq = Pipeline("RWPipeline")

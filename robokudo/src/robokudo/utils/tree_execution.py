@@ -1,4 +1,5 @@
-"""Tree execution utilities for RoboKudo.
+"""
+Tree execution utilities for RoboKudo.
 
 This module provides utilities for executing behavior trees in ROS environments.
 It supports:
@@ -43,7 +44,9 @@ def _tick_tree_until(
     stop_condition: Callable[[int], Optional[_T]],
     tick_rate: int,
 ) -> Optional[_T]:
-    """Tick an already setup tree until ``stop_condition`` returns a result."""
+    """
+    Tick an already setup tree until ``stop_condition`` returns a result.
+    """
     tick_count = 0
     result = None
     timer = None
@@ -94,7 +97,8 @@ def run_tree_once(
     max_iterations: int = 500,
     tick_rate: int = 5,
 ) -> Optional[Status]:
-    """Execute a behavior tree once with monitoring.
+    """
+    Execute a behavior tree once with monitoring.
 
     This function:
     * Grows the tree with optional GUI
@@ -136,7 +140,8 @@ def run_tree_until_successful_cas_count(
     tick_rate: int = 20,
     on_successful_cas: Optional[Callable[[CAS], None]] = None,
 ) -> list:
-    """Execute a tree until a requested number of distinct successful CASes exist.
+    """
+    Execute a tree until a requested number of distinct successful CASes exist.
 
     The tree is setup once without a ``OneShot`` wrapper so continuously running
     pipelines can process multiple percepts using the same ROS node.

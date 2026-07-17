@@ -33,34 +33,39 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 
 class StorageReaderInterface(CameraInterface):
-    """A camera interface for reading data from MongoDB storage.
+    """
+    A camera interface for reading data from MongoDB storage.
 
-    This interface reads sensor data and annotations that were previously stored
-    using the StorageWriter annotator. It handles data deserialization and
-    restoration of the Common Analysis Structure (CAS) views.
+    This interface reads sensor data and annotations that were previously stored using
+    the StorageWriter annotator. It handles data deserialization and restoration of the
+    Common Analysis Structure (CAS) views.
     """
 
     def __init__(self, camera_config: MongoCameraConfig) -> None:
-        """Initialize the storage reader interface.
+        """
+        Initialize the storage reader interface.
 
-        Sets up MongoDB connection and creates a list reader for the specified
-        database.
+        Sets up MongoDB connection and creates a list reader for the specified database.
 
         :param camera_config: Configuration containing database settings
         """
         super().__init__(camera_config)
 
         self.storage: Storage = Storage(camera_config.db_name)
-        """MongoDB storage interface"""
-
+        """
+        MongoDB storage interface.
+        """
         self.reader: Storage.ListReader = self.storage.ListReader(camera_config.db_name)
-        """List-based reader for MongoDB data"""
+        """
+        List-based reader for MongoDB data.
+        """
 
     def has_new_data(self) -> bool:
-        """Check if more data is available to read.
+        """
+        Check if more data is available to read.
 
-        Handles looping behavior based on camera configuration and
-        maintains cursor position in the data sequence.
+        Handles looping behavior based on camera configuration and maintains cursor
+        position in the data sequence.
 
         :return: True if more data is available, False otherwise
         """
@@ -71,7 +76,8 @@ class StorageReaderInterface(CameraInterface):
         return self.reader.cursor_has_frames()
 
     def set_data(self, cas: CAS) -> None:
-        """Update the Common Analysis Structure with data from storage.
+        """
+        Update the Common Analysis Structure with data from storage.
 
         This method:
         * Retrieves the next frame from storage
@@ -134,12 +140,13 @@ class StorageReaderInterface(CameraInterface):
             cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
 
     def _restore_camera_to_world_transform(self, cas_frame: dict) -> None:
-        """Restore the stored camera pose as a transform bound to the running world.
+        """
+        Restore the stored camera pose as a transform bound to the running world.
 
         The serialized ``CAMERA_TO_WORLD_TRANSFORM`` may reference bodies from the
-        recorded world. This method decodes the numeric transform, resolves the
-        intended frame names, creates/updates the matching bodies in the current
-        RoboKudo world, and stores the rebound transform in ``cas_frame["views"]``.
+        recorded world. This method decodes the numeric transform, resolves the intended
+        frame names, creates/updates the matching bodies in the current RoboKudo world,
+        and stores the rebound transform in ``cas_frame["views"]``.
         """
         view_ids = cas_frame.get("view_ids", {})
         view_id = view_ids.get(CASViews.CAMERA_TO_WORLD_TRANSFORM)
@@ -178,10 +185,11 @@ class StorageReaderInterface(CameraInterface):
     def _decode_stored_camera_to_world_transform(
         self, view_document: dict, cas_frame: dict
     ) -> tuple[HomogeneousTransformationMatrix, str, str]:
-        """Decode a stored camera transform and determine its frame names.
+        """
+        Decode a stored camera transform and determine its frame names.
 
-        Recordings must carry frame names as view metadata. The returned
-        transform contains only the numeric pose and must be rebound before use.
+        Recordings must carry frame names as view metadata. The returned transform
+        contains only the numeric pose and must be rebound before use.
         """
         payload = view_document["payload"]
         metadata = view_document.get("metadata", {})
@@ -201,7 +209,9 @@ class StorageReaderInterface(CameraInterface):
     def _decode_transform_payload_without_frames(
         payload: dict,
     ) -> HomogeneousTransformationMatrix:
-        """Decode only the numeric transform, ignoring serialized frame UUIDs."""
+        """
+        Decode only the numeric transform, ignoring serialized frame UUIDs.
+        """
         payload_without_frames = dict(payload)
         payload_without_frames.pop("reference_frame_id", None)
         payload_without_frames.pop("child_frame_id", None)
@@ -213,11 +223,12 @@ class StorageReaderInterface(CameraInterface):
         world_frame: str,
         camera_frame: str,
     ) -> HomogeneousTransformationMatrix:
-        """Create a camera transform whose frames belong to the running world.
+        """
+        Create a camera transform whose frames belong to the running world.
 
-        The numeric pose is copied from ``stored_transform``. The reference and
-        child frames are looked up or created in the current global RoboKudo
-        world, and the corresponding world connection origin is updated.
+        The numeric pose is copied from ``stored_transform``. The reference and child
+        frames are looked up or created in the current global RoboKudo world, and the
+        corresponding world connection origin is updated.
         """
         world.setup_world_for_camera_frame(
             world_frame=world_frame,

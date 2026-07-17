@@ -32,8 +32,9 @@ from typing_extensions import Any, Dict, List, Optional
 class ObjectSpec:
     """
     Data structure to define typical object properties for predefined objects.
-    Will be consumed by BaseWorldDescriptor.build_objects to create a world
-    and the corresponding connections.
+
+    Will be consumed by BaseWorldDescriptor.build_objects to create a world and the
+    corresponding connections.
     """
 
     name: str
@@ -50,8 +51,9 @@ class ObjectSpec:
 class RegionSpec:
     """
     Data structure to define typical properties for predefined regions.
-    Will be consumed by BaseWorldDescriptor.build_regions to create
-    regions and their connections.
+
+    Will be consumed by BaseWorldDescriptor.build_regions to create regions and their
+    connections.
     """
 
     name: str
@@ -67,7 +69,9 @@ class PredefinedObject(SemanticAnnotation):
 
 
 class BaseWorldDescriptor:
-    """Base class for describing a world with predefined objects and regions."""
+    """
+    Base class for describing a world with predefined objects and regions.
+    """
 
     def __init__(
         self,
@@ -78,7 +82,8 @@ class BaseWorldDescriptor:
         """
         Initialize a world descriptor.
 
-        :param world: Optional shared World instance. If not provided, a new World is created.
+        :param world: Optional shared World instance. If not provided, a new World is
+            created.
         :param root_name: Name of the root body if a new root must be created.
         :param root_prefix: Prefix for the root body name (None for no prefix).
         """
@@ -91,7 +96,9 @@ class BaseWorldDescriptor:
 
     @staticmethod
     def _center_mesh_origin(mesh: Mesh) -> None:
-        """Shift mesh origin to the center of its local bounding box."""
+        """
+        Shift mesh origin to the center of its local bounding box.
+        """
         bb = mesh.local_frame_bounding_box
         center_x = (bb.min_x + bb.max_x) / 2
         center_y = (bb.min_y + bb.max_y) / 2
@@ -101,7 +108,9 @@ class BaseWorldDescriptor:
         )
 
     def build_objects(self, root: Body, specs: List[Any]) -> Dict[str, Connection6DoF]:
-        """Create bodies, connections, annotations, and poses from object specs."""
+        """
+        Create bodies, connections, annotations, and poses from object specs.
+        """
         connections: Dict[str, Connection6DoF] = {}
 
         with self.world.modify_world():
@@ -165,7 +174,9 @@ class BaseWorldDescriptor:
     def build_regions(
         self, root: Body, specs: List[RegionSpec]
     ) -> Dict[str, Connection6DoF]:
-        """Create regions and connections from region specs."""
+        """
+        Create regions and connections from region specs.
+        """
         connections: Dict[str, Connection6DoF] = {}
 
         with self.world.modify_world():
@@ -200,7 +211,9 @@ class BaseWorldDescriptor:
         return connections
 
     def get_predefined_object_bodies(self) -> List[Body]:
-        """Get list of pre-defined objects."""
+        """
+        Get list of pre-defined objects.
+        """
         predefined_object_annotations = self.world.get_semantic_annotations_by_type(
             PredefinedObject
         )

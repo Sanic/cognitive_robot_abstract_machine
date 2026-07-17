@@ -59,10 +59,11 @@ if TYPE_CHECKING:
 
 
 class CameraInterface(object):
-    """Base class for all camera interfaces in RoboKudo.
+    """
+    Base class for all camera interfaces in RoboKudo.
 
-    This class defines the basic interface that all camera implementations
-    must provide. It handles configuration and data availability tracking.
+    This class defines the basic interface that all camera implementations must provide.
+    It handles configuration and data availability tracking.
     """
 
     def __init__(self, camera_config: Any) -> None:
@@ -72,13 +73,17 @@ class CameraInterface(object):
         :param camera_config: Configuration for the camera
         """
         self._has_new_data: bool = False
-        """Whether new data is available"""
-
+        """
+        Whether new data is available.
+        """
         self.camera_config: Any = camera_config
-        """Camera configuration object"""
-
+        """
+        Camera configuration object.
+        """
         self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """RoboKudo logger instance"""
+        """
+        RoboKudo logger instance.
+        """
 
     def has_new_data(self) -> bool:
         """
@@ -156,10 +161,10 @@ class CameraInterface(object):
 
     def set_data(self, cas: CAS) -> None:
         """
-        This method is supposed to read in, convert (if needed) and put the data into the CAS.
-        If you are running a CameraInterface which is getting data via callback methods, please make sure
-        to keep callbacks light and do the main conversion work here!
-        Callbacks should be short.
+        This method is supposed to read in, convert (if needed) and put the data into
+        the CAS. If you are running a CameraInterface which is getting data via callback
+        methods, please make sure to keep callbacks light and do the main conversion
+        work here! Callbacks should be short.
 
         :param cas: The CAS where the data should be placed in
         """
@@ -167,14 +172,16 @@ class CameraInterface(object):
 
 
 class ROSCameraInterface(CameraInterface):
-    """Base class for ROS-based camera interfaces.
+    """
+    Base class for ROS-based camera interfaces.
 
-    This class extends the base camera interface with ROS-specific
-    functionality like transform lookups and camera intrinsics handling.
+    This class extends the base camera interface with ROS-specific functionality like
+    transform lookups and camera intrinsics handling.
     """
 
     def __init__(self, camera_config: Any, node: Optional[Node] = None) -> None:
-        """Initialize the ROS camera interface.
+        """
+        Initialize the ROS camera interface.
 
         :param camera_config: Configuration for the ROS camera
         :param node: A ROS node for transform lookups
@@ -182,16 +189,20 @@ class ROSCameraInterface(CameraInterface):
         super().__init__(camera_config)
 
         self.node = node if node is not None else Node("ros_camera_node")
-        """ROS node for communication with ROS"""
-
+        """
+        ROS node for communication with ROS.
+        """
         if hasattr(self.camera_config, "lookup_viewpoint"):
             self.lookup_viewpoint: bool = self.camera_config.lookup_viewpoint
 
             self.tf_from: str = camera_config.tf_from
-            """Transform source frame"""
-
+            """
+            Transform source frame.
+            """
             self.tf_to: str = camera_config.tf_to
-            """Transform target frame"""
+            """
+            Transform target frame.
+            """
         else:
             self.lookup_viewpoint: bool = False
             """Whether to look up camera transforms"""
@@ -244,7 +255,9 @@ class ROSCameraInterface(CameraInterface):
     def store_camera_to_world_transform_from_tf(
         self, cas: CAS, timestamp: builtin_interfaces.msg.Time
     ) -> None:
-        """If the camera is configured to look up transforms, store the camera transform in the CAS.
+        """
+        If the camera is configured to look up transforms, store the camera transform in
+        the CAS.
 
         :param cas: The CAS to store the transform in
         :param timestamp: The timestamp of the transform
@@ -318,8 +331,8 @@ class ROSCameraInterface(CameraInterface):
     def set_o3d_camera_intrinsics_from_ros_camera_info(self) -> None:
         """Convert ROS camera info to Open3D camera intrinsics.
 
-        Creates an Open3D camera intrinsics object from the ROS camera
-        calibration parameters.
+        Creates an Open3D camera intrinsics object from the ROS camera calibration
+        parameters.
         """
         # Construct o3d camera intrinsics from camera info in CAS
         self.camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
@@ -333,7 +346,8 @@ class ROSCameraInterface(CameraInterface):
 
 
 def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
-    """Convert compressed depth image to proper depth format.
+    """
+    Convert compressed depth image to proper depth format.
 
     This is a workaround for handling compressed depth images in ROS.
     Source: https://answers.ros.org/question/249775/display-compresseddepth-image-python-cv2/
@@ -390,18 +404,19 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
 
 
 class KinectCameraInterface(ROSCameraInterface):
-    """Interface for Kinect-style RGB-D cameras using ROS.
+    """
+    Interface for Kinect-style RGB-D cameras using ROS.
 
-    This class implements a camera interface for RGB-D cameras that publish
-    color and depth images through ROS topics. It supports both raw and
-    compressed image formats.
+    This class implements a camera interface for RGB-D cameras that publish color and
+    depth images through ROS topics. It supports both raw and compressed image formats.
     """
 
     def __init__(self, camera_config: Any) -> None:
-        """Initialize the Kinect camera interface.
+        """
+        Initialize the Kinect camera interface.
 
-        Sets up ROS subscribers and synchronization for color, depth,
-        and camera info topics.
+        Sets up ROS subscribers and synchronization for color, depth, and camera info
+        topics.
 
         :param camera_config: Configuration for the Kinect camera
         """
@@ -412,8 +427,9 @@ class KinectCameraInterface(ROSCameraInterface):
             CompressedImage if self.compressed_color_configured() else Image,
             camera_config.topic_color,
         )
-        """Color image subscriber"""
-
+        """
+        Color image subscriber.
+        """
         self.depth_subscriber: message_filters.Subscriber = Subscriber(
             self.node,
             CompressedImage if self.compressed_depth_configured() else Image,
@@ -441,22 +457,33 @@ class KinectCameraInterface(ROSCameraInterface):
         self.rk_logger.info(f"  {camera_config.topic_camera_info}")
 
         self.color: Optional[npt.NDArray] = None
-        """Latest color image"""
-
+        """
+        Latest color image.
+        """
         self.depth: Optional[npt.NDArray] = None
-        """Latest depth image"""
+        """
+        Latest depth image
+        """
 
         self.camera_info: Optional[CameraInfo] = None
-        """Latest camera info message"""
+        """
+        Latest camera info message
+        """
 
         self.camera_intrinsic: Optional[o3d.camera.PinholeCameraIntrinsic] = None
-        """Open3D camera intrinsics"""
+        """
+        Open3D camera intrinsics
+        """
 
         self.color2depth_ratio: Optional[Tuple[float, float]] = None
-        """Ratio between color and depth image sizes"""
+        """
+        Ratio between color and depth image sizes
+        """
 
         self.timestamp: Optional[builtin_interfaces.msg.Time] = None
-        """Latest message timestamp"""
+        """
+        Latest message timestamp
+        """
 
         self.lock: Lock = Lock()
         """Thread synchronization lock"""
@@ -475,7 +502,8 @@ class KinectCameraInterface(ROSCameraInterface):
         # Thread(target=rclpy.spin_once(self.node), args=(self.node,), daemon=True).start()
 
     def compressed_depth_configured(self) -> bool:
-        """Check if compressed depth images are configured.
+        """
+        Check if compressed depth images are configured.
 
         :return: True if compressed depth is configured, False otherwise
         """
@@ -485,7 +513,8 @@ class KinectCameraInterface(ROSCameraInterface):
         )
 
     def compressed_color_configured(self) -> bool:
-        """Check if compressed color images are configured.
+        """
+        Check if compressed color images are configured.
 
         :return: True if compressed color is configured, False otherwise
         """
@@ -498,8 +527,9 @@ class KinectCameraInterface(ROSCameraInterface):
         return self.node
 
     def blackhole_callback(self, data: Any) -> None:
-        """This callback is just a dummy to receive data coming from a workaround subscription to handle problems with
-        the ApproximateTimeSynchronizer
+        """
+        This callback is just a dummy to receive data coming from a workaround
+        subscription to handle problems with the ApproximateTimeSynchronizer.
 
         :param data: Dummy data
         """
@@ -511,15 +541,16 @@ class KinectCameraInterface(ROSCameraInterface):
         depth_data: Optional[Union[Image, CompressedImage]] = None,
         camera_info: Optional[CameraInfo] = None,
     ) -> None:
-        """Process synchronized camera data.
+        """
+        Process synchronized camera data.
 
-        This callback handles incoming color, depth, and camera info messages.
-        It converts the data to OpenCV format and stores it for later use.
+        This callback handles incoming color, depth, and camera info messages. It
+        converts the data to OpenCV format and stores it for later use.
 
-        TODO make this generic. handle the encoding and order properly.
-        For standard and compressed images.
-        this might also depend on the fix of image_transport_plugins being published as a package.
-        Startpoint can be found at the bottom of this method.
+        TODO make this generic. handle the encoding and order properly. For standard and
+        compressed images. this might also depend on the fix of image_transport_plugins
+        being published as a package. Startpoint can be found at the bottom of this
+        method.
 
         :param color_data: Color image message
         :param depth_data: Depth image message

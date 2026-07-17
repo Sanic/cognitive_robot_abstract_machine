@@ -1,4 +1,6 @@
-"""Analysis engine that records Kinect camera data to storage."""
+"""
+Analysis engine that records Kinect camera data to storage.
+"""
 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -13,7 +15,9 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
-    """Records preprocessed Kinect camera data with StorageWriter."""
+    """
+    Records preprocessed Kinect camera data with StorageWriter.
+    """
 
     def name(self) -> str:
         return "storage"

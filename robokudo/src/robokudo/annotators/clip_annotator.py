@@ -23,26 +23,36 @@ FONT = cv2.FONT_HERSHEY_COMPLEX
 
 
 class ClipAnnotator(ThreadedAnnotator):
-    """A simple CLIP annotator that uses a given vocabulary to annotate all incoming object hypothesis."""
+    """
+    A simple CLIP annotator that uses a given vocabulary to annotate all incoming object
+    hypothesis.
+    """
 
     class Descriptor(ThreadedAnnotator.Descriptor):
-        """Descriptor for the ClipAnnotator."""
+        """
+        Descriptor for the ClipAnnotator.
+        """
 
         class Parameters:
-            """Parameters for the Descriptor."""
+            """
+            Parameters for the Descriptor.
+            """
 
             def __init__(self) -> None:
                 self.device = torch.device(
                     "cuda:0" if torch.cuda.is_available() else "cpu"
                 )
-                """Torch device to be used by the annotator."""
-
+                """
+                Torch device to be used by the annotator.
+                """
                 self.model_name = "openai/clip-vit-large-patch14"
-                """Name of the CLIP to use for feature extraction."""
-
+                """
+                Name of the CLIP to use for feature extraction.
+                """
                 self.vocabulary_template: str = "A photo of a {}"
-                """A template string that each vocabulary word is inserted into."""
-
+                """
+                A template string that each vocabulary word is inserted into.
+                """
                 self.vocabulary: List[str] = [
                     "Milk Container",
                     "Box of Cornflakes",
@@ -51,25 +61,32 @@ class ClipAnnotator(ThreadedAnnotator):
                     "Crepe Pan",
                     "Dish Soap",
                 ]
-                """The vocabulary used for object classification"""
-
+                """
+                The vocabulary used for object classification.
+                """
                 self.analysis_scope = CASViews.COLOR_IMAGE
-                """The analysis scope of the annotator.
-                
+                """
+                The analysis scope of the annotator.
+
                 Possible values:
-                
+
                 * CASViews.COLOR_IMAGE: Analyze the entire color image at once.
                 * ObjectHypothesis: Analyze each object hypothesis individually.
                 """
-
                 self.filter_fn: Optional[Callable[[ObjectHypothesis], bool]] = None
-                """An optional filter function used to filter object hypotheses before analyzing them."""
-
+                """
+                An optional filter function used to filter object hypotheses before
+                analyzing them.
+                """
                 self.save_top_k: int = min(5, len(self.vocabulary))
-                """How many annotations to create per analyzed image or hypothesis."""
-
+                """
+                How many annotations to create per analyzed image or hypothesis.
+                """
                 self.use_softmax: bool = True
-                """Whether to apply softmax to the results of the analyzed image or hypothesis or not."""
+                """
+                Whether to apply softmax to the results of the analyzed image or
+                hypothesis or not.
+                """
 
     def __init__(
         self,
@@ -81,22 +98,27 @@ class ClipAnnotator(ThreadedAnnotator):
         self.rk_logger.debug(f"Starting to init {self.__class__.__name__}")
 
         self.parameters = descriptor.parameters
-        """The parameters used by this annotator."""
-
+        """
+        The parameters used by this annotator.
+        """
         self.clip_model = CLIPModel.from_pretrained(self.parameters.model_name)
-        """CLIP model used for feature extraction."""
-
+        """
+        CLIP model used for feature extraction.
+        """
         self.clip_preprocess = CLIPProcessor.from_pretrained(self.parameters.model_name)
-        """CLIP preprocessor used for input preprocessing."""
-
+        """
+        CLIP preprocessor used for input preprocessing.
+        """
         self.clip_tokenizer = self.clip_preprocess.tokenizer
-        """CLIP tokenizer used for text preprocessing."""
-
+        """
+        CLIP tokenizer used for text preprocessing.
+        """
         self.vocabulary_index: faiss.IndexFlatIP = faiss.IndexFlatIP(
             self.clip_model.config.projection_dim
         )
-        """A faiss index for text features used in similarity search."""
-
+        """
+        A faiss index for text features used in similarity search.
+        """
         with torch.no_grad():
             templated_texts = [
                 self.parameters.vocabulary_template.format(name)
@@ -118,7 +140,8 @@ class ClipAnnotator(ThreadedAnnotator):
         self,
         images: Union[Image.Image, List[Image.Image], npt.NDArray, List[npt.NDArray]],
     ) -> npt.NDArray[np.float32]:
-        """Get normalized image features for the given image(s).
+        """
+        Get normalized image features for the given image(s).
 
         :param images: The image(s) to get features from.
         :return: The image(s) features.
@@ -139,7 +162,8 @@ class ClipAnnotator(ThreadedAnnotator):
         use_softmax: bool,
         save_top_k: int,
     ) -> Tuple[npt.NDArray[np.float32], npt.NDArray[np.int64]]:
-        """Search the faiss index using the given features.
+        """
+        Search the faiss index using the given features.
 
         :param features: The features to search the index with.
         :param k: The number of candidates to retrieve from the index for each feature.
@@ -165,13 +189,13 @@ class ClipAnnotator(ThreadedAnnotator):
         return class_similarities, class_indices
 
     def _analyze_scene(self, color_image: npt.NDArray[np.uint8]) -> Status:
-        """Analyze the entire color image.
+        """
+        Analyze the entire color image.
 
         :param color_image: The color image to analyze.
         :return: The py_trees status.
         """
         cas = self.get_cas()
-
         parameters: ClipAnnotator.Descriptor.Parameters = self.parameters
 
         vocabulary: List[str] = parameters.vocabulary
@@ -217,7 +241,8 @@ class ClipAnnotator(ThreadedAnnotator):
         return Status.SUCCESS
 
     def _analyze_object_hypotheses(self, color_image: npt.NDArray[np.uint8]) -> Status:
-        """Analyze the object hypothesis using the given color image.
+        """
+        Analyze the object hypothesis using the given color image.
 
         :param color_image: The color image to use for analyzation.
         :return: The py_trees status.
@@ -292,7 +317,8 @@ class ClipAnnotator(ThreadedAnnotator):
         return Status.SUCCESS
 
     def compute(self) -> Status:
-        """Compute CLIP features depending on the analysis scope.
+        """
+        Compute CLIP features depending on the analysis scope.
 
         :return: Whether the computation was successfull or not.
         """
