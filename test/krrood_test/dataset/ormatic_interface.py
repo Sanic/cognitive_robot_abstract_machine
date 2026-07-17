@@ -690,22 +690,6 @@ class IsDAO(PredicateDAO, DataAccessObject[krrood.entity_query_language.predicat
     }
 
 
-class TripleDAO(
-    PredicateDAO, DataAccessObject[krrood.entity_query_language.predicate.Triple]
-):
-    __tablename__ = "TripleDAO"
-
-    database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(PredicateDAO.database_id), primary_key=True, use_existing_column=True
-    )
-
-    __mapper_args__ = {
-        "polymorphic_identity": "TripleDAO",
-        "inherit_condition": database_id == PredicateDAO.database_id,
-        "polymorphic_load": "selectin",
-    }
-
-
 class RoleDAO(SymbolDAO, DataAccessObject[krrood.patterns.role.Role]):
     __tablename__ = "RoleDAO"
 
