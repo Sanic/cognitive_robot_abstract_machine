@@ -132,6 +132,14 @@ def test_create_depth_map_with_rectangular_resolution(ray_test_world):
     assert depth_map.shape == (128, 64)
 
 
+def test_camera_resolution_can_be_created_from_public_resolution_values():
+    square_resolution = CameraResolution.from_integral(128)
+    rectangular_resolution = CameraResolution.from_iterable((128, 64))
+
+    assert square_resolution == CameraResolution(width=128, height=128)
+    assert rectangular_resolution == CameraResolution(width=128, height=64)
+
+
 @pytest.mark.parametrize("resolution", [0, (128,), (128.0, 64), "128x64"])
 def test_invalid_camera_resolution_raises_domain_exception(resolution):
     with pytest.raises(InvalidCameraResolutionError):
