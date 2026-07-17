@@ -20,8 +20,7 @@ if TYPE_CHECKING:
 @dataclass
 class CameraResolution:
     """
-    Defines the horizontal and vertical pixel count used for camera ray
-    generation.
+    Defines the horizontal and vertical pixel count used for camera ray generation.
     """
 
     width: int
@@ -147,8 +146,8 @@ class RayTracer:
         """
         Updates the ray tracer scene with the current state of the world.
 
-        This method should be called whenever the world changes to
-        ensure the ray tracer has the latest information.
+        This method should be called whenever the world changes to ensure the ray tracer
+        has the latest information.
         """
         if self._last_world_model != self.world.get_world_model_manager().version:
             self.add_missing_bodies()
@@ -159,8 +158,8 @@ class RayTracer:
 
     def add_missing_bodies(self):
         """
-        Adds all bodies from the world to the ray tracer scene that are not
-        already present.
+        Adds all bodies from the world to the ray tracer scene that are not already
+        present.
         """
         # Bodies are added to the scene with their name as the node name plus a suffix for collision geometries.
         # We check if a body is not in the complete list of all node names in the scene graph.
@@ -188,8 +187,8 @@ class RayTracer:
         """
         Updates the transforms of all bodies in the ray tracer scene.
 
-        This is necessary to ensure that the ray tracing uses the
-        correct positions and orientations.
+        This is necessary to ensure that the ray tracing uses the correct positions and
+        orientations.
         """
         for body in self.world.bodies:
             for i, collision in enumerate(body.collision):
@@ -207,20 +206,17 @@ class RayTracer:
         max_distance: float = np.inf,
     ) -> np.ndarray:
         """
-        Creates a segmentation mask for the ray tracer scene from the camera
-        position to the target position.
+        Creates a segmentation mask for the ray tracer scene from the camera position to
+        the target position.
 
-        Each pixel in the mask corresponds to the index of a body in the
-        scene or -1 if no body is hit at that pixel.
+        Each pixel in the mask corresponds to the index of a body in the scene or -1 if
+        no body is hit at that pixel.
 
         :param camera_pose: The position of the camera.
-        :param resolution: The camera resolution value. An integer
-            creates a square image; a width-height pair creates a
-            rectangular image.
-        :param min_distance: The minimum distance of a body to be
-            considered a hit.
-        :param max_distance: The maximum distance of a body to be
-            considered a hit.
+        :param resolution: The camera resolution value. An integer creates a square
+            image; a width-height pair creates a rectangular image.
+        :param min_distance: The minimum distance of a body to be considered a hit.
+        :param max_distance: The maximum distance of a body to be considered a hit.
         :return: A segmentation mask as a numpy array.
         """
         self.update_scene()
@@ -262,21 +258,17 @@ class RayTracer:
         max_distance: float = np.inf,
     ) -> np.ndarray:
         """
-        Creates a depth map for the ray tracer scene from the camera position
-        to the target position.
+        Creates a depth map for the ray tracer scene from the camera position to the
+        target position.
 
-        Each pixel in the depth map corresponds to the distance from the
-        camera to the closest point on the surface of the scene or -1 if
-        no point is hit.
+        Each pixel in the depth map corresponds to the distance from the camera to the
+        closest point on the surface of the scene or -1 if no point is hit.
 
         :param camera_pose: The position of the camera.
-        :param resolution: The camera resolution value. An integer
-            creates a square image; a width-height pair creates a
-            rectangular image.
-        :param min_distance: The minimum distance of a body to be
-            considered a hit.
-        :param max_distance: The maximum distance of a body to be
-            considered a hit.
+        :param resolution: The camera resolution value. An integer creates a square
+            image; a width-height pair creates a rectangular image.
+        :param min_distance: The minimum distance of a body to be considered a hit.
+        :param max_distance: The maximum distance of a body to be considered a hit.
         :return: A depth map as a numpy array.
         """
         self.update_scene()
@@ -323,20 +315,18 @@ class RayTracer:
         fov=90,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Creates camera rays for the ray tracer scene from the camera position
-        to the target position.
+        Creates camera rays for the ray tracer scene from the camera position to the
+        target position.
 
-        Places the camera at the given position and orientation view of
-        the camera is along the x-axis.
+        Places the camera at the given position and orientation view of the camera is
+        along the x-axis.
 
-        :param camera_pose: The position of the camera as a 4x4
-            transformation matrix.
-        :param resolution: The camera resolution value. An integer
-            creates a square image; a width-height pair creates a
-            rectangular image.
+        :param camera_pose: The position of the camera as a 4x4 transformation matrix.
+        :param resolution: The camera resolution value. An integer creates a square
+            image; a width-height pair creates a rectangular image.
         :param fov: The field of view of the camera in degrees.
-        :return: The origin points of the rays, the direction vectors of
-            the rays, and the pixel coordinates.
+        :return: The origin points of the rays, the direction vectors of the rays, and
+            the pixel coordinates.
         """
         camera_pose = camera_pose.to_np()
         camera_resolution = CameraResolution.from_value(resolution)
@@ -364,19 +354,16 @@ class RayTracer:
         max_distance: float = np.inf,
     ) -> tuple[np.ndarray, np.ndarray, list[Body]]:
         """
-        Performs a ray test from the origin point to the target point in the
-        ray tracer scene.
+        Performs a ray test from the origin point to the target point in the ray tracer
+        scene.
 
         :param origin_points: The starting point of the ray.
         :param target_points: The end point of the ray.
         :param multiple_hits: Whether to return multiple hits or not.
-        :param min_distance: The minimum distance of a body to be
-            considered a hit.
-        :param max_distance: The maximum distance of a body to be
-            considered a hit.
-        :return: A tuple containing the points where the ray intersects
-            and the indices of rays that hit the scene as well as the
-            bodies that were.
+        :param min_distance: The minimum distance of a body to be considered a hit.
+        :param max_distance: The maximum distance of a body to be considered a hit.
+        :return: A tuple containing the points where the ray intersects and the indices
+            of rays that hit the scene as well as the bodies that were.
         """
         origin_points = np.array(origin_points)
         target_points = np.array(target_points)
