@@ -782,8 +782,6 @@ def distinct(
     match expression:
         case Query():
             return expression.distinct(*on)
-        case ResultQuantifier():
-            return expression._child_.distinct(*on)
         case Selectable():
             return entity(expression).distinct(*on)
         case _:

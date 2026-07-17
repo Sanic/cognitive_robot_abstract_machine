@@ -800,41 +800,24 @@ class InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO(
     }
 
 
-class InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO(
-    InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping
-    ],
+class TripleDAO(
+    PredicateDAO, DataAccessObject[krrood.entity_query_language.predicate.Triple]
 ):
-    __tablename__ = "InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO"
+    __tablename__ = "TripleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
-        ForeignKey(
-            InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO.database_id
-        ),
-        primary_key=True,
-        use_existing_column=True,
-    )
-
-    level_one_attribute: Mapped[builtins.float] = mapped_column(
-        use_existing_column=True
+        ForeignKey(PredicateDAO.database_id), primary_key=True, use_existing_column=True
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO",
-        "inherit_condition": database_id
-        == InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO.database_id,
+        "polymorphic_identity": "TripleDAO",
+        "inherit_condition": database_id == PredicateDAO.database_id,
         "polymorphic_load": "selectin",
     }
 
 
-class InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO(
-    InheritanceLevel1WithoutSymbolButAlternativelyMappedMappingDAO,
-    DataAccessObject[
-        test.krrood_test.dataset.example_classes.InheritanceLevel2WithoutSymbolButAlternativelyMappedMapping
-    ],
-):
-    __tablename__ = "InheritanceLevel2WithoutSymbolButAlternativelyMappedMappingDAO"
+class RoleDAO(SymbolDAO, DataAccessObject[krrood.patterns.role.Role]):
+    __tablename__ = "RoleDAO"
 
     database_id: Mapped[builtins.int] = mapped_column(
         ForeignKey(
