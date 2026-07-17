@@ -70,7 +70,6 @@ from krrood.entity_query_language.predicate import (
 )
 from krrood.entity_query_language.query.match import (
     Match,
-    MatchVariable,
 )
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,

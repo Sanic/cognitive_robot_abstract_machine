@@ -9,7 +9,7 @@ from typing import Type, Optional, TYPE_CHECKING
 from krrood.entity_query_language.predicate import (
     RenderedFields,
     SymbolicFunction,
-    symbolic_callable_to_function,
+    symbolic_callable_to_function, symbolic_function,
 )
 
 if TYPE_CHECKING:
