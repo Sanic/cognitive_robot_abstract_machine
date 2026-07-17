@@ -14,6 +14,7 @@ from copy import copy
 from dataclasses import dataclass, field
 from functools import cached_property
 from uuid import UUID
+from functools import cached_property, lru_cache
 
 from ordered_set import OrderedSet
 from typing_extensions import (
@@ -471,6 +472,9 @@ class SymbolicExpression(ABC):
     def _descendants_(self) -> Iterator[SymbolicExpression]:
         """
         :return: All descendants of this symbolic expression in children first, then depth-first by subtree order.
+
+        Does not recurse into ``ResultQuantifier`` children so that inner query
+        subtrees remain isolated from outer query traversals.
         """
         yield from self._children_
         for child in self._children_:
