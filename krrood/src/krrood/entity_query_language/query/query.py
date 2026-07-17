@@ -17,7 +17,6 @@ from functools import cached_property, wraps
 from typing_extensions import (
     Iterable,
     Any,
-    ClassVar,
     Optional,
     Type,
     Dict,
@@ -108,11 +107,6 @@ class CachedResultStream:
     that stop early.
     """
 
-    _STREAM_EXHAUSTED: ClassVar[object] = object()
-    """
-    Sentinel distinguishing a genuinely exhausted source from a ``None`` result.
-    """
-
     _source: Iterator[OperationResult]
     """
     The underlying result iterator, advanced at most once per produced item.
@@ -127,6 +121,8 @@ class CachedResultStream:
     """
 
     def __iter__(self) -> Iterator[OperationResult]:
+        # Sentinel distinguishing a genuinely exhausted source from a ``None`` result.
+        stream_exhausted = object()
         index = 0
         # Not ``while not self._exhausted``: an already-exhausted stream must still replay its
         # buffer to later iterators, so the loop always runs and the exhaustion guard below only
@@ -141,8 +137,8 @@ class CachedResultStream:
             # Sentinel form of next() rather than try/except StopIteration: this method is a
             # generator, and per PEP 479 a StopIteration raised inside it would surface as a
             # RuntimeError instead of ending iteration.
-            next_item = next(self._source, self._STREAM_EXHAUSTED)
-            if next_item is self._STREAM_EXHAUSTED:
+            next_item = next(self._source, stream_exhausted)
+            if next_item is stream_exhausted:
                 self._exhausted = True
                 return
             self._buffer.append(next_item)
