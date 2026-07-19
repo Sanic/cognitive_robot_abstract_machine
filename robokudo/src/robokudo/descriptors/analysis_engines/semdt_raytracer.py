@@ -1,4 +1,5 @@
-"""Analysis engine for simulated RGB-D input from SemDT RayTracer.
+"""
+Analysis engine for simulated RGB-D input from SemDT RayTracer.
 
 This pipeline mirrors the standard tabletop segmentation flow but uses the
 `semdt_raytracer` camera descriptor, which renders color/depth images from a
@@ -19,7 +20,9 @@ from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.cas import CASViews
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.types.annotation import Classification
@@ -27,7 +30,9 @@ from robokudo.types.scene import ObjectHypothesis
 
 
 def classify_boxes_by_color(annotator: LambdaFunctionAnnotator) -> None:
-    """Attach a simple color-based Classification annotation to each ObjectHypothesis."""
+    """
+    Attach a simple color-based Classification annotation to each ObjectHypothesis.
+    """
     cas = annotator.get_cas()
     color_image = cas.get(CASViews.COLOR_IMAGE)
     object_hypotheses = cas.filter_annotations_by_type(ObjectHypothesis)
@@ -41,10 +46,10 @@ def classify_boxes_by_color(annotator: LambdaFunctionAnnotator) -> None:
 
         b, g, r = mean_bgr
         if b > r + 15.0 and b > g:
-            class_name = "box_blue"
+            class_name = "cylinder_blue"
             class_id = 2
         elif r > b + 15.0 and r > g:
-            class_name = "box_red"
+            class_name = "cylinder_red"
             class_id = 1
         else:
             class_name = "box_unknown"
@@ -108,7 +113,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "semdt_raytracer"
 
     def implementation(self) -> Pipeline:
-        raytracer_config = CrDescriptorFactory.create_descriptor(
+        raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             "semdt_raytracer",
             world_descriptor_name="world_semdt_raytracer_cylinders",
         )
@@ -118,6 +123,8 @@ class AnalysisEngine(AnalysisEngineInterface):
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01
         expected_state_desc = ExpectedStateRendererAnnotator.Descriptor()
+        expected_state_desc.parameters.target_classname = "cylinder_blue"
+        expected_state_desc.parameters.ground_truth_body_name = "cylinder_blue"
         expected_state_desc.parameters.use_support_surface_constraint = True
         expected_state_desc.parameters.candidate_pose_generation_mode = (
             "support_surface_sampling"

@@ -1,4 +1,6 @@
-"""Render a simple expected world state from current camera perspective."""
+"""
+Render a simple expected world state from current camera perspective.
+"""
 
 from __future__ import annotations
 
@@ -18,8 +20,8 @@ from robokudo.cas import CASViews
 from robokudo.types.annotation import Classification, Encoding, Plane, PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
-    get_cam_to_world_transform_matrix,
-    get_world_to_cam_transform_matrix,
+    get_camera_to_world_transform_matrix,
+    get_world_to_camera_transform_matrix,
 )
 from robokudo.utils.cv_helper import (
     centroid_shift_px,
@@ -108,12 +110,16 @@ class SupportSurfaceConstraint:
 
 
 class ExpectedStateRendererAnnotator(ThreadedAnnotator):
-    """Render a stubbed expected world state containing only one known object."""
+    """
+    Render a stubbed expected world state containing only one known object.
+    """
 
     class Descriptor(BaseAnnotator.Descriptor):
         class Parameters:
             def __init__(self) -> None:
-                """Define tunable parameters for expected-object rendering and matching."""
+                """
+                Define tunable parameters for expected-object rendering and matching.
+                """
                 #: Classification label used to select the detected object hypothesis.
                 self.target_classname: str = "box_blue"
                 #: Name assigned to the expected object in the synthesized world model.
@@ -199,17 +205,22 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         name: str = "ExpectedStateRendererAnnotator",
         descriptor: "ExpectedStateRendererAnnotator.Descriptor" = Descriptor(),
     ) -> None:
-        """Initialize renderer with descriptor-based expected-object settings."""
+        """
+        Initialize renderer with descriptor-based expected-object settings.
+        """
         super().__init__(name, descriptor)
         # RNG is stateful across updates; recreate only when the configured seed changes.
         self._candidate_sampling_rng: np.random.Generator | None = None
         self._candidate_sampling_rng_seed: int | None = None
 
     def compute(self) -> Status:
-        """Render expected object view, compare outlines, and publish visualization/metrics."""
+        """
+        Render expected object view, compare outlines, and publish
+        visualization/metrics.
+        """
         update_start_s = time.perf_counter()
-        cam_info, cam_to_world_optical = self._read_camera_context()
-        if cam_info is None or cam_to_world_optical is None:
+        camera_info, camera_to_world_optical = self._read_camera_context()
+        if camera_info is None or camera_to_world_optical is None:
             self.feedback_message = "No CameraInfo in CAS."
             return Status.FAILURE
 
@@ -217,7 +228,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         if target_oh is None:
             self.feedback_message = f"No ObjectHypothesis with Classification '{self.descriptor.parameters.target_classname}'."
             blank = np.zeros(
-                (int(cam_info.height), int(cam_info.width), 3), dtype=np.uint8
+                (int(camera_info.height), int(camera_info.width), 3), dtype=np.uint8
             )
             self.get_annotator_output_struct().set_image(blank)
             return Status.SUCCESS
@@ -229,27 +240,27 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 "contains a valid GROUND_TRUTH_WORLD_REF."
             )
             blank = np.zeros(
-                (int(cam_info.height), int(cam_info.width), 3), dtype=np.uint8
+                (int(camera_info.height), int(camera_info.width), 3), dtype=np.uint8
             )
             self.get_annotator_output_struct().set_image(blank)
             return Status.FAILURE
 
         target_center_world = self._target_center_world_from_pose_annotation(
             object_hypothesis=target_oh,
-            cam_to_world_optical=cam_to_world_optical,
+            camera_to_world_optical=camera_to_world_optical,
         )
         if target_center_world is None:
             self.feedback_message = f"Target object '{self.descriptor.parameters.target_classname}' has no usable PoseAnnotation."
             blank = np.zeros(
-                (int(cam_info.height), int(cam_info.width), 3), dtype=np.uint8
+                (int(camera_info.height), int(camera_info.width), 3), dtype=np.uint8
             )
             self.get_annotator_output_struct().set_image(blank)
             return Status.FAILURE
 
         detected_mask = object_hypothesis_to_mask(
             object_hypothesis=target_oh,
-            image_width=int(cam_info.width),
-            image_height=int(cam_info.height),
+            image_width=int(camera_info.width),
+            image_height=int(camera_info.height),
         )
         random_initial_center_world = self._apply_random_translation_offset(
             target_center_world
@@ -257,21 +268,21 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         candidate_centers_world = self._generate_candidate_pose_centers_world(
             seed_center_world=random_initial_center_world,
             gt_object_model=gt_object_model,
-            cam_to_world_optical=cam_to_world_optical,
+            camera_to_world_optical=camera_to_world_optical,
         )
         initial_center_world = self._select_initial_center_from_candidates(
             candidate_centers_world=candidate_centers_world,
             detected_mask=detected_mask,
             gt_object_model=gt_object_model,
-            cam_info=cam_info,
-            cam_to_world_optical=cam_to_world_optical,
+            camera_info=camera_info,
+            camera_to_world_optical=camera_to_world_optical,
         )
         refinement = self._refine_expected_pose_translation(
             initial_center_world=initial_center_world,
             detected_mask=detected_mask,
             gt_object_model=gt_object_model,
-            cam_info=cam_info,
-            cam_to_world_optical=cam_to_world_optical,
+            camera_info=camera_info,
+            camera_to_world_optical=camera_to_world_optical,
         )
         gt_evaluation = self._evaluate_refinement_against_ground_truth(
             initial_center_world=initial_center_world,
@@ -296,7 +307,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         expected_mask = refinement.expected_mask
         render_bgr = self._draw_outlines(render_bgr, expected_mask, detected_mask)
         fov_deg = fov_deg_from_image_width_and_fx(
-            width_px=float(cam_info.width), fx_px=float(cam_info.k[0])
+            width_px=float(camera_info.width), fx_px=float(camera_info.k[0])
         )
         score_start = (
             float(refinement.score_history[0])
@@ -405,7 +416,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         detected_mask: np.ndarray,
         file_suffix: str = "",
     ) -> None:
-        """Persist this run's visualization and masks under /tmp."""
+        """
+        Persist this run's visualization and masks under /tmp.
+        """
         if not bool(self.descriptor.parameters.save_run_images):
             return
         output_dir = Path(str(self.descriptor.parameters.run_image_output_dir))
@@ -427,7 +440,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         )
 
     def _create_run_id(self) -> str:
-        """Create a stable unique id for one annotator update run."""
+        """
+        Create a stable unique id for one annotator update run.
+        """
         cas = self.get_cas()
         timestamp_ns = getattr(cas, "data_timestamp", None)
         if timestamp_ns is None:
@@ -435,7 +450,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         return f"expected_state_{int(timestamp_ns)}"
 
     def _apply_random_translation_offset(self, center_world: np.ndarray) -> np.ndarray:
-        """Return center pose with a uniformly sampled translation perturbation."""
+        """
+        Return center pose with a uniformly sampled translation perturbation.
+        """
         magnitude = float(self.descriptor.parameters.random_offset_translation_m)
         rng = self._create_candidate_sampling_rng()
         return sample_random_offset_translation(
@@ -448,9 +465,11 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         self,
         seed_center_world: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
-        cam_to_world_optical: np.ndarray,
+        camera_to_world_optical: np.ndarray,
     ) -> list[np.ndarray]:
-        """Generate candidate object centers according to configured strategy mode."""
+        """
+        Generate candidate object centers according to configured strategy mode.
+        """
         mode = (
             str(self.descriptor.parameters.candidate_pose_generation_mode)
             .strip()
@@ -499,7 +518,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         elif mode == "support_surface_sampling":
             support_constraint = self._resolve_support_surface_constraint(
                 gt_object_model=gt_object_model,
-                cam_to_world_optical=cam_to_world_optical,
+                camera_to_world_optical=camera_to_world_optical,
                 respect_parameter_gate=False,
             )
             if support_constraint is None:
@@ -557,10 +576,13 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         candidate_centers_world: list[np.ndarray],
         detected_mask: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
-        cam_info: CameraInfo,
-        cam_to_world_optical: np.ndarray,
+        camera_info: CameraInfo,
+        camera_to_world_optical: np.ndarray,
     ) -> np.ndarray:
-        """Choose best initial center by evaluating candidate render-vs-detection agreement."""
+        """
+        Choose best initial center by evaluating candidate render-vs-detection
+        agreement.
+        """
         if len(candidate_centers_world) == 0:
             raise ValueError("candidate_centers_world must not be empty.")
         if len(candidate_centers_world) == 1:
@@ -572,8 +594,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             _, expected_mask = self._render_expected_mask_for_center(
                 object_center_world=center_world,
                 gt_object_model=gt_object_model,
-                cam_info=cam_info,
-                cam_to_world_optical=cam_to_world_optical,
+                camera_info=camera_info,
+                camera_to_world_optical=camera_to_world_optical,
             )
             outline_match = self._compute_outline_match(expected_mask, detected_mask)
             centroid_delta_px = centroid_shift_px(
@@ -607,7 +629,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         return best_center
 
     def _create_candidate_sampling_rng(self) -> np.random.Generator:
-        """Create RNG instance for candidate generation, honoring descriptor seed."""
+        """
+        Create RNG instance for candidate generation, honoring descriptor seed.
+        """
         random_seed = int(self.descriptor.parameters.random_seed)
         self._candidate_sampling_rng, self._candidate_sampling_rng_seed = (
             create_sampling_rng(
@@ -623,7 +647,10 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         center_world: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
     ) -> bool:
-        """Check whether candidate object AABB overlaps with any other collidable body AABB."""
+        """
+        Check whether candidate object AABB overlaps with any other collidable body
+        AABB.
+        """
         target_body = get_body_from_runtime_world(
             self.get_cas(), gt_object_model.body_name
         )
@@ -639,7 +666,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _evaluate_refinement_against_ground_truth(
         self, initial_center_world: np.ndarray, refinement: RefinementResult
     ) -> GroundTruthPoseEvaluation | None:
-        """Evaluate initial/final refinement translation error against GT world pose."""
+        """
+        Evaluate initial/final refinement translation error against GT world pose.
+        """
         body_name = str(self.descriptor.parameters.ground_truth_body_name).strip()
         if body_name == "":
             return None
@@ -668,7 +697,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         )
 
     def _resolve_ground_truth_object_model(self) -> GroundTruthObjectModel | None:
-        """Read expected object box scale/color/orientation from GT world."""
+        """
+        Read expected object box scale/color/orientation from GT world.
+        """
         body_name = str(self.descriptor.parameters.ground_truth_body_name).strip()
         if body_name == "":
             self.rk_logger.warning(
@@ -782,10 +813,12 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         initial_center_world: np.ndarray,
         detected_mask: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
-        cam_info: CameraInfo,
-        cam_to_world_optical: np.ndarray,
+        camera_info: CameraInfo,
+        camera_to_world_optical: np.ndarray,
     ) -> RefinementResult:
-        """Iteratively shift expected object translation to maximize outline agreement."""
+        """
+        Iteratively shift expected object translation to maximize outline agreement.
+        """
         max_iterations = max(
             int(self.descriptor.parameters.refinement_max_iterations), 1
         )
@@ -817,7 +850,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         )
         support_surface_constraint = self._resolve_support_surface_constraint(
             gt_object_model=gt_object_model,
-            cam_to_world_optical=cam_to_world_optical,
+            camera_to_world_optical=camera_to_world_optical,
         )
 
         current_center = initial_center_world.astype(np.float64).copy()
@@ -841,8 +874,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             render_bgr, expected_mask = self._render_expected_mask_for_center(
                 object_center_world=current_center,
                 gt_object_model=gt_object_model,
-                cam_info=cam_info,
-                cam_to_world_optical=cam_to_world_optical,
+                camera_info=camera_info,
+                camera_to_world_optical=camera_to_world_optical,
             )
             outline_match = self._compute_outline_match(expected_mask, detected_mask)
             centroid_delta_px = centroid_shift_px(
@@ -1021,8 +1054,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 expected_mask=expected_mask,
                 detected_mask=detected_mask,
                 gt_object_model=gt_object_model,
-                cam_info=cam_info,
-                cam_to_world_optical=cam_to_world_optical,
+                camera_info=camera_info,
+                camera_to_world_optical=camera_to_world_optical,
                 support_constraint=support_surface_constraint,
             )
             if shift_world is None:
@@ -1046,8 +1079,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             render_bgr, expected_mask = self._render_expected_mask_for_center(
                 object_center_world=current_center,
                 gt_object_model=gt_object_model,
-                cam_info=cam_info,
-                cam_to_world_optical=cam_to_world_optical,
+                camera_info=camera_info,
+                camera_to_world_optical=camera_to_world_optical,
             )
             outline_match = self._compute_outline_match(expected_mask, detected_mask)
             best_result = RefinementResult(
@@ -1080,7 +1113,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         outline_match: OutlineMatchResult,
         pixel_error: float,
     ) -> None:
-        """Emit one refinement step with pose and score metrics."""
+        """
+        Emit one refinement step with pose and score metrics.
+        """
         self.rk_logger.info(
             (
                 "ExpectedState refinement iter %d: "
@@ -1102,7 +1137,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         refinement: RefinementResult,
         gt_evaluation: GroundTruthPoseEvaluation | None = None,
     ) -> None:
-        """Emit final refinement summary with initial/final poses and score progression."""
+        """
+        Emit final refinement summary with initial/final poses and score progression.
+        """
         score_start = (
             float(refinement.score_history[0])
             if len(refinement.score_history) > 0
@@ -1153,7 +1190,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         refinement: RefinementResult,
         gt_evaluation: GroundTruthPoseEvaluation | None,
     ) -> None:
-        """Emit and persist a structured tuning snapshot for offline parameter search."""
+        """
+        Emit and persist a structured tuning snapshot for offline parameter search.
+        """
         goal_m = max(float(self.descriptor.parameters.translation_error_goal_m), 0.0)
         run_id = self._create_run_id()
         score_start = (
@@ -1301,7 +1340,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         self._append_tuning_log_jsonl(record)
 
     def _append_tuning_log_jsonl(self, record: dict[str, object]) -> None:
-        """Append one JSON object per line for later batch analysis."""
+        """
+        Append one JSON object per line for later batch analysis.
+        """
         if not bool(self.descriptor.parameters.save_tuning_log_jsonl):
             return
         log_path = Path(str(self.descriptor.parameters.tuning_log_jsonl_path))
@@ -1314,10 +1355,12 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         self,
         object_center_world: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
-        cam_info: CameraInfo,
-        cam_to_world_optical: np.ndarray,
+        camera_info: CameraInfo,
+        camera_to_world_optical: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Render expected-world BGR and binary mask for a concrete object translation."""
+        """
+        Render expected-world BGR and binary mask for a concrete object translation.
+        """
         render_start_s = time.perf_counter()
         expected_world = self._build_expected_world(
             object_center_world=object_center_world,
@@ -1325,8 +1368,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         )
         render_bgr, expected_mask, _ = self._render_expected_world(
             expected_world=expected_world,
-            cam_info=cam_info,
-            cam_to_world_optical=cam_to_world_optical,
+            camera_info=camera_info,
+            camera_to_world_optical=camera_to_world_optical,
         )
         if bool(self.descriptor.parameters.log_runtime_profile):
             self.rk_logger.info(
@@ -1341,11 +1384,13 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         expected_mask: np.ndarray,
         detected_mask: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
-        cam_info: CameraInfo,
-        cam_to_world_optical: np.ndarray,
+        camera_info: CameraInfo,
+        camera_to_world_optical: np.ndarray,
         support_constraint: SupportSurfaceConstraint | None = None,
     ) -> np.ndarray | None:
-        """Estimate world-frame translation step from centroid error and local Jacobian."""
+        """
+        Estimate world-frame translation step from centroid error and local Jacobian.
+        """
         shift_start_s = time.perf_counter()
         shift_world, jacobian_render_count, early_exit_reason = (
             estimate_translation_shift_world(
@@ -1358,8 +1403,8 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                     lambda center: self._render_expected_mask_for_center(
                         object_center_world=center,
                         gt_object_model=gt_object_model,
-                        cam_info=cam_info,
-                        cam_to_world_optical=cam_to_world_optical,
+                        camera_info=camera_info,
+                        camera_to_world_optical=camera_to_world_optical,
                     )[1]
                 ),
                 jacobian_delta_m=float(
@@ -1402,10 +1447,12 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _resolve_support_surface_constraint(
         self,
         gt_object_model: GroundTruthObjectModel,
-        cam_to_world_optical: np.ndarray,
+        camera_to_world_optical: np.ndarray,
         respect_parameter_gate: bool = True,
     ) -> SupportSurfaceConstraint | None:
-        """Infer support surface from SemDT world, then fall back to Plane annotation."""
+        """
+        Infer support surface from SemDT world, then fall back to Plane annotation.
+        """
         if respect_parameter_gate and not bool(
             self.descriptor.parameters.use_support_surface_constraint
         ):
@@ -1419,13 +1466,15 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
 
         return self._infer_support_surface_constraint_from_plane_annotation(
             gt_object_model=gt_object_model,
-            cam_to_world_optical=cam_to_world_optical,
+            camera_to_world_optical=camera_to_world_optical,
         )
 
     def _infer_support_surface_constraint_from_ground_truth_world(
         self, gt_object_model: GroundTruthObjectModel
     ) -> SupportSurfaceConstraint | None:
-        """Infer the concrete support body below target object from SemDT world state."""
+        """
+        Infer the concrete support body below target object from SemDT world state.
+        """
         world = get_ground_truth_world_ref(self.get_cas())
         if world is None:
             return None
@@ -1548,9 +1597,11 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _infer_support_surface_constraint_from_plane_annotation(
         self,
         gt_object_model: GroundTruthObjectModel,
-        cam_to_world_optical: np.ndarray,
+        camera_to_world_optical: np.ndarray,
     ) -> SupportSurfaceConstraint | None:
-        """Fallback support-surface inference from dominant Plane annotation."""
+        """
+        Fallback support-surface inference from dominant Plane annotation.
+        """
         plane_annotations = self.get_cas().filter_annotations_by_type(Plane)
         if plane_annotations is None or len(plane_annotations) == 0:
             self.rk_logger.warning(
@@ -1563,19 +1614,21 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             float(self.descriptor.parameters.support_surface_plane_clearance_m), 0.0
         )
         for plane_annotation in plane_annotations:
-            plane_model_cam = np.asarray(plane_annotation.model, dtype=np.float64)
-            if plane_model_cam.shape[0] < 4 or not np.all(np.isfinite(plane_model_cam)):
+            plane_model_camera = np.asarray(plane_annotation.model, dtype=np.float64)
+            if plane_model_camera.shape[0] < 4 or not np.all(
+                np.isfinite(plane_model_camera)
+            ):
                 continue
-            normal_cam = plane_model_cam[:3]
-            normal_norm = float(np.linalg.norm(normal_cam))
+            normal_camera = plane_model_camera[:3]
+            normal_norm = float(np.linalg.norm(normal_camera))
             if normal_norm < 1e-9:
                 continue
-            normal_cam /= normal_norm
-            offset_cam = float(plane_model_cam[3] / normal_norm)
+            normal_camera /= normal_norm
+            offset_camera = float(plane_model_camera[3] / normal_norm)
             normal_world, offset_world = self._transform_plane_from_camera_to_world(
-                plane_normal_cam=normal_cam,
-                plane_offset_cam=offset_cam,
-                cam_to_world_optical=cam_to_world_optical,
+                plane_normal_camera=normal_camera,
+                plane_offset_camera=offset_camera,
+                camera_to_world_optical=camera_to_world_optical,
             )
             if normal_world is None:
                 continue
@@ -1614,15 +1667,17 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
 
     @staticmethod
     def _transform_plane_from_camera_to_world(
-        plane_normal_cam: np.ndarray,
-        plane_offset_cam: float,
-        cam_to_world_optical: np.ndarray,
+        plane_normal_camera: np.ndarray,
+        plane_offset_camera: float,
+        camera_to_world_optical: np.ndarray,
     ) -> tuple[np.ndarray | None, float]:
-        """Transform a normalized plane model from camera frame into world frame."""
+        """
+        Transform a normalized plane model from camera frame into world frame.
+        """
         return transform_plane_from_source_to_target(
-            plane_normal_source=plane_normal_cam,
-            plane_offset_source=plane_offset_cam,
-            source_to_target_transform=cam_to_world_optical,
+            plane_normal_source=plane_normal_camera,
+            plane_offset_source=plane_offset_camera,
+            source_to_target_transform=camera_to_world_optical,
         )
 
     @staticmethod
@@ -1630,7 +1685,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         center_world: np.ndarray,
         support_constraint: SupportSurfaceConstraint,
     ) -> tuple[np.ndarray, bool]:
-        """Snap center to configured support-surface contact distance."""
+        """
+        Snap center to configured support-surface contact distance.
+        """
         signed_distance = float(
             np.dot(support_constraint.plane_normal_world, center_world)
             + support_constraint.plane_offset_world
@@ -1648,19 +1705,23 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _read_camera_context(
         self,
     ) -> tuple[CameraInfo | None, np.ndarray | None]:
-        """Read camera intrinsics and cam-to-world optical transform from CAS."""
+        """
+        Read camera intrinsics and cam-to-world optical transform from CAS.
+        """
         cas = self.get_cas()
-        cam_info = cas.get(CASViews.CAM_INFO)
-        if not isinstance(cam_info, CameraInfo):
+        camera_info = cas.get(CASViews.CAMERA_INFO)
+        if not isinstance(camera_info, CameraInfo):
             return None, None
         try:
-            cam_to_world_optical = get_cam_to_world_transform_matrix(cas)
+            camera_to_world_optical = get_camera_to_world_transform_matrix(cas)
         except KeyError:
-            return cam_info, None
-        return cam_info, cam_to_world_optical
+            return camera_info, None
+        return camera_info, camera_to_world_optical
 
     def _find_target_object(self) -> ObjectHypothesis | None:
-        """Return best-matching target hypothesis by classname and highest confidence."""
+        """
+        Return best-matching target hypothesis by classname and highest confidence.
+        """
         target_class = self.descriptor.parameters.target_classname
         object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
         if object_hypotheses is None:
@@ -1681,9 +1742,11 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         return best_oh
 
     def _target_center_world_from_pose_annotation(
-        self, object_hypothesis: ObjectHypothesis, cam_to_world_optical: np.ndarray
+        self, object_hypothesis: ObjectHypothesis, camera_to_world_optical: np.ndarray
     ) -> np.ndarray | None:
-        """Compute world-space target center from preferred PoseAnnotation on the object."""
+        """
+        Compute world-space target center from preferred PoseAnnotation on the object.
+        """
         pose_annotations = self.get_cas().filter_by_type(
             PoseAnnotation, object_hypothesis.annotations
         )
@@ -1702,9 +1765,12 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             and pose_annotation.translation is not None
             and len(pose_annotation.translation) >= 3
         ):
-            center_cam = np.asarray(pose_annotation.translation[:3], dtype=np.float64)
-            center_world = cam_to_world_optical @ np.array(
-                [center_cam[0], center_cam[1], center_cam[2], 1.0], dtype=np.float64
+            center_camera = np.asarray(
+                pose_annotation.translation[:3], dtype=np.float64
+            )
+            center_world = camera_to_world_optical @ np.array(
+                [center_camera[0], center_camera[1], center_camera[2], 1.0],
+                dtype=np.float64,
             )
             return center_world[:3]
         return None
@@ -1712,16 +1778,18 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _render_expected_world(
         self,
         expected_world,
-        cam_info: CameraInfo,
-        cam_to_world_optical: np.ndarray,
+        camera_info: CameraInfo,
+        camera_to_world_optical: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, float]:
-        """Render expected world from current perspective and return image/mask/FOV."""
-        resolution = int(min(cam_info.width, cam_info.height))
+        """
+        Render expected world from current perspective and return image/mask/FOV.
+        """
+        resolution = int(min(camera_info.width, camera_info.height))
         fov_deg = fov_deg_from_image_width_and_fx(
-            width_px=float(cam_info.width), fx_px=float(cam_info.k[0])
+            width_px=float(camera_info.width), fx_px=float(camera_info.k[0])
         )
         camera_link_pose = HomogeneousTransformationMatrix(
-            data=cam_to_world_optical @ self._camera_optical_to_link_np(),
+            data=camera_to_world_optical @ self._camera_optical_to_link_np(),
             reference_frame=expected_world.root,
         )
 
@@ -1738,17 +1806,17 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         expected_mask = np.zeros(segmentation.shape, dtype=np.uint8)
         expected_mask[segmentation >= 0] = 255
 
-        if render_bgr.shape[0] != int(cam_info.height) or render_bgr.shape[1] != int(
-            cam_info.width
+        if render_bgr.shape[0] != int(camera_info.height) or render_bgr.shape[1] != int(
+            camera_info.width
         ):
             render_bgr = cv2.resize(
                 render_bgr,
-                (int(cam_info.width), int(cam_info.height)),
+                (int(camera_info.width), int(camera_info.height)),
                 interpolation=cv2.INTER_NEAREST,
             )
             expected_mask = cv2.resize(
                 expected_mask,
-                (int(cam_info.width), int(cam_info.height)),
+                (int(camera_info.width), int(camera_info.height)),
                 interpolation=cv2.INTER_NEAREST,
             )
 
@@ -1757,7 +1825,10 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _compute_outline_match(
         self, expected_mask: np.ndarray, detected_mask: np.ndarray
     ) -> OutlineMatchResult:
-        """Compute contour-shape and overlap metrics between expected and detected outlines."""
+        """
+        Compute contour-shape and overlap metrics between expected and detected
+        outlines.
+        """
         match_start_s = time.perf_counter()
         scores = contour_outline_match_scores(
             expected_mask=expected_mask,
@@ -1793,7 +1864,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         pixel_error_history: list[float],
         gt_evaluation: GroundTruthPoseEvaluation | None = None,
     ) -> None:
-        """Store outline-match metrics as an Encoding annotation on target object."""
+        """
+        Store outline-match metrics as an Encoding annotation on target object.
+        """
         source = "ExpectedStateRendererOutlineMatch"
         object_hypothesis.annotations = [
             annotation
@@ -1851,7 +1924,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         expected_mask: np.ndarray,
         detected_mask: np.ndarray,
     ) -> np.ndarray:
-        """Overlay expected and detected contours for quick visual comparison."""
+        """
+        Overlay expected and detected contours for quick visual comparison.
+        """
         vis = image_bgr.copy()
         expected_contour = largest_contour(expected_mask)
         detected_contour = largest_contour(detected_mask)
@@ -1868,7 +1943,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         refinement: RefinementResult,
         gt_evaluation: GroundTruthPoseEvaluation | None,
     ) -> None:
-        """Publish cloud + GT/final object geometries into the 3D visualizer output."""
+        """
+        Publish cloud + GT/final object geometries into the 3D visualizer output.
+        """
         if not bool(self.descriptor.parameters.visualize_pose_comparison_3d):
             return
 
@@ -1878,7 +1955,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             vis_geometries.append({"name": "cloud", "geometry": cloud})
 
         try:
-            world_to_cam_optical = get_world_to_cam_transform_matrix(self.get_cas())
+            world_to_camera_optical = get_world_to_camera_transform_matrix(
+                self.get_cas()
+            )
         except KeyError as err:
             self.rk_logger.warning(
                 "ExpectedState pose-comparison 3D visualization unavailable: %s",
@@ -1897,7 +1976,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         vis_geometries.extend(
             self._build_pose_visual_geometries(
                 object_pose_world=final_pose_world,
-                world_to_cam_optical=world_to_cam_optical,
+                world_to_camera_optical=world_to_camera_optical,
                 gt_object_model=gt_object_model,
                 mesh_color_rgb=np.array([0.1, 0.85, 0.25], dtype=np.float64),
                 frame_size_m=frame_size,
@@ -1922,7 +2001,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             vis_geometries.extend(
                 self._build_pose_visual_geometries(
                     object_pose_world=gt_pose_world,
-                    world_to_cam_optical=world_to_cam_optical,
+                    world_to_camera_optical=world_to_camera_optical,
                     gt_object_model=gt_object_model,
                     mesh_color_rgb=np.array([0.95, 0.2, 0.2], dtype=np.float64),
                     frame_size_m=frame_size,
@@ -1941,22 +2020,24 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _build_pose_visual_geometries(
         self,
         object_pose_world: np.ndarray,
-        world_to_cam_optical: np.ndarray,
+        world_to_camera_optical: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
         mesh_color_rgb: np.ndarray,
         frame_size_m: float,
         geometry_name_prefix: str,
     ) -> list[dict[str, object]]:
-        """Build mesh + frame geometry for one object pose in camera coordinates."""
-        object_pose_cam = world_to_cam_optical @ object_pose_world
+        """
+        Build mesh + frame geometry for one object pose in camera coordinates.
+        """
+        object_pose_camera = world_to_camera_optical @ object_pose_world
         object_mesh = self._create_o3d_mesh_for_gt_object_model(gt_object_model)
         object_mesh.paint_uniform_color(mesh_color_rgb.astype(float))
-        object_mesh.transform(object_pose_cam)
+        object_mesh.transform(object_pose_camera)
 
         pose_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
             size=float(frame_size_m)
         )
-        pose_frame.transform(object_pose_cam)
+        pose_frame.transform(object_pose_camera)
 
         return [
             {"name": f"{geometry_name_prefix}_mesh", "geometry": object_mesh},
@@ -1967,7 +2048,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _create_o3d_mesh_for_gt_object_model(
         gt_object_model: GroundTruthObjectModel,
     ) -> o3d.geometry.TriangleMesh:
-        """Create centered Open3D mesh matching GT object primitive dimensions."""
+        """
+        Create centered Open3D mesh matching GT object primitive dimensions.
+        """
         if (
             gt_object_model.shape_type == "box"
             and gt_object_model.box_scale is not None
@@ -2007,7 +2090,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         object_center_world: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
     ):
-        """Create a temporary SemDT world with only the expected object asserted."""
+        """
+        Create a temporary SemDT world with only the expected object asserted.
+        """
         world_descriptor = BaseWorldDescriptor(
             root_name="expected_world_root",
             root_prefix="world",
@@ -2062,7 +2147,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
 
     @staticmethod
     def _camera_optical_to_link_np() -> np.ndarray:
-        """Return homogeneous transform mapping camera optical frame to camera-link frame."""
+        """
+        Return homogeneous transform mapping camera optical frame to camera-link frame.
+        """
         return np.array(
             [
                 [0.0, -1.0, 0.0, 0.0],
@@ -2075,7 +2162,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
 
     @staticmethod
     def _segmentation_to_bgr(expected_world, segmentation: np.ndarray) -> np.ndarray:
-        """Colorize segmentation indices into a BGR image using body collision colors."""
+        """
+        Colorize segmentation indices into a BGR image using body collision colors.
+        """
         bgr = np.zeros(
             (segmentation.shape[0], segmentation.shape[1], 3), dtype=np.uint8
         )

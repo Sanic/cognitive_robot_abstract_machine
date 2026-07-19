@@ -1,7 +1,8 @@
-"""Helpers for reading SemDT ground-truth world data from CAS.
+"""
+Helpers for reading SemDT ground-truth world data from CAS.
 
-The world reference stored in CAS is an in-process object reference and must be
-treated as strictly read-only by consumers.
+The world reference stored in CAS is an in-process object reference and must be treated
+as strictly read-only by consumers.
 """
 
 from __future__ import annotations
@@ -20,14 +21,17 @@ if TYPE_CHECKING:
 
 
 def get_ground_truth_world_ref(cas: CAS) -> World | None:
-    """Return ground-truth world reference from CAS, or None if unavailable."""
-    if cas is None or not cas.contains(CASViews.GROUND_TRUTH_WORLD_REF):
+    """
+    Return ground-truth world reference from CAS, or None if unavailable.
+    """
+    if cas is None or not cas.contains(CASViews.GROUND_TRUTH_WORLD_REFERENCE):
         return None
-    return cas.get(CASViews.GROUND_TRUTH_WORLD_REF)
+    return cas.get(CASViews.GROUND_TRUTH_WORLD_REFERENCE)
 
 
 def get_gt_pose_from_runtime_world(cas: CAS, body_name: str) -> np.ndarray | None:
-    """Return 4x4 world pose for body_name from runtime world, or None.
+    """
+    Return 4x4 world pose for body_name from runtime world, or None.
 
     Notes:
     - This function reads current data only; callers should not cache Body refs.
@@ -52,12 +56,16 @@ def get_gt_pose_from_runtime_world(cas: CAS, body_name: str) -> np.ndarray | Non
 
 
 def get_runtime_world_ref(cas: CAS) -> World | None:
-    """Backward-compatible alias for get_ground_truth_world_ref."""
+    """
+    Backward-compatible alias for get_ground_truth_world_ref.
+    """
     return get_ground_truth_world_ref(cas)
 
 
 def get_body_from_runtime_world(cas: CAS, body_name: str) -> Body | None:
-    """Return body object by name from runtime ground-truth world, or None."""
+    """
+    Return body object by name from runtime ground-truth world, or None.
+    """
     name = str(body_name).strip()
     if name == "":
         return None
@@ -73,7 +81,9 @@ def get_body_from_runtime_world(cas: CAS, body_name: str) -> Body | None:
 
 
 def get_body_pose_world(body: Body) -> np.ndarray | None:
-    """Return 4x4 body world pose matrix, or None if invalid."""
+    """
+    Return 4x4 body world pose matrix, or None if invalid.
+    """
     pose_world = np.asarray(body.global_pose.to_np(), dtype=np.float64)
     if pose_world.shape != (4, 4) or not np.all(np.isfinite(pose_world)):
         return None
@@ -83,7 +93,8 @@ def get_body_pose_world(body: Body) -> np.ndarray | None:
 def body_world_aabb_at_center(
     body: Body, center_world: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray] | None:
-    """Compute world-aligned AABB for body primitive placed at center_world.
+    """
+    Compute world-aligned AABB for body primitive placed at center_world.
 
     Orientation is taken from the body's current runtime world pose.
     """
@@ -141,7 +152,9 @@ def body_world_aabb_at_center(
 def body_support_extent_along_normal(
     body: Body, normal_world: np.ndarray
 ) -> float | None:
-    """Return support-function extent from body center along normal_world."""
+    """
+    Return support-function extent from body center along normal_world.
+    """
     if body.collision is None or len(body.collision) == 0:
         return None
     pose_world = get_body_pose_world(body)
@@ -198,7 +211,9 @@ def body_aabb_intersects_other_collidable_bodies(
     center_world: np.ndarray,
     epsilon_m: float = 1e-4,
 ) -> bool:
-    """Check whether body AABB at center_world overlaps any other collidable body AABB."""
+    """
+    Check whether body AABB at center_world overlaps any other collidable body AABB.
+    """
     world = get_ground_truth_world_ref(cas)
     if world is None:
         return False
