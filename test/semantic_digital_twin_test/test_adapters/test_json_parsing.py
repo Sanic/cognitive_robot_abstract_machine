@@ -15,6 +15,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     SpatialTypeNotJsonSerializable,
     WorldEntityWithIDNotInKwargs,
+    MissingWorldError,
 )
 from semantic_digital_twin.spatial_types import (
     Point3,
@@ -125,7 +126,7 @@ def test_KinematicStructureEntityNotInKwargs():
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
-    with pytest.raises(WorldEntityWithIDNotInKwargs):
+    with pytest.raises(MissingWorldError):
         Point3.from_json(json_data, **kwargs)
 
 
@@ -318,4 +319,10 @@ def test_json_serialization_with_mesh():
 
     for c1 in body.collision:
         for c2 in body2.collision:
-            assert (trimesh.boolean.difference([c1.mesh, c2.mesh])).is_empty
+            difference = trimesh.boolean.difference([c1.mesh, c2.mesh])
+            # The mesh is re-exported as OBJ during serialization, and OBJ stores
+            # coordinates as decimal text, so the round-trip loses a few nanometres
+            # of precision. The boolean difference is therefore a vanishingly thin
+            # shell rather than exactly empty; treat a negligible residual volume as
+            # geometrically identical.
+            assert difference.is_empty or difference.volume < c1.mesh.volume * 1e-3

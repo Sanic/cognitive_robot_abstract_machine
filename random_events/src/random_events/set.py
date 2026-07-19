@@ -6,6 +6,7 @@ from typing_extensions import Hashable, Optional
 from typing import Any, Iterable, Self, Dict, Optional, Tuple
 from dataclasses import field, dataclass
 
+from krrood.adapters.json_serializer import to_json, from_json
 from random_events.sigma_algebra import AbstractSimpleSet, AbstractCompositeSet
 import random_events_lib as rl
 
@@ -18,9 +19,9 @@ AllElements: Tuple[Hashable]
 class SetElement(AbstractSimpleSet):
     """
     Represents a SetElement.
-    A SetElement consists of an element and all possible elements.
-    It is necessary to know of all possible elements to determine the index and complement of any element.
-    All elements are a tuple to preserve ordering.
+
+    A SetElement consists of an element and all possible elements. It is necessary to know of all possible elements to determine the index
+    and complement of any element. All elements are a tuple to preserve ordering.
 
     Beware that an empty set element is an invariant of this class and is represented by None.
     All elements are not consistent with invariants of this class.
@@ -50,7 +51,9 @@ class SetElement(AbstractSimpleSet):
     def from_data(cls, element: Hashable, all_elements: AllElements) -> Self:
         """
         Create a set element from data.
-        :param element: The element to create the set element from. If None, create an empty set element.
+
+        :param element: The element to create the set element from. If None, create an
+            empty set element.
         :param all_elements: The set of all elements.
         """
         instance = cls.__new__(cls)
@@ -101,13 +104,13 @@ class SetElement(AbstractSimpleSet):
     def to_json(self) -> Dict[str, Any]:
         return {
             **super().to_json(),
-            "value": self.element,
-            "content": list(self.all_elements),
+            "value": to_json(self.element),
+            "content": to_json(list(self.all_elements)),
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls.from_data(data["value"], data["content"])
+        return cls.from_data(from_json(data["value"]), from_json(data["content"]))
 
     def as_composite_set(self) -> AbstractCompositeSet:
         return Set.from_simple_sets(self)
@@ -169,7 +172,7 @@ class Set(AbstractCompositeSet):
             *[SetElement.from_data(elem, all_elements) for elem in all_elements]
         )
 
-    @property
+    @cached_property
     def hash_map(self) -> HashMap:
         """
         :return: A map that maps the hashes of each element in all_elements to the element.

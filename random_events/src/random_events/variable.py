@@ -3,14 +3,13 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import assert_never
 
-import random_events_lib as rl
-from typing_extensions import Self, Dict, Any, Optional, Iterable, Type
+from typing_extensions import Self, Any, Optional, Iterable, Type, Union
 
+import random_events_lib as rl
 from random_events.interval import reals, Interval, closed, singleton, SimpleInterval
 from random_events.set import Set, SetElement
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.utils import CPPWrapper
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 
 compatible_types = (
     int,
@@ -34,6 +33,7 @@ class Variable(CPPWrapper):
     domain: AbstractCompositeSet = field(kw_only=True, default=None)
     """
     The domain of the variable.
+
     The domain is a composite set that can be used to create values of the variable.
     """
 
@@ -77,6 +77,7 @@ class Variable(CPPWrapper):
     def make_value(self, value: Any) -> AbstractCompositeSet:
         """
         Create a value of the domain from an arbitrary value.
+
         This method tries to parse the value and wrap it in a composite set.
 
         :param value: The value.
@@ -216,3 +217,29 @@ def variable_from_name_and_type(name: str, type_: Type) -> Variable:
         assert_never((name, type_))
 
     return result
+
+
+def most_appropriate_variable_type(
+    union: Iterable[Type],
+) -> Optional[Type[Union[*compatible_types]]]:
+    """
+    Get the most appropriate type for a random events variable from a union of types.
+    The most appropriate type is the one, where the mathematical interpretation as set
+    has the highest cardinality.
+
+    :param union: The union of types.
+    :return: The most appropriate type.
+    """
+    if float in union:
+        return float
+
+    elif int in union:
+        return int
+
+    elif enum.Enum in union:
+        return enum.Enum
+
+    elif bool in union:
+        return bool
+    else:
+        return None

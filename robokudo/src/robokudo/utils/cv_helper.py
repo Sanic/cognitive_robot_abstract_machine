@@ -1,4 +1,5 @@
-"""OpenCV helper utilities for Robokudo.
+"""
+OpenCV helper utilities for Robokudo.
 
 This module provides helper functions for working with OpenCV images and operations.
 It supports:
@@ -18,6 +19,7 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING, Tuple
 
 from robokudo.cas import CASViews
+from robokudo.exceptions import ColorToDepthRatioMissing
 from robokudo.types.cv import ImageROI
 
 if TYPE_CHECKING:
@@ -28,7 +30,8 @@ if TYPE_CHECKING:
 
 
 def crop_image(image: npt.NDArray, xy: tuple, wh: tuple) -> npt.NDArray:
-    """Crop region from image using coordinates and dimensions.
+    """
+    Crop region from image using coordinates and dimensions.
 
     Based on https://stackoverflow.com/a/67799880
 
@@ -48,7 +51,8 @@ def crop_image(image: npt.NDArray, xy: tuple, wh: tuple) -> npt.NDArray:
 
 
 def crop_image_roi(image: npt.NDArray, roi: ImageROI) -> npt.NDArray:
-    """Crop region from image using ROI object.
+    """
+    Crop region from image using ROI object.
 
     :param image: Input image
     :param roi: Region of interest
@@ -62,23 +66,27 @@ def crop_image_roi(image: npt.NDArray, roi: ImageROI) -> npt.NDArray:
 def get_scaled_color_image_for_depth_image(
     cas: CAS, color_image: npt.NDArray
 ) -> npt.NDArray:
-    """Scale color image to match depth image resolution.
+    """
+    Scale color image to match depth image resolution.
 
-    If the color2depth ratio is not 1,1, we will usually scale the color image to the same size
-    the depth image has. This method will get check if a conversion is required and will return the
-    correct size. This is usually called before o3d.geometry.RGBDImage.create_from_color_and_depth is called,
-    so that depth and color image match.
+    If the color2depth ratio is not 1,1, we will usually scale the color image to the
+    same size the depth image has. This method will get check if a conversion is
+    required and will return the correct size. This is usually called before
+    o3d.geometry.RGBDImage.create_from_color_and_depth is called, so that depth and
+    color image match.
 
     :param cas: The CAS where the COLOR2DEPTH_RATIO is stored.
     :param color_image: The color image to be adjusted
-    :return: A resized copy of the color image if a resize necessary. Otherwise, the unchanged color_image
-    is returned.
-    :raises RuntimeError: If color-to-depth ratio not set in CAS
+    :return: A resized copy of the color image if a resize necessary. Otherwise, the
+        unchanged color_image is returned.
+    :raises ColorToDepthRatioMissing: If color-to-depth ratio not set in CAS
     """
     color2depth_ratio = cas.get(CASViews.COLOR2DEPTH_RATIO)
 
     if not color2depth_ratio:
-        raise RuntimeError("No Color to Depth Ratio set. Can't continue.")
+        raise ColorToDepthRatioMissing(
+            operation="scale color image to depth image resolution"
+        )
 
     if color2depth_ratio == (1, 1):
         resized_color = color_image
@@ -99,15 +107,16 @@ def get_scaled_color_image_for_depth_image(
 def get_scale_coordinates(
     color2depth_ratio: Tuple[int, int], coordinates: Tuple[int, int]
 ) -> Tuple[int, int]:
-    """Scale coordinates based on color-to-depth ratio.
+    """
+    Scale coordinates based on color-to-depth ratio.
 
     :param color2depth_ratio: Scale factors (x_scale, y_scale)
     :param coordinates: Input coordinates (x, y)
     :return: Scaled coordinates
-    :raises RuntimeError: If color-to-depth ratio not provided
+    :raises ColorToDepthRatioMissing: If color-to-depth ratio not provided
     """
     if not color2depth_ratio:
-        raise RuntimeError("No Color to Depth Ratio set. Can't continue.")
+        raise ColorToDepthRatioMissing(operation="scale coordinates")
 
     if color2depth_ratio == (1, 1):
         return coordinates
@@ -119,7 +128,8 @@ def get_scale_coordinates(
 
 
 def get_hsv_for_rgb_color(rgb: Tuple[int, int, int]) -> npt.NDArray:
-    """Convert RGB color to HSV color space.
+    """
+    Convert RGB color to HSV color space.
 
     :param rgb: RGB color values (r,g,b)
     :return: HSV color values
@@ -128,7 +138,8 @@ def get_hsv_for_rgb_color(rgb: Tuple[int, int, int]) -> npt.NDArray:
 
 
 def get_hsv_for_bgr_color(bgr: Tuple[int, int, int]) -> npt.NDArray:
-    """Convert BGR color to HSV color space.
+    """
+    Convert BGR color to HSV color space.
 
     :param bgr: BGR color values (b,g,r)
     :return: HSV color values
@@ -139,7 +150,8 @@ def get_hsv_for_bgr_color(bgr: Tuple[int, int, int]) -> npt.NDArray:
 def draw_rectangle_around_center(
     binary_image: npt.NDArray, x: int, y: int, width: int, height: int, value: int = 255
 ) -> npt.NDArray:
-    """Draw filled rectangle centered at given point.
+    """
+    Draw filled rectangle centered at given point.
 
     :param binary_image: Binary image to draw on
     :param x: Center x coordinate
@@ -163,7 +175,8 @@ def draw_rectangle_around_center(
 def clamp_bounding_rect(
     bounding_rect: cv2t.Rect, image_width: int, image_height: int
 ) -> cv2t.Rect:
-    """Clamp bounding rectangle to image boundaries.
+    """
+    Clamp bounding rectangle to image boundaries.
 
     :param bounding_rect: Input bounding rectangle (x,y,w,h)
     :param image_width: Image width
@@ -188,15 +201,15 @@ def rect_outside_image(
     """
     Check whether a bounding rectangle is completely outside an image.
 
-    A bounding rectangle is considered outside if it has no overlapping
-    area with the image. Rectangles that only touch the image border
-    (zero-area intersection) are treated as outside.
+    A bounding rectangle is considered outside if it has no overlapping area with the
+    image. Rectangles that only touch the image border (zero-area intersection) are
+    treated as outside.
 
     :param bounding_rect: Bounding rectangle to check (x, y, w, h)
     :param image_width: Image width
     :param image_height: Image height
-    :return: True if the bounding rectangle lies completely outside
-             the image, False otherwise
+    :return: True if the bounding rectangle lies completely outside the image, False
+        otherwise
     """
     x, y, w, h = bounding_rect
 
@@ -224,10 +237,11 @@ def rect_outside_image(
 def sanity_checks_bounding_rects(
     bounding_rect: cv2t.Rect, image_width: int, image_height: int
 ) -> bool:
-    """Check if bounding rectangle is valid for image dimensions.
+    """
+    Check if bounding rectangle is valid for image dimensions.
 
-    Check basic rules of a boundingRect to reject bad ones. Might happen if projections are done on objects
-    that are out-of-view etc.
+    Check basic rules of a boundingRect to reject bad ones. Might happen if projections
+    are done on objects that are out-of-view etc.
 
     :param bounding_rect: Bounding rectangle to check (x,y,w,h)
     :param image_width: Image width
@@ -248,12 +262,15 @@ def sanity_checks_bounding_rects(
 def adjust_roi(
     image: npt.NDArray, roi: Tuple[int, int, int, int], offset: int
 ) -> Tuple[int, int, int, int]:
-    """Adjusts the ROI by a given offset while respecting image boundaries, keeping the same center point.
+    """
+    Adjusts the ROI by a given offset while respecting image boundaries, keeping the
+    same center point.
 
     :param image: The image (OpenCV format).
     :param roi: A tuple (x, y, width, height) representing the bounding box.
     :param offset: The amount by which to grow or shrink the ROI (can be negative).
-    :return: A tuple (new_x, new_y, new_width, new_height) representing the adjusted ROI.
+    :return: A tuple (new_x, new_y, new_width, new_height) representing the adjusted
+        ROI.
     """
     x, y, width, height = roi
 
@@ -291,10 +308,12 @@ def adjust_roi(
 
 
 def adjust_image_roi(image: npt.NDArray, image_roi: ImageROI, offset: int) -> None:
-    """Adjusts the ImageROI's ROI by a given offset while respecting image boundaries,
+    """
+    Adjusts the ImageROI's ROI by a given offset while respecting image boundaries,
     keeping the same center point. This method uses the adjust_roi function.
 
-    :param image: The image this ROI is relative to. Necessary to respect the boundaries properly.
+    :param image: The image this ROI is relative to. Necessary to respect the boundaries
+        properly.
     :param image_roi: An object of type ImageROI.
     :param offset: The amount by which to grow or shrink the ROI (can be negative).
     :return: None. The ImageROI's ROI is adjusted in place.
@@ -318,8 +337,10 @@ def adjust_image_roi(image: npt.NDArray, image_roi: ImageROI, offset: int) -> No
 
 
 def adjust_mask(mask: npt.NDArray, offset: int, fill_value: int = 0) -> npt.NDArray:
-    """Adjusts the mask by a given offset. When expanding, the new areas are filled with the specified fill value.
+    """
+    Adjusts the mask by a given offset.
 
+    When expanding, the new areas are filled with the specified fill value.
     :param mask: The mask corresponding to the ROI (same dimensions as the ROI).
     :param offset: The amount by which to grow or shrink the mask (can be negative).
     :param fill_value: The value to fill new areas when expanding the mask.
@@ -347,7 +368,9 @@ def adjust_mask(mask: npt.NDArray, offset: int, fill_value: int = 0) -> npt.NDAr
 def object_hypothesis_to_mask(
     object_hypothesis: ObjectHypothesis, image_width: int, image_height: int
 ) -> npt.NDArray:
-    """Create a full-image uint8 mask from an ObjectHypothesis ROI and optional ROI mask."""
+    """
+    Create a full-image uint8 mask from an ObjectHypothesis ROI and optional ROI mask.
+    """
     mask_full = np.zeros((image_height, image_width), dtype=np.uint8)
     roi = object_hypothesis.roi.roi
     x = max(int(roi.pos.x), 0)
@@ -377,7 +400,9 @@ def object_hypothesis_to_mask(
 
 
 def largest_contour(mask: npt.NDArray):
-    """Return largest external contour in mask, or None when no contour exists."""
+    """
+    Return largest external contour in mask, or None when no contour exists.
+    """
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     if len(contours) == 0:
         return None
@@ -385,7 +410,9 @@ def largest_contour(mask: npt.NDArray):
 
 
 def mask_centroid(mask: npt.NDArray) -> npt.NDArray | None:
-    """Compute contour centroid in pixels for the largest mask component."""
+    """
+    Compute contour centroid in pixels for the largest mask component.
+    """
     contour = largest_contour(mask)
     if contour is None:
         return None
@@ -400,7 +427,9 @@ def mask_centroid(mask: npt.NDArray) -> npt.NDArray | None:
 def centroid_shift_px(
     expected_mask: npt.NDArray, detected_mask: npt.NDArray
 ) -> npt.NDArray | None:
-    """Return detected-minus-expected centroid shift in pixel coordinates."""
+    """
+    Return detected-minus-expected centroid shift in pixel coordinates.
+    """
     expected_centroid = mask_centroid(expected_mask)
     detected_centroid = mask_centroid(detected_mask)
     if expected_centroid is None or detected_centroid is None:
@@ -413,7 +442,9 @@ def contour_outline_match_scores(
     detected_mask: npt.NDArray,
     contour_thickness: int = 1,
 ) -> dict[str, float]:
-    """Compute contour-shape and outline-overlap scores for two binary masks."""
+    """
+    Compute contour-shape and outline-overlap scores for two binary masks.
+    """
     expected_contour = largest_contour(expected_mask)
     detected_contour = largest_contour(detected_mask)
     if expected_contour is None or detected_contour is None:
@@ -459,7 +490,9 @@ def contour_outline_match_scores(
 
 
 def fov_deg_from_image_width_and_fx(width_px: float, fx_px: float) -> float:
-    """Estimate horizontal FOV in degrees from image width and focal length fx."""
+    """
+    Estimate horizontal FOV in degrees from image width and focal length fx.
+    """
     width = float(width_px)
     fx = float(fx_px)
     if fx <= 0.0 or width <= 0.0:

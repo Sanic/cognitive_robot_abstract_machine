@@ -2,6 +2,16 @@ import numpy as np
 import pytest
 from sensor_msgs.msg import Image
 
+from robokudo.exceptions import (
+    CVBridgeImageConversionError,
+    CVBridgeImageShapeError,
+    CVBridgeROSImagePayloadError,
+    CVBridgeROSImageShapeError,
+    CVBridgeROSImageStepError,
+    CVBridgeUnsupportedImageData,
+    CVBridgeUnsupportedEncoding,
+    CVBridgeUnsupportedTargetEncoding,
+)
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
 
@@ -81,6 +91,45 @@ class TestCVBridgeWorkaround(object):
         assert decoded.shape == (1, 2)
         assert np.array_equal(decoded, values)
 
+    def test_imgmsg_to_cv2_rejects_invalid_ros_image_shape(self) -> None:
+        bridge = CVBridgeWorkaround()
+        msg = _make_image_msg(
+            height=0,
+            width=1,
+            encoding="mono8",
+            step=1,
+            data=bytes([0]),
+        )
+
+        with pytest.raises(CVBridgeROSImageShapeError):
+            bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+
+    def test_imgmsg_to_cv2_rejects_small_ros_image_step(self) -> None:
+        bridge = CVBridgeWorkaround()
+        msg = _make_image_msg(
+            height=1,
+            width=2,
+            encoding="rgb8",
+            step=5,
+            data=bytes([0, 0, 0, 0, 0]),
+        )
+
+        with pytest.raises(CVBridgeROSImageStepError):
+            bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+
+    def test_imgmsg_to_cv2_rejects_small_ros_image_payload(self) -> None:
+        bridge = CVBridgeWorkaround()
+        msg = _make_image_msg(
+            height=2,
+            width=2,
+            encoding="mono8",
+            step=2,
+            data=bytes([0, 0, 0]),
+        )
+
+        with pytest.raises(CVBridgeROSImagePayloadError):
+            bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+
     def test_imgmsg_to_cv2_casts_to_32fc1(self) -> None:
         bridge = CVBridgeWorkaround()
         depth_u16 = np.array([[100, 200], [300, 400]], dtype=np.uint16)
@@ -98,6 +147,20 @@ class TestCVBridgeWorkaround(object):
         assert decoded.shape == (2, 2)
         assert np.array_equal(decoded, depth_u16.astype(np.float32))
 
+    def test_imgmsg_to_cv2_rejects_multi_channel_image_for_32fc1(self) -> None:
+        bridge = CVBridgeWorkaround()
+        bgr = np.zeros((1, 1, 3), dtype=np.uint8)
+        msg = _make_image_msg(
+            height=1,
+            width=1,
+            encoding="bgr8",
+            step=3,
+            data=bgr.tobytes(),
+        )
+
+        with pytest.raises(CVBridgeImageConversionError):
+            bridge.imgmsg_to_cv2(msg, desired_encoding="32FC1")
+
     def test_cv2_to_imgmsg_passthrough_roundtrip(self) -> None:
         bridge = CVBridgeWorkaround()
         image = np.array([[1, 2], [3, 4]], dtype=np.uint16)
@@ -109,12 +172,26 @@ class TestCVBridgeWorkaround(object):
         assert msg.step == image.strides[0]
         assert np.array_equal(restored, image)
 
+    def test_cv2_to_imgmsg_rejects_image_with_invalid_dimensions(self) -> None:
+        bridge = CVBridgeWorkaround()
+        image = np.zeros((1, 1, 1, 1), dtype=np.uint8)
+
+        with pytest.raises(CVBridgeImageShapeError):
+            bridge.cv2_to_imgmsg(image, encoding="passthrough")
+
     def test_cv2_to_imgmsg_rejects_encoding_mismatch(self) -> None:
         bridge = CVBridgeWorkaround()
         image = np.array([[1, 2], [3, 4]], dtype=np.uint16)
 
         with pytest.raises(ValueError, match="do not match requested encoding"):
             bridge.cv2_to_imgmsg(image, encoding="bgr8")
+
+    def test_cv2_to_imgmsg_rejects_unsupported_image_data(self) -> None:
+        bridge = CVBridgeWorkaround()
+        image = np.array([[True, False]], dtype=np.bool_)
+
+        with pytest.raises(CVBridgeUnsupportedImageData):
+            bridge.cv2_to_imgmsg(image, encoding="passthrough")
 
     def test_imgmsg_to_cv2_rejects_unsupported_target_encoding(self) -> None:
         bridge = CVBridgeWorkaround()
@@ -127,5 +204,18 @@ class TestCVBridgeWorkaround(object):
             data=bgr.tobytes(),
         )
 
-        with pytest.raises(ValueError, match="Unsupported desired encoding"):
+        with pytest.raises(CVBridgeUnsupportedTargetEncoding):
             bridge.imgmsg_to_cv2(msg, desired_encoding="rgb8")
+
+    def test_imgmsg_to_cv2_rejects_unsupported_source_encoding(self) -> None:
+        bridge = CVBridgeWorkaround()
+        msg = _make_image_msg(
+            height=1,
+            width=1,
+            encoding="not_an_encoding",
+            step=1,
+            data=bytes([0]),
+        )
+
+        with pytest.raises(CVBridgeUnsupportedEncoding):
+            bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")

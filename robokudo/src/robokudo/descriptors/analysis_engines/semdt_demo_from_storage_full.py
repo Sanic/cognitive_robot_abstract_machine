@@ -12,7 +12,9 @@ from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.semantic_world_connector import SemanticDigitalTwinConnector
-from robokudo.descriptors import CrDescriptorFactory
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
@@ -23,12 +25,14 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         """
-        Create a pipeline that does tabletop segmentation and integrates primary navigation
-        using a YOLO annotator.
+        Create a pipeline that does tabletop segmentation and integrates primary
+        navigation using a YOLO annotator.
         """
         tf_publisher = TFPublisher(_world=world_instance(), node=get_node())
 
-        cr_storage_config = CrDescriptorFactory.create_descriptor("mongo", loop=False)
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            "mongo", loop=False
+        )
 
         seq = Pipeline("RWPipeline")
         seq.add_children(

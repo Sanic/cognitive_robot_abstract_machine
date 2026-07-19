@@ -27,12 +27,21 @@ jobs:
           submodules: recursive
 
       - name: Install dependencies
+        env:
+          # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
+          # hardlink packages into site-packages instead of full-copying them. The default cache
+          # (~/.cache/uv under the mounted /github/home volume) is a different filesystem, which
+          # forces a full copy of every wheel and stores each package twice -- exhausting the runner
+          # disk ("No space left on device") during install.
+          UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
           sudo apt-get update
           sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
-          poetry install
+          uv sync --extra dev --active
+          uv tree --depth 1
+          python -c "import sys; print(sys.executable)"
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -45,21 +54,12 @@ jobs:
             ${{ runner.os }}-cache-
 
       - name: Build ORM
-        if: ${{inputs.lib == 'pycram' || inputs.lib == 'semantic_digital_twin'}}
+        if: ${{inputs.lib == 'coraplex' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'experiments'}}
         run: |
           cd cognitive_robot_abstract_machine/${{ inputs.lib }}/scripts/
           source /opt/ros/cram-env/bin/activate
           source /opt/ros/overlay_ws/install/setup.bash
           python generate_orm.py
-
-      - name: Build ROS2 packages
-        run: |
-          source /opt/ros/cram-env/bin/activate
-          source /opt/ros/overlay_ws/install/setup.bash
-          cd /opt/ros/overlay_ws/src
-          ln -s "${GITHUB_WORKSPACE}/cognitive_robot_abstract_machine/cram_ros2_packages" cram_ros2_packages
-          cd ..
-          colcon build --merge-install
 
       - name: Run CPP tests
         if: ${{inputs.lib == 'random_events'}}
@@ -84,7 +84,7 @@ jobs:
           if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
             export QT_QPA_PLATFORM=offscreen
           fi
-          python -m pytest -sv cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
 
       - name: Save cache
         uses: actions/cache/save@v4

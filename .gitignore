@@ -1,3 +1,4 @@
+.direnv/
 tmp/
 *.mypy_cache/
 build/
@@ -65,7 +66,10 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+# Package Managers
 poetry.lock
+uv.lock
 
 # Created during tests
 file::memory:
@@ -139,3 +143,21 @@ doc/doc_out
 /.ijwb/
 /.aswb/
 /.clwb/
+
+# Generated visualization artifacts: graph / class-diagram renders and RDR rule
+# trees written into the working tree by visualize(), render_tree() and
+# render_evaluated_rule_tree() during tests and doc builds. None are committed.
+pdf_graph.pdf
+query_graph.pdf
+class_diagram.pdf
+*_explanation.pdf
+*_read_tree.dot
+*_read_tree.svg
+*_evaluated_tree.dot
+*_evaluated_tree.svg
+*_rdr.dot
+*_rdr.svg
+
+# Personal, per-user Claude Code memory (populated by .claude/hooks/session-start.sh
+# from the claude/personal-notes branch). Never committed on any branch.
+CLAUDE.local.md

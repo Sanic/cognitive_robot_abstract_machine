@@ -23,6 +23,17 @@ import numpy as np
 from sensor_msgs.msg import Image
 from typing_extensions import TYPE_CHECKING, Tuple
 
+from robokudo.exceptions import (
+    CVBridgeImageConversionError,
+    CVBridgeImageShapeError,
+    CVBridgeROSImagePayloadError,
+    CVBridgeROSImageShapeError,
+    CVBridgeROSImageStepError,
+    CVBridgeUnsupportedImageData,
+    CVBridgeUnsupportedEncoding,
+    CVBridgeUnsupportedTargetEncoding,
+)
+
 if TYPE_CHECKING:
     import numpy.typing as npt
 
@@ -92,16 +103,16 @@ class CVBridgeWorkaround:
 
         if target_encoding == "32fc1":
             if image.ndim != 2:
-                raise ValueError(
-                    f"Cannot convert non-single-channel image '{img_msg.encoding}' to '{desired_encoding}'"
+                raise CVBridgeImageConversionError(
+                    source_encoding=img_msg.encoding,
+                    target_encoding=desired_encoding,
+                    reason="source image is not single-channel",
                 )
             if image.dtype == np.float32:
                 return image
             return image.astype(np.float32)
 
-        raise ValueError(
-            f"Unsupported desired encoding '{desired_encoding}' for ROS image conversion"
-        )
+        raise CVBridgeUnsupportedTargetEncoding(target_encoding=desired_encoding)
 
     def cv2_to_imgmsg(
         self, cv_image: npt.NDArray, encoding: str = "passthrough"
@@ -109,8 +120,9 @@ class CVBridgeWorkaround:
         """Convert a NumPy/OpenCV image to ROS ``sensor_msgs/Image``."""
         np_image = np.asarray(cv_image)
         if np_image.ndim not in (2, 3):
-            raise ValueError(
-                f"Expected 2D or 3D image array, got shape {np_image.shape} with ndim={np_image.ndim}"
+            raise CVBridgeImageShapeError(
+                shape=np_image.shape,
+                dimensions=np_image.ndim,
             )
 
         if not np_image.flags.c_contiguous:
@@ -153,7 +165,7 @@ class CVBridgeWorkaround:
 
         match = cls._GENERIC_ENCODING_RE.match(normalized)
         if match is None:
-            raise ValueError(f"Unsupported ROS image encoding '{encoding}'")
+            raise CVBridgeUnsupportedEncoding(encoding=encoding)
 
         bits, kind, channels = match.groups()
         dtype_map = {
@@ -168,29 +180,29 @@ class CVBridgeWorkaround:
         }
         dtype = dtype_map.get((bits, kind.lower()))
         if dtype is None:
-            raise ValueError(f"Unsupported ROS image encoding '{encoding}'")
+            raise CVBridgeUnsupportedEncoding(encoding=encoding)
         return np.dtype(dtype), int(channels)
 
     @classmethod
     def _decode_image_message(cls, msg: Image) -> npt.NDArray:
         base_dtype, channels = cls._encoding_to_dtype_channels(msg.encoding)
         if msg.height <= 0 or msg.width <= 0:
-            raise ValueError(
-                f"Invalid ROS image shape height={msg.height}, width={msg.width}"
-            )
+            raise CVBridgeROSImageShapeError(height=msg.height, width=msg.width)
 
         msg_dtype = base_dtype.newbyteorder(">" if msg.is_bigendian else "<")
         row_bytes = int(msg.step)
         pixel_row_bytes = int(msg.width) * channels * base_dtype.itemsize
         if row_bytes < pixel_row_bytes:
-            raise ValueError(
-                f"ROS image step ({row_bytes}) is smaller than pixel row bytes ({pixel_row_bytes})"
+            raise CVBridgeROSImageStepError(
+                row_bytes=row_bytes,
+                pixel_row_bytes=pixel_row_bytes,
             )
 
         required_bytes = int(msg.height) * row_bytes
         if len(msg.data) < required_bytes:
-            raise ValueError(
-                f"ROS image payload too small: got {len(msg.data)} bytes, expected at least {required_bytes}"
+            raise CVBridgeROSImagePayloadError(
+                actual_bytes=len(msg.data),
+                required_bytes=required_bytes,
             )
 
         raw = np.frombuffer(msg.data, dtype=np.uint8, count=required_bytes)
@@ -214,8 +226,9 @@ class CVBridgeWorkaround:
         elif cv_image.ndim == 3:
             channel_count = int(cv_image.shape[2])
         else:
-            raise ValueError(
-                f"Expected 2D or 3D image array, got shape {cv_image.shape} with ndim={cv_image.ndim}"
+            raise CVBridgeImageShapeError(
+                shape=cv_image.shape,
+                dimensions=cv_image.ndim,
             )
 
         dtype = cv_image.dtype
@@ -245,6 +258,7 @@ class CVBridgeWorkaround:
         if dtype == np.float64:
             return f"64FC{channel_count}"
 
-        raise ValueError(
-            f"Unsupported dtype for ROS image conversion: dtype={dtype}, channels={channel_count}"
+        raise CVBridgeUnsupportedImageData(
+            dtype=str(dtype),
+            channel_count=channel_count,
         )

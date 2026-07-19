@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 
 import numpy as np
@@ -74,15 +76,15 @@ class ByteTrackAnnotator(BaseAnnotator):
         masks = [oh.roi.mask for oh in ohs]
         masks = list(filter(lambda m: m is not None, masks))
         if len(masks) == len(rois_xyxy):
-            cam_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
-                CASViews.CAM_INTRINSIC
+            camera_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
+                CASViews.CAMERA_INTRINSIC
             )
 
             # Masks must be restored to full color image size
             restored_masks = []
             for roi, mask in zip(rois_xyxy, masks):
                 restored_mask = np.zeros(
-                    (cam_intrinsic.height, cam_intrinsic.width), dtype=np.uint8
+                    (camera_intrinsic.height, camera_intrinsic.width), dtype=np.uint8
                 )
                 restored_mask[roi[1] : roi[3], roi[0] : roi[2]] = mask
                 restored_masks.append(restored_mask)

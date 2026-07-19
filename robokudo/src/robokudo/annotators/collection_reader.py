@@ -19,6 +19,7 @@ The module uses:
 """
 
 from __future__ import annotations
+
 from timeit import default_timer as timer
 
 from py_trees.common import Status
@@ -30,8 +31,8 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.descriptors.camera_configs.components import TfComponent
 
 if TYPE_CHECKING:
-    from robokudo.io.camera_interface import CameraInterface
     from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+    from robokudo.io.camera_interface import CameraInterface
 
 
 class CollectionReaderAnnotator(BaseAnnotator):
@@ -77,18 +78,18 @@ class CollectionReaderAnnotator(BaseAnnotator):
 
     def __init__(
         self,
-        descriptor: "CollectionReaderAnnotator.Descriptor",
+        descriptor: CollectionReaderAnnotator.Descriptor,
         name: str = "CollectionReader",
     ) -> None:
         """Initialize the collection reader.
 
         :param descriptor: Configuration descriptor
-        :param name: Name of this annotator instance, defaults to "CollectionReader"
+        :param name: Name of this annotator instance
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.collection_readers: List["CollectionReaderAnnotator.Descriptor"] = [
+        self.collection_readers: List[CollectionReaderAnnotator.Descriptor] = [
             descriptor
         ]
         self.start_timer: Optional[float] = None
@@ -113,7 +114,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
             child.feedback_message = ""
 
     def add_collection_reader(
-        self, descriptor: "CollectionReaderAnnotator.Descriptor"
+        self, descriptor: CollectionReaderAnnotator.Descriptor
     ) -> None:
         """Add another collection reader descriptor.
 
@@ -173,14 +174,11 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 f"{self.__class__.__name__}.update(): New CAS id={pipeline.cas.cas_id}"
             )
 
-            # Create a fresh world
-            # world.clear_world()
-
-            cam_config = self.descriptor.parameters.camera_config
-            if issubclass(type(cam_config), TfComponent):
+            camera_config = self.descriptor.parameters.camera_config
+            if issubclass(type(camera_config), TfComponent):
                 cas = self.get_cas()
-                cas.world_frame = cam_config.tf_to
-                cas.cam_frame = cam_config.tf_from
+                cas.world_frame = camera_config.tf_to
+                cas.camera_frame = camera_config.tf_from
 
             # Restore any existing queries
             if query:
@@ -226,7 +224,6 @@ class CollectionReaderAnnotator(BaseAnnotator):
         )
 
 
-"""ROS1 TO ROS2 
-The setup method in the ROS2 version has three parameters (timeout, node, visitor) 
-n the ROS2 version, STATUS are referenced as py_trees.common.Status.RUNNING and py_trees.common.Status.SUCCESS
-"""
+# ROS1 TO ROS2
+# The setup method in the ROS2 version has three parameters (timeout, node, visitor)
+# n the ROS2 version, STATUS are referenced as py_trees.common.Status.RUNNING and py_trees.common.Status.SUCCESS

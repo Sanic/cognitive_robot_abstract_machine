@@ -27,6 +27,8 @@ class RWXNode:
     # Visual emphasis options
     enclosed: bool = field(default=False)
     enclosed_name: ClassVar[str] = "enclosed"
+    faded: bool = field(default=False)
+    border_color: Optional[str] = field(default=None)
 
     def __post_init__(self):
         # store self as node data to keep a 1:1 mapping
@@ -124,8 +126,11 @@ class RWXNode:
         filename: str = "pdf_graph.pdf",
         title: str = "Directed Query Graph (Top to Bottom)",
     ):
-        """Render a rooted, top-to-bottom directed graph.
-        Delegates to a dedicated visualizer class to keep this method small and reusable.
+        """
+        Render a rooted, top-to-bottom directed graph.
+
+        Delegates to a dedicated visualizer class to keep this method small and
+        reusable.
         """
         visualizer = GraphVisualizer(
             node=self,

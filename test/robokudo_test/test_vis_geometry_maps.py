@@ -14,7 +14,8 @@ RANDOM_SEED = 42
 def get_random_mesh(
     mesh_type: Type, rng: np.random.Generator
 ) -> Union[o3d.geometry.TriangleMesh, o3d.geometry.TetraMesh]:
-    """Get a random open3d mesh of he given type.
+    """
+    Get a random open3d mesh of the given type.
 
     Accepted types:
 
@@ -57,7 +58,8 @@ def get_random_mesh(
 
 
 def assert_mesh_equal(mesh1, mesh2) -> None:
-    """Assert that the two meshes contain the same mesh data.
+    """
+    Assert that the two meshes contain the same mesh data.
 
     :param mesh1: The first mesh to compare.
     :param mesh2: The second mesh to compare.
@@ -121,11 +123,15 @@ def assert_mesh_equal(mesh1, mesh2) -> None:
 class TestVisGeometryMaps(object):
     @pytest.fixture
     def rng(self) -> np.random.Generator:
-        """Random number generator initialized with the global random seed."""
+        """
+        Random number generator initialized with the global random seed.
+        """
         return np.random.default_rng(seed=RANDOM_SEED)
 
     def test_point_cloud_maps(self, rng: np.random.Generator) -> None:
-        """Test writing and reading point clouds with the shared memory manager."""
+        """
+        Test writing and reading point clouds with the shared memory manager.
+        """
         iterations = 3
 
         write_manager = SharedMemoryManager.with_shm(
@@ -171,7 +177,9 @@ class TestVisGeometryMaps(object):
             )
 
     def test_mesh_base_maps(self, rng: np.random.Generator) -> None:
-        """Test writing and reading base meshes with the shared memory manager."""
+        """
+        Test writing and reading base meshes with the shared memory manager.
+        """
         iterations = 3
 
         mesh_size = (np.dtype(np.float64).itemsize * (3 + 3 + 3)) * 1000
@@ -199,7 +207,9 @@ class TestVisGeometryMaps(object):
             assert_mesh_equal(output_mesh, input_mesh)
 
     def test_triangle_mesh_maps(self, rng: np.random.Generator) -> None:
-        """Test writing and reading triangle meshes with the shared memory manager."""
+        """
+        Test writing and reading triangle meshes with the shared memory manager.
+        """
         iterations = 3
 
         mesh_size = (
@@ -231,7 +241,9 @@ class TestVisGeometryMaps(object):
             assert_mesh_equal(output_mesh, input_mesh)
 
     def test_tetra_mesh_maps(self, rng: np.random.Generator) -> None:
-        """Test writing and reading base meshes with the shared memory manager."""
+        """
+        Test writing and reading base meshes with the shared memory manager.
+        """
         iterations = 3
 
         mesh_size = (
@@ -262,7 +274,9 @@ class TestVisGeometryMaps(object):
             assert_mesh_equal(output_mesh, input_mesh)
 
     def test_half_edge_mesh_maps(self) -> None:
-        """Test writing and reading triangle meshes with the shared memory manager."""
+        """
+        Test writing and reading triangle meshes with the shared memory manager.
+        """
         iterations = 3
 
         mesh_size = (
@@ -306,7 +320,9 @@ class TestVisGeometryMaps(object):
             assert_mesh_equal(output_mesh, input_mesh)
 
     def test_oriented_bounding_box_maps(self, rng: np.random.Generator) -> None:
-        """Test writing and reading oriented bounding boxes with the shared memory manager."""
+        """
+        Test writing and reading oriented bounding boxes with the shared memory manager.
+        """
         iterations = 3
 
         bbox_size = (3 + 3 + 3 + 9) * np.dtype(np.float64).itemsize
@@ -340,7 +356,10 @@ class TestVisGeometryMaps(object):
             assert np.all(np.asarray(output_obb.R) == np.asarray(input_obb.R))
 
     def test_axis_aligned_bounding_box_maps(self, rng: np.random.Generator) -> None:
-        """Test writing and reading axis aligned bounding boxes with the shared memory manager."""
+        """
+        Test writing and reading axis aligned bounding boxes with the shared memory
+        manager.
+        """
         iterations = 3
 
         bbox_size = (3 + 3 + 3) * np.dtype(np.float64).itemsize
@@ -376,7 +395,9 @@ class TestVisGeometryMaps(object):
             )
 
     def test_line_set_maps(self, rng: np.random.Generator) -> None:
-        """Test writing and reading line sets with the shared memory manager."""
+        """
+        Test writing and reading line sets with the shared memory manager.
+        """
         iterations = 3
 
         lineset_size = (
@@ -418,7 +439,10 @@ class TestVisGeometryMaps(object):
             )
 
     def test_maps_from_geometry_dict(self, rng: np.random.Generator) -> None:
-        """Test writing and reading full geometry dictionaries with the shared memory manager."""
+        """
+        Test writing and reading full geometry dictionaries with the shared memory
+        manager.
+        """
         m_width, m_height = 16, 9
 
         iterations = 3
@@ -464,9 +488,6 @@ class TestVisGeometryMaps(object):
                 rng.integers(0, 256, (m_height, m_width, 3), dtype=np.uint8)
             )
             material.emissive_color = rng.random(4)
-            # material.generic_imgs =
-            # material.generic_params =
-            # material.gradient =
             material.ground_plane_axis = rng.random()
             material.has_alpha = rng.random() > 0.5
             material.metallic_img = o3d.geometry.Image(

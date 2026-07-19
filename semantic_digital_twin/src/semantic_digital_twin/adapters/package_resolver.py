@@ -4,9 +4,13 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import List
+from typing_extensions import List, Optional
 
-from semantic_digital_twin.exceptions import ParsingError
+from semantic_digital_twin.exceptions import (
+    ParsingError,
+    PackageResolutionError,
+    PathResolutionError,
+)
 
 
 class PackageLocator(ABC):
@@ -33,8 +37,8 @@ class AmentPackageLocator(PackageLocator):
 
             return get_package_share_directory(package_name)
         except (ImportError, LookupError) as error:
-            raise ParsingError(
-                message=f"Ament could not resolve package '{package_name}': {error}"
+            raise PackageResolutionError(
+                package_name=package_name, details=f"ament: {error}"
             )
 
 
@@ -51,8 +55,8 @@ class ROSPackagePathLocator(PackageLocator):
             for candidate in [root, os.path.join(root, package_name)]:
                 if os.path.isdir(candidate) and root.endswith(package_name):
                     return candidate
-        raise ParsingError(
-            message=f"Package '{package_name}' not found in ROS_PACKAGE_PATH."
+        raise PackageResolutionError(
+            package_name=package_name, details="not found in ROS_PACKAGE_PATH"
         )
 
 
@@ -73,8 +77,8 @@ class ROSPackageLocator(PackageLocator):
                 return locator.resolve(package_name)
             except ParsingError as error:
                 errors.append(str(error))
-        raise ParsingError(
-            message=f"Could not resolve package '{package_name}'. Details: {'; '.join(errors)}"
+        raise PackageResolutionError(
+            package_name=package_name, details="; ".join(errors)
         )
 
 
@@ -123,7 +127,7 @@ class FileUriResolver(PathResolver):
     Resolves file:// URIs and plain filesystem paths.
     """
 
-    base_directory: str = None
+    base_directory: Optional[str] = None
     """
     The base directory to resolve relative paths from.
     """
@@ -134,13 +138,13 @@ class FileUriResolver(PathResolver):
     def resolve(self, uri: str) -> str:
         if uri.startswith("file://"):
             if uri.startswith("file:///"):
-                path = uri[len("file://"):]  # absolute
+                path = uri[len("file://") :]  # absolute
             else:
                 path = uri.replace("file://", "", 1)  # relative
         else:
             path = uri
 
-        if not os.path.isabs(path):
+        if self.base_directory and not os.path.isabs(path):
             path = os.path.join(self.base_directory, path)
 
         return os.path.abspath(path)
@@ -178,6 +182,4 @@ class CompositePathResolver(PathResolver):
             except ParsingError as error:
                 errors.append(str(error))
 
-        raise ParsingError(
-            message=f"Could not resolve path '{uri}'. Details: {'; '.join(errors)}"
-        )
+        raise PathResolutionError(uri=uri, details="; ".join(errors))

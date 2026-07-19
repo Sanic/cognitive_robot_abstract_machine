@@ -36,13 +36,14 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
+    "pytest>=7.0.0,<8.0.0",
+    "mypy>=1.8",
 ]
 
 [project.urls]
-Homepage = "https://code-iai.github.io/krrood/intro.html"
-Repository = "https://github.com/code-iai/krrood"
-Issues = "https://github.com/code-iai/krrood/issues"
+Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

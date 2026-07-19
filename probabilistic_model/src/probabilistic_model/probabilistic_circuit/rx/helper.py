@@ -16,7 +16,6 @@ def uniform_measure_of_event(event: Event) -> ProbabilisticCircuit:
     :param event: The event
     :return: The circuit describing the uniform measure
     """
-
     # calculate the bounding box of the event
     bounding_box = event.bounding_box()
 
@@ -31,10 +30,10 @@ def uniform_measure_of_event(event: Event) -> ProbabilisticCircuit:
 def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> ProbabilisticCircuit:
     """
     Create a uniform measure for the given simple event.
+
     :param simple_event: The simple event
     :return: The circuit describing the uniform measure over the simple event
     """
-
     # initialize the root of the circuit
     result = ProbabilisticCircuit()
     uniform_model = ProductUnit(probabilistic_circuit=result)
@@ -101,17 +100,15 @@ def fully_factorized(
 ) -> ProbabilisticCircuit:
     """
     Create a fully factorized distribution over a set of variables.
-    For symbolic variables, the distribution is uniform.
-    For continuous variables, the distribution is normal.
+
+    For symbolic variables, the distribution is uniform. For continuous variables, the
+    distribution is normal.
 
     :param variables: The variables.
-
-    :param means: The means of the normal distributions.
-    Defaults to 0 for every not specified variable.
-
-    :param variances: The variances of the normal distributions.
-    Defaults to 1 for every not specified variable.
-
+    :param means: The means of the normal distributions. Defaults to 0 for every not
+        specified variable.
+    :param variances: The variances of the normal distributions. Defaults to 1 for every
+        not specified variable.
     :return: The circuit describing the fully factorized normal distribution
     """
     pc = ProbabilisticCircuit()
@@ -125,8 +122,8 @@ def fully_factorized(
     root = ProductUnit(probabilistic_circuit=pc)
     for variable in variables:
 
-        # create a normal distribution for every continuous variable
-        if isinstance(variable, Continuous):
+        # create a normal distribution for every continuous or integer variable
+        if isinstance(variable, (Continuous, Integer)):
             distribution = GaussianDistribution(
                 variable=variable,
                 location=means.get(variable, 0.0),
@@ -149,3 +146,28 @@ def fully_factorized(
         root.add_subcircuit(distribution)
 
     return root.probabilistic_circuit
+
+
+def multiply_distributions(
+    distribution: ProbabilisticCircuit, expansion: ProbabilisticCircuit
+):
+    """
+    Expand the `distribution` by the `expansion` using factorization.
+
+    `distribution` is expanded in-place.
+
+    The resulting distribution is the product of the expansion and the distribution.
+
+    :param distribution: The probabilistic circuit to expand
+    :param expansion: The probabilistic circuit to use for expansion
+    :return: The expanded probabilistic circuit
+    """
+    old_distribution_root = distribution.root
+    expansion_root_index = expansion.root.index
+    remap = distribution.mount(expansion.root)
+    ff_root = remap[expansion_root_index]
+
+    new_root = ProductUnit(probabilistic_circuit=distribution)
+    new_root.add_subcircuit(ff_root)
+    new_root.add_subcircuit(old_distribution_root)
+    return distribution

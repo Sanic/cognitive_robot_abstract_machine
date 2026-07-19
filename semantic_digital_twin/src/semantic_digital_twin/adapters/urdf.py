@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, Tuple, Union, List
+from typing_extensions import Dict, Optional, Tuple, Union, List
 from urdf_parser_py import urdf as urdfpy
+from xacro import process_file
 
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
@@ -57,14 +58,13 @@ def urdf_joint_to_limits(
 ) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
     """
     Maps the URDF joint specifications to lower and upper joint limits, including
-    position and velocity constraints. Mimics and safety controller parameters are
-    also considered when determining the limits.
+    position and velocity constraints. Mimics and safety controller parameters are also
+    considered when determining the limits.
 
-    :param urdf_joint: A URDF (Unified Robot Description Format) joint object
-                       which contains the joint's type, limits, safety controller,
-                       and mimic information.
-    :return: A tuple containing two DerivativeMap objects, representing the lower
-             and upper limits of the joint in terms of position and velocity.
+    :param urdf_joint: A URDF (Unified Robot Description Format) joint object which
+        contains the joint's type, limits, safety controller, and mimic information.
+    :return: A tuple containing two DerivativeMap objects, representing the lower and
+        upper limits of the joint in terms of position and velocity.
     """
     lower_limits = DerivativeMap()
     upper_limits = DerivativeMap()
@@ -97,24 +97,6 @@ def urdf_joint_to_limits(
     lower_limits.velocity = -velocity if velocity is not None else None
     upper_limits.velocity = velocity if velocity is not None else None
 
-    if urdf_joint.mimic is not None:
-        multiplier = (
-            urdf_joint.mimic.multiplier
-            if urdf_joint.mimic.multiplier is not None
-            else 1
-        )
-        offset = urdf_joint.mimic.offset if urdf_joint.mimic.offset is not None else 0
-
-        for d2 in Derivatives.range(Derivatives.position, Derivatives.velocity):
-            lower_limits[d2] -= offset
-            upper_limits[d2] -= offset
-            if multiplier < 0:
-                upper_limits[d2], lower_limits[d2] = (
-                    lower_limits[d2],
-                    upper_limits[d2],
-                )
-            upper_limits[d2] /= multiplier
-            lower_limits[d2] /= multiplier
     return lower_limits, upper_limits
 
 
@@ -122,6 +104,7 @@ def urdf_joint_to_limits(
 class URDFParser:
     """
     Class to parse URDF files to worlds.
+
     Must set either urdf or file_path.
     """
 
@@ -169,11 +152,26 @@ class URDFParser:
         return urdf_parser
 
     @classmethod
-    def from_xacro(cls, xacro_path: str, prefix: Optional[str] = None) -> URDFParser:
-        from xacro import process_file
+    def from_xacro(
+        cls,
+        xacro_path: str,
+        prefix: Optional[str] = None,
+        mappings: Optional[Dict[str, str]] = None,
+    ) -> URDFParser:
+        """
+        Creates a parser from a xacro file by expanding it to URDF.
 
+        The xacro file is resolved and processed into a URDF string, applying the given
+        substitution arguments, before constructing the parser.
+
+        :param xacro_path: The path to the xacro file to expand.
+        :param prefix: The prefix for every name used in this world.
+        :param mappings: The xacro substitution arguments to apply during expansion (the
+            ``arg`` values, e.g. ``{"ur_type": "ur5"}``).
+        :return: A parser for the world described by the expanded xacro file.
+        """
         xacro_path = CompositePathResolver().resolve(xacro_path)
-        urdf = process_file(xacro_path).toxml()
+        urdf = process_file(xacro_path, mappings=mappings).toxml()
         return URDFParser(urdf=urdf, prefix=prefix)
 
     def parse(self) -> World:
@@ -187,14 +185,23 @@ class URDFParser:
         world.name = self.prefix
         with world.modify_world():
             world.add_kinematic_structure_entity(root)
-            joints = []
+            main_joints = []
+            mimic_joints = []
+
             for joint in self.parsed.joints:
+                if joint.mimic is not None:
+                    mimic_joints.append(joint)
+                else:
+                    main_joints.append(joint)
+
+            parsed_joints = []
+            for joint in main_joints + mimic_joints:
                 parent = [link for link in links if link.name.name == joint.parent][0]
                 child = [link for link in links if link.name.name == joint.child][0]
                 parsed_joint = self.parse_joint(joint, parent, child, world, prefix)
-                joints.append(parsed_joint)
+                parsed_joints.append(parsed_joint)
 
-            [world.add_connection(joint) for joint in joints]
+            [world.add_connection(joint) for joint in parsed_joints]
 
         return world
 
@@ -204,12 +211,12 @@ class URDFParser:
         """
         Parses a given URDF joint and creates a corresponding connection object.
 
-        The function processes the provided joint data, extracting necessary
-        information including translation offsets, rotation offsets, connection type,
-        and relevant joint limits. It maps URDF joint types to predefined connection
-        types and either retrieves or creates a degree of freedom (DOF) in the world
-        context. It generates and returns a connection object representing the
-        relationship between a parent and a child body.
+        The function processes the provided joint data, extracting necessary information
+        including translation offsets, rotation offsets, connection type, and relevant
+        joint limits. It maps URDF joint types to predefined connection types and either
+        retrieves or creates a degree of freedom (DOF) in the world context. It
+        generates and returns a connection object representing the relationship between
+        a parent and a child body.
 
         :param joint: The URDF joint to be parsed.
         :param parent: The parent body to be connected by the joint.
@@ -239,9 +246,8 @@ class URDFParser:
                 parent_T_connection_expression=parent_T_connection,
             )
 
-        lower_limits, upper_limits = urdf_joint_to_limits(joint)
         dof_name = connection_name
-        multiplier = offset = None
+        multiplier, offset = 1.0, 0.0
         if joint.mimic:
             multiplier = (
                 joint.mimic.multiplier if joint.mimic.multiplier is not None else 1
@@ -250,6 +256,7 @@ class URDFParser:
             dof_name = PrefixedName(joint.mimic.joint, prefix)
 
         if dof_name not in [d.name for d in world.degrees_of_freedom]:
+            lower_limits, upper_limits = urdf_joint_to_limits(joint)
             dof = DegreeOfFreedom(
                 name=dof_name,
                 limits=DegreeOfFreedomLimits(lower=lower_limits, upper=upper_limits),
@@ -267,15 +274,17 @@ class URDFParser:
             multiplier=multiplier,
             offset=offset,
             axis=Vector3(*map(int, joint.axis), reference_frame=parent),
-            dof_id=dof.id,
+            raw_dof=dof,
         )
         return result
 
     def parse_link(self, link: urdfpy.Link, parent_frame: PrefixedName) -> Body:
         """
         Parses a URDF link to a link object.
+
         :param link: The URDF link to parse.
-        :param parent_frame: The parent frame of the link, used for transformations of collisions and visuals.
+        :param parent_frame: The parent frame of the link, used for transformations of
+            collisions and visuals.
         :return: The parsed link object.
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
@@ -293,6 +302,7 @@ class URDFParser:
     ) -> ShapeCollection:
         """
         Parses a URDF geometry to the corresponding shapes.
+
         :param geometry: The URDF geometry to parse either the collisions of visuals.'
         :param body: The body of the geometry, used for back referencing.
         :return: A List of shapes corresponding to the URDF geometry.

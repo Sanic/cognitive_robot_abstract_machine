@@ -1,14 +1,15 @@
 """
 This module provides mechanisms for mapping symbolic expressions to object domains.
 
-It contains classes for attribute access, indexing, and function calls on symbolic expressions.
+It contains classes for attribute access, indexing, and function calls on symbolic
+expressions.
 """
 
 from __future__ import annotations
 
 import operator
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, is_dataclass, fields, field
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Self
 
@@ -22,34 +23,39 @@ from typing_extensions import (
     List,
 )
 
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
     OperationResult,
     Selectable,
+    SymbolicExpression,
+    UnificationDict,
 )
+from krrood.entity_query_language.exceptions import SymbolicDunderAccessError
 from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.operators.math_operations import MathOperator
 from krrood.entity_query_language.utils import (
     T,
     merge_args_and_kwargs,
     convert_args_and_kwargs_into_hashable_key,
 )
-
 from krrood.symbol_graph.helpers import get_field_type_endpoint
 
 
 @dataclass(eq=False, repr=False)
 class CanBehaveLikeAVariable(Selectable[T], ABC):
     """
-    This class adds the monitoring/tracking behavior on variables that tracks attribute access, calling,
-    and comparison operations.
+    This class adds the monitoring/tracking behavior on variables that tracks attribute
+    access, calling, and comparison operations.
     """
 
     _known_mapped_variables_: Dict[MappedVariableCacheItem, MappedVariable] = field(
         init=False, default_factory=dict
     )
     """
-    A storage of created MappedVariable instances to prevent recreating same mapping multiple times.
+    A storage of created MappedVariable instances to prevent recreating same mapping
+    multiple times.
     """
 
     __iter__ = None
@@ -80,7 +86,8 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         """
         Generates a hashable key for the given type and arguments.
 
-        :param type_: The type of the mapped variable to generate a key for, e.g., Attribute, Index, etc.
+        :param type_: The type of the mapped variable to generate a key for, e.g.,
+            Attribute, Index, etc.
         :param args: Positional arguments to pass to the MappedVariable constructor.
         :param kwargs: Keyword arguments to pass to the MappedVariable constructor.
         :return: The generated hashable key.
@@ -90,6 +97,13 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
         return convert_args_and_kwargs_into_hashable_key(all_kwargs)
 
     def __getattr__(self, name: str) -> CanBehaveLikeAVariable[T]:
+        # Dunder names are never symbolic attribute access. Mapping them would (a) let copy/pickle
+        # and other machinery that probes optional dunder hooks recurse into endless variable
+        # creation, and (b) blur language semantics. Access a dunder-named member symbolically via a
+        # :func:`symbolic_function` instead. SymbolicDunderAccessError is an AttributeError so that
+        # optional-hook probing still treats it as a missing attribute.
+        if name.startswith("__") and name.endswith("__"):
+            raise SymbolicDunderAccessError(name)
         return self._get_mapped_variable_(Attribute, name)
 
     def __getitem__(self, key) -> CanBehaveLikeAVariable[T]:
@@ -115,6 +129,91 @@ class CanBehaveLikeAVariable(Selectable[T], ABC):
 
     def __ge__(self, other) -> Comparator:
         return Comparator(self, other, operator.ge)
+
+    def _arithmetic_(
+        self, other: Any, math_operator: MathOperator
+    ) -> CanBehaveLikeAVariable[T]:
+        """
+        Build a binary arithmetic operation with this variable as the left operand.
+
+        :param other: The right operand.
+        :param math_operator: The operator to apply.
+        :return: The symbolic arithmetic operation.
+        """
+        from krrood.entity_query_language.operators.arithmetic import (
+            ArithmeticOperation,
+        )
+
+        return ArithmeticOperation(self, other, math_operator)
+
+    def _reflected_arithmetic_(
+        self, other: Any, math_operator: MathOperator
+    ) -> CanBehaveLikeAVariable[T]:
+        """
+        Build a binary arithmetic operation with this variable as the right operand.
+
+        This is used for the reflected dunders (``other <op> self``) so that the operand
+        order is preserved for non-commutative operators such as subtraction and
+        division.
+
+        :param other: The left operand.
+        :param math_operator: The operator to apply.
+        :return: The symbolic arithmetic operation.
+        """
+        from krrood.entity_query_language.operators.arithmetic import (
+            ArithmeticOperation,
+        )
+
+        return ArithmeticOperation(other, self, math_operator)
+
+    def __add__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.ADD)
+
+    def __radd__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.ADD)
+
+    def __sub__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.SUBTRACT)
+
+    def __rsub__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.SUBTRACT)
+
+    def __mul__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.MULTIPLY)
+
+    def __rmul__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.MULTIPLY)
+
+    def __truediv__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.DIVIDE)
+
+    def __rtruediv__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.DIVIDE)
+
+    def __floordiv__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.FLOOR_DIVIDE)
+
+    def __rfloordiv__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.FLOOR_DIVIDE)
+
+    def __mod__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.MODULO)
+
+    def __rmod__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.MODULO)
+
+    def __pow__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._arithmetic_(other, MathOperator.POWER)
+
+    def __rpow__(self, other) -> CanBehaveLikeAVariable[T]:
+        return self._reflected_arithmetic_(other, MathOperator.POWER)
+
+    def __neg__(self) -> CanBehaveLikeAVariable[T]:
+        from krrood.entity_query_language.operators.arithmetic import (
+            UnaryArithmeticOperation,
+        )
+
+        return UnaryArithmeticOperation(self, MathOperator.NEGATE)
 
     def __hash__(self):
         return super().__hash__()
@@ -145,24 +244,30 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
     def _evaluate__(
         self,
-        sources: Bindings,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Apply the mapping to the child's values.
         """
-
         yield from (
             self._build_operation_result_and_update_truth_value_(
                 child_result.bindings | {self._id_: mapped_value}, child_result
             )
-            for child_result in self._child_._evaluate_(sources, parent=self)
-            for mapped_value in self._apply_mapping_(child_result.value)
+            for child_result in self._child_._evaluate_(sources)
+            for mapped_value in self._apply_mapping_(
+                child_result.value, sources=sources
+            )
         )
 
     @abstractmethod
-    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
+    def _apply_mapping_(
+        self, value: Any, sources: Optional[OperationResult] = None
+    ) -> Iterable[Any]:
         """
         Apply the mapping to a value from the child variable.
+
+        :param value: The value to map.
+        :param sources: The bindings from the evaluation context.
         """
         pass
 
@@ -178,9 +283,21 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
             result.append(current)
         return result[:-1][::-1]
 
+    @property
+    def _chain_root_(self) -> Any:
+        """
+        :return: The first non-:class:`MappedVariable` expression at the base of this
+            mapping chain (e.g. the ``robot`` variable behind ``robot.arm.joint``).
+        """
+        current = self
+        while isinstance(current, MappedVariable):
+            current = current._child_
+        return current
+
     def _set_external_root_instance_value_(self, instance: Any, value: Any):
         """
         Set the field of the instance at this access path to the given value.
+
         This modifies instance in-place.
 
         .. warning::
@@ -199,6 +316,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
     def _set_child_instance_value_(self, instance: Any, value: Any):
         """
         Set the field of the instance using this operation to the given value.
+
         This modifies instance in-place.
 
         :param instance: The instance to be updated.
@@ -206,13 +324,39 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         """
         raise NotImplementedError
 
+    def apply_mapping_on_external_root(self, instance: Any) -> Any:
+        """
+        Apply the mapping on the given instance by following the access path and
+        applying the mapping at each step.
+
+        :param instance: The instance to apply the mapping on.
+        :return: An iterable of the mapped values.
+        """
+        current = instance
+        for domain_mapping in self._access_path_:
+            current = next(domain_mapping._apply_mapping_(current))
+        return current
+
+    def get_clean_name_from_mapped_variable(self) -> str:
+        """
+        Get a clean name from a mapped variable by joining its attribute names.
+
+        :return: The clean name.
+        """
+        names = []
+        for step in self._access_path_:
+            if isinstance(step, Attribute):
+                names.append(step._attribute_name_)
+        return ".".join(names)
+
 
 @dataclass(eq=False, repr=False)
-class Attribute(MappedVariable):
+class Attribute(MappedVariable[T]):
     """
     A symbolic attribute that can be used to access attributes of symbolic variables.
 
-    For instance, if Body.name is called, then the attribute name is "name" and `_owner_class_` is `Body`
+    For instance, if Body.name is called, then the attribute name is "name" and
+    `_owner_class_` is `Body`
     """
 
     _attribute_name_: str
@@ -233,8 +377,11 @@ class Attribute(MappedVariable):
         """
         self._type_ = get_field_type_endpoint(self._owner_class_, self._attribute_name_)
 
-    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
-        yield getattr(value, self._attribute_name_)
+    def _apply_mapping_(
+        self, value: Any, sources: Optional[OperationResult] = None
+    ) -> Iterable[Any]:
+        if hasattr(value, self._attribute_name_):
+            yield getattr(value, self._attribute_name_)
 
     @property
     def _name_(self):
@@ -247,7 +394,8 @@ class Attribute(MappedVariable):
 @dataclass(eq=False, repr=False)
 class Index(MappedVariable):
     """
-    A variable that was created through collection indexing by a certain key on its child variable.
+    A variable that was created through collection indexing by a certain key on its
+    child variable.
     """
 
     _key_: Any
@@ -255,15 +403,24 @@ class Index(MappedVariable):
     The key to index with.
     """
 
-    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
+    def _apply_mapping_(
+        self, value: Any, sources: Optional[OperationResult] = None
+    ) -> Iterable[Any]:
         try:
-            yield value[self._key_]
+            # Need to verify that this solution is general and not a hack.
+            if isinstance(self._key_, SymbolicExpression) and not (
+                isinstance(value, UnificationDict) and self._key_ in value
+            ):
+                for key in self._key_._evaluate_(sources):
+                    yield value[key.value]
+            else:
+                yield value[self._key_]
         except IndexError:  # break iterator if the key does not exist
             return
 
     @property
     def _name_(self):
-        return f"{self._child_._var_._name_}[{self._key_}]"
+        return f"{self._child_._var_._name_}[{repr(self._key_)}]"
 
     def _set_child_instance_value_(self, instance: Any, value: Any):
         instance[self._key_] = value
@@ -279,12 +436,15 @@ class Call(MappedVariable):
     """
     The arguments to call the method with.
     """
+
     _kwargs_: Dict[str, Any] = field(default_factory=dict)
     """
     The keyword arguments to call the method with.
     """
 
-    def _apply_mapping_(self, value: Any) -> Iterable[Any]:
+    def _apply_mapping_(
+        self, value: Any, sources: Optional[OperationResult] = None
+    ) -> Iterable[Any]:
         if len(self._args_) > 0 or len(self._kwargs_) > 0:
             yield value(*self._args_, **self._kwargs_)
         else:
@@ -294,9 +454,14 @@ class Call(MappedVariable):
     def _name_(self):
         return f"{self._child_._var_._name_}()"
 
+    def _update_type_(self) -> None:
+        if self._child_._type_ is None:
+            return
+        self._type_ = get_type_hints_of_object(self._child_._type_)["return"]
+
 
 @dataclass(eq=False, repr=False)
-class FlatVariable(MappedVariable):
+class FlatVariable(MappedVariable[T]):
     """
     A variable that is created from its child through a flattening operation that
      transforms the values of the child from an iterable-of-iterables into a single iterable of items.
@@ -307,34 +472,42 @@ class FlatVariable(MappedVariable):
     similar to UNNEST in SQL.
     """
 
-    def _apply_mapping_(self, value: Iterable[Any]) -> Iterable[Any]:
+    def _apply_mapping_(
+        self, value: Iterable[T], sources: Optional[OperationResult] = None
+    ) -> Iterable[T]:
         yield from value
 
     @cached_property
-    def _name_(self):
+    def _name_(self) -> str:
         return f"Flatten({self._child_._name_})"
 
 
 @dataclass
 class MappedVariableCacheItem:
     """
-    A cache item for mapped variable creation. To prevent recreating same mapped variable multiple times, mapping
-     instances are stored in a dictionary with a hashable key. This class is used to generate the key for the dictionary
-      that stores the mapped variable instances.
+    A cache item for mapped variable creation.
+
+    To prevent recreating same mapped variable multiple times, mapping instances are
+    stored in a dictionary with a hashable key. This class is used to generate the key
+    for the dictionary  that stores the mapped variable instances.
     """
 
     type: Type[MappedVariable]
     """
     The mapping type to create, e.g., Attribute, Index, etc.
     """
+
     child: CanBehaveLikeAVariable
     """
-    The child of the mapping (i.e. the original variable on which the mapping is applied).
+    The child of the mapping (i.e. the original variable on which the mapping is
+    applied).
     """
+
     args: Tuple[Any, ...] = field(default_factory=tuple)
     """
     Positional arguments to pass to the mapping constructor.
     """
+
     kwargs: Dict[str, Any] = field(default_factory=dict)
     """
     Keyword arguments to pass to the mapping constructor.

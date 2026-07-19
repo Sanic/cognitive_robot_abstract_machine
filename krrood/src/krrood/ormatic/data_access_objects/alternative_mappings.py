@@ -28,8 +28,17 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
         Make sure to decorate subclasses with @dataclass(eq=False).
     """
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # The import is local since helper imports this module at load time.
+        from krrood.ormatic.data_access_objects.helper import clear_dao_lookup_caches
+
+        clear_dao_lookup_caches()
+
     @classmethod
-    def to_dao(cls, source_object: T, state: Optional[ToDataAccessObjectState]) -> T:
+    def to_dao(
+        cls, source_object: T, state: Optional[ToDataAccessObjectState] = None
+    ) -> T:
         """
         Resolve a source object to a DAO.
 
@@ -37,7 +46,7 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
         :param state: The conversion state.
         :return: The converted DAO instance.
         """
-        if state.has(source_object):
+        if state is not None and state.has(source_object):
             return state.get(source_object)
         elif isinstance(source_object, cls):
             return source_object
@@ -50,8 +59,9 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
     def from_domain_object(cls, obj: T) -> Self:
         """
         Create this from a domain object.
-        Do not create any DAOs here but the target DAO of `T`.
-        The rest of the `to_dao` algorithm will process the fields of the created instance.
+
+        Do not create any DAOs here but the target DAO of `T`. The rest of the `to_dao`
+        algorithm will process the fields of the created instance.
 
         :param obj: The source object.
         :return: A new instance of this mapping class.
@@ -68,8 +78,11 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
     @classmethod
     def required_pre_build_classes(cls) -> List[Type]:
         """
-        A list of other classes that have to be built before this one in the `from_dao` algorithm.
-        The types inside the list are the domain types, not the data access objects nor the alternative mappings.
+        A list of other classes that have to be built before this one in the `from_dao`
+        algorithm.
+
+        The types inside the list are the domain types, not the data access objects nor
+        the alternative mappings.
         """
         return []
 

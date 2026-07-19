@@ -33,17 +33,25 @@ workon cram-env
 deactivate
 ```
 
-#### Optional: Create symlink for ROS2 packages
-If you are using this repo with ROS2, you need to create a symlink for the ROS2 packages.
-Currently, only jazzy is supported.
+#### Optional: Setup your ROS Workspace
+To run the tests or use CRAM with a real robot you need to setup a ROS workspace with the dependencies. 
+The monorepo provides a shell script to setup the workspace for you. 
 ```bash
-cd <your_ros2_ws_path>/src
-ln -s <your_cram_repo_path>/cram_ros2_packages cram_ros2_packages
-colcon build
+export OVERLAY_WS=$HOME/ros_ws
+./scripts/setup_ros_workspace.sh
+```
+This will create a ROS workspace in the folder specified in OVERLAY_WS
+
+### Install additional dependencies
+
+You need to install the following system dependencies:
+
+```bash
+sudo apt install -y graphviz graphviz-dev
 ```
 
 
-### Install using UV 
+### Install using UV
 
 To install the whole repo we use uv (https://github.com/astral-sh/uv), first to install uv:
 
@@ -58,6 +66,12 @@ then install packages:
 uv sync --active
 ```
 
+If you also want the development dependencies, run:
+
+```bash
+uv sync --extra dev --active 
+```
+
 
 ### Alternative: Poetry
 
@@ -67,11 +81,11 @@ Install poetry if you haven't already:
 
 ```bash
 pip install poetry
-``` 
+```
 
 Install the CRAM package along with its dependencies:
 
-```bash 
+```bash
 poetry install
 ```
 
@@ -89,7 +103,7 @@ sudo bash .github/docker/setup_ros_workspace.sh && source ~/.bashrc
 pytest test/<package>_test
 ```
 
-e.g. `pytest test/pycram_test`
+e.g. `pytest test/coraplex_test`
 
 ## Contribution
 

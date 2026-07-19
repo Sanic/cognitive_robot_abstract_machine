@@ -54,10 +54,9 @@ class ObjectBeliefState:
 
     @property
     def latest_pose(self) -> Optional[PoseAnnotation]:
-        """The pose of the latest hypothesis added to the belief state."""
+        """The newest pose annotation of the latest hypothesis."""
         hypothesis = self.latest_hypothesis
         if hypothesis is not None:
-            # Last pose added in the pipeline is likely the most accurate?
             for annotation in reversed(hypothesis.annotations):
                 if type(annotation) == PoseAnnotation:
                     return annotation
@@ -65,10 +64,9 @@ class ObjectBeliefState:
 
     @property
     def latest_bbox_3d(self) -> Optional[BoundingBox3DAnnotation]:
-        """The 3D bbox of the latest hypothesis added to the belief state."""
+        """The newest 3D bounding box annotation of the latest hypothesis."""
         hypothesis = self.latest_hypothesis
         if hypothesis is not None:
-            # Last pose added in the pipeline is likely the most accurate?
             for annotation in reversed(hypothesis.annotations):
                 if type(annotation) == BoundingBox3DAnnotation:
                     return annotation

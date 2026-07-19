@@ -12,11 +12,8 @@ class SupportDeterminismViolation(DataclassException):
     """
     Base class for all violations produced by verify_support_determinism().
 
-    Inherits from DataclassException so each violation is also a raiseable
-    exception. Subclasses set self.message in __post_init__ before calling
-    super().__post_init__(). String representation is handled by
-    DataclassException via Exception.__str__, which returns self.message
-    through the args tuple set in __post_init__.
+    Inherits from DataclassException so each violation is also a raiseable exception.
+    Subclasses implement error_message().
     """
 
 
@@ -32,16 +29,20 @@ class MissingQueryVariableViolation(SupportDeterminismViolation):
     """Variables present in the query_set but not in the circuit."""
 
     available_variables: List[Variable]
-    """All Variables currently registered in the circuit."""
+    """
+    All Variables currently registered in the circuit.
+    """
 
-    def __post_init__(self) -> None:
+    def error_message(self) -> str:
         missing = [v.name for v in self.missing_variables]
         available = [v.name for v in self.available_variables]
-        self.message = (
+        return (
             f"Query-set Variables {missing} not found in circuit. "
             f"Available: {available}"
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
@@ -49,56 +50,67 @@ class UnnormalizedSumUnitViolation(SupportDeterminismViolation):
     """
     Violation raised when a SumUnit's log-weights do not sum to log(1).
 
-    Produced by Check 2 of verify_support_determinism().
-    Unnormalized SumUnits produce incorrect backdoor adjustment probabilities.
+    Produced by Check 2 of verify_support_determinism(). Unnormalized SumUnits produce
+    incorrect backdoor adjustment probabilities.
     """
 
     sum_unit_index: int
-    """Graph index of the offending SumUnit."""
+    """
+    Graph index of the offending SumUnit.
+    """
 
     actual_log_weight_sum: float
-    """The actual sum of log-weights, which should be 0.0."""
+    """
+    The actual sum of log-weights, which should be 0.0.
+    """
 
-    def __post_init__(self) -> None:
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"SumUnit (index={self.sum_unit_index}) log-weights sum to "
             f"{self.actual_log_weight_sum:.6f}, expected 0.0. "
             f"Unnormalized circuits produce incorrect backdoor probabilities."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class OverlappingChildSupportsViolation(SupportDeterminismViolation):
     """
-    Violation raised when a SumUnit's children have overlapping marginal support
-    on a declared query Variable.
+    Violation raised when a SumUnit's children have overlapping marginal support on a
+    declared query Variable.
 
-    Produced by Check 3 of verify_support_determinism().
-    Overlapping supports violate the support-determinism property required for
-    tractable backdoor adjustment.
+    Produced by Check 3 of verify_support_determinism(). Overlapping supports violate
+    the support-determinism property required for tractable backdoor adjustment.
     """
 
     sum_unit_index: int
-    """Graph index of the offending SumUnit."""
+    """
+    Graph index of the offending SumUnit.
+    """
 
     query_variable: Variable
-    """The declared query Variable on which the overlap was detected."""
+    """
+    The declared query Variable on which the overlap was detected.
+    """
 
-    def __post_init__(self) -> None:
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"SumUnit (index={self.sum_unit_index}) has overlapping children supports "
             f"on declared query Variable '{self.query_variable.name}': children are not "
             f"support-deterministic for this Variable."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class SupportDeterminismVerificationResult(DataclassException):
     """
-    Result of verifying support determinism of a circuit against its
-    Marginal Determinism Variable Tree.
+    Result of verifying support determinism of a circuit against its Marginal
+    Determinism Variable Tree.
 
     Support determinism requires that for each declared cause Variable,
     SumUnit children have disjoint support regions — i.e. each child
@@ -111,22 +123,28 @@ class SupportDeterminismVerificationResult(DataclassException):
     """
 
     passed: bool
-    """True if all three checks passed with no violations."""
+    """
+    True if all three checks passed with no violations.
+    """
 
     violations: List[SupportDeterminismViolation]
-    """Typed violations found, in check order. Empty when passed is True."""
+    """
+    Typed violations found, in check order.
+
+    Empty when passed is True.
+    """
 
     checked_query_sets: List[Set[Variable]]
-    """All non-empty query_sets from the Marginal Determinism Variable Tree."""
+    """
+    All non-empty query_sets from the Marginal Determinism Variable Tree.
+    """
 
     circuit_variables: List[Variable]
-    """All Variables present in the circuit at verification time."""
+    """
+    All Variables present in the circuit at verification time.
+    """
 
-    def __post_init__(self) -> None:
-        self.message = str(self)
-        super().__post_init__()
-
-    def __str__(self) -> str:
+    def error_message(self) -> str:
         status = "PASS" if self.passed else "FAIL"
         checked_names = [{v.name for v in qs} for qs in self.checked_query_sets]
         circuit_names = [v.name for v in self.circuit_variables]
@@ -141,74 +159,94 @@ class SupportDeterminismVerificationResult(DataclassException):
                 lines.append(f"    - {str(violation)}")
         return "\n".join(lines)
 
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class UnregisteredVariableError(DataclassException):
     """
-    Raised when a Variable passed to backdoor_adjustment or diagnose_failure
-    is not registered as a cause or effect Variable in the CausalCircuit.
+    Raised when a Variable passed to backdoor_adjustment or diagnose_failure is not
+    registered as a cause or effect Variable in the CausalCircuit.
     """
 
     variable_name: str
-    """Name of the unregistered Variable."""
+    """
+    Name of the unregistered Variable.
+    """
 
     registered_names: List[str]
-    """Names of all Variables registered in the relevant role."""
+    """
+    Names of all Variables registered in the relevant role.
+    """
 
     role: str
-    """Either 'cause' or 'effect', describing which role the Variable was expected in."""
+    """
+    Either 'cause' or 'effect', describing which role the Variable was expected in.
+    """
 
-    def __post_init__(self) -> None:
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"'{self.variable_name}' is not a registered {self.role} Variable. "
             f"Registered: {self.registered_names}."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class EmptyInterventionalCircuitError(DataclassException):
     """
-    Raised when backdoor_adjustment produces no ProductUnit components,
-    meaning the interventional circuit is empty. This indicates the cause
-    Variable's observed value lies entirely outside the training distribution,
-    or the adjustment variables produce no valid strata.
+    Raised when backdoor_adjustment produces no ProductUnit components, meaning the
+    interventional circuit is empty.
+
+    This indicates the cause Variable's observed value lies entirely outside the
+    training distribution, or the adjustment variables produce no valid strata.
     """
 
     cause_variable_name: str
-    """Name of the cause Variable for which the circuit is empty."""
+    """
+    Name of the cause Variable for which the circuit is empty.
+    """
 
     adjustment_variable_names: List[str]
-    """Names of adjustment Variables used, empty list if no adjustment was applied."""
+    """
+    Names of adjustment Variables used, empty list if no adjustment was applied.
+    """
 
-    def __post_init__(self) -> None:
+    def error_message(self) -> str:
         if self.adjustment_variable_names:
-            self.message = (
+            return (
                 f"Interventional circuit with adjustment is empty. "
                 f"cause='{self.cause_variable_name}', "
                 f"adjustment={self.adjustment_variable_names}."
             )
-        else:
-            self.message = (
-                f"Interventional circuit is empty for cause '{self.cause_variable_name}'. "
-                f"Ensure the circuit was trained on data covering this Variable's domain."
-            )
-        super().__post_init__()
+        return (
+            f"Interventional circuit is empty for cause '{self.cause_variable_name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "ensure the circuit was trained on data covering this Variable's domain."
 
 
 @dataclass
 class NoCauseVariablesError(DataclassException):
     """
-    Raised when diagnose_failure finds no numeric cause Variables in
-    observed_values that match any registered cause Variable.
+    Raised when diagnose_failure finds no numeric cause Variables in observed_values
+    that match any registered cause Variable.
     """
 
     registered_cause_names: List[str]
-    """Names of all cause Variables registered in the CausalCircuit."""
+    """
+    Names of all cause Variables registered in the CausalCircuit.
+    """
 
-    def __post_init__(self) -> None:
-        self.message = (
+    def error_message(self) -> str:
+        return (
             f"No cause Variables found in observed_values. "
             f"Expected at least one of: {self.registered_cause_names}."
         )
-        super().__post_init__()
+
+    def suggest_correction(self) -> str:
+        return ""

@@ -8,7 +8,7 @@ from abc import ABC
 from dataclasses import dataclass, fields, is_dataclass
 from dataclasses import field
 from types import NoneType
-from typing import List, Optional
+from typing import List, Optional, TypeAlias, TYPE_CHECKING
 
 import numpy as np
 from typing_extensions import Dict, Any, Self, Union, Type, TypeVar
@@ -27,7 +27,6 @@ from krrood.singleton import SingletonMeta
 from krrood.utils import (
     get_full_class_name,
     recursive_subclasses,
-    inheritance_path_length,
 )
 
 list_like_classes = (
@@ -45,12 +44,25 @@ leaf_types = (
 
 JSON_DICT_TYPE = Dict[str, Any]  # Commonly referred JSON dict
 JSON_RETURN_TYPE = Union[
-    JSON_DICT_TYPE, list[JSON_DICT_TYPE], *leaf_types
+    JSON_DICT_TYPE, List[Any], *leaf_types
 ]  # Commonly referred JSON types
 JSON_IS_CLASS = "__is_class__"
 """
-We need to remember if something is a class, because the type of a class is often just type.
+We need to remember if something is a class, because the type of a class is often just
+type.
 """
+
+if TYPE_CHECKING:
+    JSONData: TypeAlias = JSON_RETURN_TYPE
+else:
+
+    class JSONData:
+        """
+        Represents raw JSON data.
+
+        Use this type for type hints when you want to tell KRROOD that something is JSON
+        data that should not be further processed (e.g. by from_json()).
+        """
 
 
 @dataclass
@@ -58,19 +70,24 @@ class JSONSerializableTypeRegistry(metaclass=SingletonMeta):
     """
     Singleton registry for custom serializers and deserializers.
 
-    Use this registry when you need to add custom JSON serialization/deserialization logic for a type where you cannot
-    control its inheritance.
+    Use this registry when you need to add custom JSON serialization/deserialization
+    logic for a type where you cannot control its inheritance.
     """
 
     def get_external_serializer(self, clazz: Type) -> Type[ExternalClassJSONSerializer]:
         """
         Get the external serializer for the given class.
 
-        This returns the serializer of the closest superclass if no direct match is found.
+        This returns the serializer of the closest superclass if no direct match is
+        found.
 
         :param clazz: The class to get the serializer for.
         :return: The serializer class.
         """
+        # Imported lazily to avoid a circular import: inheritance_path_length pulls in the EQL
+        # predicate/variable modules, which import back from json_serializer during package load.
+        from krrood.inheritance_path_length import inheritance_path_length
+
         if issubclass(clazz, enum.Enum):
             return EnumJSONSerializer
 
@@ -94,8 +111,8 @@ class SubclassJSONSerializer:
     """
     Class for automatic (de)serialization of subclasses using importlib.
 
-    Stores the fully qualified class name in `type` during serialization and
-    imports that class during deserialization.
+    Stores the fully qualified class name in `type` during serialization and imports
+    that class during deserialization.
     """
 
     def to_json(self) -> Dict[str, Any]:
@@ -105,11 +122,13 @@ class SubclassJSONSerializer:
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         """
         Create an instance from a json dict.
-        This method is called from the from_json method after the correct subclass is determined and should be
-        overwritten by the subclass.
+
+        This method is called from the from_json method after the correct subclass is
+        determined and should be overwritten by the subclass.
 
         :param data: The JSON dict
-        :param kwargs: Additional keyword arguments to pass to the constructor of the subclass.
+        :param kwargs: Additional keyword arguments to pass to the constructor of the
+            subclass.
         :return: The deserialized object
         """
         raise NotImplementedError()
@@ -120,10 +139,10 @@ class SubclassJSONSerializer:
         Create the correct instanceof the subclass from a json dict.
 
         :param data: The json dict
-        :param kwargs: Additional keyword arguments to pass to the constructor of the subclass.
+        :param kwargs: Additional keyword arguments to pass to the constructor of the
+            subclass.
         :return: The correct instance of the subclass
         """
-
         if isinstance(data, leaf_types):
             return data
 
@@ -166,7 +185,8 @@ class SubclassJSONSerializer:
         Update the current object from a list of shallow diffs.
 
         :param diffs: The shallow diffs to apply.
-        :param kwargs: Additional keyword arguments to pass to the constructor of the subclass.
+        :param kwargs: Additional keyword arguments to pass to the constructor of the
+            subclass.
         """
         for diff in diffs:
             self._apply_diff(diff, **kwargs)
@@ -174,6 +194,7 @@ class SubclassJSONSerializer:
     def _apply_diff(self, diff: JSONAttributeDiff, **kwargs) -> None:
         """
         Apply a single diff to the current object.
+
         :param diff: The diff to apply.
         """
         current_value = getattr(self, diff.attribute_name)
@@ -207,8 +228,12 @@ def to_json(obj: Union[SubclassJSONSerializer, Any]) -> JSON_RETURN_TYPE:
     :param obj: The object to convert to json
     :return: The JSON string
     """
+    if isinstance(obj, dict):
+        json_type = obj.get(JSON_TYPE_NAME, None)
+        if json_type is not None:
+            return obj
 
-    if isinstance(obj, leaf_types):
+    if isinstance(obj, (leaf_types)):
         return obj
 
     if isinstance(obj, list_like_classes):
@@ -238,12 +263,12 @@ class JSONAttributeDiff(SubclassJSONSerializer):
     The name of the attribute that has changed.
     """
 
-    added_values: List[Any] = field(default_factory=list)
+    added_values: List[JSONData] = field(default_factory=list)
     """
     The items that have been added to the attribute.
     """
 
-    removed_values: List[Any] = field(default_factory=list)
+    removed_values: List[JSONData] = field(default_factory=list)
     """
     The items that have been removed from the attribute.
     """
@@ -253,16 +278,16 @@ class JSONAttributeDiff(SubclassJSONSerializer):
         return {
             JSON_TYPE_NAME: get_full_class_name(self.__class__),
             "attribute_name": self.attribute_name,
-            "removed_values": to_json(self.removed_values),
-            "added_values": to_json(self.added_values),
+            "removed_values": self.removed_values,
+            "added_values": self.added_values,
         }
 
     @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         return cls(
             attribute_name=data["attribute_name"],
-            removed_values=from_json(data["removed_values"], **kwargs),
-            added_values=from_json(data["added_values"], **kwargs),
+            removed_values=data["removed_values"],
+            added_values=data["added_values"],
         )
 
 
@@ -270,12 +295,14 @@ def shallow_diff_json(
     original_json: Dict[str, Any], new_json: Dict[str, Any], **kwargs
 ) -> List[JSONAttributeDiff]:
     """
-    Create a shallow diff between two JSON dicts. Result describes the changes that need to be applied to first json to get second json.
+    Create a shallow diff between two JSON dicts.
 
+    Result describes the changes that need to be applied to first json to get second
+    json.
     :param original_json: The original JSON dict.
     :param new_json: The new JSON dict.
-
-    :return: List of JSONAttributeDiff describing the changes that need to be applied to first json to get second json.
+    :return: List of JSONAttributeDiff describing the changes that need to be applied to
+        first json to get second json.
     """
     all_keys = original_json.keys() | new_json.keys()
     diffs: List[JSONAttributeDiff] = [
@@ -295,22 +322,24 @@ def _compute_attribute_diff(
 
     :param original_json: The original JSON dict.
     :param new_json: The new JSON dict.
-    :param key: The key to compute the diff for.
-
-    :return JSONAttributeDiff describing the changes that need to be applied to first json to get second json for a specific key.
+    :param key: The key to compute the diff for. :return JSONAttributeDiff describing
+        the changes that need to be applied to first json to get second json for a
+        specific key.
     """
-    original_value = original_json.get(key)
-    new_value = new_json.get(key)
+    original_values = original_json.get(key)
+    new_values = new_json.get(key)
 
-    if not isinstance(original_value, list_like_classes):
-        if original_value == new_value:
+    if not isinstance(original_values, list_like_classes):
+        if original_values == new_values:
             return None
-        return JSONAttributeDiff(
-            attribute_name=key, added_values=[from_json(new_value, **kwargs)]
-        )
+        return JSONAttributeDiff(attribute_name=key, added_values=[new_values])
 
-    add = [from_json(x, **kwargs) for x in new_value if x not in original_value]
-    remove = [from_json(x, **kwargs) for x in original_value if x not in new_value]
+    add = [new_value for new_value in new_values if new_value not in original_values]
+    remove = [
+        original_value
+        for original_value in original_values
+        if original_value not in new_values
+    ]
     if not (add or remove):
         return None
     return JSONAttributeDiff(
@@ -326,8 +355,8 @@ class ExternalClassJSONSerializer(HasGeneric[T], ABC):
     """
     ABC for all added JSON de/serializers that are outside the control of your classes.
 
-    Create a new subclass of this class pointing to your original class whenever you can't change its inheritance path
-    to `SubclassJSONSerializer`.
+    Create a new subclass of this class pointing to your original class whenever you
+    can't change its inheritance path to `SubclassJSONSerializer`.
     """
 
     @classmethod
@@ -356,8 +385,8 @@ class ExternalClassJSONSerializer(HasGeneric[T], ABC):
         Determines if the provided class type matches the original class type.
 
         :param clazz: The class type to compare against the original class type.
-        :return: A boolean value indicating whether the provided class type matches
-                 the original class type.
+        :return: A boolean value indicating whether the provided class type matches the
+            original class type.
         """
         return cls.original_class() == clazz
 
@@ -382,14 +411,16 @@ class UUIDJSONSerializer(ExternalClassJSONSerializer[uuid.UUID]):
 @dataclass
 class ClassJSONSerializer(ExternalClassJSONSerializer[None]):
     """
-    A class that provides mechanisms for serializing and deserializing Python classes
-    to and from JSON representations.
+    A class that provides mechanisms for serializing and deserializing Python classes to
+    and from JSON representations.
     """
 
     @classmethod
     def to_json(cls, obj: Type) -> Dict[str, Any]:
         """
-        This is a special case because we need to remember that the type of the class is a class, not a type.
+        This is a special case because we need to remember that the type of the class is
+        a class, not a type.
+
         .. note:: We can't do type(obj) because that often returns just `type`.
         """
         return {
@@ -460,8 +491,9 @@ class NumpyNDarrayJSONSerializer(ExternalClassJSONSerializer[np.ndarray]):
 class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
     """
     Generic JSON serializer for dataclasses.
-    It creates a dict where all fields are serialized using the to_json function.
-    If this is not enough, you still need to implement a custom serializer.
+
+    It creates a dict where all fields are serialized using the to_json function. If
+    this is not enough, you still need to implement a custom serializer.
     """
 
     @classmethod
@@ -516,7 +548,9 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
 
 @dataclass
 class NumpyFloatJSONSerializer(ExternalClassJSONSerializer[np.float32]):
-    """External JSON serializer for numpy floats."""
+    """
+    External JSON serializer for numpy floats.
+    """
 
     @classmethod
     def to_json(cls, obj: np.float32) -> Dict[str, Any]:

@@ -11,26 +11,35 @@ if TYPE_CHECKING:
 class IntractableError(DataclassException):
     """
     Exception raised when an inference is intractable for a model.
+
     For instance, the mode of a non-deterministic model.
     """
 
     model: ProbabilisticModel
 
-    def __post_init__(self):
-        self.message = f"Inference is intractable for {self.model}."
+    def error_message(self) -> str:
+        return f"Inference is intractable for {self.model}."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 @dataclass
 class UndefinedOperationError(DataclassException):
     """
     Exception raised when an operation is not defined for a model.
+
     For instance, invoking the CDF of a model that contains symbolic variables.
     """
 
     model: ProbabilisticModel
 
-    def __post_init__(self):
-        self.message = f"Operation is not defined for {self.model}."
+    def error_message(self) -> str:
+        return f"Operation is not defined for {self.model}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
 
 @dataclass
 class ShapeMismatchError(DataclassException, ValueError):
@@ -48,5 +57,8 @@ class ShapeMismatchError(DataclassException, ValueError):
     The second object to compare.
     """
 
-    def __post_init__(self):
-        self.message = f"Expected shape {self.expected_shape}, received shape {self.received_shape}"
+    def error_message(self) -> str:
+        return f"Expected shape {self.expected_shape}, received shape {self.received_shape}"
+
+    def suggest_correction(self) -> str:
+        return ""

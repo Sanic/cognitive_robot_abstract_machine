@@ -4,7 +4,9 @@ from semantic_digital_twin.world_description.geometry import Scale, Color
 
 
 class WorldDescriptor(BaseWorldDescriptor):
-    """A compact tabletop world for SemDT RayTracer with cylindrical target objects."""
+    """
+    A compact tabletop world for SemDT RayTracer with cylindrical target objects.
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -14,10 +16,10 @@ class WorldDescriptor(BaseWorldDescriptor):
         table_thickness = 0.06
         table_surface_region_thickness = 0.03
 
-        red_cyl_width = 0.10
-        red_cyl_height = 0.10
-        blue_cyl_width = 0.08
-        blue_cyl_height = 0.14
+        red_cylinder_width = 0.10
+        red_cylinder_height = 0.10
+        blue_cylinder_width = 0.08
+        blue_cylinder_height = 0.14
 
         object_specs = [
             ObjectSpec(
@@ -32,26 +34,26 @@ class WorldDescriptor(BaseWorldDescriptor):
                 ),
             ),
             ObjectSpec(
-                name="box_red",
-                cylinder_width=red_cyl_width,
-                cylinder_height=red_cyl_height,
+                name="cylinder_red",
+                cylinder_width=red_cylinder_width,
+                cylinder_height=red_cylinder_height,
                 color=Color(0.83, 0.20, 0.20, 1.0),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.20,
                     y=1.20,
-                    z=table_top_z + (red_cyl_height / 2.0),
+                    z=table_top_z + (red_cylinder_height / 2.0),
                     reference_frame=root,
                 ),
             ),
             ObjectSpec(
-                name="box_blue",
-                cylinder_width=blue_cyl_width,
-                cylinder_height=blue_cyl_height,
+                name="cylinder_blue",
+                cylinder_width=blue_cylinder_width,
+                cylinder_height=blue_cylinder_height,
                 color=Color(0.22, 0.37, 0.82, 1.0),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.00,
                     y=1.32,
-                    z=table_top_z + (blue_cyl_height / 2.0),
+                    z=table_top_z + (blue_cylinder_height / 2.0),
                     yaw=0.40,
                     reference_frame=root,
                 ),

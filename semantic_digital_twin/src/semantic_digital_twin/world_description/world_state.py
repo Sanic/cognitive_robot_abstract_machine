@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 class WorldStateEntryView:
     """
     Returned if you access members in WorldState.
+
     Provides a more convenient interface to the data of a single DOF.
     """
 
@@ -40,7 +41,9 @@ class WorldStateEntryView:
 
     lock: threading.RLock
     """
-    Lock for thread safety. This should be the same lock instance as the world has.
+    Lock for thread safety.
+
+    This should be the same lock instance as the world has.
     """
 
     def __getitem__(self, item: Derivatives) -> float:
@@ -88,7 +91,9 @@ class WorldStateEntryView:
 class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     """
     Tracks the state of all DOF in the world.
-    Data is stored in a 4xN numpy array, such that it can be used as input for compiled functions without copying.
+
+    Data is stored in a 4xN numpy array, such that it can be used as input for compiled
+    functions without copying.
 
     This class adds a few convenience methods for manipulating this data.
     """
@@ -106,8 +111,10 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 
     version: int = 0
     """
-    The version of the state. This increases whenever a change to the state of the kinematic model is made. 
-    Mostly triggered by updating connection values.
+    The version of the state.
+
+    This increases whenever a change to the state of the kinematic model is made. Mostly
+    triggered by updating connection values.
     """
 
     state_change_callbacks: List[StateChangeCallback] = field(
@@ -119,12 +126,12 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 
     def _notify_state_change(self, **kwargs) -> None:
         """
-        If you have changed the state of the world, call this function to trigger necessary events and increase
-        the state version.
+        If you have changed the state of the world, call this function to trigger
+        necessary events and increase the state version.
         """
         self.version += 1
-        for callback in self.state_change_callbacks:
-            callback.notify(**kwargs)
+        for callback in list(self.state_change_callbacks):
+            callback.notify_state_change(**kwargs)
 
     def clear(self):
         with self.world_lock:
@@ -199,9 +206,13 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             if set(self._ids) != set(other._ids):
                 return False
 
+            # align the columns of `other` to this state's column order, so that
+            # states with the same per-DOF values compare equal regardless of
+            # the order in which the DOFs were added
+            other_column_order = [other._index[dof_id] for dof_id in self._ids]
             return np.allclose(
                 self._data,
-                other._data,
+                other._data[:, other_column_order],
                 rtol=1e-8,
                 atol=1e-12,
                 equal_nan=True,
@@ -209,7 +220,8 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 
     def keys(self) -> List[UUID]:
         with self.world_lock:
-            return self._ids
+            # return a copy so that callers cannot corrupt the internal bookkeeping
+            return list(self._ids)
 
     def items(self) -> List[tuple[UUID, np.ndarray]]:
         with self.world_lock:
@@ -280,6 +292,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     def set_derivative(self, derivative: Derivatives, new_state: np.ndarray):
         """
         Overwrite the data for a whole derivative row.
+
         Assums that the order of the DOFs is consistent.
         """
         with self.world_lock:
@@ -298,7 +311,8 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 
     def add_degree_of_freedom(self, dof: DegreeOfFreedom):
         """
-        Adds a degree of freedom to the world state, initializing its position to 0 or the nearest limit.
+        Adds a degree of freedom to the world state, initializing its position to 0 or
+        the nearest limit.
         """
         with self.world_lock:
             dof.create_variables()
@@ -317,14 +331,16 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 
     def get_variables(self) -> List[FloatVariable]:
         """
-        Constructs and returns a list of variables representing the state of the system. The state
-        is defined in terms of positions, velocities, accelerations, and jerks for each degree
-        of freedom specified in the current state.
+        Constructs and returns a list of variables representing the state of the system.
+
+        The state is defined in terms of positions, velocities, accelerations, and jerks
+        for each degree of freedom specified in the current state.
 
         :raises KeyError: If a degree of freedom defined in the state does not exist in
             the `degrees_of_freedom`.
-        :returns: A combined list of variables corresponding to the positions, velocities,
-            accelerations, and jerks for each degree of freedom in the state.
+        :returns: A combined list of variables corresponding to the positions,
+            velocities, accelerations, and jerks for each degree of freedom in the
+            state.
         """
         with self.world_lock:
             positions = [
@@ -353,11 +369,12 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         self, commands: np.ndarray, dt: float, derivative: Derivatives
     ):
         """
-        Apply control commands to the specified derivative level, and integrate down to lower derivatives.
+        Apply control commands to the specified derivative level, and integrate down to
+        lower derivatives.
 
         :param commands: Control commands to be applied at the specified derivative
-            level. The array length must match the number of free variables
-            in the system.
+            level. The array length must match the number of free variables in the
+            system.
         :param dt: Time step used for the integration of lower derivatives.
         :param derivative: The derivative level to which the control commands are
             applied.
@@ -380,9 +397,14 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 
     def merge_state(self, other: WorldState):
         """
-        Merges another WorldState into this one, overwriting values for any DOFs that are present in both states.
+        Merges another WorldState into this one, overwriting values for any DOFs that
+        are present in both states.
+
+        If a DOF only exists in the other state, a DofNotInWorldStateError is raised.
         """
         for dof_id in other:
+            if dof_id not in self:
+                raise DofNotInWorldStateError(dof_id)
             self_state_dof = self[dof_id]
             other_state_dof = other[dof_id]
             self_state_dof.position = other_state_dof.position
@@ -394,8 +416,8 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 @dataclass
 class WorldStateView:
     """
-    A lightweight view on a single time step of the trajectory that offers the
-    same convenience interface as `WorldState` for per-DOF access.
+    A lightweight view on a single time step of the trajectory that offers the same
+    convenience interface as `WorldState` for per-DOF access.
 
     ..warning:: It does not own memory; mutation writes through to the parent trajectory.
     """
@@ -403,12 +425,20 @@ class WorldStateView:
     _data: np.ndarray
     """
     Multidimensional array containing the recorded world state data.
+
     shape (4, N), view into trajectory.
     """
+
     _ids: List[UUID]
-    """List of DOF ids in column order."""
+    """
+    List of DOF ids in column order.
+    """
+
     _index: Dict[UUID, int]
-    """Maps DOF ids to column indices."""
+    """
+    Maps DOF ids to column indices.
+    """
+
     lock: threading.RLock
 
     def __getitem__(self, dof_id: UUID) -> WorldStateEntryView:
@@ -447,30 +477,51 @@ class WorldStateTrajectory:
     Represents a trajectory of world states over time in a given world.
 
     This class is used to track and manage a sequence of world states at various
-    timestamps. It provides functionality to append new states to the trajectory,
-    and to retrieve states or their timing information.
+    timestamps. It provides functionality to append new states to the trajectory, and to
+    retrieve states or their timing information.
     """
 
     world: World
-    """The world instance associated with this trajectory."""
+    """
+    The world instance associated with this trajectory.
+    """
+
     _ids: List[UUID] = field(default_factory=list)
-    """List of DOF ids in column order."""
+    """
+    List of DOF ids in column order.
+    """
+
     _index: Dict[UUID, int] = field(default_factory=dict)
-    """Maps DOF ids to column indices."""
+    """
+    Maps DOF ids to column indices.
+    """
+
     _times: List[float] = field(default_factory=list, repr=False)
-    """List of timestamps corresponding to the recorded world states."""
+    """
+    List of timestamps corresponding to the recorded world states.
+    """
+
     _data: List[np.ndarray] = field(default_factory=list, repr=False)
     """
     List containing the recorded world state data as numpy arrays.
+
     Each array has shape (4, N).
     """
+
     _times_cache: Optional[np.ndarray] = field(default=None, init=False, repr=False)
-    """Cache for the numpy array of timestamps."""
+    """
+    Cache for the numpy array of timestamps.
+    """
+
     _data_cache: Optional[np.ndarray] = field(default=None, init=False, repr=False)
-    """Cache for the numpy array of world state data."""
+    """
+    Cache for the numpy array of world state data.
+    """
+
     _world_version: int = field(init=False)
     """
     The version of the world model at the time of trajectory creation.
+
     All states appended to this trajectory must have the same version as this value.
     """
 
@@ -479,7 +530,9 @@ class WorldStateTrajectory:
 
     @property
     def times(self) -> np.ndarray:
-        """Array of timestamps corresponding to the recorded world states."""
+        """
+        Array of timestamps corresponding to the recorded world states.
+        """
         with self.world_lock():
             if self._times_cache is None:
                 self._times_cache = np.array(self._times, dtype=float)
@@ -489,9 +542,9 @@ class WorldStateTrajectory:
     def data(self) -> np.ndarray:
         """
         Multidimensional array containing the recorded world state data.
-        The first dimension indexes time steps.
-        The second dimension indexes the derivatives.
-        The third dimension indexes the DOFs.
+
+        The first dimension indexes time steps. The second dimension indexes the
+        derivatives. The third dimension indexes the DOFs.
         """
         with self.world_lock():
             if self._data_cache is None:
@@ -506,11 +559,12 @@ class WorldStateTrajectory:
         """
         Creates an instance of the class using the given world state and timestamp.
 
-        :param state: The current state of the world. Represents the state as an
-            object of type `WorldState`.
+        :param state: The current state of the world. Represents the state as an object
+            of type `WorldState`.
         :param time: The timestamp associated with the state. This represents the
             specific time as a floating-point value.
-        :return: An instance of the class created using the provided world state and timestamp.
+        :return: An instance of the class created using the provided world state and
+            timestamp.
         """
         return cls(
             world=state._world,
@@ -530,8 +584,8 @@ class WorldStateTrajectory:
         version consistency is maintained.
 
         :param state: The current state of the world to append.
-        :param time: The time corresponding to the new state to append. Must be
-            greater than the last time in the series.
+        :param time: The time corresponding to the new state to append. Must be greater
+            than the last time in the series.
         """
         with self.world_lock():
             current_world_model_version = state._world.get_world_model_manager().version
@@ -557,12 +611,12 @@ class WorldStateTrajectory:
         """
         Yields state views for every time step.
 
-        This method iterates over the available time steps and generates
-        a `WorldStateView` object for each one. The yielded views represent
-        the state at that specific time step.
+        This method iterates over the available time steps and generates a
+        `WorldStateView` object for each one. The yielded views represent the state at
+        that specific time step.
 
-        :yield: An iterator of `WorldStateView` objects representing the data
-                at each time step.
+        :yield: An iterator of `WorldStateView` objects representing the data at each
+            time step.
         """
         with self.world_lock():
             for idx in range(len(self._times)):

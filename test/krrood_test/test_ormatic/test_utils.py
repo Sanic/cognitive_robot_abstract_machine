@@ -1,4 +1,8 @@
-from krrood.utils import inheritance_path_length
+import pytest
+from krrood.ormatic.exceptions import UnsupportedColumnType
+from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column
+from krrood.inheritance_path_length import inheritance_path_length
+
 from ..dataset.example_classes import *
 
 
@@ -28,3 +32,26 @@ def test_distance_between_classes():
     assert inheritance_path_length(D, A) == 2
     assert inheritance_path_length(E, A) == 2
     assert inheritance_path_length(WackyEnum, Enum) == 1
+
+
+def test_sqlalchemy_column_type_extraction():
+    from krrood.ormatic.custom_types import PolymorphicEnumType
+    from sqlalchemy import Boolean, Column, Integer, String
+
+    assert get_python_type_from_sqlalchemy_column(Column(Integer)) == int
+    assert get_python_type_from_sqlalchemy_column(Column(String)) == str
+    assert get_python_type_from_sqlalchemy_column(Column(Boolean)) == bool
+    assert get_python_type_from_sqlalchemy_column(Column(PolymorphicEnumType)) == Enum
+
+    class TestUnsupportedCustomType(TypeDecorator):
+        impl = types.Unicode(50)
+        cache_ok = True
+
+        def process_bind_param(self, value, dialect):
+            return value
+
+        def process_result_value(self, value, dialect):
+            return value
+
+    with pytest.raises(UnsupportedColumnType):
+        get_python_type_from_sqlalchemy_column(Column(TestUnsupportedCustomType))

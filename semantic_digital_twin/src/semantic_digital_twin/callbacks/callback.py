@@ -9,7 +9,9 @@ import numpy as np
 from typing_extensions import Dict
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from semantic_digital_twin.world_description.world_entity import WorldEntityWithClassBasedID
+from semantic_digital_twin.world_description.world_entity import (
+    WorldEntityWithClassBasedID,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +19,12 @@ logger = logging.getLogger(__name__)
 @dataclass(eq=False)
 class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
     """
-    Callback is an abstract base class (ABC)
-    reacting to changes in the associated `_world`.
-    It provides a flexible mechanism for subclasses to implement custom behaviors to be triggered
-    whenever a change occurs.
+    Callback is an abstract base class (ABC) reacting to changes in the associated
+    `_world`. It provides a flexible mechanism for subclasses to implement custom
+    behaviors to be triggered whenever a change occurs.
 
-    The primary purpose of this class is to encapsulate logic that needs to be
-    executed as a response to certain events or changes within the `_world` object.
+    The primary purpose of this class is to encapsulate logic that needs to be executed
+    as a response to certain events or changes within the `_world` object.
     """
 
     _is_paused = False
@@ -31,29 +32,14 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
     Flag that indicates if the callback is paused.
     """
 
-    def notify(self, **kwargs):
-        """
-        Notify the callback of a change in the world.
-        """
-        if self._is_paused:
-            pass
-        else:
-            self._notify(**kwargs)
-
-    @abstractmethod
-    def _notify(self, **kwargs):
-        """
-        Notify the callback of a change in the world.
-        Override this method to implement custom behaviors.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
     def stop(self):
         """
         Stop the callback.
+
+        Should be overridden by the Subclasses. Subclasses should call super().stop()
+        after their own cleanup.
         """
-        raise NotImplementedError
+        pass
 
     def pause(self):
         """
@@ -70,6 +56,7 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
     def to_json(self) -> Dict[str, Any]:
         return {**super().to_json(), "is_paused": self._is_paused}
 
+    @classmethod
     def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
         instance = super()._from_json(data, **kwargs)
         instance._is_paused = data.get("is_paused", False)
@@ -91,11 +78,20 @@ class StateChangeCallback(Callback, ABC):
         self._world.state.state_change_callbacks.append(self)
         self.update_previous_world_state()
 
+    def notify_state_change(self, **kwargs):
+        if not self._is_paused:
+            self.on_state_change(**kwargs)
+
+    @abstractmethod
+    def on_state_change(self, **kwargs):
+        raise NotImplementedError
+
     def stop(self):
         try:
             self._world.state.state_change_callbacks.remove(self)
         except ValueError:
             pass
+        super().stop()
 
     def update_previous_world_state(self):
         """
@@ -114,8 +110,17 @@ class ModelChangeCallback(Callback, ABC):
         super().__post_init__()
         self._world.get_world_model_manager().model_change_callbacks.append(self)
 
+    def notify_model_change(self, **kwargs):
+        if not self._is_paused:
+            self.on_model_change(**kwargs)
+
+    @abstractmethod
+    def on_model_change(self, **kwargs):
+        raise NotImplementedError
+
     def stop(self):
         try:
             self._world.get_world_model_manager().model_change_callbacks.remove(self)
         except ValueError:
             pass
+        super().stop()
