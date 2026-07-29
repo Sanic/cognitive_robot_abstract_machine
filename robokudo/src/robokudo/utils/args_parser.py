@@ -6,7 +6,9 @@ from robokudo.defs import PACKAGE_NAME
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse the RoboKudo CLI args and return them."""
+    """
+    Parse the RoboKudo CLI args and return them.
+    """
     parser = argparse.ArgumentParser(prefix_chars="_")
     parser.add_argument(
         "_ae",
@@ -81,5 +83,5 @@ def parse_args() -> argparse.Namespace:
         sys.exit(1)
 
     args.vis = args.vis.replace(" ", "").split(",") if args.vis else args.vis
-    args = parser.parse_args()
+
     return args
