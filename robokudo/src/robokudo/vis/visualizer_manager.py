@@ -73,7 +73,7 @@ class VisualizationManager(Behaviour):
 
         if "web" in visualizers:
             try:
-                from robokudo_web.web.web_visualizer import WebVisualizer
+                from robokudo_web.vis.web_visualizer import WebVisualizer
             except ImportError as e:
                 self.rk_logger.error(f"Import of the web visualizer failed: {e}")
                 raise e
