@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from robokudo.cas import CASViews
-from semantic_digital_twin.world_description.geometry import Box, Cylinder
+from semantic_digital_twin.world_description.geometry import Box, Cylinder, Mesh
 from semantic_digital_twin.world_description.world_entity import Body
 
 from typing_extensions import TYPE_CHECKING
@@ -90,6 +90,22 @@ def get_body_pose_world(body: Body) -> np.ndarray | None:
     return pose_world
 
 
+def mesh_vertices_in_body_frame(mesh: Mesh) -> np.ndarray | None:
+    """
+    Return mesh vertices after applying the mesh-local origin transform.
+    """
+    vertices = np.asarray(mesh.mesh.vertices, dtype=np.float64)
+    if vertices.ndim != 2 or vertices.shape[1] != 3 or len(vertices) == 0:
+        return None
+    origin = np.asarray(mesh.origin.to_np(), dtype=np.float64)
+    if origin.shape != (4, 4) or not np.all(np.isfinite(origin)):
+        return None
+
+    vertices_homogeneous = np.ones((vertices.shape[0], 4), dtype=np.float64)
+    vertices_homogeneous[:, :3] = vertices
+    return (origin @ vertices_homogeneous.T).T[:, :3]
+
+
 def body_world_aabb_at_center(
     body: Body, center_world: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray] | None:
@@ -106,6 +122,11 @@ def body_world_aabb_at_center(
     rotation_world = pose_world[:3, :3]
     if not np.all(np.isfinite(rotation_world)):
         return None
+
+    center = np.asarray(center_world, dtype=np.float64)
+    if center.shape[0] < 3 or not np.all(np.isfinite(center[:3])):
+        return None
+    center = center[:3]
 
     shape = body.collision[0]
     if isinstance(shape, Box):
@@ -139,13 +160,16 @@ def body_world_aabb_at_center(
             half_extents_world[axis_idx] = (axial_component * half_height) + (
                 radial_component * radius
             )
+    elif isinstance(shape, Mesh):
+        vertices_body = mesh_vertices_in_body_frame(shape)
+        if vertices_body is None:
+            return None
+        vertices_world = (rotation_world @ vertices_body.T).T + center
+        if vertices_world.ndim != 2 or vertices_world.shape[1] != 3:
+            return None
+        return vertices_world.min(axis=0), vertices_world.max(axis=0)
     else:
         return None
-
-    center = np.asarray(center_world, dtype=np.float64)
-    if center.shape[0] < 3 or not np.all(np.isfinite(center[:3])):
-        return None
-    center = center[:3]
     return center - half_extents_world, center + half_extents_world
 
 
@@ -201,6 +225,16 @@ def body_support_extent_along_normal(
         axial_component = abs(float(np.dot(normal, axis_world)))
         radial_component = float(np.sqrt(max(0.0, 1.0 - (axial_component**2))))
         return float((axial_component * half_height) + (radial_component * radius))
+
+    if isinstance(shape, Mesh):
+        vertices_body = mesh_vertices_in_body_frame(shape)
+        if vertices_body is None:
+            return None
+        normal_body = rotation_world.T @ normal
+        projections = vertices_body @ normal_body
+        if projections.ndim != 1 or len(projections) == 0:
+            return None
+        return float(max(0.0, -float(np.min(projections))))
 
     return None
 

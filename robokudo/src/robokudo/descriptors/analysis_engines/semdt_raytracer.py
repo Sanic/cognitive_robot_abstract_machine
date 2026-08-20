@@ -29,7 +29,7 @@ from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
 
 
-def classify_boxes_by_color(annotator: LambdaFunctionAnnotator) -> None:
+def classify_objects_by_color(annotator: LambdaFunctionAnnotator) -> None:
     """
     Attach a simple color-based Classification annotation to each ObjectHypothesis.
     """
@@ -45,7 +45,10 @@ def classify_boxes_by_color(annotator: LambdaFunctionAnnotator) -> None:
             continue
 
         b, g, r = mean_bgr
-        if b > r + 15.0 and b > g:
+        if r > 150.0 and g > 120.0 and b < 100.0:
+            class_name = "needle"
+            class_id = 3
+        elif b > r + 15.0 and b > g:
             class_name = "cylinder_blue"
             class_id = 2
         elif r > b + 15.0 and r > g:
@@ -115,30 +118,43 @@ class AnalysisEngine(AnalysisEngineInterface):
     def implementation(self) -> Pipeline:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             "semdt_raytracer",
-            world_descriptor_name="world_semdt_raytracer_cylinders",
+            world_descriptor_name="world_semdt_raytracer_needle",
         )
         color_classifier_descriptor = LambdaFunctionAnnotator.Descriptor()
-        color_classifier_descriptor.parameters.func = classify_boxes_by_color
+        color_classifier_descriptor.parameters.func = classify_objects_by_color
 
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01
+        cluster_desc = PointCloudClusterExtractor.Descriptor()
+        cluster_desc.parameters.dbscan_min_cluster_count = 8
+        cluster_desc.parameters.min_cluster_count = 20
+        cluster_desc.parameters.min_on_plane_point_count = 20
+        cluster_desc.parameters.eps = 0.03
+
         expected_state_desc = ExpectedStateRendererAnnotator.Descriptor()
-        expected_state_desc.parameters.target_classname = "cylinder_blue"
-        expected_state_desc.parameters.ground_truth_body_name = "cylinder_blue"
+        expected_state_desc.parameters.target_classname = "needle"
+        expected_state_desc.parameters.expected_object_name = "expected_needle"
+        expected_state_desc.parameters.ground_truth_body_name = "needle"
         expected_state_desc.parameters.use_support_surface_constraint = True
+        expected_state_desc.parameters.random_offset_translation_m = 0.12
         expected_state_desc.parameters.candidate_pose_generation_mode = (
             "support_surface_sampling"
         )
-        expected_state_desc.parameters.candidate_pose_sample_count = 60
+        expected_state_desc.parameters.candidate_pose_sample_count = 90
         expected_state_desc.parameters.candidate_pose_include_seed_center = True
-        expected_state_desc.parameters.candidate_pose_sampling_radius_m = 0.16
+        expected_state_desc.parameters.candidate_pose_sampling_radius_m = 0.12
         expected_state_desc.parameters.refinement_max_iterations = 40
         expected_state_desc.parameters.refinement_max_step_m = 0.02
         expected_state_desc.parameters.refinement_min_iterations_before_convergence = 5
-        expected_state_desc.parameters.refinement_convergence_pixel_error = 0.05
-        expected_state_desc.parameters.refinement_score_delta_pixel_error_gate = 0.25
+        expected_state_desc.parameters.refinement_convergence_pixel_error = 1.0
+        expected_state_desc.parameters.refinement_min_outline_score_for_convergence = (
+            0.30
+        )
+        expected_state_desc.parameters.refinement_score_delta_pixel_error_gate = 1.0
         expected_state_desc.parameters.refinement_pixel_error_patience_iterations = 12
         expected_state_desc.parameters.refinement_pixel_error_patience_min_delta = 0.01
+        expected_state_desc.parameters.pose_prior_translation_scale_m = 0.06
+        expected_state_desc.parameters.pose_prior_weight = 0.8
         expected_state_desc.parameters.support_surface_plane_clearance_m = 0.002
         expected_state_desc.parameters.save_tuning_log_jsonl = True
         expected_state_desc.parameters.tuning_log_jsonl_path = (
@@ -156,7 +172,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
-                PointCloudClusterExtractor(),
+                PointCloudClusterExtractor(descriptor=cluster_desc),
                 ClusterPoseBBAnnotator(),
                 LambdaFunctionAnnotator(
                     name="RayTracerColorClassifier",

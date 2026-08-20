@@ -1,4 +1,6 @@
-"""Utilities for image-driven translation-only pose refinement."""
+"""
+Utilities for image-driven translation-only pose refinement.
+"""
 
 from __future__ import annotations
 
@@ -11,15 +13,32 @@ def pose_agreement_score(
     pixel_error: float,
     centroid_scale_px: float,
     centroid_weight: float,
+    prior_distance_m: float = 0.0,
+    prior_scale_m: float = 1.0,
+    prior_weight: float = 0.0,
 ) -> float:
-    """Combine silhouette score with centroid closeness into one scalar objective."""
+    """
+    Combine silhouette, centroid, and optional pose-prior agreement.
+    """
     scale_px = max(float(centroid_scale_px), 1e-3)
     weight = max(float(centroid_weight), 0.0)
     clipped_px = float(np.clip(pixel_error, 0.0, scale_px))
     normalized_penalty = clipped_px / scale_px
     if not np.isfinite(pixel_error):
         normalized_penalty = 1.0
-    return float(outline_score) - (weight * normalized_penalty)
+
+    prior_scale = max(float(prior_scale_m), 1e-6)
+    prior_penalty = 0.0
+    if prior_weight > 0.0:
+        clipped_prior_distance = float(np.clip(prior_distance_m, 0.0, prior_scale))
+        prior_penalty = clipped_prior_distance / prior_scale
+        if not np.isfinite(prior_distance_m):
+            prior_penalty = 1.0
+    return (
+        float(outline_score)
+        - (weight * normalized_penalty)
+        - (max(float(prior_weight), 0.0) * prior_penalty)
+    )
 
 
 def is_refinement_result_better(
@@ -29,19 +48,31 @@ def is_refinement_result_better(
     incumbent_pixel_error: float,
     centroid_scale_px: float,
     centroid_weight: float,
+    candidate_prior_distance_m: float = 0.0,
+    incumbent_prior_distance_m: float = 0.0,
+    prior_scale_m: float = 1.0,
+    prior_weight: float = 0.0,
 ) -> bool:
-    """Rank results by joint silhouette/centroid agreement, then silhouette, then centroid."""
+    """
+    Rank results by joint silhouette/centroid/prior agreement.
+    """
     candidate_agreement = pose_agreement_score(
         outline_score=float(candidate_outline_score),
         pixel_error=float(candidate_pixel_error),
         centroid_scale_px=centroid_scale_px,
         centroid_weight=centroid_weight,
+        prior_distance_m=candidate_prior_distance_m,
+        prior_scale_m=prior_scale_m,
+        prior_weight=prior_weight,
     )
     incumbent_agreement = pose_agreement_score(
         outline_score=float(incumbent_outline_score),
         pixel_error=float(incumbent_pixel_error),
         centroid_scale_px=centroid_scale_px,
         centroid_weight=centroid_weight,
+        prior_distance_m=incumbent_prior_distance_m,
+        prior_scale_m=prior_scale_m,
+        prior_weight=prior_weight,
     )
     if candidate_agreement > incumbent_agreement + 1e-6:
         return True
@@ -75,7 +106,8 @@ def estimate_translation_shift_world(
     max_step_m: float,
     project_center_fn: Callable[[np.ndarray], np.ndarray] | None = None,
 ) -> tuple[np.ndarray | None, int, str | None]:
-    """Estimate translation step in world frame from centroid error and local Jacobian.
+    """
+    Estimate translation step in world frame from centroid error and local Jacobian.
 
     Returns:
     - shift vector or None

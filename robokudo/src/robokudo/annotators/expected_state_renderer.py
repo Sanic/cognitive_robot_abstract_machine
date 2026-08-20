@@ -4,6 +4,7 @@ Render a simple expected world state from current camera perspective.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -31,6 +32,7 @@ from robokudo.utils.cv_helper import (
     mask_centroid,
     object_hypothesis_to_mask,
 )
+from robokudo.utils.o3d_helper import trimesh_to_o3d_mesh
 from robokudo.utils.semdt_ground_truth import (
     body_aabb_intersects_other_collidable_bodies,
     body_support_extent_along_normal,
@@ -51,9 +53,18 @@ from robokudo.utils.pose_sampling import (
     sample_random_offset_translation,
 )
 from robokudo.utils.transform import transform_plane_from_source_to_target
-from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec
+from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec, PredefinedObject
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.geometry import Box, Cylinder, Scale, Color
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.geometry import (
+    Box,
+    Color,
+    Cylinder,
+    Mesh,
+    Scale,
+)
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -97,6 +108,9 @@ class GroundTruthObjectModel:
     box_scale: Scale | None
     cylinder_width: float | None
     cylinder_height: float | None
+    mesh_path: Path | None
+    mesh_origin: HomogeneousTransformationMatrix | None
+    mesh_scale: Scale | None
     color: Color
     rotation_world: np.ndarray
 
@@ -165,6 +179,10 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 self.pose_agreement_centroid_scale_px: float = 25.0
                 #: Weight of centroid penalty in joint pose-agreement score.
                 self.pose_agreement_centroid_weight: float = 0.25
+                #: Distance scale for optional 3D pose-prior penalty (meters).
+                self.pose_prior_translation_scale_m: float = 0.05
+                #: Weight of 3D pose-prior penalty in candidate/result ranking.
+                self.pose_prior_weight: float = 0.0
                 #: Require px_err to be below this value before score-delta stop can trigger.
                 self.refinement_score_delta_pixel_error_gate: float = 5.0
                 #: Stop when px_err shows no meaningful improvement for this many iterations.
@@ -272,6 +290,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         )
         initial_center_world = self._select_initial_center_from_candidates(
             candidate_centers_world=candidate_centers_world,
+            reference_center_world=target_center_world,
             detected_mask=detected_mask,
             gt_object_model=gt_object_model,
             camera_info=camera_info,
@@ -279,6 +298,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         )
         refinement = self._refine_expected_pose_translation(
             initial_center_world=initial_center_world,
+            reference_center_world=target_center_world,
             detected_mask=detected_mask,
             gt_object_model=gt_object_model,
             camera_info=camera_info,
@@ -314,11 +334,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             if len(refinement.score_history) > 0
             else outline_match.combined_score
         )
-        score_final = (
-            float(refinement.score_history[-1])
-            if len(refinement.score_history) > 0
-            else outline_match.combined_score
-        )
+        score_final = float(outline_match.combined_score)
         self._log_refinement_summary(
             initial_center_world=initial_center_world,
             refinement=refinement,
@@ -574,6 +590,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _select_initial_center_from_candidates(
         self,
         candidate_centers_world: list[np.ndarray],
+        reference_center_world: np.ndarray | None,
         detected_mask: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
         camera_info: CameraInfo,
@@ -589,7 +606,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             return candidate_centers_world[0].astype(np.float64).copy()
 
         best_center = candidate_centers_world[0].astype(np.float64).copy()
-        best_key = (float("inf"), float("inf"), 1, float("inf"))
+        best_key = (float("inf"), float("inf"), 1, float("inf"), float("inf"))
         for center_world in candidate_centers_world:
             _, expected_mask = self._render_expected_mask_for_center(
                 object_center_world=center_world,
@@ -616,17 +633,48 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 centroid_weight=float(
                     self.descriptor.parameters.pose_agreement_centroid_weight
                 ),
+                prior_distance_m=self._translation_prior_distance_m(
+                    center_world=center_world,
+                    reference_center_world=reference_center_world,
+                ),
+                prior_scale_m=float(
+                    self.descriptor.parameters.pose_prior_translation_scale_m
+                ),
+                prior_weight=float(self.descriptor.parameters.pose_prior_weight),
             )
             rank_key = (
                 float(-agreement_score),
                 float(-outline_match.combined_score),
                 finite_flag,
                 float(pixel_error),
+                self._translation_prior_distance_m(
+                    center_world=center_world,
+                    reference_center_world=reference_center_world,
+                ),
             )
             if rank_key < best_key:
                 best_key = rank_key
                 best_center = center_world.astype(np.float64).copy()
         return best_center
+
+    @staticmethod
+    def _translation_prior_distance_m(
+        center_world: np.ndarray,
+        reference_center_world: np.ndarray | None,
+    ) -> float:
+        """
+        Return distance to the observed pose center used as a soft ranking prior.
+        """
+        if reference_center_world is None:
+            return 0.0
+        center = np.asarray(center_world, dtype=np.float64)
+        reference = np.asarray(reference_center_world, dtype=np.float64)
+        if center.shape[0] < 3 or reference.shape[0] < 3:
+            return float("inf")
+        distance = float(np.linalg.norm(center[:3] - reference[:3]))
+        if not np.isfinite(distance):
+            return float("inf")
+        return distance
 
     def _create_candidate_sampling_rng(self) -> np.random.Generator:
         """
@@ -742,6 +790,16 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             )
             return None
 
+        mesh_shape = self._first_mesh_shape(body.collision)
+        if mesh_shape is None:
+            mesh_shape = self._first_mesh_shape(body.visual)
+        if mesh_shape is not None:
+            return self._ground_truth_object_model_from_mesh_shape(
+                body_name=body_name,
+                mesh_shape=mesh_shape,
+                rotation_world=rotation_world,
+            )
+
         shape = body.collision[0]
         shape_type: str
         box_scale: Scale | None = None
@@ -799,6 +857,59 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             cylinder_height=(
                 float(cylinder_height) if cylinder_height is not None else None
             ),
+            mesh_path=None,
+            mesh_origin=None,
+            mesh_scale=None,
+            color=Color(
+                float(shape_color.R),
+                float(shape_color.G),
+                float(shape_color.B),
+                float(shape_color.A),
+            ),
+            rotation_world=rotation_world.copy(),
+        )
+
+    @staticmethod
+    def _first_mesh_shape(shapes: Iterable[object]) -> Mesh | None:
+        """
+        Return the first mesh shape from a SemDT shape collection.
+        """
+        for shape in shapes:
+            if isinstance(shape, Mesh):
+                return shape
+        return None
+
+    def _ground_truth_object_model_from_mesh_shape(
+        self, body_name: str, mesh_shape: Mesh, rotation_world: np.ndarray
+    ) -> GroundTruthObjectModel | None:
+        """
+        Create the expected-state object model for a mesh-backed GT body.
+        """
+        mesh_filename = str(mesh_shape.filename).strip()
+        if mesh_filename == "":
+            self.rk_logger.warning(
+                "ExpectedState GT body '%s' has a mesh shape without filename.",
+                body_name,
+            )
+            return None
+
+        shape_color = mesh_shape.color
+        mesh_scale = mesh_shape.scale
+        return GroundTruthObjectModel(
+            body_name=body_name,
+            shape_type="mesh",
+            box_scale=None,
+            cylinder_width=None,
+            cylinder_height=None,
+            mesh_path=Path(mesh_filename),
+            mesh_origin=HomogeneousTransformationMatrix(
+                data=np.asarray(mesh_shape.origin.to_np(), dtype=np.float64).copy()
+            ),
+            mesh_scale=Scale(
+                float(mesh_scale.x),
+                float(mesh_scale.y),
+                float(mesh_scale.z),
+            ),
             color=Color(
                 float(shape_color.R),
                 float(shape_color.G),
@@ -811,6 +922,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
     def _refine_expected_pose_translation(
         self,
         initial_center_world: np.ndarray,
+        reference_center_world: np.ndarray | None,
         detected_mask: np.ndarray,
         gt_object_model: GroundTruthObjectModel,
         camera_info: CameraInfo,
@@ -965,6 +1077,18 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 centroid_weight=float(
                     self.descriptor.parameters.pose_agreement_centroid_weight
                 ),
+                candidate_prior_distance_m=self._translation_prior_distance_m(
+                    center_world=current_result.center_world,
+                    reference_center_world=reference_center_world,
+                ),
+                incumbent_prior_distance_m=self._translation_prior_distance_m(
+                    center_world=best_result.center_world,
+                    reference_center_world=reference_center_world,
+                ),
+                prior_scale_m=float(
+                    self.descriptor.parameters.pose_prior_translation_scale_m
+                ),
+                prior_weight=float(self.descriptor.parameters.pose_prior_weight),
             ):
                 best_result = current_result
 
@@ -979,20 +1103,24 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 and pixel_error <= convergence_pixel_error
                 and outline_match.combined_score >= min_outline_score_for_convergence
             ):
-                current_result.converged = True
-                current_result.stop_reason = (
+                selected_result = (
+                    best_result if best_result is not None else current_result
+                )
+                selected_result.converged = True
+                selected_result.stop_reason = (
                     "pixel_error_converged "
                     f"(px_err={pixel_error:.2f} <= {convergence_pixel_error:.2f}, "
                     f"score={outline_match.combined_score:.3f} >= "
                     f"{min_outline_score_for_convergence:.3f}, "
                     f"iter={executed_iterations} >= {min_iterations_before_convergence})"
                 )
-                current_result.score_history = list(score_history)
-                current_result.center_history_world = [
+                selected_result.iterations = executed_iterations
+                selected_result.score_history = list(score_history)
+                selected_result.center_history_world = [
                     list(xyz) for xyz in center_history_world
                 ]
-                current_result.pixel_error_history = list(pixel_error_history)
-                return current_result
+                selected_result.pixel_error_history = list(pixel_error_history)
+                return selected_result
             if (
                 executed_iterations >= min_iterations_before_convergence
                 and score_delta <= convergence_score_delta
@@ -1145,11 +1273,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             if len(refinement.score_history) > 0
             else float(refinement.outline_match.combined_score)
         )
-        score_final = (
-            float(refinement.score_history[-1])
-            if len(refinement.score_history) > 0
-            else float(refinement.outline_match.combined_score)
-        )
+        score_final = float(refinement.outline_match.combined_score)
         self.rk_logger.info(
             (
                 "ExpectedState refinement summary: "
@@ -1200,11 +1324,7 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             if len(refinement.score_history) > 0
             else float(refinement.outline_match.combined_score)
         )
-        score_final = (
-            float(refinement.score_history[-1])
-            if len(refinement.score_history) > 0
-            else float(refinement.outline_match.combined_score)
-        )
+        score_final = float(refinement.outline_match.combined_score)
 
         record = {
             "run_id": run_id,
@@ -1258,6 +1378,10 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             "pose_agreement_centroid_weight": float(
                 self.descriptor.parameters.pose_agreement_centroid_weight
             ),
+            "pose_prior_translation_scale_m": float(
+                self.descriptor.parameters.pose_prior_translation_scale_m
+            ),
+            "pose_prior_weight": float(self.descriptor.parameters.pose_prior_weight),
             "refinement_score_delta_pixel_error_gate": float(
                 self.descriptor.parameters.refinement_score_delta_pixel_error_gate
             ),
@@ -1279,6 +1403,9 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             "refined_center_world_xyz": list(refinement.center_world.astype(float)),
             "init_offset_from_pose_annotation_m": float(
                 np.linalg.norm(initial_center_world - target_center_world)
+            ),
+            "refined_offset_from_pose_annotation_m": float(
+                np.linalg.norm(refinement.center_world - target_center_world)
             ),
             "translation_error_goal_m": float(goal_m),
         }
@@ -2049,8 +2176,17 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
         gt_object_model: GroundTruthObjectModel,
     ) -> o3d.geometry.TriangleMesh:
         """
-        Create centered Open3D mesh matching GT object primitive dimensions.
+        Create an Open3D mesh matching the GT object model.
         """
+        if gt_object_model.shape_type == "mesh":
+            mesh_shape = (
+                ExpectedStateRendererAnnotator._create_semdt_mesh_for_gt_object_model(
+                    gt_object_model
+                )
+            )
+            trimesh_mesh = mesh_shape.mesh.copy()
+            trimesh_mesh.apply_transform(mesh_shape.origin.to_np())
+            return trimesh_to_o3d_mesh(trimesh_mesh)
         if (
             gt_object_model.shape_type == "box"
             and gt_object_model.box_scale is not None
@@ -2085,6 +2221,39 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             f"Unsupported GT object model shape '{gt_object_model.shape_type}' for visualization."
         )
 
+    @staticmethod
+    def _create_semdt_mesh_for_gt_object_model(
+        gt_object_model: GroundTruthObjectModel,
+    ) -> Mesh:
+        """
+        Create a SemDT mesh shape from the stored GT mesh model data.
+        """
+        if gt_object_model.mesh_path is None:
+            raise ValueError("GT object model for mesh requires mesh_path.")
+        mesh_origin = gt_object_model.mesh_origin
+        if mesh_origin is None:
+            mesh_origin = HomogeneousTransformationMatrix()
+        mesh_scale = gt_object_model.mesh_scale
+        if mesh_scale is None:
+            mesh_scale = Scale()
+        return Mesh(
+            origin=HomogeneousTransformationMatrix(
+                data=np.asarray(mesh_origin.to_np(), dtype=np.float64).copy()
+            ),
+            filename=str(gt_object_model.mesh_path),
+            scale=Scale(
+                float(mesh_scale.x),
+                float(mesh_scale.y),
+                float(mesh_scale.z),
+            ),
+            color=Color(
+                float(gt_object_model.color.R),
+                float(gt_object_model.color.G),
+                float(gt_object_model.color.B),
+                float(gt_object_model.color.A),
+            ),
+        )
+
     def _build_expected_world(
         self,
         object_center_world: np.ndarray,
@@ -2114,6 +2283,14 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
                 reference_frame=root,
             ),
         }
+        if gt_object_model.shape_type == "mesh":
+            self._add_mesh_expected_object_to_world(
+                world_descriptor=world_descriptor,
+                root=root,
+                pose=expected_object_kwargs["pose"],
+                gt_object_model=gt_object_model,
+            )
+            return world_descriptor.world
         if gt_object_model.shape_type == "box":
             if gt_object_model.box_scale is None:
                 raise ValueError("GT object model for box requires box_scale.")
@@ -2144,6 +2321,35 @@ class ExpectedStateRendererAnnotator(ThreadedAnnotator):
             )
         world_descriptor.build_objects(root, [expected_object])
         return world_descriptor.world
+
+    def _add_mesh_expected_object_to_world(
+        self,
+        world_descriptor: BaseWorldDescriptor,
+        root: Body,
+        pose: HomogeneousTransformationMatrix,
+        gt_object_model: GroundTruthObjectModel,
+    ) -> None:
+        """
+        Add a mesh-backed expected object with mesh collision geometry.
+        """
+        visual_mesh = self._create_semdt_mesh_for_gt_object_model(gt_object_model)
+        collision_mesh = self._create_semdt_mesh_for_gt_object_model(gt_object_model)
+        with world_descriptor.world.modify_world():
+            body = Body(
+                name=PrefixedName(name=self.descriptor.parameters.expected_object_name),
+                visual=ShapeCollection([visual_mesh]),
+                collision=ShapeCollection([collision_mesh]),
+            )
+            connection = Connection6DoF.create_with_dofs(
+                parent=root,
+                child=body,
+                world=world_descriptor.world,
+            )
+            world_descriptor.world.add_connection(connection)
+            world_descriptor.world.add_semantic_annotation(PredefinedObject(body=body))
+
+        with world_descriptor.world.modify_world():
+            connection.origin = pose
 
     @staticmethod
     def _camera_optical_to_link_np() -> np.ndarray:
