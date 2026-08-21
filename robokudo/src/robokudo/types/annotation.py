@@ -370,3 +370,9 @@ class TSDFAnnotation(Annotation):
         pcd = self.volume.extract_voxel_point_cloud()
         pcd.transform(self.transform)
         return pcd
+
+
+@dataclass
+class Size(Annotation):
+    value: float = 0.0
+    cls: Optional[str] = None
