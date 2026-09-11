@@ -30,6 +30,12 @@ from krrood.class_diagrams.attribute_introspector import (
 from krrood.entity_query_language.factories import variable, contains, a, entity
 from krrood.ormatic.utils import classproperty
 from krrood.utils import get_generic_type_parameters
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraModel,
+    CameraModality,
+    CameraRange,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
@@ -455,51 +461,39 @@ class Sensor(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class Camera(Sensor, ABC):
-    """
-    A camera is a sensor that captures images of the environment.
-    """
+class Camera(HasRootBody):
+    """A camera that captures images of the environment."""
 
     forward_facing_axis: Vector3 = field(kw_only=True)
-    """
-    The axis of the camera that is facing forward, expressed in the camera's root frame.
-    """
+    """Viewing direction expressed in the camera's root frame."""
 
-    field_of_view: FieldOfView = field(kw_only=True)
-    """
-    The field of view of the camera, defined by the vertical and horizontal angles of
-    the camera's view.
-    """
+    camera_model: CameraModel = field(kw_only=True)
+    """Native projection model of the camera."""
 
-    default_camera: bool = False
-    """
-    Whether this camera is the default camera of the robot.
+    camera_range: CameraRange = field(default_factory=CameraRange, kw_only=True)
+    """Usable distance interval of the camera."""
 
-    Used for quick access.
-    """
-
-    minimal_height: float = 0.0
-    """
-    The minimal height of the camera above the ground, in meters.
-    """
-
-    maximal_height: float = 1.0
-    """
-    The maximal height of the camera above the ground, in meters.
-    """
+    modalities: tuple[CameraModality, ...] = field(default_factory=tuple, kw_only=True)
+    """Kinds of image data the camera can produce."""
 
     def __post_init__(self):
+        """Express the viewing direction in the camera root frame."""
         super().__post_init__()
         self.forward_facing_axis.reference_frame = self.root
 
     @property
-    def root_T_forward_view(self) -> HomogeneousTransformationMatrix:
-        """
-        The camera's pose in the world root frame, with its x axis along the direction
-        the camera looks.
+    def field_of_view(self) -> FieldOfView:
+        """Return the angular extent of the native camera model."""
+        return self.camera_model.field_of_view
 
-        The y and z axes only complete the frame and carry no meaning.
-        """
+    @property
+    def resolution(self) -> Optional[CameraResolution]:
+        """Return the native resolution when the model defines one."""
+        return self.camera_model.resolution
+
+    @property
+    def root_T_forward_view(self) -> HomogeneousTransformationMatrix:
+        """Return the camera pose with its x axis along the viewing direction."""
         root_T_camera = self.root.global_transform
         root_V_forward = root_T_camera.to_rotation_matrix() @ self.forward_facing_axis
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
@@ -507,6 +501,20 @@ class Camera(Sensor, ABC):
             rotation_matrix=RotationMatrix.from_x_axis(root_V_forward),
             reference_frame=root_T_camera.reference_frame,
         )
+
+
+@dataclass(eq=False)
+class RobotCamera(Camera, Sensor, ABC):
+    """A camera that participates in robot-part lifecycle handling."""
+
+    default_camera: bool = False
+    """Whether this camera is the robot's default camera."""
+
+    minimal_height: float = 0.0
+    """Minimal camera height above the ground in meters."""
+
+    maximal_height: float = 1.0
+    """Maximal camera height above the ground in meters."""
 
 
 @dataclass(eq=False)
@@ -988,12 +996,12 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
                 return part.right_arm
         return None
 
-    def get_default_camera(self) -> Camera:
+    def get_default_camera(self) -> RobotCamera:
         """
         Returns the default camera of the robot.
         """
         for robot_part in self._robot_parts:
-            if isinstance(robot_part, Camera) and robot_part.default_camera:
+            if isinstance(robot_part, RobotCamera) and robot_part.default_camera:
                 return robot_part
         raise MissingDefaultCameraError(type(self))
 

@@ -16,6 +16,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     GripperState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -29,7 +30,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Arm,
     EndEffector,
     Finger,
-    Camera,
+    RobotCamera,
 )
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world_description.world_entity import (
@@ -306,7 +307,7 @@ class DAiSyRightArm(Arm[DAiSyRightGripper]):
 
 
 @dataclass(eq=False)
-class DAiSyCamera(Camera):
+class DAiSyCamera(RobotCamera):
     """
     DAiSy does not currently have a dedicated camera.
 
@@ -328,7 +329,9 @@ class DAiSyCamera(Camera):
                 robot_root, "camera_link"
             ),
             forward_facing_axis=Vector3.Z(),
-            field_of_view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
+            ),
             minimal_height=1.4,
             maximal_height=1.4,
             default_camera=True,

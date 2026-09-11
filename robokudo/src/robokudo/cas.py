@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
     from robokudo.types.core import Annotation
+    from robokudo.types.camera import CameraObservation
 
 
 class CASViews(StrEnum):
@@ -73,6 +74,9 @@ class CASViews(StrEnum):
 
     CAMERA_INTRINSIC = "cam_intrinsic"
     """Open3D pinhole camera intrinsic model for RGB to be set by the camera driver."""
+
+    CAMERA_OBSERVATION = "camera_observation"
+    """Semantic camera and effective projection metadata for the current frame."""
 
     POINTCLOUD_CAMERA_INTRINSIC = "pc_cam_intrinsic"
     """Camera intrinsic that has been used for point cloud generation. This can be different, 
@@ -201,6 +205,16 @@ class CAS:
     @camera_intrinsic.setter
     def camera_intrinsic(self, value: o3d.camera.PinholeCameraIntrinsic) -> None:
         self.views[CASViews.CAMERA_INTRINSIC] = value
+
+    @property
+    def camera_observation(self) -> Optional[CameraObservation]:
+        """Return the semantic camera metadata for the current frame."""
+        return self.views.get(CASViews.CAMERA_OBSERVATION)
+
+    @camera_observation.setter
+    def camera_observation(self, value: CameraObservation) -> None:
+        """Store camera metadata by reference to preserve semantic identity."""
+        self.views[CASViews.CAMERA_OBSERVATION] = value
 
     @property
     def pointcloud_camera_intrinsic(

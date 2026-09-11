@@ -16,14 +16,21 @@ from sensor_msgs.msg import CameraInfo
 
 import robokudo.world as rk_world
 from robokudo.cas import CASViews, CAS
+from robokudo.exceptions import CameraAnnotationAmbiguous, CameraAnnotationMissing
 from robokudo.io.camera_interface import CameraInterface, ROSCameraInterface
-from robokudo.utils.camera_model import (
-    pinhole_camera_parameters_from_horizontal_field_of_view,
-)
+from robokudo.types.camera import CameraObservation
 from robokudo.utils.module_loader import ModuleLoader
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraDistortionModel,
+    CameraModality,
+    CameraRange,
+    PinholeCameraModel,
+)
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera, RobotCamera
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -35,9 +42,9 @@ class SemDTRayTracerCameraInterface(CameraInterface):
     """
     Render RGB-D camera data from a Semantic Digital Twin world.
 
-    The interface loads a configured world descriptor, places a virtual camera in
-    that world, and writes the rendered color image, depth image, segmentation,
-    camera model, and ground-truth world reference into the CAS.
+    The interface renders from a semantic camera in either a supplied runtime world or
+    a configured world descriptor. It writes the rendered images and the camera state
+    used for the frame into the CAS.
 
     .. note::
         The configured camera pose uses ROS optical-frame convention, while the
@@ -54,6 +61,10 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         self.module_loader = ModuleLoader()
         """
         Loader used to import configured SemDT world descriptors.
+        """
+        self._world: World | None = None
+        """
+        Shared runtime world after its first resolution.
         """
 
     def has_new_data(self) -> bool:
@@ -72,36 +83,28 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         :param cas: CAS that receives rendered camera data and frame metadata.
         """
         world = self._load_runtime_world()
-        world_frame_body = self._ensure_world_frame(world)
-        camera_body = self._ensure_camera_body(world, world_frame_body)
-        (
-            render_camera_to_world,
-            optical_camera_to_world,
-        ) = self._set_camera_pose(world, world_frame_body, camera_body)
-
-        image_size = int(self.camera_config.resolution)
-        resolution = CameraResolution(width=image_size, height=image_size)
-        fov_deg = float(self.camera_config.fov_deg)
-        field_of_view = FieldOfView(
-            horizontal_angle=np.radians(fov_deg), vertical_angle=np.radians(fov_deg)
-        )
-        min_distance = float(self.camera_config.min_distance)
-        max_distance = float(self.camera_config.max_distance)
+        camera = self._select_or_create_camera(world)
+        camera_model = self._effective_camera_model(camera)
+        resolution = camera_model.resolution
+        field_of_view = camera_model.field_of_view
+        minimum_distance, maximum_distance = self._effective_camera_range(camera)
+        world_T_render_camera = camera.root_T_forward_view
+        world_T_camera = camera.root.global_transform
 
         ray_tracer = world.ray_tracer
         segmentation, depth_m = self._render_segmentation_and_depth(
             ray_tracer=ray_tracer,
-            camera_to_world=render_camera_to_world,
+            camera_to_world=world_T_render_camera,
             resolution=resolution,
             field_of_view=field_of_view,
-            min_distance=min_distance,
-            max_distance=max_distance,
+            min_distance=minimum_distance,
+            max_distance=maximum_distance,
         )
 
         color_bgr, object_color_map = self._render_color_image(
             world=world,
             ray_tracer=ray_tracer,
-            camera_to_world=render_camera_to_world,
+            camera_to_world=world_T_render_camera,
             segmentation=segmentation,
             resolution=resolution,
             field_of_view=field_of_view,
@@ -109,9 +112,8 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         depth_mm = self._depth_m_to_mm(depth_m)
 
         camera_info, camera_intrinsic = self._build_camera_models(
-            frame_id=self.camera_config.camera_frame,
-            resolution=image_size,
-            fov_deg=fov_deg,
+            frame_id=camera.root.name.name,
+            camera_model=camera_model,
         )
 
         timestamp_ns = time.time_ns()
@@ -127,10 +129,173 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         cas.set(CASViews.OBJECT_COLOR_MAP, object_color_map)
         # Shared SemDT ground-truth world for this frame. Consumers must treat as read-only.
         cas.set_ref(CASViews.GROUND_TRUTH_WORLD_REFERENCE, world)
-
-        cas.camera_to_world_transform = optical_camera_to_world
+        cas.camera_observation = CameraObservation(
+            camera=camera,
+            camera_model=camera_model,
+            world_T_camera=world_T_camera,
+            timestamp_nanoseconds=timestamp_ns,
+        )
+        cas.camera_to_world_transform = world_T_camera
         cas.data_timestamp = timestamp_ns
         ROSCameraInterface.store_legacy_camera_to_world_transform_from_cas(cas)
+
+    def _select_or_create_camera(self, world: World) -> Camera:
+        """
+        Select the configured semantic camera or create a legacy one.
+
+        :param world: Runtime world containing camera annotations.
+        :return: Camera that provides the rendered frame.
+        :raises CameraAnnotationMissing: If a configured camera does not exist.
+        :raises CameraAnnotationAmbiguous: If automatic selection is ambiguous.
+        """
+        cameras = world.get_semantic_annotations_by_type(Camera)
+        camera_name = self.camera_config.camera_name
+        if camera_name is not None:
+            named_cameras = [
+                camera
+                for camera in cameras
+                if camera.name.name == camera_name or str(camera.name) == camera_name
+            ]
+            if len(named_cameras) == 0:
+                raise CameraAnnotationMissing(camera_name=camera_name)
+            if len(named_cameras) > 1:
+                raise CameraAnnotationAmbiguous(
+                    camera_names=tuple(str(camera.name) for camera in named_cameras)
+                )
+            return named_cameras[0]
+
+        if len(cameras) == 1:
+            return cameras[0]
+
+        default_cameras = [
+            camera
+            for camera in cameras
+            if isinstance(camera, RobotCamera) and camera.default_camera
+        ]
+        if len(default_cameras) == 1:
+            return default_cameras[0]
+        if len(cameras) > 1:
+            raise CameraAnnotationAmbiguous(
+                camera_names=tuple(str(camera.name) for camera in cameras)
+            )
+        return self._create_legacy_camera(world)
+
+    def _create_legacy_camera(self, world: World) -> Camera:
+        """
+        Create a semantic camera from deprecated primitive configuration.
+
+        :param world: Runtime world to which the camera is added.
+        :return: Camera annotation representing the configured renderer.
+        """
+        world_frame_body = self._ensure_world_frame(world)
+        camera_body = self._ensure_camera_body(world, world_frame_body)
+        self._set_camera_pose(world, world_frame_body, camera_body)
+        camera_model = PinholeCameraModel.from_field_of_view(
+            resolution=self._configured_resolution(),
+            field_of_view=self._configured_field_of_view(),
+        )
+        camera = Camera(
+            name=PrefixedName(name=camera_body.name.name),
+            root=camera_body,
+            forward_facing_axis=Vector3.Z(),
+            camera_model=camera_model,
+            camera_range=CameraRange(
+                minimum_distance=(
+                    float(self.camera_config.min_distance)
+                    if self.camera_config.min_distance is not None
+                    else self.camera_config.default_minimum_distance
+                ),
+                maximum_distance=(
+                    float(self.camera_config.max_distance)
+                    if self.camera_config.max_distance is not None
+                    else self.camera_config.default_maximum_distance
+                ),
+            ),
+            modalities=(
+                CameraModality.COLOR,
+                CameraModality.DEPTH,
+                CameraModality.SEGMENTATION,
+            ),
+        )
+        with world.modify_world():
+            world.add_semantic_annotation(camera)
+        return camera
+
+    def _effective_camera_model(self, camera: Camera) -> PinholeCameraModel:
+        """
+        Return the calibrated model used for this rendered frame.
+
+        :param camera: Selected semantic camera.
+        :return: Complete effective pinhole projection.
+        """
+        has_resolution_override = self.camera_config.resolution is not None
+        has_field_of_view_override = self.camera_config.fov_deg is not None
+        if (
+            isinstance(camera.camera_model, PinholeCameraModel)
+            and not has_resolution_override
+            and not has_field_of_view_override
+        ):
+            return camera.camera_model
+
+        resolution = (
+            self._configured_resolution()
+            if has_resolution_override or camera.resolution is None
+            else camera.resolution
+        )
+        field_of_view = (
+            self._configured_field_of_view()
+            if has_field_of_view_override
+            else camera.field_of_view
+        )
+        return PinholeCameraModel.from_field_of_view(
+            resolution=resolution,
+            field_of_view=field_of_view,
+        )
+
+    def _effective_camera_range(self, camera: Camera) -> tuple[float, float]:
+        """
+        Return the hit-distance interval used for this frame.
+
+        :param camera: Selected semantic camera.
+        :return: Minimum and maximum ray-hit distances in meters.
+        """
+        minimum_distance = (
+            camera.camera_range.minimum_distance
+            if self.camera_config.min_distance is None
+            else float(self.camera_config.min_distance)
+        )
+        maximum_distance = (
+            camera.camera_range.maximum_distance
+            if self.camera_config.max_distance is None
+            else float(self.camera_config.max_distance)
+        )
+        return minimum_distance, maximum_distance
+
+    def _configured_resolution(self) -> CameraResolution:
+        """
+        Return the configured square resolution or its legacy default.
+        """
+        image_size = (
+            self.camera_config.default_resolution
+            if self.camera_config.resolution is None
+            else int(self.camera_config.resolution)
+        )
+        return CameraResolution(width=image_size, height=image_size)
+
+    def _configured_field_of_view(self) -> FieldOfView:
+        """
+        Return the configured symmetric field of view or its legacy default.
+        """
+        field_of_view_degrees = (
+            self.camera_config.default_field_of_view_degrees
+            if self.camera_config.fov_deg is None
+            else float(self.camera_config.fov_deg)
+        )
+        field_of_view_radians = np.radians(field_of_view_degrees)
+        return FieldOfView(
+            horizontal_angle=field_of_view_radians,
+            vertical_angle=field_of_view_radians,
+        )
 
     def _load_runtime_world(self) -> World:
         """
@@ -138,12 +303,21 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
         :return: Runtime world instance used for rendering.
         """
-        world_descriptor = self.module_loader.load_world_descriptor(
-            ros_pkg_name=self.camera_config.world_descriptor_ros_package,
-            module_name=self.camera_config.world_descriptor_name,
-        )
-        rk_world.set_world(world_descriptor.world)
-        return rk_world.world_instance()
+        if self._world is not None:
+            return self._world
+
+        if self.camera_config.world is not None:
+            self._world = self.camera_config.world
+        else:
+            world_descriptor = self.module_loader.load_world_descriptor(
+                ros_pkg_name=self.camera_config.world_descriptor_ros_package,
+                module_name=self.camera_config.world_descriptor_name,
+            )
+            self._world = world_descriptor.world
+
+        rk_world.set_world(self._world)
+        rk_world.init_world_entity_tracker_from_world(self._world)
+        return self._world
 
     def _ensure_world_frame(self, world: World) -> Body:
         """
@@ -183,7 +357,11 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         :param world_frame_body: Parent frame for a newly created camera body.
         :return: Body representing the configured camera frame.
         """
-        camera_frame = self.camera_config.camera_frame
+        camera_frame = (
+            self.camera_config.default_camera_frame
+            if self.camera_config.camera_frame is None
+            else self.camera_config.camera_frame
+        )
         bodies = world.get_bodies_by_name(camera_frame)
         if len(bodies) > 0:
             return bodies[0]
@@ -201,18 +379,17 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
     def _set_camera_pose(
         self, world: World, world_frame_body: Body, camera_body: Body
-    ) -> Tuple[HomogeneousTransformationMatrix, HomogeneousTransformationMatrix]:
+    ) -> None:
         """
         Apply the configured camera pose to the runtime world.
 
         :param world: Runtime world that owns the camera body connection.
         :param world_frame_body: Reference frame for the configured camera pose.
         :param camera_body: Camera frame body that receives the configured pose.
-        :return: RayTracer render pose and ROS optical camera pose.
         """
         # Config pose is given in ROS optical-frame convention:
         # x right, y down, z forward.
-        camera_optical_to_world = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=float(self.camera_config.camera_x),
             y=float(self.camera_config.camera_y),
             z=float(self.camera_config.camera_z),
@@ -222,47 +399,9 @@ class SemDTRayTracerCameraInterface(CameraInterface):
             reference_frame=world_frame_body,
             child_frame=camera_body,
         )
-        # SemDT ray tracer expects a camera_link-like frame:
-        # x forward, y left, z up.
-        camera_link_to_world = HomogeneousTransformationMatrix(
-            data=(
-                camera_optical_to_world.to_np()
-                @ SemDTRayTracerCameraInterface._camera_optical_to_link_np()
-            ),
-            reference_frame=world_frame_body,
-        )
-
         with world.modify_world():
             if camera_body.parent_connection is not None:
-                camera_body.parent_connection.origin = camera_optical_to_world
-
-        return camera_link_to_world, camera_optical_to_world
-
-    @staticmethod
-    def _camera_link_to_optical_np() -> np.ndarray:
-        """
-        Return the transform from camera-link frame to ROS optical frame.
-
-        :return: Numpy homogeneous transformation matrix.
-        """
-        return np.array(
-            [
-                [0.0, 0.0, 1.0, 0.0],
-                [-1.0, 0.0, 0.0, 0.0],
-                [0.0, -1.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            dtype=np.float64,
-        )
-
-    @staticmethod
-    def _camera_optical_to_link_np() -> np.ndarray:
-        """
-        Return the transform from ROS optical frame to camera-link frame.
-
-        :return: Numpy homogeneous transformation matrix.
-        """
-        return np.linalg.inv(SemDTRayTracerCameraInterface._camera_link_to_optical_np())
+                camera_body.parent_connection.origin = world_T_camera
 
     @staticmethod
     def _render_segmentation_and_depth(
@@ -471,48 +610,45 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
     @staticmethod
     def _build_camera_models(
-        frame_id: str, resolution: int, fov_deg: float
+        frame_id: str, camera_model: PinholeCameraModel
     ) -> Tuple[CameraInfo, o3d.camera.PinholeCameraIntrinsic]:
         """
         Build ROS and Open3D pinhole camera models.
 
         :param frame_id: Camera frame name stored in the ROS camera info header.
-        :param resolution: Square image resolution.
-        :param fov_deg: Horizontal camera field of view.
+        :param camera_model: Effective pinhole calibration of the frame.
         :return: ROS camera info and matching Open3D intrinsic model.
         """
-        camera_parameters = pinhole_camera_parameters_from_horizontal_field_of_view(
-            width=int(resolution),
-            height=int(resolution),
-            horizontal_field_of_view_degrees=float(fov_deg),
-        )
-
         camera_info = CameraInfo()
         camera_info.header.frame_id = frame_id
-        camera_info.width = camera_parameters.width
-        camera_info.height = camera_parameters.height
-        camera_info.distortion_model = "plumb_bob"
-        camera_info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
+        camera_info.width = camera_model.resolution.width
+        camera_info.height = camera_model.resolution.height
+        if camera_model.distortion.model == CameraDistortionModel.NONE:
+            camera_info.distortion_model = CameraDistortionModel.PLUMB_BOB.value
+            camera_info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
+        else:
+            camera_info.distortion_model = camera_model.distortion.model.value
+            camera_info.d = list(camera_model.distortion.coefficients)
         camera_info.k = [
-            camera_parameters.focal_length_x,
+            camera_model.focal_length_x,
             0.0,
-            camera_parameters.center_x,
+            camera_model.principal_point_x,
             0.0,
-            camera_parameters.focal_length_y,
-            camera_parameters.center_y,
+            camera_model.focal_length_y,
+            camera_model.principal_point_y,
             0.0,
             0.0,
             1.0,
         ]
         camera_info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         camera_info.p = [
-            camera_parameters.focal_length_x,
+            camera_model.focal_length_x,
             0.0,
-            camera_parameters.center_x,
+            camera_model.principal_point_x,
             0.0,
             0.0,
-            camera_parameters.focal_length_y,
-            camera_parameters.center_y,
+            camera_model.focal_length_y,
+            camera_model.principal_point_y,
             0.0,
             0.0,
             0.0,
@@ -521,12 +657,12 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         ]
 
         camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(
-            camera_parameters.width,
-            camera_parameters.height,
-            camera_parameters.focal_length_x,
-            camera_parameters.focal_length_y,
-            camera_parameters.center_x,
-            camera_parameters.center_y,
+            camera_model.resolution.width,
+            camera_model.resolution.height,
+            camera_model.focal_length_x,
+            camera_model.focal_length_y,
+            camera_model.principal_point_x,
+            camera_model.principal_point_y,
         )
 
         return camera_info, camera_intrinsic

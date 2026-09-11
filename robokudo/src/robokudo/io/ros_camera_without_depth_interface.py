@@ -18,6 +18,7 @@ The module is used for cameras like:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from threading import Lock
 
 import builtin_interfaces.msg
@@ -30,11 +31,18 @@ from sensor_msgs.msg import CameraInfo, Image
 from typing_extensions import Any, Tuple, TYPE_CHECKING, Optional, List
 
 from robokudo.cas import CASViews
+from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.camera_interface import ROSCameraInterface
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraDistortionModel,
+    CameraModality,
+)
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+    from robokudo.cas import CAS
 
 
 # TODO Needs to be migrated to ROS2 for new RGB-only use cases
@@ -133,15 +141,21 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         c_y = K[1, 2]
 
         if rotation == "90_ccw":
-            new_K = np.array([[f_y, 0, c_y], [0, f_x, width - c_x], [0, 0, 1]])
+            new_K = np.array([[f_y, 0, c_y], [0, f_x, width - 1.0 - c_x], [0, 0, 1]])
             new_size = (height, width)
 
         elif rotation == "90_cw":
-            new_K = np.array([[f_y, 0, height - c_y], [0, f_x, c_x], [0, 0, 1]])
+            new_K = np.array([[f_y, 0, height - 1.0 - c_y], [0, f_x, c_x], [0, 0, 1]])
             new_size = (height, width)
 
         elif rotation == "180":
-            new_K = np.array([[f_x, 0, width - c_x], [0, f_y, height - c_y], [0, 0, 1]])
+            new_K = np.array(
+                [
+                    [f_x, 0, width - 1.0 - c_x],
+                    [0, f_y, height - 1.0 - c_y],
+                    [0, 0, 1],
+                ]
+            )
             new_size = (width, height)
 
         else:
@@ -150,6 +164,46 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
             )
 
         return new_K, new_size
+
+    @staticmethod
+    def rotate_camera_distortion(
+        coefficients: Sequence[float], distortion_model: str, rotation: str
+    ) -> tuple[float, ...]:
+        """Express lens distortion in the rotated image-axis convention.
+
+        :param coefficients: ROS distortion coefficients for the original image.
+        :param distortion_model: ROS distortion model name.
+        :param rotation: Rotation applied to the delivered image.
+        :return: Distortion coefficients matching the rotated image axes.
+        :raises InvalidCameraObservation: If tangential terms are missing.
+        """
+        tangential_models = (
+            CameraDistortionModel.PLUMB_BOB.value,
+            CameraDistortionModel.RATIONAL_POLYNOMIAL.value,
+        )
+        if distortion_model not in tangential_models:
+            return tuple(coefficients)
+        if len(coefficients) < 4:
+            raise InvalidCameraObservation(
+                reason=(
+                    f"the ROS distortion model '{distortion_model}' requires "
+                    "two tangential coefficients"
+                )
+            )
+
+        rotated_coefficients = list(coefficients)
+        tangential_x = coefficients[2]
+        tangential_y = coefficients[3]
+        if rotation == "90_ccw":
+            rotated_coefficients[2] = -tangential_y
+            rotated_coefficients[3] = tangential_x
+        elif rotation == "90_cw":
+            rotated_coefficients[2] = tangential_y
+            rotated_coefficients[3] = -tangential_x
+        elif rotation == "180":
+            rotated_coefficients[2] = -tangential_x
+            rotated_coefficients[3] = -tangential_y
+        return tuple(rotated_coefficients)
 
     def rotate_image_and_intrinsics(
         self, img: npt.NDArray, K: npt.NDArray, rotation: str = "90_ccw"
@@ -231,10 +285,10 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         width = self.camera_info.width
         height = self.camera_info.height
 
-        fx = self.camera_info.K[0]
-        cx = self.camera_info.K[2]
-        fy = self.camera_info.K[4]
-        cy = self.camera_info.K[5]
+        fx = self.camera_info.k[0]
+        cx = self.camera_info.k[2]
+        fy = self.camera_info.k[4]
+        cy = self.camera_info.k[5]
         if self.camera_config.rotate_image is None:
             self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
         else:
@@ -253,8 +307,16 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
             cy = k_flat[5]
             width, height = new_size
             # K is an immutable Tuple, so we have to override it completely
-            self.camera_info.K = (fx, 0, cx, 0, fy, cy, 0, 0, 1)
+            self.camera_info.k = (fx, 0, cx, 0, fy, cy, 0, 0, 1)
+            self.camera_info.d = self.rotate_camera_distortion(
+                coefficients=self.camera_info.d,
+                distortion_model=self.camera_info.distortion_model,
+                rotation=self.camera_config.rotate_image,
+            )
             self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
+
+        self.camera_info.width = width
+        self.camera_info.height = height
 
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, None)
@@ -262,6 +324,16 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, (1, 1))
         self.store_camera_to_world_transform_from_tf(cas, self.timestamp)
+        camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
+        self.store_camera_observation(
+            cas=cas,
+            camera_info=self.camera_info,
+            camera_frame=camera_frame,
+            timestamp_nanoseconds=(
+                self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec
+            ),
+            modalities=(CameraModality.COLOR,),
+        )
 
         self._has_new_data = False
         self.lock.release()

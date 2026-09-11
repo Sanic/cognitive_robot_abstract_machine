@@ -31,6 +31,8 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.world_descriptor import PredefinedObject
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.world_description.geometry import Mesh
 
 
@@ -286,6 +288,16 @@ class TestFullAEExecution(object):
             seq, node, max_iterations=80, tick_rate=20
         )
         assert tree_result is py_trees.common.Status.SUCCESS
+
+        camera_observation = seq.cas.camera_observation
+        configured_resolution = raytracer_config.parameters.camera_config.resolution
+        assert camera_observation.resolution == CameraResolution(
+            width=configured_resolution,
+            height=configured_resolution,
+        )
+        assert camera_observation.camera in (
+            seq.cas.ground_truth_world_ref.get_semantic_annotations_by_type(Camera)
+        )
 
         types_of_annotations = list(map(type, seq.cas.annotations))
         assert types_of_annotations.count(robokudo.types.annotation.Plane) == 1

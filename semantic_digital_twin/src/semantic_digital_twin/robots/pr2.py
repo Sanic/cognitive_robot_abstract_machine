@@ -20,6 +20,7 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -36,7 +37,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Arm,
     Neck,
     Finger,
-    Camera,
+    RobotCamera,
     AbstractRobot,
     EndEffector,
 )
@@ -87,7 +88,7 @@ class PR2Joint(StrEnum):
 
 
 @dataclass(eq=False)
-class PR2KinectV1(Camera):
+class PR2KinectV1(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
@@ -104,7 +105,9 @@ class PR2KinectV1(Camera):
                 robot_root, "wide_stereo_optical_frame"
             ),
             forward_facing_axis=Vector3.Z(),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=1.27,
             maximal_height=1.60,
             default_camera=True,

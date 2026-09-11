@@ -43,17 +43,36 @@ from typing_extensions import Optional, List, Any, TYPE_CHECKING, Union, Tuple
 
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
-from robokudo.exceptions import CameraDataMissing
+from robokudo.exceptions import (
+    CameraAnnotationAmbiguous,
+    CameraDataMissing,
+    InvalidCameraObservation,
+)
 from robokudo.io.tf_listener_proxy import TFListenerProxy
+from robokudo.types.camera import CameraObservation
 from robokudo.types.tf import StampedTransform
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.world import (
+    init_world_entity_tracker_from_world,
     setup_world_for_camera_frame,
     update_connection_transform,
     world_instance,
 )
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraDistortion,
+    CameraDistortionModel,
+    CameraModality,
+    PinholeCameraModel,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
+from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -159,6 +178,124 @@ class CameraInterface(object):
             timestamp_ns=timestamp_ns,
         )
         return True
+
+    @staticmethod
+    def camera_model_from_camera_info(
+        camera_info: CameraInfo,
+    ) -> PinholeCameraModel:
+        """Convert a ROS camera calibration into a semantic pinhole model.
+
+        :param camera_info: Effective calibration of the delivered image.
+        :return: ROS-independent pinhole camera model.
+        :raises InvalidCameraObservation: If the distortion model is unsupported.
+        """
+        distortion_models = {
+            model.value: model
+            for model in CameraDistortionModel
+            if model is not CameraDistortionModel.NONE
+        }
+        if camera_info.distortion_model == "":
+            distortion_model = CameraDistortionModel.NONE
+        elif camera_info.distortion_model in distortion_models:
+            distortion_model = distortion_models[camera_info.distortion_model]
+        else:
+            raise InvalidCameraObservation(
+                reason=(
+                    "the ROS distortion model "
+                    f"'{camera_info.distortion_model}' is unsupported"
+                )
+            )
+
+        return PinholeCameraModel(
+            image_resolution=CameraResolution(
+                width=camera_info.width,
+                height=camera_info.height,
+            ),
+            focal_length_x=camera_info.k[0],
+            focal_length_y=camera_info.k[4],
+            principal_point_x=camera_info.k[2],
+            principal_point_y=camera_info.k[5],
+            distortion=CameraDistortion(
+                model=distortion_model,
+                coefficients=tuple(camera_info.d),
+            ),
+        )
+
+    def store_camera_observation(
+        self,
+        cas: CAS,
+        camera_info: CameraInfo,
+        camera_frame: str,
+        timestamp_nanoseconds: int,
+        modalities: tuple[CameraModality, ...],
+    ) -> None:
+        """Store semantic identity and effective calibration for a camera frame.
+
+        :param cas: CAS receiving the observation.
+        :param camera_info: Effective calibration of the delivered image.
+        :param camera_frame: Optical frame associated with the calibration.
+        :param timestamp_nanoseconds: Acquisition time in nanoseconds since the epoch.
+        :param modalities: Kinds of image data delivered by the interface.
+        """
+        camera_model = self.camera_model_from_camera_info(camera_info)
+        camera = self._resolve_or_create_camera(
+            camera_frame=camera_frame,
+            camera_model=camera_model,
+            modalities=modalities,
+        )
+        cas.camera_observation = CameraObservation(
+            camera=camera,
+            camera_model=camera_model,
+            world_T_camera=cas.camera_to_world_transform,
+            timestamp_nanoseconds=timestamp_nanoseconds,
+        )
+
+    def _resolve_or_create_camera(
+        self,
+        camera_frame: str,
+        camera_model: PinholeCameraModel,
+        modalities: tuple[CameraModality, ...],
+    ) -> Camera:
+        """Resolve the stream camera or add a standalone semantic camera.
+
+        :param camera_frame: Optical frame associated with the image stream.
+        :param camera_model: First trustworthy calibration for a new camera.
+        :param modalities: Kinds of image data produced by a new camera.
+        :return: Camera annotation representing the physical image source.
+        :raises CameraAnnotationAmbiguous: If several cameras use the stream frame.
+        """
+        runtime_world = world_instance()
+        cameras = runtime_world.get_semantic_annotations_by_type(Camera)
+        frame_cameras = [
+            camera
+            for camera in cameras
+            if camera.root.name.name == camera_frame
+            or str(camera.root.name) == camera_frame
+        ]
+        if len(frame_cameras) == 1:
+            return frame_cameras[0]
+        if len(frame_cameras) > 1:
+            raise CameraAnnotationAmbiguous(
+                camera_names=tuple(str(camera.name) for camera in frame_cameras)
+            )
+
+        camera_bodies = runtime_world.get_bodies_by_name(camera_frame)
+        with runtime_world.modify_world():
+            if len(camera_bodies) == 0:
+                camera_body = Body(name=PrefixedName(name=camera_frame))
+                runtime_world.add_body(camera_body)
+            else:
+                camera_body = camera_bodies[0]
+            camera = Camera(
+                name=PrefixedName(name=camera_frame),
+                root=camera_body,
+                forward_facing_axis=Vector3.Z(),
+                camera_model=camera_model,
+                modalities=modalities,
+            )
+            runtime_world.add_semantic_annotation(camera)
+        init_world_entity_tracker_from_world(runtime_world)
+        return camera
 
     def set_data(self, cas: CAS) -> None:
         """
@@ -621,6 +758,8 @@ class KinectCameraInterface(ROSCameraInterface):
         height = self.camera_info.height
         if self.camera_config.hi_res_mode:
             height = 960
+        self.camera_info.width = width
+        self.camera_info.height = height
 
         fx = self.camera_info.k[0]
         cx = self.camera_info.k[2]
@@ -637,6 +776,16 @@ class KinectCameraInterface(ROSCameraInterface):
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.color2depth_ratio)
 
         self.store_camera_to_world_transform_from_tf(cas, self.timestamp)
+        camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
+        self.store_camera_observation(
+            cas=cas,
+            camera_info=self.camera_info,
+            camera_frame=camera_frame,
+            timestamp_nanoseconds=(
+                self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec
+            ),
+            modalities=(CameraModality.COLOR, CameraModality.DEPTH),
+        )
 
         self._has_new_data = False
 

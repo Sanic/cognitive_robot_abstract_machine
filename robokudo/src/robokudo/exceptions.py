@@ -54,6 +54,62 @@ class UnknownMode(RoboKudoError, ValueError):
 
 
 @dataclass
+class CameraAnnotationMissing(RoboKudoError):
+    """
+    Raised when no semantic camera matches the configured selection.
+    """
+
+    camera_name: str | None = None
+    """
+    Requested camera name, or ``None`` when no name was configured.
+    """
+
+    def error_message(self) -> str:
+        if self.camera_name is None:
+            return "The Semantic Digital Twin world contains no camera annotation."
+        return f"No camera annotation named '{self.camera_name}' exists in the world."
+
+    def suggest_correction(self) -> str:
+        return "add a Camera annotation to the world or select an existing camera."
+
+
+@dataclass
+class CameraAnnotationAmbiguous(RoboKudoError):
+    """
+    Raised when camera selection has more than one valid result.
+    """
+
+    camera_names: tuple[str, ...]
+    """
+    Names of camera annotations that satisfy the selection.
+    """
+
+    def error_message(self) -> str:
+        return f"Camera selection is ambiguous between {self.camera_names}."
+
+    def suggest_correction(self) -> str:
+        return "configure the name of the camera that should provide perception data."
+
+
+@dataclass
+class InvalidCameraObservation(RoboKudoError, TypeError):
+    """
+    Raised when persisted camera metadata contains incompatible values.
+    """
+
+    reason: str
+    """
+    Reason the persisted observation is invalid.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid camera observation: {self.reason}."
+
+    def suggest_correction(self) -> str:
+        return "store an observation whose camera and projection model are compatible."
+
+
+@dataclass
 class CameraDataMissing(RoboKudoError):
     """
     Raised when a camera callback requires a message that was not provided.

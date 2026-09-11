@@ -36,13 +36,14 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     Finger,
     MobileBase,
     Neck,
     Torso,
     EndEffector,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Quaternion, Vector3
 from semantic_digital_twin.world_description.connections import (
@@ -367,7 +368,7 @@ class TiagoRightArm(Arm[TiagoRightGripper]):
 
 
 @dataclass(eq=False)
-class TiagoCamera(Camera):
+class TiagoCamera(RobotCamera):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -378,7 +379,9 @@ class TiagoCamera(Camera):
                 robot_root, "head_front_camera_optical_frame"
             ),
             forward_facing_axis=Vector3.Z(),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=1.0665,
             maximal_height=1.4165,
             default_camera=True,

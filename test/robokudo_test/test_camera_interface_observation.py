@@ -1,0 +1,427 @@
+from collections.abc import Iterator
+from dataclasses import dataclass
+import logging
+from threading import Lock
+
+import cv2
+import numpy as np
+import pytest
+from builtin_interfaces.msg import Time
+from sensor_msgs.msg import CameraInfo
+
+import robokudo.world as robokudo_world
+from robokudo.cas import CAS
+from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.io.camera_interface import CameraInterface, KinectCameraInterface
+from robokudo.io.camera_without_depth_interface import (
+    OpenCVCameraWithoutDepthInterface,
+)
+from robokudo.io.ros_camera_without_depth_interface import (
+    ROSCameraWithoutDepthInterface,
+)
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraDistortionModel,
+    CameraModality,
+    PinholeCameraModel,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
+
+
+@dataclass
+class LiveRGBDCameraConfig:
+    """Provide the options consumed by the RGB-D reader's frame conversion."""
+
+    tf_from: str = "color_optical_frame"
+    """Camera optical frame used when the message does not declare one."""
+
+    hi_res_mode: bool = False
+    """Whether the legacy high-resolution crop is active."""
+
+    color2depth_ratio: tuple[float, float] = (1.0, 1.0)
+    """Scale from color resolution to aligned depth resolution."""
+
+
+@dataclass
+class LiveColorCameraConfig:
+    """Provide the options consumed by the RGB-only reader's frame conversion."""
+
+    tf_from: str = "color_optical_frame"
+    """Camera optical frame used when the message does not declare one."""
+
+    rotate_image: str | None = None
+    """Optional rotation applied before publishing the frame to the CAS."""
+
+
+@dataclass
+class OpenCVCameraTestConfig:
+    """Provide the options consumed by one OpenCV frame conversion."""
+
+    camera_info: CameraInfo
+    """Calibration for the configured capture resolution."""
+
+    camera_frame: str = "opencv_optical_frame"
+    """Fallback optical frame when the calibration declares no frame."""
+
+    normalize_rgb: bool = False
+    """Whether to normalize the captured color values."""
+
+    depth: np.ndarray | None = None
+    """Optional static depth image."""
+
+    camera_intrinsic: object | None = None
+    """Legacy intrinsic value replaced from the declared calibration."""
+
+    color2depth_ratio: tuple[float, float] = (1.0, 1.0)
+    """Scale from color resolution to optional depth resolution."""
+
+    update_global_with_depth_parameter: bool = False
+    """Whether to change the process-wide depth setting."""
+
+
+@dataclass
+class VideoCaptureMimic:
+    """Provide the metadata operations used after an OpenCV frame is retrieved."""
+
+    frame_position: float = 1.0
+    """Current playback frame position."""
+
+    frame_count: float = 1.0
+    """Number of frames in the source."""
+
+    def get(self, property_identifier: int) -> float:
+        """Return the requested playback metadata.
+
+        :param property_identifier: OpenCV capture property identifier.
+        :return: Stored value for the requested property.
+        """
+        if property_identifier == cv2.CAP_PROP_POS_FRAMES:
+            return self.frame_position
+        return self.frame_count
+
+    def set(self, property_identifier: int, value: float) -> bool:
+        """Accept a playback-position update.
+
+        :param property_identifier: OpenCV capture property identifier.
+        :param value: Requested property value.
+        :return: Whether the property is supported.
+        """
+        if property_identifier != cv2.CAP_PROP_POS_FRAMES:
+            return False
+        self.frame_position = value
+        return True
+
+
+# %% Fixtures
+
+
+@pytest.fixture
+def runtime_world() -> Iterator[World]:
+    """Install an isolated semantic world for one camera-interface test."""
+    previous_world = robokudo_world.world_instance()
+    world = World()
+    robokudo_world.set_world(world)
+    yield world
+    robokudo_world.set_world(previous_world)
+
+
+@pytest.fixture
+def camera_info() -> CameraInfo:
+    """Provide a calibrated ROS camera-info message."""
+    message = CameraInfo()
+    message.header.frame_id = "color_optical_frame"
+    message.width = 640
+    message.height = 480
+    message.k = [500.0, 0.0, 321.0, 0.0, 510.0, 239.0, 0.0, 0.0, 1.0]
+    message.distortion_model = CameraDistortionModel.RATIONAL_POLYNOMIAL.value
+    message.d = [0.1, -0.2, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06]
+    return message
+
+
+# %% Camera model conversion
+
+
+def test_camera_info_conversion_preserves_effective_calibration(
+    camera_info: CameraInfo,
+) -> None:
+    """The semantic pinhole model represents every relevant CameraInfo value."""
+    camera_model = CameraInterface.camera_model_from_camera_info(camera_info)
+
+    assert camera_model.resolution == CameraResolution(width=640, height=480)
+    assert camera_model.focal_length_x == camera_info.k[0]
+    assert camera_model.focal_length_y == camera_info.k[4]
+    assert camera_model.principal_point_x == camera_info.k[2]
+    assert camera_model.principal_point_y == camera_info.k[5]
+    assert camera_model.distortion.model == CameraDistortionModel.RATIONAL_POLYNOMIAL
+    assert camera_model.distortion.coefficients == tuple(camera_info.d)
+
+
+# %% Semantic camera resolution
+
+
+def test_camera_observation_reuses_camera_rooted_in_stream_frame(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """A live stream reuses the semantic camera mounted on its optical frame."""
+    camera_body = Body(name=PrefixedName(name=camera_info.header.frame_id))
+    native_model = PinholeCameraModel.from_field_of_view(
+        resolution=CameraResolution(width=1280, height=960),
+        field_of_view=FieldOfView(),
+    )
+    camera = Camera(
+        name=PrefixedName(name="head_camera"),
+        root=camera_body,
+        forward_facing_axis=Vector3.Z(),
+        camera_model=native_model,
+        modalities=(CameraModality.COLOR,),
+    )
+    with runtime_world.modify_world():
+        runtime_world.add_body(camera_body)
+        runtime_world.add_semantic_annotation(camera)
+    cas = CAS()
+    cas.camera_to_world_transform = camera_body.global_transform
+    interface = CameraInterface(BaseCameraConfig(interface_type="test"))
+
+    interface.store_camera_observation(
+        cas=cas,
+        camera_info=camera_info,
+        camera_frame=camera_info.header.frame_id,
+        timestamp_nanoseconds=123,
+        modalities=(CameraModality.COLOR,),
+    )
+
+    assert cas.camera_observation.camera is camera
+    assert cas.camera_observation.camera_model.resolution == CameraResolution(
+        width=camera_info.width,
+        height=camera_info.height,
+    )
+    assert cas.camera_observation.timestamp_nanoseconds == 123
+
+
+def test_camera_observation_creates_standalone_camera_without_world_pose(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """A live stream can create its semantic camera without a robot or TF pose."""
+    interface = CameraInterface(BaseCameraConfig(interface_type="test"))
+    cas = CAS()
+
+    interface.store_camera_observation(
+        cas=cas,
+        camera_info=camera_info,
+        camera_frame=camera_info.header.frame_id,
+        timestamp_nanoseconds=456,
+        modalities=(CameraModality.COLOR,),
+    )
+
+    cameras = runtime_world.get_semantic_annotations_by_type(Camera)
+    assert cameras == [cas.camera_observation.camera]
+    assert cas.camera_observation.camera.root.name.name == camera_info.header.frame_id
+    assert cas.camera_observation.world_T_camera is None
+    assert cas.camera_observation.camera_model.distortion.coefficients == tuple(
+        camera_info.d
+    )
+
+
+# %% Live reader contracts
+
+
+def test_rgbd_reader_stores_camera_observation(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """The live RGB-D reader publishes semantic metadata with each CAS frame."""
+    interface = object.__new__(KinectCameraInterface)
+    interface.camera_config = LiveRGBDCameraConfig()
+    interface._has_new_data = True
+    interface.lookup_viewpoint = False
+    interface.color = np.zeros(
+        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    )
+    interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
+    interface.camera_info = camera_info
+    interface.camera_intrinsic = None
+    interface.color2depth_ratio = None
+    interface.timestamp = Time(sec=10, nanosec=20)
+    interface.lock = Lock()
+    cas = CAS()
+
+    interface.set_data(cas)
+
+    assert cas.camera_observation.camera.root.name.name == camera_info.header.frame_id
+    assert cas.camera_observation.camera.modalities == (
+        CameraModality.COLOR,
+        CameraModality.DEPTH,
+    )
+    assert cas.camera_observation.camera_model.resolution == CameraResolution(
+        width=camera_info.width,
+        height=camera_info.height,
+    )
+    assert cas.camera_observation.timestamp_nanoseconds == 10_000_000_020
+
+
+def test_rgb_only_reader_stores_camera_observation(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """The live RGB-only reader publishes the same semantic metadata contract."""
+    interface = object.__new__(ROSCameraWithoutDepthInterface)
+    interface.camera_config = LiveColorCameraConfig()
+    interface._has_new_data = True
+    interface.lookup_viewpoint = False
+    interface.color = np.zeros(
+        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    )
+    interface.camera_info = camera_info
+    interface.camera_intrinsic = None
+    interface.timestamp = Time(sec=30, nanosec=40)
+    interface.lock = Lock()
+    cas = CAS()
+
+    interface.set_data(cas)
+
+    assert cas.camera_observation.camera.root.name.name == camera_info.header.frame_id
+    assert cas.camera_observation.camera.modalities == (CameraModality.COLOR,)
+    assert cas.camera_observation.camera_model.resolution == CameraResolution(
+        width=camera_info.width,
+        height=camera_info.height,
+    )
+    assert cas.camera_observation.timestamp_nanoseconds == 30_000_000_040
+
+
+def test_rgb_only_rotation_updates_every_effective_calibration_view(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """A rotated frame publishes one matching calibration through every CAS API."""
+    original_width = camera_info.width
+    original_height = camera_info.height
+    original_focal_length_x = camera_info.k[0]
+    original_focal_length_y = camera_info.k[4]
+    original_principal_point_x = camera_info.k[2]
+    original_principal_point_y = camera_info.k[5]
+    original_tangential_x = camera_info.d[2]
+    original_tangential_y = camera_info.d[3]
+    interface = object.__new__(ROSCameraWithoutDepthInterface)
+    interface.camera_config = LiveColorCameraConfig(rotate_image="90_ccw")
+    interface._has_new_data = True
+    interface.lookup_viewpoint = False
+    interface.color = np.zeros(
+        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    )
+    interface.camera_info = camera_info
+    interface.camera_intrinsic = None
+    interface.timestamp = Time(sec=50, nanosec=60)
+    interface.lock = Lock()
+    cas = CAS()
+
+    interface.set_data(cas)
+
+    expected_resolution = CameraResolution(
+        width=original_height,
+        height=original_width,
+    )
+    expected_intrinsic_matrix = np.array(
+        [
+            [original_focal_length_y, 0.0, original_principal_point_y],
+            [
+                0.0,
+                original_focal_length_x,
+                original_width - 1.0 - original_principal_point_x,
+            ],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    assert cas.color_image.shape[:2] == (
+        expected_resolution.height,
+        expected_resolution.width,
+    )
+    assert cas.camera_info.width == expected_resolution.width
+    assert cas.camera_info.height == expected_resolution.height
+    np.testing.assert_allclose(
+        np.asarray(cas.camera_info.k).reshape(3, 3),
+        expected_intrinsic_matrix,
+    )
+    np.testing.assert_allclose(
+        cas.camera_intrinsic.intrinsic_matrix,
+        expected_intrinsic_matrix,
+    )
+    assert cas.camera_observation.camera_model.resolution == expected_resolution
+    assert (
+        cas.camera_observation.camera_model.principal_point_y
+        == expected_intrinsic_matrix[1, 2]
+    )
+    assert cas.camera_observation.camera_model.distortion.coefficients[2:4] == (
+        -original_tangential_y,
+        original_tangential_x,
+    )
+
+
+def test_rgbd_high_resolution_crop_updates_effective_resolution(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """The high-resolution crop publishes its delivered color-image dimensions."""
+    camera_info.width = 1280
+    camera_info.height = 1024
+    camera_info.k = [900.0, 0.0, 640.0, 0.0, 910.0, 512.0, 0.0, 0.0, 1.0]
+    interface = object.__new__(KinectCameraInterface)
+    interface.camera_config = LiveRGBDCameraConfig(hi_res_mode=True)
+    interface._has_new_data = True
+    interface.lookup_viewpoint = False
+    interface.color = np.zeros((1024, 1280, 3), dtype=np.uint8)
+    interface.depth = np.zeros((480, 640), dtype=np.uint16)
+    interface.camera_info = camera_info
+    interface.camera_intrinsic = None
+    interface.color2depth_ratio = None
+    interface.timestamp = Time(sec=70, nanosec=80)
+    interface.lock = Lock()
+    cas = CAS()
+
+    interface.set_data(cas)
+
+    expected_resolution = CameraResolution(width=1280, height=960)
+    assert cas.color_image.shape[:2] == (
+        expected_resolution.height,
+        expected_resolution.width,
+    )
+    assert cas.camera_info.width == expected_resolution.width
+    assert cas.camera_info.height == expected_resolution.height
+    assert cas.camera_observation.camera_model.resolution == expected_resolution
+    assert cas.camera_observation.camera_model.principal_point_y == camera_info.k[5]
+
+
+def test_opencv_reader_stores_camera_observation(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """The physical OpenCV reader publishes the common camera metadata contract."""
+    interface = object.__new__(OpenCVCameraWithoutDepthInterface)
+    interface.camera_config = OpenCVCameraTestConfig(camera_info=camera_info)
+    interface.video_capture = VideoCaptureMimic()
+    interface.device_driver_flag = 0
+    interface.stream_type = 1
+    interface._loop_counter = 0
+    interface._backup_color = np.zeros(
+        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    )
+    interface._has_new_data = True
+    interface.rk_logger = logging.getLogger("robokudo-opencv-camera-test")
+    cas = CAS()
+
+    interface.set_data(cas)
+
+    assert cas.camera_observation.camera.root.name.name == camera_info.header.frame_id
+    assert cas.camera_observation.camera.modalities == (CameraModality.COLOR,)
+    assert cas.camera_observation.camera_model.resolution == CameraResolution(
+        width=camera_info.width,
+        height=camera_info.height,
+    )
+    assert cas.camera_observation.world_T_camera is None
+    assert cas.camera_observation.timestamp_nanoseconds == cas.data_timestamp

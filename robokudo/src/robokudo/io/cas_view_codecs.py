@@ -9,11 +9,15 @@ import base64
 import importlib
 import io
 from dataclasses import dataclass, field
+from enum import StrEnum
+from uuid import UUID
 
 import numpy as np
 from typing_extensions import Any, Dict, Iterable, List, Optional
 from robokudo import world
+from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.cas_annotation_codecs import krrood_to_json, krrood_from_json
+from robokudo.types.camera import CameraObservation
 from robokudo.io.open3d_codec_utils import (
     o3d,
     is_open3d_point_cloud,
@@ -21,6 +25,8 @@ from robokudo.io.open3d_codec_utils import (
     decode_open3d_point_cloud_from_base64_pcd,
 )
 from robokudo.types.tf import StampedTransform
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 
@@ -528,6 +534,82 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
         return HomogeneousTransformationMatrix.from_json(payload.payload, **kwargs)
 
 
+class CameraObservationCodec(ViewCodec):
+    """Codec for frame metadata containing a semantic camera reference."""
+
+    serializer_id: str = "robokudo_camera_observation_v1"
+
+    def can_encode(self, value: Any) -> bool:
+        """Check whether a value is camera observation metadata."""
+        return isinstance(value, CameraObservation)
+
+    def encode(self, value: CameraObservation) -> ViewPayload:
+        """Encode an observation while preserving camera identity."""
+        return ViewPayload(
+            serializer_id=self.serializer_id,
+            payload={
+                CameraObservationField.CAMERA_ID: str(value.camera.id),
+                CameraObservationField.MODEL: krrood_to_json(value.camera_model),
+                CameraObservationField.WORLD_T_CAMERA: (
+                    value.world_T_camera.to_json()
+                    if value.world_T_camera is not None
+                    else None
+                ),
+                CameraObservationField.TIMESTAMP: value.timestamp_nanoseconds,
+            },
+            type_name=_full_type_name(value),
+        )
+
+    def decode(self, payload: ViewPayload) -> CameraObservation:
+        """Decode an observation and resolve its camera in the active world."""
+        tracker = world.get_world_entity_tracker()
+        camera = tracker.get_world_entity_with_id(
+            UUID(payload.payload[CameraObservationField.CAMERA_ID])
+        )
+        if not isinstance(camera, Camera):
+            raise InvalidCameraObservation(
+                reason=f"the referenced entity '{camera.name}' is not a camera"
+            )
+        camera_model = krrood_from_json(payload.payload[CameraObservationField.MODEL])
+        if not isinstance(camera_model, PinholeCameraModel):
+            raise InvalidCameraObservation(
+                reason="the payload does not contain a pinhole camera model"
+            )
+        world_T_camera_payload = payload.payload[CameraObservationField.WORLD_T_CAMERA]
+        world_T_camera = (
+            HomogeneousTransformationMatrix.from_json(
+                world_T_camera_payload,
+                **tracker.create_kwargs(),
+            )
+            if world_T_camera_payload is not None
+            else None
+        )
+        return CameraObservation(
+            camera=camera,
+            camera_model=camera_model,
+            world_T_camera=world_T_camera,
+            timestamp_nanoseconds=int(
+                payload.payload[CameraObservationField.TIMESTAMP]
+            ),
+        )
+
+
+class CameraObservationField(StrEnum):
+    """Name each field in a persisted camera observation."""
+
+    CAMERA_ID = "camera_id"
+    """Identifier of the semantic camera."""
+
+    MODEL = "camera_model"
+    """Effective projection model."""
+
+    WORLD_T_CAMERA = "world_T_camera"
+    """Sampled camera pose in the world frame."""
+
+    TIMESTAMP = "timestamp_nanoseconds"
+    """Frame acquisition time."""
+
+
 class KrroodCodec(ViewCodec):
     """
     Codec that delegates serialization to KRROOD.
@@ -584,6 +666,7 @@ class CASViewCodecRegistry:
                 Open3DPointCloudCodec(),
                 Open3DPinholeCameraIntrinsicCodec(),
                 StampedTransformCodec(),
+                CameraObservationCodec(),
                 HomogeneousTransformationMatrixCodec(),
                 RosMessageCodec(),
                 KrroodCodec(),
