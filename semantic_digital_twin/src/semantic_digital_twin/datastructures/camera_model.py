@@ -16,8 +16,6 @@ from semantic_digital_twin.exceptions import (
     InvalidPinholeCameraModelError,
 )
 
-# %% Projection models
-
 
 @dataclass
 class CameraModel(ABC):
@@ -146,9 +144,6 @@ class PinholeCameraModel(CameraModel):
             horizontal_angle=horizontal_angle,
             vertical_angle=vertical_angle,
         )
-
-
-# %% Distortion and range
 
 
 class CameraDistortionModel(StrEnum):
