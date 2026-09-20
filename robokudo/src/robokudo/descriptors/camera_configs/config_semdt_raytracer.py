@@ -7,7 +7,11 @@ from typing_extensions import TYPE_CHECKING, ClassVar, Optional, Tuple
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
     from semantic_digital_twin.world import World
+
+
+# %% Semantic Digital Twin ray-tracer configuration
 
 
 @dataclass(slots=True)
@@ -19,31 +23,6 @@ class SemDTRayTracerCameraConfig(BaseCameraConfig):
     registry_name: ClassVar[str] = "semdt_raytracer"
     """
     Name under which the camera configuration is registered.
-    """
-
-    default_camera_frame: ClassVar[str] = "semdt_camera_optical_frame"
-    """
-    Camera frame used when adapting a legacy descriptor.
-    """
-
-    default_resolution: ClassVar[int] = 512
-    """
-    Image size used when a legacy descriptor supplies no resolution.
-    """
-
-    default_field_of_view_degrees: ClassVar[float] = 90.0
-    """
-    Viewing angle used when a legacy descriptor supplies no field of view.
-    """
-
-    default_minimum_distance: ClassVar[float] = 0.05
-    """
-    Nearest rendered distance used for a legacy descriptor.
-    """
-
-    default_maximum_distance: ClassVar[float] = 8.0
-    """
-    Farthest rendered distance used for a legacy descriptor.
     """
 
     interface_type: str = "SemDTRayTracer"
@@ -66,13 +45,6 @@ class SemDTRayTracerCameraConfig(BaseCameraConfig):
     Existing semantic world to render instead of loading a descriptor.
     """
 
-    world_frame: Optional[str] = None
-    """
-    World frame to use as camera pose reference.
-
-    If None, descriptor root is used.
-    """
-
     camera_name: Optional[str] = None
     """
     Semantic camera name.
@@ -80,59 +52,12 @@ class SemDTRayTracerCameraConfig(BaseCameraConfig):
     A unique or default camera is used when omitted.
     """
 
-    camera_frame: Optional[str] = None
+    camera_pose: Optional[HomogeneousTransformationMatrix] = None
     """
-    Frame name used only when creating a camera for a legacy world descriptor.
-    """
+    Optional initial pose for the selected camera root.
 
-    camera_x: float = -1.20
-    """
-    Legacy camera x position in the configured world frame.
-    """
-
-    camera_y: float = 0.40
-    """
-    Legacy camera y position in the configured world frame.
-    """
-
-    camera_z: float = 1.05
-    """
-    Legacy camera z position in the configured world frame.
-    """
-
-    camera_roll: float = -2.2689280275926285
-    """
-    Legacy camera roll in radians.
-    """
-
-    camera_pitch: float = 0.0
-    """
-    Legacy camera pitch in radians.
-    """
-
-    camera_yaw: float = -0.2707963267948965
-    """
-    Legacy camera yaw in radians.
-    """
-
-    resolution: Optional[int] = None
-    """
-    Optional square output-resolution override in pixels.
-    """
-
-    fov_deg: Optional[float] = None
-    """
-    Optional symmetric output field-of-view override in degrees.
-    """
-
-    min_distance: Optional[float] = None
-    """
-    Optional minimum rendered distance in meters.
-    """
-
-    max_distance: Optional[float] = None
-    """
-    Optional maximum rendered distance in meters.
+    A pose without a reference frame is interpreted relative to the camera root's parent
+    body.
     """
 
     color2depth_ratio: Tuple[float, float] = (1.0, 1.0)

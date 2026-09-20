@@ -30,10 +30,7 @@ from robokudo.annotators.shape_estimator import ShapeEstimatorAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
-from robokudo.world_descriptor import PredefinedObject
-from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.world_description.geometry import Mesh
 
 
 @pytest.fixture
@@ -249,7 +246,6 @@ class TestFullAEExecution(object):
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             "semdt_raytracer",
             world_descriptor_name="world_semdt_raytracer_cylinders",
-            resolution=128,
         )
 
         plane_desc = PlaneAnnotator.Descriptor()
@@ -290,11 +286,7 @@ class TestFullAEExecution(object):
         assert tree_result is py_trees.common.Status.SUCCESS
 
         camera_observation = seq.cas.camera_observation
-        configured_resolution = raytracer_config.parameters.camera_config.resolution
-        assert camera_observation.resolution == CameraResolution(
-            width=configured_resolution,
-            height=configured_resolution,
-        )
+        assert camera_observation.camera_model is camera_observation.camera.camera_model
         assert camera_observation.camera in (
             seq.cas.ground_truth_world_ref.get_semantic_annotations_by_type(Camera)
         )
@@ -336,7 +328,6 @@ class TestFullAEExecution(object):
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             "semdt_raytracer",
             world_descriptor_name="world_semdt_raytracer_tabletop",
-            resolution=128,
         )
 
         plane_desc = PlaneAnnotator.Descriptor()

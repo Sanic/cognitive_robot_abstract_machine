@@ -53,6 +53,9 @@ class UnknownMode(RoboKudoError, ValueError):
         return "use one of the modes supported by this component."
 
 
+# %% Semantic camera selection
+
+
 @dataclass
 class CameraAnnotationMissing(RoboKudoError):
     """
@@ -89,6 +92,64 @@ class CameraAnnotationAmbiguous(RoboKudoError):
 
     def suggest_correction(self) -> str:
         return "configure the name of the camera that should provide perception data."
+
+
+@dataclass
+class CameraResolutionUnavailable(RoboKudoError):
+    """
+    Raised when rendering requires an image resolution the camera lacks.
+    """
+
+    camera_name: str
+    """
+    Name of the semantic camera without a configured image resolution.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing rendering parameter.
+        """
+        return f"Camera '{self.camera_name}' does not define an image resolution."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to provide the required resolution.
+        """
+        return "define the semantic camera with a PinholeCameraModel."
+
+
+@dataclass
+class CameraPoseOverrideUnavailable(RoboKudoError):
+    """
+    Raised when the selected camera attachment cannot accept a pose override.
+    """
+
+    camera_name: str
+    """
+    Name of the semantic camera whose pose cannot be changed.
+    """
+
+    connection_type: str | None
+    """
+    Camera-root connection type, or ``None`` when the camera is the world root.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe why the configured pose cannot be applied.
+        """
+        if self.connection_type is None:
+            return f"Camera '{self.camera_name}' has no parent connection."
+        return (
+            f"Camera '{self.camera_name}' is attached through immutable connection "
+            f"type '{self.connection_type}'."
+        )
+
+    def suggest_correction(self) -> str:
+        """
+        Describe the attachment required for configurable camera placement.
+        """
+        return "attach the camera root through a Connection6DoF or omit camera_pose."
 
 
 @dataclass
