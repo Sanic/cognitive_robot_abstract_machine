@@ -1,27 +1,21 @@
 from importlib.util import find_spec
-import math
 from pathlib import Path
 
+from robokudo.descriptors.worlds.pinhole_rgbd_camera import PinholeRGBDCameraSpec
 from robokudo.world_descriptor import (
     BaseWorldDescriptor,
-    CameraSpec,
     ObjectSpec,
     PredefinedObject,
     RegionSpec,
 )
-from semantic_digital_twin.datastructures.camera_model import (
-    CameraModality,
-    CameraRange,
-    PinholeCameraModel,
-)
-from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
-from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Color, Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+
+# %% World descriptor
 
 
 class WorldDescriptor(BaseWorldDescriptor):
@@ -161,8 +155,7 @@ class WorldDescriptor(BaseWorldDescriptor):
         self.build_regions(root, region_specs)
         self.build_camera(
             root,
-            CameraSpec(
-                name="semdt_camera_optical_frame",
+            PinholeRGBDCameraSpec(
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.20,
                     y=0.40,
@@ -171,23 +164,6 @@ class WorldDescriptor(BaseWorldDescriptor):
                     pitch=0.0,
                     yaw=-0.2707963267948965,
                     reference_frame=root,
-                ),
-                forward_facing_axis=Vector3.Z(),
-                camera_model=PinholeCameraModel.from_field_of_view(
-                    resolution=CameraResolution(),
-                    field_of_view=FieldOfView(
-                        horizontal_angle=math.radians(90.0),
-                        vertical_angle=math.radians(90.0),
-                    ),
-                ),
-                camera_range=CameraRange(
-                    minimum_distance=0.05,
-                    maximum_distance=8.0,
-                ),
-                modalities=(
-                    CameraModality.COLOR,
-                    CameraModality.DEPTH,
-                    CameraModality.SEGMENTATION,
                 ),
             ),
         )
