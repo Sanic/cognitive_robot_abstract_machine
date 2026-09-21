@@ -215,9 +215,9 @@ class CameraInterface(object):
             focal_length_y=camera_info.k[4],
             principal_point_x=camera_info.k[2],
             principal_point_y=camera_info.k[5],
-            distortion=CameraDistortion(
+            distortion=CameraDistortion.from_ordered_coefficients(
                 model=distortion_model,
-                coefficients=tuple(camera_info.d),
+                coefficients=camera_info.d,
             ),
         )
 
@@ -241,7 +241,7 @@ class CameraInterface(object):
             camera_info.d = [0.0] * CameraDistortionModel.PLUMB_BOB.coefficient_count
         else:
             camera_info.distortion_model = camera_model.distortion.model.value
-            camera_info.d = list(camera_model.distortion.coefficients)
+            camera_info.d = list(camera_model.distortion.to_ordered_coefficients())
         camera_info.k = [
             camera_model.focal_length_x,
             0.0,

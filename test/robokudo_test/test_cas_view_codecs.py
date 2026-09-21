@@ -8,7 +8,10 @@ from robokudo.types.tf import StampedTransform
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.datastructures.camera_model import (
+    PinholeCameraModel,
+    RationalPolynomialCameraDistortion,
+)
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -81,6 +84,10 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     camera_model = PinholeCameraModel.from_field_of_view(
         resolution=CameraResolution(width=640, height=480),
         field_of_view=FieldOfView(),
+        distortion=RationalPolynomialCameraDistortion(
+            radial_coefficient_1=0.1,
+            tangential_coefficient_1=0.01,
+        ),
     )
     camera = Camera(
         name=PrefixedName(name="camera"),

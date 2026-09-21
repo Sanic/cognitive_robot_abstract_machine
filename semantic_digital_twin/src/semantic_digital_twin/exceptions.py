@@ -338,25 +338,16 @@ class InvalidCameraDistortionError(UsageError):
     Distortion model whose coefficients are invalid.
     """
 
-    coefficient_count: int
+    reason: str
     """
-    Number of coefficients that were provided.
-    """
-
-    expected_coefficient_count: int
-    """
-    Number of coefficients required by the model.
+    Reason the distortion value is invalid.
     """
 
     def error_message(self) -> str:
-        return (
-            f"Camera distortion model '{self.model}' requires "
-            f"{self.expected_coefficient_count} coefficients, got "
-            f"{self.coefficient_count}."
-        )
+        return f"Invalid camera distortion model '{self.model}': {self.reason}."
 
     def suggest_correction(self) -> str:
-        return "provide the coefficient count defined by the distortion model."
+        return "provide finite coefficients defined by the distortion model."
 
 
 @dataclass

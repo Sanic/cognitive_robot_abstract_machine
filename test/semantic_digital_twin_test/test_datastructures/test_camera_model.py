@@ -5,6 +5,9 @@ from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortion,
     CameraDistortionModel,
     CameraRange,
+    EquidistantCameraDistortion,
+    NoCameraDistortion,
+    PlumbBobCameraDistortion,
     FieldOfViewCameraModel,
     PinholeCameraModel,
 )
@@ -39,6 +42,7 @@ def test_pinhole_camera_model_from_field_of_view_preserves_projection():
         model.field_of_view.vertical_angle,
         field_of_view.vertical_angle,
     )
+    assert isinstance(model.distortion, NoCameraDistortion)
 
 
 def test_field_of_view_camera_model_rejects_zero_angle():
@@ -94,4 +98,46 @@ def test_camera_distortion_rejects_wrong_coefficient_count(
     model: CameraDistortionModel, coefficients: tuple[float, ...]
 ) -> None:
     with pytest.raises(InvalidCameraDistortionError):
-        CameraDistortion(model=model, coefficients=coefficients)
+        CameraDistortion.from_ordered_coefficients(
+            model=model,
+            coefficients=coefficients,
+        )
+
+
+def test_plumb_bob_distortion_names_ordered_coefficients():
+    coefficients = (0.1, -0.2, 0.01, 0.02, 0.03)
+
+    distortion = CameraDistortion.from_ordered_coefficients(
+        model=CameraDistortionModel.PLUMB_BOB,
+        coefficients=coefficients,
+    )
+
+    assert isinstance(distortion, PlumbBobCameraDistortion)
+    assert distortion.radial_coefficient_1 == coefficients[0]
+    assert distortion.radial_coefficient_2 == coefficients[1]
+    assert distortion.tangential_coefficient_1 == coefficients[2]
+    assert distortion.tangential_coefficient_2 == coefficients[3]
+    assert distortion.radial_coefficient_3 == coefficients[4]
+    assert distortion.to_ordered_coefficients() == coefficients
+
+
+def test_equidistant_distortion_names_ordered_coefficients():
+    coefficients = (0.1, -0.2, 0.3, -0.4)
+
+    distortion = CameraDistortion.from_ordered_coefficients(
+        model=CameraDistortionModel.EQUIDISTANT,
+        coefficients=coefficients,
+    )
+
+    assert isinstance(distortion, EquidistantCameraDistortion)
+    assert distortion.radial_coefficient_1 == coefficients[0]
+    assert distortion.radial_coefficient_2 == coefficients[1]
+    assert distortion.radial_coefficient_3 == coefficients[2]
+    assert distortion.radial_coefficient_4 == coefficients[3]
+    assert distortion.to_ordered_coefficients() == coefficients
+
+
+@pytest.mark.parametrize("coefficient", [np.nan, np.inf, -np.inf])
+def test_camera_distortion_rejects_nonfinite_coefficient(coefficient: float):
+    with pytest.raises(InvalidCameraDistortionError):
+        PlumbBobCameraDistortion(radial_coefficient_1=coefficient)

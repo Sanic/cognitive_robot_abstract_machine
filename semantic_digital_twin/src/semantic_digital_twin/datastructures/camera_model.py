@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -80,7 +81,7 @@ class PinholeCameraModel(CameraModel):
     principal_point_y: float = field(kw_only=True)
     """Vertical principal point in pixels from the image's top edge."""
 
-    distortion: CameraDistortion = field(default_factory=lambda: CameraDistortion())
+    distortion: CameraDistortion = field(default_factory=lambda: NoCameraDistortion())
     """Lens-distortion parameters associated with the calibration."""
 
     def __post_init__(self) -> None:
@@ -125,7 +126,7 @@ class PinholeCameraModel(CameraModel):
             focal_length_y=focal_length_y,
             principal_point_x=resolution.width / 2.0,
             principal_point_y=resolution.height / 2.0,
-            distortion=distortion if distortion is not None else CameraDistortion(),
+            distortion=(distortion if distortion is not None else NoCameraDistortion()),
         )
 
     @property
@@ -163,13 +164,13 @@ class CameraDistortionModel(StrEnum):
     """The image has no modeled lens distortion."""
 
     PLUMB_BOB = "plumb_bob"
-    """The coefficients follow the ROS plumb-bob convention."""
+    """Follow ROS order ``(k1, k2, t1, t2, k3)`` for plumb-bob distortion."""
 
     RATIONAL_POLYNOMIAL = "rational_polynomial"
-    """The coefficients follow the ROS rational-polynomial convention."""
+    """Follow ROS order ``(k1, k2, t1, t2, k3, k4, k5, k6)``."""
 
     EQUIDISTANT = "equidistant"
-    """The coefficients follow the ROS equidistant convention."""
+    """Follow ROS order ``(k1, k2, k3, k4)`` for equidistant distortion."""
 
     @property
     def coefficient_count(self) -> int:
@@ -182,26 +183,200 @@ class CameraDistortionModel(StrEnum):
         }[self]
 
 
-@dataclass
-class CameraDistortion:
-    """Describe lens distortion associated with an image calibration."""
-
-    model: CameraDistortionModel = CameraDistortionModel.NONE
-    """Mathematical distortion model used by the coefficients."""
-
-    coefficients: tuple[float, ...] = field(default_factory=tuple)
-    """Ordered coefficients defined by :attr:`model`."""
+@dataclass(frozen=True, kw_only=True)
+class CameraDistortion(ABC):
+    """Describe lens distortion using ROS ``CameraInfo`` model conventions."""
 
     def __post_init__(self) -> None:
-        """Validate and store coefficients in their canonical representation."""
-        self.coefficients = tuple(self.coefficients)
-        expected_coefficient_count = self.model.coefficient_count
-        if len(self.coefficients) != expected_coefficient_count:
+        """Validate that every coefficient is finite."""
+        if not all(
+            math.isfinite(coefficient) for coefficient in self.to_ordered_coefficients()
+        ):
             raise InvalidCameraDistortionError(
                 model=self.model.value,
-                coefficient_count=len(self.coefficients),
-                expected_coefficient_count=expected_coefficient_count,
+                reason="coefficients must be finite",
             )
+
+    @property
+    @abstractmethod
+    def model(self) -> CameraDistortionModel:
+        """Return the mathematical model represented by this value."""
+
+    @abstractmethod
+    def to_ordered_coefficients(self) -> tuple[float, ...]:
+        """Return coefficients in the ROS order defined by :attr:`model`."""
+
+    @staticmethod
+    def from_ordered_coefficients(
+        model: CameraDistortionModel,
+        coefficients: Sequence[float],
+    ) -> CameraDistortion:
+        """
+        Parse a coefficient sequence ordered according to ROS ``CameraInfo``.
+
+        :param model: Mathematical model defining coefficient order.
+        :param coefficients: Coefficients ordered according to ``model``.
+        :return: Structured distortion value.
+        :raises InvalidCameraDistortionError: If the coefficient count is invalid.
+        """
+        ordered_coefficients = tuple(coefficients)
+        if len(ordered_coefficients) != model.coefficient_count:
+            raise InvalidCameraDistortionError(
+                model=model.value,
+                reason=(
+                    f"requires {model.coefficient_count} coefficients, got "
+                    f"{len(ordered_coefficients)}"
+                ),
+            )
+        if model is CameraDistortionModel.NONE:
+            return NoCameraDistortion()
+        if model is CameraDistortionModel.PLUMB_BOB:
+            return PlumbBobCameraDistortion(
+                radial_coefficient_1=ordered_coefficients[0],
+                radial_coefficient_2=ordered_coefficients[1],
+                tangential_coefficient_1=ordered_coefficients[2],
+                tangential_coefficient_2=ordered_coefficients[3],
+                radial_coefficient_3=ordered_coefficients[4],
+            )
+        if model is CameraDistortionModel.RATIONAL_POLYNOMIAL:
+            return RationalPolynomialCameraDistortion(
+                radial_coefficient_1=ordered_coefficients[0],
+                radial_coefficient_2=ordered_coefficients[1],
+                tangential_coefficient_1=ordered_coefficients[2],
+                tangential_coefficient_2=ordered_coefficients[3],
+                radial_coefficient_3=ordered_coefficients[4],
+                radial_coefficient_4=ordered_coefficients[5],
+                radial_coefficient_5=ordered_coefficients[6],
+                radial_coefficient_6=ordered_coefficients[7],
+            )
+        return EquidistantCameraDistortion(
+            radial_coefficient_1=ordered_coefficients[0],
+            radial_coefficient_2=ordered_coefficients[1],
+            radial_coefficient_3=ordered_coefficients[2],
+            radial_coefficient_4=ordered_coefficients[3],
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class NoCameraDistortion(CameraDistortion):
+    """Represent an image without modeled lens distortion."""
+
+    @property
+    def model(self) -> CameraDistortionModel:
+        """Return the no-distortion model identifier."""
+        return CameraDistortionModel.NONE
+
+    def to_ordered_coefficients(self) -> tuple[float, ...]:
+        """Return the empty coefficient sequence."""
+        return ()
+
+
+@dataclass(frozen=True, kw_only=True)
+class RadialTangentialCameraDistortion(CameraDistortion, ABC):
+    """Provide coefficients shared by ROS radial-tangential models.
+
+    ROS names the tangential terms ``t1`` and ``t2``. They are the coefficients
+    commonly written as ``p1`` and ``p2`` in camera-model equations.
+    """
+
+    radial_coefficient_1: float = 0.0
+    """First radial distortion coefficient, conventionally ``k1``."""
+
+    radial_coefficient_2: float = 0.0
+    """Second radial distortion coefficient, conventionally ``k2``."""
+
+    tangential_coefficient_1: float = 0.0
+    """First tangential coefficient, conventionally ``p1`` and named ``t1`` by ROS."""
+
+    tangential_coefficient_2: float = 0.0
+    """Second tangential coefficient, conventionally ``p2`` and named ``t2`` by ROS."""
+
+    radial_coefficient_3: float = 0.0
+    """Third radial distortion coefficient, conventionally ``k3``."""
+
+    @property
+    def radial_tangential_coefficients(self) -> tuple[float, ...]:
+        """Return the coefficients shared by radial-tangential models."""
+        return (
+            self.radial_coefficient_1,
+            self.radial_coefficient_2,
+            self.tangential_coefficient_1,
+            self.tangential_coefficient_2,
+            self.radial_coefficient_3,
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class PlumbBobCameraDistortion(RadialTangentialCameraDistortion):
+    """Represent radial-tangential distortion using the plumb-bob model."""
+
+    @property
+    def model(self) -> CameraDistortionModel:
+        """Return the plumb-bob model identifier."""
+        return CameraDistortionModel.PLUMB_BOB
+
+    def to_ordered_coefficients(self) -> tuple[float, ...]:
+        """Return coefficients in plumb-bob order."""
+        return self.radial_tangential_coefficients
+
+
+@dataclass(frozen=True, kw_only=True)
+class RationalPolynomialCameraDistortion(RadialTangentialCameraDistortion):
+    """Represent radial-tangential distortion with rational radial terms."""
+
+    radial_coefficient_4: float = 0.0
+    """Fourth radial distortion coefficient, conventionally ``k4``."""
+
+    radial_coefficient_5: float = 0.0
+    """Fifth radial distortion coefficient, conventionally ``k5``."""
+
+    radial_coefficient_6: float = 0.0
+    """Sixth radial distortion coefficient, conventionally ``k6``."""
+
+    @property
+    def model(self) -> CameraDistortionModel:
+        """Return the rational-polynomial model identifier."""
+        return CameraDistortionModel.RATIONAL_POLYNOMIAL
+
+    def to_ordered_coefficients(self) -> tuple[float, ...]:
+        """Return coefficients in rational-polynomial order."""
+        return (
+            *self.radial_tangential_coefficients,
+            self.radial_coefficient_4,
+            self.radial_coefficient_5,
+            self.radial_coefficient_6,
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class EquidistantCameraDistortion(CameraDistortion):
+    """Represent fisheye distortion using the equidistant model."""
+
+    radial_coefficient_1: float = 0.0
+    """First equidistant distortion coefficient, conventionally ``k1``."""
+
+    radial_coefficient_2: float = 0.0
+    """Second equidistant distortion coefficient, conventionally ``k2``."""
+
+    radial_coefficient_3: float = 0.0
+    """Third equidistant distortion coefficient, conventionally ``k3``."""
+
+    radial_coefficient_4: float = 0.0
+    """Fourth equidistant distortion coefficient, conventionally ``k4``."""
+
+    @property
+    def model(self) -> CameraDistortionModel:
+        """Return the equidistant model identifier."""
+        return CameraDistortionModel.EQUIDISTANT
+
+    def to_ordered_coefficients(self) -> tuple[float, ...]:
+        """Return coefficients in equidistant-model order."""
+        return (
+            self.radial_coefficient_1,
+            self.radial_coefficient_2,
+            self.radial_coefficient_3,
+            self.radial_coefficient_4,
+        )
 
 
 @dataclass

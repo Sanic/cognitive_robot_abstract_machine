@@ -23,6 +23,7 @@ from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortionModel,
     CameraModality,
     PinholeCameraModel,
+    RationalPolynomialCameraDistortion,
 )
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
@@ -157,8 +158,10 @@ def test_camera_info_conversion_preserves_effective_calibration(
     assert camera_model.focal_length_y == camera_info.k[4]
     assert camera_model.principal_point_x == camera_info.k[2]
     assert camera_model.principal_point_y == camera_info.k[5]
-    assert camera_model.distortion.model == CameraDistortionModel.RATIONAL_POLYNOMIAL
-    assert camera_model.distortion.coefficients == tuple(camera_info.d)
+    assert isinstance(camera_model.distortion, RationalPolynomialCameraDistortion)
+    assert camera_model.distortion.radial_coefficient_1 == camera_info.d[0]
+    assert camera_model.distortion.tangential_coefficient_1 == camera_info.d[2]
+    assert camera_model.distortion.to_ordered_coefficients() == tuple(camera_info.d)
 
 
 def test_camera_model_conversion_preserves_ros_calibration(
@@ -243,8 +246,9 @@ def test_camera_observation_creates_standalone_camera_without_world_pose(
     assert cameras == [cas.camera_observation.camera]
     assert cas.camera_observation.camera.root.name.name == camera_info.header.frame_id
     assert cas.camera_observation.world_T_camera is None
-    assert cas.camera_observation.camera_model.distortion.coefficients == tuple(
-        camera_info.d
+    assert (
+        cas.camera_observation.camera_model.distortion.to_ordered_coefficients()
+        == tuple(camera_info.d)
     )
 
 
@@ -376,10 +380,10 @@ def test_rgb_only_rotation_updates_every_effective_calibration_view(
         cas.camera_observation.camera_model.principal_point_y
         == expected_intrinsic_matrix[1, 2]
     )
-    assert cas.camera_observation.camera_model.distortion.coefficients[2:4] == (
-        -original_tangential_y,
-        original_tangential_x,
-    )
+    distortion = cas.camera_observation.camera_model.distortion
+    assert isinstance(distortion, RationalPolynomialCameraDistortion)
+    assert distortion.tangential_coefficient_1 == -original_tangential_y
+    assert distortion.tangential_coefficient_2 == original_tangential_x
 
 
 def test_rgbd_high_resolution_crop_updates_effective_resolution(
