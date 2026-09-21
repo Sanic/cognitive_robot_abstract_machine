@@ -48,6 +48,23 @@ def test_field_of_view_camera_model_rejects_zero_angle():
         )
 
 
+def test_field_of_view_camera_model_has_default_resolution():
+    model = FieldOfViewCameraModel(view=FieldOfView())
+
+    assert model.resolution == CameraResolution()
+
+
+def test_field_of_view_camera_model_preserves_explicit_resolution():
+    resolution = CameraResolution(width=320, height=240)
+
+    model = FieldOfViewCameraModel(
+        view=FieldOfView(),
+        image_resolution=resolution,
+    )
+
+    assert model.resolution is resolution
+
+
 def test_pinhole_camera_model_rejects_nonpositive_focal_length():
     with pytest.raises(InvalidPinholeCameraModelError):
         PinholeCameraModel(

@@ -20,9 +20,11 @@ from PIL import Image as PILImage, UnidentifiedImageError
 from pyglet.canvas.xlib import NoSuchDisplayException
 
 from robokudo.descriptors.camera_configs.config_semdt_raytracer import SemDTRGBMode
-from robokudo.exceptions import CameraResolutionUnavailable
 from robokudo.io.semdt_camera_context import RayTracingContext
-from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraModel,
+    PinholeCameraModel,
+)
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
@@ -54,6 +56,9 @@ class RenderedRGBDFrame:
     """
     Mapping from semantic RGB color keys to object names.
     """
+
+    camera_model: PinholeCameraModel
+    """Effective projection model used to render the frame."""
 
 
 # %% Semantic Digital Twin rendering
@@ -109,13 +114,10 @@ class SemDTRayTracerRenderer:
 
         :param context: Resolved semantic world and camera.
         :return: Aligned color, depth, segmentation, and semantic color mapping.
-        :raises CameraResolutionUnavailable: If the camera has no pinhole model.
         """
         world = context.world
         camera = context.camera
-        camera_model = camera.camera_model
-        if not isinstance(camera_model, PinholeCameraModel):
-            raise CameraResolutionUnavailable(camera_name=camera.name.name)
+        camera_model = self._pinhole_model_for_rendering(camera.camera_model)
 
         resolution = camera_model.resolution
         field_of_view = camera_model.field_of_view
@@ -142,6 +144,24 @@ class SemDTRayTracerRenderer:
             depth_mm=self._depth_m_to_mm(depth_m),
             segmentation=segmentation,
             object_color_map=object_color_map,
+            camera_model=camera_model,
+        )
+
+    @staticmethod
+    def _pinhole_model_for_rendering(
+        camera_model: CameraModel,
+    ) -> PinholeCameraModel:
+        """
+        Return pinhole calibration for rendering and downstream image consumers.
+
+        :param camera_model: Native semantic camera model.
+        :return: Existing or derived pinhole calibration.
+        """
+        if isinstance(camera_model, PinholeCameraModel):
+            return camera_model
+        return PinholeCameraModel.from_field_of_view(
+            resolution=camera_model.resolution,
+            field_of_view=camera_model.field_of_view,
         )
 
     @staticmethod

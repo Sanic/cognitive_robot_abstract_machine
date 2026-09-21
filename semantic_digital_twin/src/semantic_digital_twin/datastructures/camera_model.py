@@ -30,16 +30,21 @@ class CameraModel(ABC):
 
     @property
     @abstractmethod
-    def resolution(self) -> Optional[CameraResolution]:
-        """Return the image resolution when the model defines one."""
+    def resolution(self) -> CameraResolution:
+        """Return the image resolution represented by the model."""
 
 
 @dataclass
 class FieldOfViewCameraModel(CameraModel):
-    """Describe a camera whose angular extent is known without calibration."""
+    """Describe an ideal camera from its angular extent and image resolution."""
 
     view: FieldOfView = field(kw_only=True)
     """Angular extent of the camera image."""
+
+    image_resolution: CameraResolution = field(
+        default_factory=CameraResolution, kw_only=True
+    )
+    """Pixel dimensions of images produced by the camera."""
 
     def __post_init__(self) -> None:
         """Validate that both viewing angles describe a physical camera."""
@@ -51,9 +56,9 @@ class FieldOfViewCameraModel(CameraModel):
         return self.view
 
     @property
-    def resolution(self) -> None:
-        """Return no resolution because this model does not define one."""
-        return None
+    def resolution(self) -> CameraResolution:
+        """Return the image resolution represented by the model."""
+        return self.image_resolution
 
 
 @dataclass

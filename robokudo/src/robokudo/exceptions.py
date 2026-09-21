@@ -150,30 +150,6 @@ class CameraAnnotationAmbiguous(RoboKudoError):
 
 
 @dataclass
-class CameraResolutionUnavailable(RoboKudoError):
-    """
-    Raised when rendering requires an image resolution the camera lacks.
-    """
-
-    camera_name: str
-    """
-    Name of the semantic camera without a configured image resolution.
-    """
-
-    def error_message(self) -> str:
-        """
-        Describe the missing rendering parameter.
-        """
-        return f"Camera '{self.camera_name}' does not define an image resolution."
-
-    def suggest_correction(self) -> str:
-        """
-        Describe how to provide the required resolution.
-        """
-        return "define the semantic camera with a PinholeCameraModel."
-
-
-@dataclass
 class CameraPoseOverrideUnavailable(RoboKudoError):
     """
     Raised when the selected camera attachment cannot accept a pose override.

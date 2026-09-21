@@ -1,33 +1,47 @@
 import logging
 
 import numpy as np
-import pytest
 
 from robokudo.descriptors.camera_configs.config_semdt_raytracer import SemDTRGBMode
 from robokudo.descriptors.worlds.world_semdt_raytracer_cylinders import WorldDescriptor
-from robokudo.exceptions import CameraResolutionUnavailable
 from robokudo.io.semdt_camera_context import RayTracingContext
 from robokudo.io.semdt_raytracer_renderer import SemDTRayTracerRenderer
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.robots.robot_parts import Camera
 
 # %% Renderer contracts
 
 
-def test_renderer_requires_complete_pinhole_camera_model():
+def test_renderer_derives_effective_pinhole_model_from_field_of_view():
     """
-    Rendering rejects a camera whose image resolution is unknown.
+    Rendering derives centered intrinsics from an FOV model and its resolution.
     """
     world = WorldDescriptor().world
     [camera] = world.get_semantic_annotations_by_type(Camera)
-    camera.camera_model = FieldOfViewCameraModel(view=camera.field_of_view)
+    resolution = CameraResolution(width=32, height=24)
+    camera.camera_model = FieldOfViewCameraModel(
+        view=camera.field_of_view,
+        image_resolution=resolution,
+    )
     renderer = SemDTRayTracerRenderer(
         rgb_mode=SemDTRGBMode.SEMANTIC,
         logger=logging.getLogger("semdt-renderer-test"),
     )
 
-    with pytest.raises(CameraResolutionUnavailable):
-        renderer.render(RayTracingContext(world=world, camera=camera))
+    frame = renderer.render(RayTracingContext(world=world, camera=camera))
+
+    assert frame.camera_model.resolution is resolution
+    assert np.isclose(
+        frame.camera_model.field_of_view.horizontal_angle,
+        camera.field_of_view.horizontal_angle,
+    )
+    assert np.isclose(
+        frame.camera_model.field_of_view.vertical_angle,
+        camera.field_of_view.vertical_angle,
+    )
+    assert frame.color_bgr.shape[:2] == frame.depth_mm.shape
+    assert frame.depth_mm.shape == frame.segmentation.shape
 
 
 def test_renderer_converts_projective_depth_to_millimeters():

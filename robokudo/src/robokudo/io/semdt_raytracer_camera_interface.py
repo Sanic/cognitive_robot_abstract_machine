@@ -74,8 +74,7 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         """
         context = self.context_resolver.resolve()
         frame = self.renderer.render(context)
-        camera_model = context.camera.camera_model
-        assert isinstance(camera_model, PinholeCameraModel)
+        camera_model = frame.camera_model
 
         camera_info = self.camera_info_from_camera_model(
             camera_model=camera_model,

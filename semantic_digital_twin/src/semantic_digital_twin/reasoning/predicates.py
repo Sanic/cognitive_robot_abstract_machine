@@ -23,7 +23,6 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 from krrood.inheritance_path_length import inheritance_path_length
 from random_events.interval import Interval
-from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_computations.ik_solver import (
@@ -43,11 +42,6 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     KinematicStructureEntity,
 )
-
-DEFAULT_VISIBILITY_IMAGE_SIZE = 256
-"""
-Image size used for visibility checks when a camera has no native resolution.
-"""
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -104,14 +98,9 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     """
     rt = RayTracer(camera._world)
     rt.update_scene()
-    resolution = camera.resolution or CameraResolution(
-        width=DEFAULT_VISIBILITY_IMAGE_SIZE,
-        height=DEFAULT_VISIBILITY_IMAGE_SIZE,
-    )
-
     seg = rt.create_segmentation_mask(
         camera.root_T_forward_view,
-        resolution=resolution,
+        resolution=camera.resolution,
         min_distance=0.2,
         field_of_view=camera.field_of_view,
     )
@@ -144,10 +133,6 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     :return: A list of bodies that are occluding the given body.
     """
     camera_pose = camera.root_T_forward_view
-    resolution = camera.resolution or CameraResolution(
-        width=DEFAULT_VISIBILITY_IMAGE_SIZE,
-        height=DEFAULT_VISIBILITY_IMAGE_SIZE,
-    )
 
     # create a world only containing the target body
     world_without_occlusion = deepcopy(body._world)
@@ -171,7 +156,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     segmentation_mask_without_occlusion = (
         ray_tracer_without_occlusion.create_segmentation_mask(
             camera_pose,
-            resolution=resolution,
+            resolution=camera.resolution,
             min_distance=0.1,
             field_of_view=camera.field_of_view,
         )
@@ -183,7 +168,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     segmentation_mask_with_occlusion = (
         ray_tracer_with_occlusion.create_segmentation_mask(
             camera_pose,
-            resolution=resolution,
+            resolution=camera.resolution,
             min_distance=0.1,
             field_of_view=camera.field_of_view,
         )

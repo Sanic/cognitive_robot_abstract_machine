@@ -544,8 +544,8 @@ class Camera(HasRootBody):
         return self.camera_model.field_of_view
 
     @property
-    def resolution(self) -> Optional[CameraResolution]:
-        """Return the native resolution when the model defines one."""
+    def resolution(self) -> CameraResolution:
+        """Return the native image resolution."""
         return self.camera_model.resolution
 
     @property
