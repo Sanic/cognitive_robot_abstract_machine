@@ -563,9 +563,7 @@ class CameraObservationCodec(ViewCodec):
     def decode(self, payload: ViewPayload) -> CameraObservation:
         """Decode an observation and resolve its camera in the active world."""
         tracker = world.get_world_entity_tracker()
-        camera = tracker.get_world_entity_with_id(
-            UUID(payload.payload[CameraObservationField.CAMERA_ID])
-        )
+        camera = tracker.get(UUID(payload.payload[CameraObservationField.CAMERA_ID]))
         if not isinstance(camera, Camera):
             raise InvalidCameraObservation(
                 reason=f"the referenced entity '{camera.name}' is not a camera"
