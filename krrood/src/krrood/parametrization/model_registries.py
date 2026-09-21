@@ -142,17 +142,29 @@ class RelationalCircuitRegistry(ModelRegistry):
     ) -> CausalCircuit:
         """
         Wrap an already-grounded, already-renamed circuit as a verified
-        ``CausalCircuit`` registering the query's declared cause and effect variables.
+        ``CausalCircuit`` registering the query's declared cause, effect and confounder
+        variables, trimmed down to just those.
+
+        Trimming matters for cost, not correctness (see
+        ``RelationalCausalCircuit.from_grounded_circuit``): a class circuit fitted
+        over many unrelated scalar and exchangeable variables otherwise makes
+        ``verify_support_determinism`` compute over all of them, not just the ones
+        this query actually declared. Confounders are trimmed in alongside the cause
+        and effect, not just registered later, so a caller's own
+        ``backdoor_adjustment(..., adjustment_variables=...)`` call still finds them
+        on the returned circuit.
 
         :param grounded: The grounded, renamed circuit to wrap.
         :param parameters: The parameters extracted from the queried statement, carrying
-            the declared cause and effect variables.
+            the declared cause, effect and confounder variables.
         :return: A verified, support-deterministic ``CausalCircuit``.
         """
         return RelationalCausalCircuit().from_grounded_circuit(
             grounded,
             parameters.search_cause_variables,
             list(parameters.effect_variables_from_causes_effect),
+            adjustment_variables=parameters.search_confounder_variables,
+            trim_to_registered_variables=True,
         )
 
 

@@ -14,7 +14,10 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
-from probabilistic_model.distributions.distributions import SymbolicDistribution
+from probabilistic_model.distributions.distributions import (
+    DiracDeltaDistribution,
+    SymbolicDistribution,
+)
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.utils import MissingDict
 
@@ -199,6 +202,48 @@ def _build_correlated_circuit() -> tuple:
         root.add_subcircuit(component, math.log(0.5))
 
     return circuit, x, w, y
+
+
+def _build_nested_overlap_circuit() -> tuple:
+    """
+    SumUnit-rooted mixture whose components all overlap on x without being identical:
+    the kind of circuit Monte-Carlo grounding builds when it mixes one copy of a part
+    template per sampled aggregation value.
+
+    Three equal-weight components:
+        Wide:   x∈[0,3], y∈[0,1]
+        Narrow: x∈[0,1], y∈[1,2]
+        Middle: x∈[1,3], y∈[0,2]
+
+    Wide overlaps both others, so no pair of components is disjoint, yet the
+    components do not share one support either: x∈[0,1] lies in Wide and Narrow but
+    not Middle, so the mixture is not support-deterministic over x.
+    """
+    x, y = Continuous("x"), Continuous("y")
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+
+    for x_range, y_range in [((0, 3), (0, 1)), ((0, 1), (1, 2)), ((1, 3), (0, 2))]:
+        component = ProductUnit(probabilistic_circuit=circuit)
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=x, interval=closed(*x_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=y, interval=closed(*y_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        root.add_subcircuit(component, math.log(1 / 3))
+
+    return circuit, x, y
 
 
 def _build_confounded_circuit() -> tuple:
@@ -679,6 +724,30 @@ class VerifySupportDeterminismDisjointnessTestCase(unittest.TestCase):
         result = cc.verify_support_determinism()
         self.assertTrue(result.passed, msg=f"Violations: {result.violations}")
 
+    def test_components_overlapping_without_a_disjoint_pair_fail(self):
+        """
+        A sum unit splits on a variable as soon as its children's supports on it differ,
+        not only once two of them are disjoint; overlapping children that differ still
+        leave no disjoint regions to intervene on.
+        """
+        circuit, x, y = _build_nested_overlap_circuit()
+        tree = MarginalDeterminismTreeNode.from_causal_graph([x], [y])
+        cc = CausalCircuit.from_probabilistic_circuit(circuit, tree, [x], [y])
+        with self.assertRaises(SupportDeterminismVerificationResult) as ctx:
+            cc.verify_support_determinism()
+        self.assertEqual(
+            [violation.query_variable for violation in ctx.exception.violations], [x]
+        )
+
+    def test_fewer_than_two_children_do_not_split(self):
+        """
+        A sum unit with no children, or one, has nothing to split on.
+        """
+        x = Continuous("x")
+        one_child = [SimpleEvent.from_data({x: closed(0, 1)}).as_composite_set()]
+        self.assertFalse(CausalCircuit._child_marginals_split_on_variable([]))
+        self.assertFalse(CausalCircuit._child_marginals_split_on_variable(one_child))
+
 
 class VerifySupportDeterminismSharedSubcircuitTestCase(unittest.TestCase):
     """
@@ -1079,6 +1148,126 @@ class DiscreteConfounderAdjustmentTestCase(unittest.TestCase):
         )
         # P(treatment=HIGH) = P(WARM)*0.8 + P(COLD)*0.3 = 0.6*0.8 + 0.4*0.3 = 0.6
         self.assertAlmostEqual(high_mass, 0.6, delta=0.01)
+
+
+def _build_cause_specific_effect_circuit() -> tuple:
+    """
+    Circuit where treatment has a real, differentiated causal effect on outcome within
+    each season stratum -- unlike `_build_discrete_confounded_circuit`'s null-effect
+    fixture, where P(outcome | do(treatment)) happens to be identical for every
+    treatment value by construction, so it cannot distinguish a correctly cause-
+    restricted adjustment from one that silently drops the cause restriction.
+
+    Two equal-weight strata, each further split by treatment:
+        Warm stratum (p=0.6): P(treatment=HIGH)=0.8; treatment=HIGH pairs with
+            outcome=GOOD (deterministic), treatment=LOW pairs with outcome=BAD.
+        Cold stratum (p=0.4): P(treatment=HIGH)=0.3; same treatment/outcome pairing.
+
+    Ground truth:
+        P(outcome=GOOD | do(treatment=HIGH)) = 1.0
+        P(outcome=GOOD | do(treatment=LOW)) = 0.0
+    """
+    season = Symbolic("season", domain=Set.from_iterable(Season))
+    treatment = Symbolic("treatment", domain=Set.from_iterable(Treatment))
+    outcome = Symbolic("outcome", domain=Set.from_iterable(Outcome))
+
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    for season_value, treatment_high_probability, stratum_weight in [
+        (Season.WARM, 0.8, 0.6),
+        (Season.COLD, 0.3, 0.4),
+    ]:
+        component = ProductUnit(probabilistic_circuit=circuit)
+        component.add_subcircuit(
+            leaf(
+                SymbolicDistribution(
+                    variable=season,
+                    probabilities=MissingDict(float, {hash(season_value): 1.0}),
+                ),
+                circuit,
+            )
+        )
+        treatment_outcome = SumUnit(probabilistic_circuit=circuit)
+        for treatment_value, outcome_value, branch_weight in [
+            (Treatment.HIGH, Outcome.GOOD, treatment_high_probability),
+            (Treatment.LOW, Outcome.BAD, 1 - treatment_high_probability),
+        ]:
+            branch = ProductUnit(probabilistic_circuit=circuit)
+            branch.add_subcircuit(
+                leaf(
+                    SymbolicDistribution(
+                        variable=treatment,
+                        probabilities=MissingDict(float, {hash(treatment_value): 1.0}),
+                    ),
+                    circuit,
+                )
+            )
+            branch.add_subcircuit(
+                leaf(
+                    SymbolicDistribution(
+                        variable=outcome,
+                        probabilities=MissingDict(float, {hash(outcome_value): 1.0}),
+                    ),
+                    circuit,
+                )
+            )
+            treatment_outcome.add_subcircuit(branch, math.log(branch_weight))
+        component.add_subcircuit(treatment_outcome)
+        root.add_subcircuit(component, math.log(stratum_weight))
+
+    return circuit, treatment, season, outcome
+
+
+class CauseSpecificAdjustmentTestCase(unittest.TestCase):
+    """
+    Regression coverage for the joint-truncation bug in `_add_region_for_cause_value`:
+
+    it intersected the adjustment partition's event with the cause region's event
+    before filling either to the full variable set, so `intersection_with` kept only
+    the variables already present on its left operand and silently dropped the cause
+    region's own variable -- every cause value then received the same, cause-
+    unrestricted adjusted probability. `_build_discrete_confounded_circuit` cannot
+    catch this: its true adjusted probability happens to be identical for every
+    treatment value by construction, so a cause-blind computation reproduces it by
+    coincidence.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.circuit, cls.treatment, cls.season, cls.outcome = (
+            _build_cause_specific_effect_circuit()
+        )
+        cls.cc = CausalCircuit.from_probabilistic_circuit(
+            cls.circuit,
+            MarginalDeterminismTreeNode.from_causal_graph(
+                [cls.treatment, cls.season], [cls.outcome]
+            ),
+            [cls.treatment, cls.season],
+            [cls.outcome],
+        )
+
+    def test_adjusted_probability_differs_by_cause_value(self):
+        adjusted = self.cc.backdoor_adjustment(
+            self.treatment, self.outcome, [self.season]
+        )
+        for treatment_value, expected in (
+            (Treatment.HIGH, 1.0),
+            (Treatment.LOW, 0.0),
+        ):
+            with self.subTest(treatment=treatment_value):
+                narrowed, region_probability = adjusted.truncated(
+                    SimpleEvent.from_data(
+                        {self.treatment: Set.from_iterable([treatment_value])}
+                    )
+                    .as_composite_set()
+                    .fill_missing_variables_pure(adjusted.variables)
+                )
+                self.assertGreater(region_probability, 0.0)
+                self.assertAlmostEqual(
+                    _symbolic_probability(narrowed, self.outcome, Outcome.GOOD),
+                    expected,
+                    delta=0.01,
+                )
 
 
 class SplitIntoAtomicValuesTestCase(unittest.TestCase):
@@ -1524,3 +1713,63 @@ class EndToEndIntegrationTestCase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _build_circuit_with_an_untruncatable_cause_region() -> tuple:
+    """
+    Two equal-weight strata whose cause ``x`` is a Dirac point each, one of them at a
+    value single precision cannot represent exactly.
+
+    A support region is read off the circuit in single precision, so truncating the
+    circuit back to the region misses the Dirac at ``0.2`` and yields nothing, while the
+    region at ``1.0`` truncates fine. Adjusting for ``z`` has to skip the former region
+    without leaving anything behind.
+    """
+    x, y, z = Continuous("x"), Continuous("y"), Continuous("z")
+    circuit = ProbabilisticCircuit()
+    root = SumUnit(probabilistic_circuit=circuit)
+    for x_location, y_range in [(0.2, (0, 1)), (1.0, (1, 2))]:
+        component = ProductUnit(probabilistic_circuit=circuit)
+        component.add_subcircuit(
+            leaf(DiracDeltaDistribution(variable=x, location=x_location), circuit)
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(
+                    variable=y, interval=closed(*y_range).simple_sets[0]
+                ),
+                circuit,
+            )
+        )
+        component.add_subcircuit(
+            leaf(
+                UniformDistribution(variable=z, interval=closed(0, 1).simple_sets[0]),
+                circuit,
+            )
+        )
+        root.add_subcircuit(component, math.log(0.5))
+    return circuit, x, y, z
+
+
+class BackdoorAdjustmentSkippedRegionTestCase(unittest.TestCase):
+    """
+    A cause region that cannot be truncated to must be skipped without leaving a
+    dangling unit in the interventional circuit, which would give it several roots.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.circuit, cls.x, cls.y, cls.z = (
+            _build_circuit_with_an_untruncatable_cause_region()
+        )
+        cls.cc = CausalCircuit.from_probabilistic_circuit(
+            cls.circuit,
+            MarginalDeterminismTreeNode.from_causal_graph([cls.x], [cls.y]),
+            [cls.x],
+            [cls.y],
+        )
+
+    def test_adjusted_circuit_has_one_root(self):
+        adjusted = self.cc.backdoor_adjustment(self.x, self.y, [self.z])
+        self.assertTrue(isinstance(adjusted.root, SumUnit))
+        self.assertEqual(len(adjusted.root.subcircuits), 1)

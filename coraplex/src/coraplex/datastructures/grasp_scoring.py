@@ -271,7 +271,7 @@ def load_successful_grasps_from_dataset(
     with Session(engine) as session:
         query = (
             select(GrasPoseMappingDAO)
-            .join(BodyDAO, GrasPoseMappingDAO.reference_frame_id == BodyDAO.database_id)
+            .join(BodyDAO, GrasPoseMappingDAO._reference_frame_id == BodyDAO.database_id)
             .where(BodyDAO.id == object_uuid)
         )
 

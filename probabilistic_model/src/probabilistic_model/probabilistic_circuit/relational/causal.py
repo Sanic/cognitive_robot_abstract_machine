@@ -14,8 +14,9 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, List, Optional, TypeAlias, Union
+from typing_extensions import TYPE_CHECKING, List, Optional
 
+from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
     MarginalDeterminismTreeNode,
@@ -38,14 +39,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-VariableReference: TypeAlias = Union[Variable, str]
-"""
-A cause, effect, or adjustment variable, given either as an already-resolved
-``Variable`` or as a dotted access-path string resolved against a grounded circuit via
-:meth:`RelationalCausalCircuit.resolve_variable`.
-"""
-
-
 @dataclass
 class RelationalCausalCircuit:
     """
@@ -56,28 +49,37 @@ class RelationalCausalCircuit:
 
     adjustment_region_count_warning_threshold: int = 1000
     """
-    Warn rather than silently proceed when the Cartesian product of an adjustment
-    set's leaf-region counts exceeds this. See :meth:`from_grounded_circuit`.
+    Warn rather than silently proceed when the Cartesian product of an adjustment set's
+    leaf-region counts exceeds this.
+
+    See :meth:`from_grounded_circuit`.
     """
 
     @staticmethod
-    def resolve_variable(circuit: ProbabilisticCircuit, path: str) -> Variable:
+    def resolve_variable(
+        circuit: ProbabilisticCircuit, path: str | MappedVariable
+    ) -> Variable:
         """
         Resolve a dotted access-path suffix to the Variable it names in a grounded
         circuit.
 
         Accepts either a variable's full runtime name (e.g.
-        ``"SceneRoom.objects[0].type"``) or just enough of its trailing access path to
-        be unambiguous (e.g. ``"objects[0].type"``, or ``"chair_count()"`` for an
-        aggregation latent), so callers don't need to reconstruct the class-name
-        prefixing convention grounding applies.
+        ``"SceneRoom.objects[0].type"``), just enough of its trailing access path to be
+        unambiguous (e.g. ``"objects[0].type"``, or ``"chair_count()"`` for an
+        aggregation latent), or an EQL attribute-access expression (e.g.
+        ``variable(SceneRoom).objects[0].type``) built the same way a query builds its
+        own field access -- so callers don't need to reconstruct the class-name
+        prefixing convention grounding applies, or spell it out as a string at all.
 
         :param circuit: The grounded circuit to resolve the path against.
-        :param path: The variable's full name, or an unambiguous suffix of it.
+        :param path: The variable's full name, an unambiguous suffix of it, or an EQL
+            attribute-access expression naming it.
         :return: The matching Variable.
         :raises VariableNotFoundError: If no variable's name matches.
         :raises AmbiguousVariablePathError: If more than one variable's name matches.
         """
+        if isinstance(path, MappedVariable):
+            path = path._name_
         matches = [
             variable
             for variable in circuit.variables
@@ -89,34 +91,15 @@ class RelationalCausalCircuit:
             raise VariableNotFoundError(path, list(circuit.variables))
         raise AmbiguousVariablePathError(path, matches)
 
-    @staticmethod
-    def _resolve_variables(
-        circuit: ProbabilisticCircuit, variables: List[VariableReference]
-    ) -> List[Variable]:
-        """
-        Resolve a mixed list of Variables and dotted access-path strings.
-
-        :param circuit: The grounded circuit to resolve any path strings against.
-        :param variables: Variables and/or dotted access-path strings.
-        :return: The resolved Variables, in input order.
-        """
-        return [
-            (
-                variable
-                if isinstance(variable, Variable)
-                else RelationalCausalCircuit.resolve_variable(circuit, variable)
-            )
-            for variable in variables
-        ]
-
     def ground(
         self,
         relational_probabilistic_circuit: RelationalProbabilisticCircuit,
         query: Match,
-        causal_variables: List[VariableReference],
-        effect_variables: List[VariableReference],
-        adjustment_variables: Optional[List[VariableReference]] = None,
+        causal_variables: List[Variable],
+        effect_variables: List[Variable],
+        adjustment_variables: Optional[List[Variable]] = None,
         grounding_mode: GroundingMode = GroundingMode.SAMPLED,
+        trim_to_registered_variables: bool = False,
     ) -> CausalCircuit:
         """
         Ground a relational circuit for a query and wrap it as a ``CausalCircuit``.
@@ -128,9 +111,11 @@ class RelationalCausalCircuit:
         :param relational_probabilistic_circuit: The fitted relational circuit to
             ground.
         :param query: The grounding query.
-        :param causal_variables: Cause variables to register, as Variables or dotted
-            access-path strings resolved against the grounded circuit (see
-            :meth:`resolve_variable`).
+        :param causal_variables: Already-resolved cause variables to register. If you
+            only have a name, ground ``relational_probabilistic_circuit`` for the same
+            query yourself first, resolve the name against that circuit (see
+            :meth:`resolve_variable`), and pass the result here -- a Variable's name
+            identifies it regardless of which grounding produced it.
         :param effect_variables: Effect variables to register, same format.
         :param adjustment_variables: Backdoor-adjustment variables to register, same
             format. Defaults to none.
@@ -139,6 +124,7 @@ class RelationalCausalCircuit:
             succeeds; :attr:`GroundingMode.EXACT` gives reproducible, domain-covering
             regions but may fall back internally if its precondition isn't met. See
             :class:`~probabilistic_model.probabilistic_circuit.relational.rspn.GroundingMode`.
+        :param trim_to_registered_variables: See :meth:`from_grounded_circuit`.
         :return: A verified, support-deterministic ``CausalCircuit`` over the grounded
             circuit.
         :raises SupportDeterminismVerificationResult: If the grounded circuit is not
@@ -148,15 +134,20 @@ class RelationalCausalCircuit:
             query, grounding_mode
         )
         return self.from_grounded_circuit(
-            grounded_circuit, causal_variables, effect_variables, adjustment_variables
+            grounded_circuit,
+            causal_variables,
+            effect_variables,
+            adjustment_variables,
+            trim_to_registered_variables,
         )
 
     def from_grounded_circuit(
         self,
         grounded_circuit: ProbabilisticCircuit,
-        causal_variables: List[VariableReference],
-        effect_variables: List[VariableReference],
-        adjustment_variables: Optional[List[VariableReference]] = None,
+        causal_variables: List[Variable],
+        effect_variables: List[Variable],
+        adjustment_variables: Optional[List[Variable]] = None,
+        trim_to_registered_variables: bool = False,
     ) -> CausalCircuit:
         """
         Wrap an already-grounded circuit as a verified ``CausalCircuit``.
@@ -167,23 +158,40 @@ class RelationalCausalCircuit:
         can be wrapped this way, whether or not it was built with causal use in mind.
 
         :param grounded_circuit: The grounded circuit to wrap.
-        :param causal_variables: Cause variables to register, as Variables or dotted
-            access-path strings resolved against ``grounded_circuit`` (see
-            :meth:`resolve_variable`).
+        :param causal_variables: Already-resolved cause variables to register. Resolve
+            a name against ``grounded_circuit`` first (see :meth:`resolve_variable`) if
+            you only have one.
         :param effect_variables: Effect variables to register, same format.
         :param adjustment_variables: Backdoor-adjustment variables to register, same
             format. Defaults to none.
+        :param trim_to_registered_variables: Marginalize ``grounded_circuit`` down to
+            exactly the union of ``causal_variables``, ``effect_variables`` and
+            ``adjustment_variables`` before registering it, discarding every other
+            variable grounding retained. Every check and query this class runs
+            afterward reads only those variables, so the discarded ones cannot change
+            the result -- marginalizing to a set that includes all of them is exact,
+            not an approximation. It matters for cost, not correctness: on a class
+            circuit fitted over many unrelated scalar and exchangeable variables, the
+            joint support ``verify_support_determinism`` and `backdoor_adjustment`
+            compute grows with all of them, not just the ones actually queried, so
+            trimming first keeps that cost down to the registered variables alone.
+            Defaults to ``False``, preserving every variable grounding retained.
         :return: A verified, support-deterministic ``CausalCircuit`` over
-            ``grounded_circuit``.
+            ``grounded_circuit`` (or its trim, if requested).
         :raises SupportDeterminismVerificationResult: If ``grounded_circuit`` is not
             support-deterministic for ``causal_variables``.
         """
         adjustment_variables = adjustment_variables or []
-        causal_variables = self._resolve_variables(grounded_circuit, causal_variables)
-        effect_variables = self._resolve_variables(grounded_circuit, effect_variables)
-        adjustment_variables = self._resolve_variables(
-            grounded_circuit, adjustment_variables
-        )
+
+        if trim_to_registered_variables:
+            registered_variables = list(
+                dict.fromkeys(
+                    causal_variables + effect_variables + adjustment_variables
+                )
+            )
+            grounded_circuit = grounded_circuit.restrict_to_variables(
+                registered_variables
+            )
 
         self._warn_if_adjustment_regions_are_expensive(
             grounded_circuit, adjustment_variables

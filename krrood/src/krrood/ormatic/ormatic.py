@@ -346,7 +346,7 @@ class ORMatic:
         """
         :return: A foreign key name for the given field.
         """
-        return f"{wrapped_field.clazz.clazz.__name__.lower()}_{wrapped_field.field.name}{self.foreign_key_postfix}"
+        return f"_{wrapped_field.clazz.clazz.__name__.lower()}_{wrapped_field.field.name}{self.foreign_key_postfix}"
 
     def to_sqlalchemy_file(self, file: TextIO):
         """

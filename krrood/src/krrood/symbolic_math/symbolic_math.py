@@ -31,9 +31,10 @@ from types import TracebackType
 from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import field, dataclass
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from functools import partial, wraps
 from inspect import BoundArguments
+from uuid import UUID, uuid4
 
 import casadi as ca
 import numpy as np
@@ -53,6 +54,9 @@ from typing_extensions import (
     Any,
 )
 
+from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
+from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.exceptions import (
     HasFreeVariablesError,
     DuplicateVariablesError,
@@ -529,7 +533,10 @@ class SymbolicMathType(ABC):
     """
 
     pinned_free_variables: List[FloatVariable] = field(
-        kw_only=True, repr=False, default_factory=list
+        kw_only=True,
+        repr=False,
+        default_factory=list,
+        metadata=JSONMetadata(serialize=False).as_dict(),
     )
     """
     Strong references to this expression's free variables, keeping them alive.
@@ -915,8 +922,153 @@ class SymbolicMathType(ABC):
         return H.dot(v)
 
 
+# %% JSON serialization
+
+
+class SymbolicMathJSONKey(StrEnum):
+    """
+    The keys of the JSON a symbolic math value is serialized to.
+    """
+
+    VALUES = "values"
+    """
+    The entries of a constant value, as a list of rows.
+    """
+
+    EXPRESSION = "expression"
+    """
+    The :class:`ExpressionGraph` of a value that depends on variables.
+    """
+
+    FREE_VARIABLES = "free_variables"
+    """
+    The variables an expression graph is computed from.
+    """
+
+    CASADI_FUNCTION = "casadi_function"
+    """
+    The serialized CasADi function an expression graph computes its value with.
+    """
+
+    ID = "id"
+    """
+    The id of a float variable.
+    """
+
+    NAME = "name"
+    """
+    The name of a float variable.
+    """
+
+
+@dataclass(eq=False, repr=False)
+class SerializableSymbolicMathType(SymbolicMathType, SubclassJSONSerializer):
+    """
+    A symbolic math value that can be serialized to JSON.
+
+    A constant is serialized as its entries, a value that depends on variables as the
+    :class:`ExpressionGraph` computing it.
+    """
+
+    def to_json(self, **kwargs) -> Dict[str, Any]:
+        result = super().to_json(**kwargs)
+        result.update(self._value_to_json(**kwargs))
+        return result
+
+    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+        """
+        :param kwargs: Keyword arguments to hand on to nested ``to_json`` calls.
+        :return: The JSON entries describing the value itself.
+        """
+        if self.is_constant():
+            return {SymbolicMathJSONKey.VALUES: ca.DM(self.casadi_sx).full().tolist()}
+        return {
+            SymbolicMathJSONKey.EXPRESSION: ExpressionGraph.from_expression(
+                self
+            ).to_json(**kwargs)
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        if SymbolicMathJSONKey.EXPRESSION in data:
+            return ExpressionGraph.from_json(
+                data[SymbolicMathJSONKey.EXPRESSION], **kwargs
+            ).to_expression(cls)
+        return cls(data[SymbolicMathJSONKey.VALUES])
+
+
+@dataclass
+class ExpressionGraph(SubclassJSONSerializer):
+    """
+    The computation of a symbolic math value from the variables it depends on.
+    """
+
+    free_variables: List[FloatVariable]
+    """
+    The variables the value depends on, in the order :attr:`casadi_function` takes them.
+    """
+
+    casadi_function: ca.Function
+    """
+    Computes the value from the stacked :attr:`free_variables`.
+    """
+
+    @classmethod
+    def from_expression(cls, expression: SymbolicMathType) -> Self:
+        """
+        :param expression: The value to capture the computation of.
+        :return: The computation of `expression` from its free variables.
+        """
+        free_variables = expression.free_variables()
+        casadi_function = ca.Function(
+            cls.__name__,
+            [ca.vertcat(*[variable.casadi_sx for variable in free_variables])],
+            [expression.casadi_sx],
+        )
+        return cls(free_variables=free_variables, casadi_function=casadi_function)
+
+    def to_expression(
+        self, expression_type: Type[GenericSymbolicType]
+    ) -> GenericSymbolicType:
+        """
+        :param expression_type: The type of the value this graph computes.
+        :return: The value this graph computes, depending on :attr:`free_variables`.
+        """
+        arguments = ca.vertcat(
+            *[variable.casadi_sx for variable in self.free_variables]
+        )
+        result = expression_type.from_casadi_sx(self.casadi_function(arguments))
+        result.pinned_free_variables = list(self.free_variables)
+        return result
+
+    def to_json(self, **kwargs) -> Dict[str, Any]:
+        result = super().to_json(**kwargs)
+        result[SymbolicMathJSONKey.FREE_VARIABLES] = [
+            variable.to_json(**kwargs) for variable in self.free_variables
+        ]
+        result[SymbolicMathJSONKey.CASADI_FUNCTION] = self.casadi_function.serialize()
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        # registers the tracker in kwargs, so every variable below shares it
+        FloatVariableTracker.from_kwargs(kwargs)
+        return cls(
+            free_variables=[
+                FloatVariable.from_json(variable_data, **kwargs)
+                for variable_data in data[SymbolicMathJSONKey.FREE_VARIABLES]
+            ],
+            casadi_function=ca.Function.deserialize(
+                data[SymbolicMathJSONKey.CASADI_FUNCTION]
+            ),
+        )
+
+
+# %% scalars, vectors and matrices
+
+
 @dataclass(eq=False, init=False, repr=False)
-class Scalar(SymbolicMathType):
+class Scalar(SerializableSymbolicMathType):
     """
     A symbolic type representing a scalar value.
     """
@@ -945,14 +1097,23 @@ class Scalar(SymbolicMathType):
     def const_true(cls) -> Self:
         return cls(True)
 
-    def is_const_true(self):
-        return self.is_constant() and self == True
+    def is_constant_true(self) -> bool:
+        """
+        Determine whether the scalar is constantly true.
+        """
+        return self.is_constant() and bool(self == True)
 
-    def is_const_unknown(self):
-        return self.is_constant() and self == 0.5
+    def is_constant_unknown(self) -> bool:
+        """
+        Determine whether the scalar is constantly unknown.
+        """
+        return self.is_constant() and bool(self == 0.5)
 
-    def is_const_false(self):
-        return self.is_constant() and self == False
+    def is_constant_false(self) -> bool:
+        """
+        Determine whether the scalar is constantly false.
+        """
+        return self.is_constant() and bool(self == False)
 
     def is_true(self) -> Scalar:
         """
@@ -1016,50 +1177,85 @@ class Scalar(SymbolicMathType):
         return Scalar.from_casadi_sx(ca.logic_not(self.casadi_sx))
 
     def __and__(self, other: Scalar | FloatVariable) -> Scalar:
-        if is_const_false(self):
+        if is_constant_false(self):
             return self
-        if is_const_false(other):
+        if is_constant_false(other):
             return other
         return Scalar.from_casadi_sx(ca.logic_and(to_sx(self), to_sx(other)))
 
     def __or__(self, other: Scalar | FloatVariable) -> Scalar:
-        if is_const_true(self):
+        if is_constant_true(self):
             return self
-        if is_const_true(other):
+        if is_constant_true(other):
             return other
         return Scalar.from_casadi_sx(ca.logic_or(to_sx(self), to_sx(other)))
 
     # %% Comparison operations
-    def _compare(
-        self, other: Scalar | FloatVariable | NumericalScalar | bool, op_f: Callable
-    ) -> Scalar | bool:
+    def _compare(self, other: ScalarData, op_f: Callable) -> Scalar:
+        """
+        Compare this scalar with another value using the given operator function.
+
+        :param other: Value to compare with.
+        :param op_f: Operator function to apply.
+        :return: A scalar expression representing the result of the comparison.
+        """
         left = to_sx(self)
         right = to_sx(other)
         result = op_f(left, right)
-        if result.is_constant():
-            return bool(result)
         return Scalar.from_casadi_sx(result)
 
-    def __eq__(
-        self, other: Scalar | FloatVariable | NumericalScalar | bool
-    ) -> Scalar | bool:
+    def __eq__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for equality.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the equality comparison.
+        """
         return self._compare(other, operator.eq)
 
-    def __ne__(
-        self, other: Scalar | FloatVariable | NumericalScalar | bool
-    ) -> Scalar | bool:
+    def __ne__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for inequality.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the inequality comparison.
+        """
         return self._compare(other, operator.ne)
 
-    def __le__(self, other: Scalar | FloatVariable) -> Scalar | bool:
+    def __le__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for less than or equal to.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the comparison result.
+        """
         return self._compare(other, operator.le)
 
-    def __lt__(self, other: Scalar | FloatVariable) -> Scalar | bool:
+    def __lt__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for less than.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the comparison result.
+        """
         return self._compare(other, operator.lt)
 
-    def __ge__(self, other: Scalar | FloatVariable) -> Scalar | bool:
+    def __ge__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for greater than or equal to.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the comparison result.
+        """
         return self._compare(other, operator.ge)
 
-    def __gt__(self, other: Scalar | FloatVariable) -> Scalar | bool:
+    def __gt__(self, other: ScalarData) -> Scalar:
+        """
+        Compare for greater than.
+
+        :param other: Value to compare with.
+        :return: A scalar representing the comparison result.
+        """
         return self._compare(other, operator.gt)
 
     # %% Arithmatic operations
@@ -1151,6 +1347,12 @@ class FloatVariable(Scalar):
 
     name: str = field(kw_only=True)
 
+    id: UUID = field(kw_only=True, default_factory=uuid4)
+    """
+    Identifies this variable in serialized expressions, unlike :attr:`name`, which
+    several variables may share.
+    """
+
     _registry: ClassVar[weakref.WeakValueDictionary[ca.SX, FloatVariable]] = (
         weakref.WeakValueDictionary()
     )
@@ -1162,6 +1364,13 @@ class FloatVariable(Scalar):
     .. warning:: Does not ensure that two FloatVariable instances are identical.
     """
 
+    _registry_by_id: ClassVar[weakref.WeakValueDictionary[UUID, FloatVariable]] = (
+        weakref.WeakValueDictionary()
+    )
+    """
+    The living FloatVariable instances, by their :attr:`id`.
+    """
+
     resolve: Callable[[], float] | None = field(default=None, init=False)
     """
     This is called by SymbolicType.evaluate().
@@ -1169,11 +1378,37 @@ class FloatVariable(Scalar):
     Subclasses should set it to return the current float value for this variable.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, id: Optional[UUID] = None):
+        """
+        :param name: The name of the variable.
+        :param id: The id of the variable, a new one if None.
+        """
         self.name = name
+        self.id = uuid4() if id is None else id
         casadi_sx = ca.SX.sym(self.name)
         self._registry[casadi_sx] = self
+        self._registry_by_id[self.id] = self
         super().__init__(casadi_sx)
+
+    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+        return {
+            SymbolicMathJSONKey.ID: to_json(self.id),
+            SymbolicMathJSONKey.NAME: self.name,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+        """
+        :return: The variable with the serialized id, if one was already deserialized
+            from this document or is alive in this process, else a new one.
+        """
+        tracker = FloatVariableTracker.from_kwargs(kwargs)
+        variable_id = from_json(data[SymbolicMathJSONKey.ID])
+        if tracker.has(variable_id):
+            return tracker.get(variable_id)
+        variable = cls(name=data[SymbolicMathJSONKey.NAME], id=variable_id)
+        tracker.add(variable_id, variable)
+        return variable
 
     def __copy__(self) -> Scalar:
         """
@@ -1209,8 +1444,24 @@ class FloatVariable(Scalar):
         return hash(self.casadi_sx)
 
 
+@dataclass
+class FloatVariableTracker(DeserializedObjectTracker[UUID, FloatVariable]):
+    """
+    The float variables deserialized from one JSON document, by their id.
+
+    A variable the document did not create is looked up among the variables alive in
+    this process.
+    """
+
+    def _has_untracked(self, key: UUID) -> bool:
+        return key in FloatVariable._registry_by_id
+
+    def _get_untracked(self, key: UUID) -> FloatVariable:
+        return FloatVariable._registry_by_id[key]
+
+
 @dataclass(eq=False, repr=False)
-class Vector(SymbolicMathType):
+class Vector(SerializableSymbolicMathType):
     """
     A vector of symbolic expressions.
 
@@ -1342,7 +1593,7 @@ class Vector(SymbolicMathType):
 
 
 @dataclass(eq=False, repr=False)
-class Matrix(SymbolicMathType):
+class Matrix(SerializableSymbolicMathType):
     """
     A matrix of symbolic expressions.
 
@@ -2093,7 +2344,7 @@ def gauss(n: ScalarData) -> Scalar:
 
 
 # %% binary logic
-def is_const_true(expression: Scalar) -> bool:
+def is_constant_true(expression: Scalar) -> bool:
     """
     Checks whether a scalar expression is the constant truth value.
 
@@ -2103,7 +2354,7 @@ def is_const_true(expression: Scalar) -> bool:
     return bool(expression == 1)
 
 
-def is_const_false(expression: Scalar) -> bool:
+def is_constant_false(expression: Scalar) -> bool:
     """
     Checks whether a scalar expression is the constant false value.
 
@@ -2188,10 +2439,10 @@ def trinary_logic_and(*args: FloatVariable | Scalar) -> Scalar:
             minimum_number_of_arguments=1, actual_number_of_arguments=len(args)
         )
     # if there is any False, return False
-    if any(x for x in args if x.is_const_false()):
+    if any(x for x in args if x.is_constant_false()):
         return Scalar.const_false()
     # filter all True
-    args = [x for x in args if not x.is_const_true()]
+    args = [x for x in args if not x.is_constant_true()]
     if len(args) == 0:
         return Scalar.const_true()
     if len(args) == 1:
@@ -2217,10 +2468,10 @@ def trinary_logic_or(*args: FloatVariable | Scalar) -> Scalar:
             minimum_number_of_arguments=1, actual_number_of_arguments=len(args)
         )
     # if there is any True, return True
-    if any(x for x in args if x.is_const_true()):
+    if any(x for x in args if x.is_constant_true()):
         return Scalar.const_true()
     # filter all False
-    args = [x for x in args if not x.is_const_false()]
+    args = [x for x in args if not x.is_constant_false()]
     if len(args) == 0:
         return Scalar.const_false()
     if len(args) == 1:

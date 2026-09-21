@@ -20,7 +20,7 @@ def test_move_to_reach(coraplex_testing_session):
     coraplex_testing_session.commit()
 
     query = select(DesignatorNodeDAO.status).join(
-        MoveToReachDAO, DesignatorNodeDAO.designator_id == MoveToReachDAO.database_id
+        MoveToReachDAO, DesignatorNodeDAO._designator_id == MoveToReachDAO.database_id
     )
     results = coraplex_testing_session.execute(query).all()
 

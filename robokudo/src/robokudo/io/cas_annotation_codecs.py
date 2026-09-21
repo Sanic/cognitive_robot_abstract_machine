@@ -13,7 +13,7 @@ from krrood.adapters.json_serializer import (
     from_json,
     to_json,
 )
-from krrood.adapters.exceptions import JSON_TYPE_NAME
+from krrood.adapters.json_field import JSONField
 from krrood.utils import get_full_class_name
 from robokudo.io.open3d_codec_utils import (
     o3d,
@@ -38,12 +38,12 @@ class Open3DPointCloudJSONSerializer(
     """
 
     @classmethod
-    def to_json(cls, obj: o3d.geometry.PointCloud) -> Dict[str, Any]:
+    def to_json(cls, obj: o3d.geometry.PointCloud, **kwargs) -> Dict[str, Any]:
         """
         Convert an Open3D point cloud into a JSON-compatible payload.
         """
         return {
-            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            JSONField.TYPE: get_full_class_name(type(obj)),
             "payload": encode_open3d_point_cloud_to_base64_pcd(obj),
         }
 
@@ -66,12 +66,12 @@ class NumpyScalarJSONSerializer(ExternalClassJSONSerializer[np.generic]):
     """
 
     @classmethod
-    def to_json(cls, obj: np.generic) -> Dict[str, Any]:
+    def to_json(cls, obj: np.generic, **kwargs) -> Dict[str, Any]:
         """
         Convert a NumPy scalar value to JSON-compatible data.
         """
         return {
-            JSON_TYPE_NAME: get_full_class_name(type(obj)),
+            JSONField.TYPE: get_full_class_name(type(obj)),
             "dtype": str(obj.dtype),
             "value": obj.item(),
         }

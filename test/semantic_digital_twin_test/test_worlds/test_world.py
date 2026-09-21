@@ -12,6 +12,10 @@ from numpy.testing import assert_raises
 from typing_extensions import Tuple, Type
 
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.callbacks.callback import (
+    ModelChangeCallback,
+    StateChangeCallback,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -24,6 +28,8 @@ from semantic_digital_twin.exceptions import (
     NonMonotonicTimeError,
     BrokenWorldModificationHistoryError,
     WorldEntityNotFoundError,
+    WorldEntityWithIDBelongsToAnotherWorld,
+    AlreadyBelongsToAWorldError,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
@@ -38,6 +44,7 @@ from semantic_digital_twin.spatial_types.derivatives import Derivatives, Derivat
 # from semantic_digital_twin.spatial_types.math import rotation_matrix_from_rpy
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
+    Pose2D,
     RotationMatrix,
 )
 from semantic_digital_twin.testing import StateChangeCounter, world_setup
@@ -546,6 +553,28 @@ def test_compute_relative_pose(world_setup):
     )
 
     np.testing.assert_array_almost_equal(relative_pose.to_np(), expected_pose.to_np())
+
+
+def test_transform_a_pose_2d(world_setup):
+    """
+    A Pose2D carries no z, roll or pitch, so transforming one answers with the
+    transformed 3D pose flattened back onto the target frame's plane.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: PrismaticConnection = world.get_connection(l1, l2)
+    world.state[connection.dof.id].position = 1.0
+    world.notify_state_change()
+
+    pose_2d = Pose2D(x=2.0, y=0.5, yaw=0.3, reference_frame=l2)
+
+    relative_pose_2d = world.transform(pose_2d, l1)
+
+    assert isinstance(relative_pose_2d, Pose2D)
+    assert relative_pose_2d.reference_frame == l1
+    np.testing.assert_array_almost_equal(
+        relative_pose_2d.to_np(),
+        Pose2D.from_pose(world.transform(pose_2d.to_pose(), l1)).to_np(),
+    )
 
 
 def test_compute_relative_pose_both(world_setup):
@@ -1249,6 +1278,200 @@ def test_copy_id(pr2_world_state_reset):
         assert body.id == pr2_copy.get_kinematic_structure_entity_by_name(body.name).id
 
 
+def test_rebind_body(world_setup):
+    """
+    A directly-held body reference is rebound onto the target world's own body, found by
+    id rather than by identity or name.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    assert world_copy.rebind_world_entities(l1) is world_copy.get_body_by_name(l1.name)
+
+
+def test_rebind_connection(world_setup):
+    """
+    A connection is rebound to the connection of the other world between the same parent
+    and child.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    connection = world.get_connection(l1, l2)
+    assert world_copy.rebind_world_entities(connection) is world_copy.get_connection(
+        world_copy.get_body_by_name(l1.name), world_copy.get_body_by_name(l2.name)
+    )
+
+
+def test_rebind_nested_dataclass(world_setup):
+    """
+    A world entity nested in a dataclass field is rebound, and sibling fields keep their
+    values.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+
+    @dataclass
+    class BodyReference:
+        body: Body
+        label: str
+
+    rebound = world_copy.rebind_world_entities(BodyReference(body=l1, label="target"))
+    assert rebound.body is world_copy.get_body_by_name(l1.name)
+    assert rebound.label == "target"
+
+
+def test_rebind_list_and_plain_value(world_setup):
+    """
+    A list rebinds elementwise, and a value holding no world entity keeps its value.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+
+    assert world_copy.rebind_world_entities([l1, l2, "not a world entity"]) == [
+        world_copy.get_body_by_name(l1.name),
+        world_copy.get_body_by_name(l2.name),
+        "not a world entity",
+    ]
+    assert world_copy.rebind_world_entities(1.5) == 1.5
+
+
+def test_rebind_leaves_an_entity_this_world_does_not_contain(world_setup):
+    """
+    An entity the target world does not contain is left as it is, since it is not that
+    world's state to rebind.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    assert World().rebind_world_entities(l1) is l1
+
+
+def test_lookup_by_id_finds_an_annotation_sharing_a_hash_table_key(world_setup):
+    """
+    An annotation stays findable by its id after a later annotation of the same type
+    over the same entities takes over its key in the world's hash table.
+
+    A semantic annotation hashes by its content, so both annotations land on one key and
+    only the last one added remains in the table, while both remain part of the world.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    first, second = Handle(root=l1), Handle(root=l1)
+    with world.modify_world():
+        world.add_semantic_annotation(first)
+        world.add_semantic_annotation(second)
+
+    assert first.id != second.id
+    assert hash(first) == hash(second)
+    assert world.get_world_entity_with_id_by_id(first.id) is first
+    assert world.get_world_entity_with_id_by_id(second.id) is second
+
+
+def test_rebind_annotation_sharing_a_hash_table_key(world_setup):
+    """
+    An annotation whose hash table key a later same-content annotation took over is
+    still rebound onto the target world's own instance, rather than left pointing at the
+    world it came from.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    first, second = Handle(root=l1), Handle(root=l1)
+    with world.modify_world():
+        world.add_semantic_annotation(first)
+        world.add_semantic_annotation(second)
+    world_copy = deepcopy(world)
+
+    rebound = world_copy.rebind_world_entities(first)
+    assert rebound.id == first.id
+    assert rebound._world is world_copy
+
+
+def test_rebound_annotation_sharing_a_hash_table_key_can_modify_the_copy(world_setup):
+    """
+    A rebound annotation whose hash table key a same-content annotation took over is
+    usable for modifying the world it was rebound into.
+
+    Model modification is what a rebound reference is needed for, and what a reference
+    left pointing at the world it came from fails at, with a `MismatchingWorld`.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    first, second = Handle(root=l1), Handle(root=l1)
+    with world.modify_world():
+        world.add_semantic_annotation(first)
+        world.add_semantic_annotation(second)
+    world_copy = deepcopy(world)
+
+    rebound = world_copy.rebind_world_entities(first)
+    new_parent = world_copy.get_body_by_name(r1.name)
+    world_copy.move_branch(rebound.root, new_parent)
+
+    assert rebound.root.parent_connection.parent is new_parent
+
+
+def test_adding_an_entity_that_belongs_to_another_world_raises(world_setup):
+    """
+    An entity cannot be registered with a second world while it still belongs to the
+    first, which would leave it in that world's lookup table under a world it no longer
+    reports.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    with pytest.raises(AlreadyBelongsToAWorldError):
+        l1.add_to_world(World())
+
+    assert l1._world is world
+    assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
+
+
+def test_adding_an_entity_to_the_world_it_belongs_to_re_registers_it(world_setup):
+    """
+    Registering an entity with the world it already belongs to stays allowed, since it
+    only refreshes the entry that world already holds.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    l1.add_to_world(world)
+
+    assert l1._world is world
+    assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
+
+
+def test_rebind_rejects_an_entity_registered_here_but_owned_elsewhere(world_setup):
+    """
+    An entity left registered in this world while reporting another one is reported,
+    rather than handed back to fail later wherever it is used.
+
+    :meth:`WorldEntity.add_to_world` refuses to create this state, so the test writes
+    the inconsistent lookup table entry the guard exists for directly.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    other_world = World()
+    l1._world = other_world
+    world._world_entity_hash_table[hash(l1)] = l1
+
+    with pytest.raises(WorldEntityWithIDBelongsToAnotherWorld):
+        world.rebind_world_entities(l1)
+
+
+def test_rebind_copies_mutable_leaf_values(world_setup):
+    """
+    A mutable value that is neither a world entity nor a recognized container is copied,
+    not shared.
+
+    Mutating the rebound copy must not affect the original, the way sharing a `Pose`'s
+    underlying `casadi_sx` matrix would.
+    """
+
+    class MutableLeaf:
+        def __init__(self, value):
+            self.value = value
+
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+
+    leaf = MutableLeaf(value=1)
+    rebound = world_copy.rebind_world_entities(leaf)
+    assert rebound is not leaf
+
+    rebound.value = 2
+    assert leaf.value == 1
+
+
 def test_world_entity_with_class_id():
     @dataclass(eq=False)
     class A(WorldEntityWithClassBasedID): ...
@@ -1514,6 +1737,83 @@ def test_add_body_hash():
     with world.modify_world():
         world.remove_kinematic_structure_entity(body)
     assert hash(body) not in world._world_entity_hash_table
+
+
+# %% connections are identified by the entities they connect
+
+
+def test_a_connection_and_its_copy_in_another_world_share_an_id(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(r1, r2)
+
+    world_copy = deepcopy(world)
+    connection_copy = world_copy.get_connection(
+        world_copy.get_kinematic_structure_entity_by_id(r1.id),
+        world_copy.get_kinematic_structure_entity_by_id(r2.id),
+    )
+
+    assert connection_copy is not connection
+    assert connection_copy.id == connection.id
+
+
+def test_connections_between_different_entities_have_different_ids(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    assert world.get_connection(bf, l1).id != world.get_connection(bf, r1).id
+
+
+def test_the_world_finds_a_connection_by_its_id(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(r1, r2)
+
+    assert world.get_world_entity_with_id_by_id(connection.id) is connection
+
+
+def test_a_connection_leaves_the_world_with_its_child(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(r1, r2)
+
+    with world.modify_world():
+        world.remove_kinematic_structure_entity(r2)
+
+    assert world.find_world_entity_with_id(connection.id) is None
+    assert connection._world is None
+
+
+def test_adding_a_second_connection_between_connected_entities_keeps_the_first(
+    world_setup,
+):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection = world.get_connection(bf, l1)
+    number_of_connections = len(world.connections)
+
+    with world.modify_world():
+        world.add_connection(FixedConnection(parent=bf, child=l1))
+
+    assert len(world.connections) == number_of_connections
+    assert world.get_connection(bf, l1) is connection
+
+
+def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: RevoluteConnection = world.get_connection(r1, r2)
+    new_child = Body(name=PrefixedName("r3"))
+
+    connection_copy = connection.copy_with_new_child(new_child)
+
+    assert type(connection_copy) is RevoluteConnection
+    assert connection_copy.parent is r1
+    assert connection_copy.child is new_child
+    assert connection_copy.raw_dof is connection.raw_dof
+    assert (
+        connection_copy.id
+        == RevoluteConnection(
+            parent=r1,
+            child=new_child,
+            raw_dof=connection.raw_dof,
+            axis=connection.axis,
+        ).id
+    )
 
 
 def test_world_state_trajectory(world_setup, tmp_path):
@@ -2581,3 +2881,112 @@ def test_column_indices_of_degree_of_freedom_outside_the_state(world_setup):
 
     with pytest.raises(DofNotInWorldStateError):
         world.state.column_indices([DegreeOfFreedom(name=PrefixedName("new_dof"))])
+
+
+# %% World Replacement
+
+
+@dataclass(eq=False)
+class ModelChangeRecordingCallback(ModelChangeCallback):
+    notifications: list = field(default_factory=list, init=False)
+
+    def on_model_change(self, publish_changes: bool = None, **kwargs):
+        self.notifications.append(publish_changes)
+
+
+@dataclass(eq=False)
+class StateChangeRecordingCallback(StateChangeCallback):
+    notifications: list = field(default_factory=list, init=False)
+
+    def on_state_change(self, publish_changes: bool = None, **kwargs):
+        self.notifications.append(publish_changes)
+
+
+def test_replace_with_replaces_entities_and_kinematic_structure():
+    world = World.create_with_root_body("old_root")
+    old_body = Body(name=PrefixedName("old_body"))
+    with world.modify_world():
+        world.add_body(old_body)
+        world.add_connection(FixedConnection(parent=world.root, child=old_body))
+
+    other_world = World.create_with_root_body("new_root")
+    new_body = Body(name=PrefixedName("new_body"))
+    with other_world.modify_world():
+        other_world.add_body(new_body)
+        other_world.add_connection(
+            FixedConnection(parent=other_world.root, child=new_body)
+        )
+
+    world._replace_with(other_world)
+
+    assert world.root.name == PrefixedName("new_root")
+    assert world.is_kinematic_structure_entity_in_world_by_name("new_body")
+    assert not world.is_kinematic_structure_entity_in_world_by_name("old_body")
+    assert (
+        world.get_kinematic_structure_entity_by_name(PrefixedName("new_body"))
+        is not None
+    )
+    with pytest.raises(WorldEntityNotFoundError):
+        world.get_kinematic_structure_entity_by_name(PrefixedName("old_body"))
+    assert len(world.kinematic_structure_entities) == 2
+
+
+def test_replace_with_transfers_degrees_of_freedom_and_state():
+    world = World.create_with_root_body("w1_root")
+    other_world = World.create_with_root_body("w2_root")
+    child_body = Body(name=PrefixedName("moving_child"))
+    with other_world.modify_world():
+        other_world.add_body(child_body)
+        conn = RevoluteConnection.create_with_dofs(
+            world=other_world,
+            parent=other_world.root,
+            child=child_body,
+            axis=Vector3.Z(),
+        )
+        other_world.add_connection(conn)
+    other_world.state[conn.dof.id].position = 0.75
+
+    world._replace_with(other_world)
+
+    assert len(world.degrees_of_freedom) == 1
+    assert world.state[conn.dof.id].position == pytest.approx(0.75)
+
+
+def test_replace_with_preserves_registered_callbacks_and_notifies():
+    world = World.create_with_root_body("world_root")
+    model_callback = ModelChangeRecordingCallback(_world=world)
+    state_callback = StateChangeRecordingCallback(_world=world)
+
+    other_world = World.create_with_root_body("replacement_root")
+    other_body = Body(name=PrefixedName("replacement_body"))
+    with other_world.modify_world():
+        other_world.add_body(other_body)
+        other_world.add_connection(
+            FixedConnection(parent=other_world.root, child=other_body)
+        )
+
+    model_callback.notifications.clear()
+    state_callback.notifications.clear()
+
+    world._replace_with(other_world)
+
+    assert model_callback in world.get_world_model_manager().model_change_callbacks
+    assert state_callback in world.state.state_change_callbacks
+    assert model_callback.notifications == [False]
+
+
+def test_replace_with_clears_other_world():
+    world = World.create_with_root_body("w1")
+    other_world = World.create_with_root_body("w2")
+    other_body = Body(name=PrefixedName("b2"))
+    with other_world.modify_world():
+        other_world.add_body(other_body)
+        other_world.add_connection(
+            FixedConnection(parent=other_world.root, child=other_body)
+        )
+
+    world._replace_with(other_world)
+
+    assert other_world.root is None
+    assert len(other_world.kinematic_structure_entities) == 0
+    assert len(other_world.connections) == 0

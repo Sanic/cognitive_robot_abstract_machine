@@ -26,9 +26,37 @@ from krrood.symbolic_math.symbolic_math import (
     trinary_logic_or,
 )
 
+# %% running a list of nodes
+
 
 @dataclass(repr=False, eq=False)
-class Sequence(Goal):
+class NodeListGoal(Goal):
+    """
+    A goal that runs the list of nodes it is handed.
+
+    The nodes join the motion statechart when :meth:`expand` adds them during
+    compilation, so a node handed over before that is serialized once, inside this goal.
+    """
+
+    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
+    """
+    The nodes this goal runs, in the order they were handed over.
+    """
+
+    def add_node(self, node: MotionStatechartNode) -> None:
+        """
+        Hands this goal one more node to run.
+
+        :param node: The node to run as a child of this goal.
+        """
+        self._add_node_sanity_check(node)
+        if node in self.nodes:
+            return
+        self.nodes.append(node)
+
+
+@dataclass(repr=False, eq=False)
+class Sequence(NodeListGoal):
     """
     Runs a list of nodes one after another.
 
@@ -38,8 +66,6 @@ class Sequence(Goal):
 
     .. note:: corresponds to the RPL's SEQ. (McDermott, Drew. A reactive plan language, 1991)
     """
-
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
 
     def expand(self, context: MotionStatechartContext) -> None:
         """
@@ -55,7 +81,7 @@ class Sequence(Goal):
         self._check_has_children()
         last_node: Optional[MotionStatechartNode] = None
         for node in self.nodes:
-            self.add_node(node)
+            self._add_child_to_motion_statechart(node)
             if last_node is not None:
                 node.start_condition = last_node.is_succeeded
             # A node that ends the motion has nothing left to transition to.
@@ -93,7 +119,7 @@ class Sequence(Goal):
 
 
 @dataclass(repr=False, eq=False)
-class Parallel(Goal):
+class Parallel(NodeListGoal):
     """
     Takes a list of nodes and executes them in parallel.
 
@@ -101,7 +127,6 @@ class Parallel(Goal):
     their goals.
     """
 
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
     minimum_success: Optional[int] = field(default=None, kw_only=True)
     """
     How many nodes must have reached their goals for this goal to be achieved.
@@ -112,7 +137,7 @@ class Parallel(Goal):
     def expand(self, context: MotionStatechartContext) -> None:
         self._check_has_children()
         for node in self.nodes:
-            self.add_node(node)
+            self._add_child_to_motion_statechart(node)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
@@ -170,6 +195,12 @@ class RepeatUntil(Goal):
     and set it themselves in :meth:`__post_init__`.
     """
 
+    exception: Optional[DataclassException] = field(default=None, kw_only=True)
+    """
+    The failure that ends the motion once :attr:`stop_retry_monitor` calls the retrying
+    off, or None to only observe False then.
+    """
+
     @property
     def attempt_failed(self) -> Scalar:
         """
@@ -187,7 +218,9 @@ class RepeatUntil(Goal):
         instead of holding the task at the start line, and the monitor is armed again
         for the next attempt.
         """
-        self.add_nodes([self.task, self.failure_monitor, self.stop_retry_monitor])
+        self._add_children_to_motion_statechart(
+            [self.task, self.failure_monitor, self.stop_retry_monitor]
+        )
 
         # Each reading is compared against True, so that an undecided Unknown counts as
         # neither, and the results combine as plain booleans.
@@ -215,6 +248,20 @@ class RepeatUntil(Goal):
         self.failure_monitor.end_condition = (
             self.stop_retry_monitor.observation_variable
         )
+        self._end_motion_once_retrying_stops()
+
+    def _end_motion_once_retrying_stops(self) -> None:
+        """
+        Add the node that ends the motion with :attr:`exception` once
+        :attr:`stop_retry_monitor` calls the retrying off.
+        """
+        if self.exception is None:
+            return
+        exhausted = CancelMotion(
+            name=f"{self.name}/exhausted", exception=self.exception
+        )
+        self._add_child_to_motion_statechart(exhausted)
+        exhausted.start_condition = self.stop_retry_monitor.observation_variable
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
@@ -286,17 +333,12 @@ class RepeatOnStall(RepeatUntil):
 
 
 @dataclass(repr=False, eq=False)
-class TryAll(Goal):
+class TryAll(NodeListGoal):
     """
     Takes a list of nodes and executes them in parallel.
 
     Its observation turns True as soon as any node is True and turns False only when all
     nodes are False, i.e. it only fails if every node fails.
-    """
-
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
-    """
-    The child nodes executed in parallel.
     """
 
     def expand(self, context: MotionStatechartContext) -> None:
@@ -305,7 +347,7 @@ class TryAll(Goal):
         """
         self._check_has_children()
         for node in self.nodes:
-            self.add_node(node)
+            self._add_child_to_motion_statechart(node)
 
     def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
         """
@@ -320,7 +362,7 @@ class TryAll(Goal):
 
 
 @dataclass(repr=False, eq=False)
-class TryInOrder(Goal):
+class TryInOrder(NodeListGoal):
     """
     Tries a list of nodes one after another, short-circuiting on the first success.
 
@@ -333,11 +375,6 @@ class TryInOrder(Goal):
         construct: RPL knows no alternative timing out, only one that gives up
         explicitly. See :attr:`give_up_after`.
     .. note:: corresponds to the RPL's TRY-IN-ORDER. (McDermott, Drew. A reactive plan language, 1991)
-    """
-
-    nodes: List[MotionStatechartNode] = field(default_factory=list, init=True)
-    """
-    The child nodes tried one after another, in order.
     """
 
     _alternatives: List[MotionStatechartNode] = field(default_factory=list, init=False)
@@ -369,7 +406,7 @@ class TryInOrder(Goal):
         self._alternatives = list(self.nodes)
         previous_node: Optional[MotionStatechartNode] = None
         for node in self._alternatives:
-            self.add_node(node)
+            self._add_child_to_motion_statechart(node)
             if previous_node is not None:
                 node.start_condition = previous_node.is_failed_or_interrupted
             still_progressing = StillProgressing(
@@ -377,7 +414,7 @@ class TryInOrder(Goal):
                 monitored_node=node,
                 timeout=self.give_up_after,
             )
-            self.add_node(still_progressing)
+            self._add_child_to_motion_statechart(still_progressing)
             still_progressing.start_condition = node.is_running
             still_progressing.end_condition = node.is_terminated
             node.end_condition = trinary_logic_or(
@@ -441,5 +478,5 @@ class CancelledWhenTrue(StoppedWhenTrue):
         cancelled = CancelMotion(
             name=f"{self.name}/cancelled", exception=self.exception
         )
-        self.add_node(cancelled)
+        self._add_child_to_motion_statechart(cancelled)
         cancelled.start_condition = self.monitor.observation_variable

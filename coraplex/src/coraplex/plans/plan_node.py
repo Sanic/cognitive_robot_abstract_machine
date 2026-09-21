@@ -5,11 +5,12 @@ from abc import abstractmethod, ABC
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable, Iterator
+from typing import Optional, Any, List, Type, TYPE_CHECKING, Iterable
 
 from typing_extensions import Union
 
 from coraplex.plans.designator import Designator
+from giskardpy.motion_statechart.goals.templates import NodeListGoal
 from giskardpy.motion_statechart.graph_node import Goal
 from krrood.entity_query_language.query.match import Match
 from giskardpy.motion_statechart.data_types import LifeCycleValues
@@ -17,7 +18,6 @@ from coraplex.datastructures.execution_data import ExecutionData
 from coraplex.plans.executables import (
     Executable,
     GiskardExecutable,
-    UnderspecifiedExecutable,
 )
 from coraplex.plans.failures import PlanFailure
 from coraplex.plans.motion_state_chart_building import BuildsMotionStateChart
@@ -395,115 +395,6 @@ class ExecutionBoundaryNode(ABC, PlanNode):
     """
 
 
-@dataclass(eq=False, repr=False)
-class UnderspecifiedNode(ExecutionBoundaryNode):
-    """
-    An action or language expression that is described by an underspecified `an(...)`
-    match statement.
-
-    This node is used to generate fully specified actions  or language expressions.
-    The semantics are: try until it succeeds or fails if the underspecified action is exhausted.
-    If you want to limit the number of attempts, add a limit clause to the underspecified action.
-    """
-
-    underspecified_action: Match = field(kw_only=True)
-    """
-    The underspecified statement that can be used to generate actions.
-    """
-
-    _action_iterator: Optional[Iterator[ActionDescription]] = field(
-        default=None, kw_only=True
-    )
-    """
-    The iterator that is used to generate the actions.
-
-    Only available after the first call to notify.
-    """
-
-    current_candidate: Optional[ActionNode] = field(
-        default=None, init=False, repr=False
-    )
-    """
-    The action candidate this node currently resolves to, set by `advance` at execution
-    time.
-
-    On failure, `advance` replaces it with the next candidate.
-    """
-
-    @property
-    def designator_type(self) -> Type:
-        return self.underspecified_action.type
-
-    def _next_candidate(self) -> Optional[ActionNode]:
-        """
-        Pull the next grounded action from the iterator and make it the current
-        candidate.
-
-        :return: The new candidate node, or None if the iterator is exhausted.
-        """
-        if self._action_iterator is None:
-            self._action_iterator = self.context.query_backend.evaluate(
-                self.underspecified_action
-            )
-
-        grounded_action = next(self._action_iterator, None)
-        if grounded_action is None:
-            self._action_iterator = None
-            return None
-
-        candidate = ActionNode(designator=grounded_action)
-        self.add_child(candidate)
-        self.current_candidate = candidate
-        return candidate
-
-    def stop_grounding(self) -> None:
-        """
-        Release the action iterator once no further candidate will be requested from it.
-
-        Between candidates the iterator is left suspended (rather than exhausted) so a
-        later retry can resume the search instead of restarting it; a suspended
-        generator keeps every value its frame holds alive, including resources a
-        candidate generator only builds to validate against (for example a location's
-        deep-copied test world). Once a candidate is accepted and no retry will happen,
-        closing the iterator here releases those resources immediately instead of
-        retaining them for this node's whole lifetime.
-        """
-        if self._action_iterator is not None:
-            self._action_iterator.close()
-            self._action_iterator = None
-
-    def notify(self):
-        # Resolution is deferred to execution time: the underspecified statement can
-        # only be grounded once the preceding actions have run and mutated the world
-        # (e.g. the torso is raised, the object is in the gripper). The grounding
-        # happens in UnderspecifiedExecutable, so expansion does nothing here.
-        pass
-
-    def advance(self) -> bool:
-        """
-        Resolve the next candidate and expand it against the current world state.
-
-        Driven by :class:`~pycram.plans.executables.UnderspecifiedExecutable` to ground the
-        action at execution time, and reused by failure handling to retry with a freshly
-        generated action.
-
-        :return: True if a new candidate was generated, False if the iterator is
-            exhausted.
-        """
-        if self._next_candidate() is None:
-            return False
-        self.current_candidate.notify()
-        return True
-
-    def parse(self) -> Executable:
-        # Defer resolution to execution: the returned executable grounds the action
-        # when it is reached, against the world state produced by the preceding nodes.
-        return UnderspecifiedExecutable(node=self, context=self.context)
-
-    def __repr__(self):
-        return f"{self.designator_type.__name__}"
-
-
 @dataclass(eq=True, repr=False)
 class DesignatorNode(PlanNode, ABC):
     """
@@ -641,7 +532,7 @@ class ActionNode(DesignatorNode, BuildsMotionStateChart):
         return self.children[1:-1]
 
     def add_to_motion_state_chart(
-        self, parent_goal: Goal, executable: GiskardExecutable
+        self, parent_goal: NodeListGoal, executable: GiskardExecutable
     ) -> Goal:
         """
         Add this action's body as its own goal below `parent_goal`.
@@ -724,7 +615,7 @@ class MotionNode(DesignatorNode, BuildsMotionStateChart):
         return True
 
     def add_to_motion_state_chart(
-        self, parent_goal: Goal, executable: GiskardExecutable
+        self, parent_goal: NodeListGoal, executable: GiskardExecutable
     ) -> Task:
         """
         Add this motion's giskard task below `parent_goal` and record it on

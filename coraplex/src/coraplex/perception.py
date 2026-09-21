@@ -110,11 +110,11 @@ class PerceptionQuery(SubclassJSONSerializer):
         robot_camera = self.robot.get_default_camera()
         return [body for body in region_bodies if visible(robot_camera, body)]
 
-    def to_json(self) -> Dict[str, Any]:
-        result = super().to_json()
-        result["semantic_annotation"] = to_json(self.semantic_annotation)
-        result["region"] = to_json(self.region)
-        result["robot_id"] = to_json(self.robot.id)
+    def to_json(self, **kwargs) -> Dict[str, Any]:
+        result = super().to_json(**kwargs)
+        result["semantic_annotation"] = to_json(self.semantic_annotation, **kwargs)
+        result["region"] = to_json(self.region, **kwargs)
+        result["robot_id"] = to_json(self.robot.id, **kwargs)
         result["trust_detected_orientation"] = self.trust_detected_orientation
         return result
 
@@ -124,7 +124,7 @@ class PerceptionQuery(SubclassJSONSerializer):
         return cls(
             semantic_annotation=from_json(data["semantic_annotation"], **kwargs),
             region=from_json(data["region"], **kwargs),
-            robot=tracker.get_world_entity_with_id(id=from_json(data["robot_id"])),
+            robot=tracker.get(from_json(data["robot_id"])),
             world=kwargs["world"],
             trust_detected_orientation=data.get("trust_detected_orientation", True),
         )

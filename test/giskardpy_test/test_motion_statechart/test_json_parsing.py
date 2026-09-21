@@ -20,7 +20,9 @@ from giskardpy.motion_statechart.graph_node import (
     EndMotion,
     CancelMotion,
 )
+from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
     LifeCycleState,
@@ -54,7 +56,10 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    WorldEntityReferenceWriter,
+)
 
 
 def test_TrueMonitor():
@@ -124,6 +129,57 @@ def test_to_json_joint_position_list(mini_world):
     assert node_copy.name == node.name
     assert node_copy.threshold == node.threshold
     assert node_copy.goal_state == node.goal_state
+
+
+def test_a_motion_statechart_refers_to_world_entities_by_reference(mini_world):
+    """
+    Whoever reads a motion statechart has the world it was built for, so its nodes point
+    at the entities of that world instead of carrying copies of them.
+    """
+    root = mini_world.get_kinematic_structure_entity_by_name("root")
+    tip = mini_world.get_kinematic_structure_entity_by_name("tip")
+    msc = MotionStatechart()
+    msc.add_node(
+        node := CartesianPose(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.1, reference_frame=root
+            ),
+        )
+    )
+
+    json_data = json.loads(json.dumps(msc.to_json()))
+
+    assert json_data["nodes"][node.index][
+        "root_link"
+    ] == WorldEntityReferenceWriter().write_reference(root)
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    msc_copy = MotionStatechart.from_json(json_data, **tracker.create_kwargs())
+    node_copy = msc_copy.get_node_by_index(node.index)
+    assert node_copy.root_link is root
+    assert node_copy.tip_link is tip
+
+
+def test_a_motion_statechart_refers_to_connections_by_reference(mini_world):
+    """
+    A connection is a world entity like any other, so a node holding one points at the
+    connection of the reader's world.
+    """
+    connection = mini_world.get_connection_by_name("root_T_tip")
+    msc = MotionStatechart()
+    msc.add_node(node := JointPositionReached(connection=connection, position=0.5))
+
+    json_data = json.loads(json.dumps(msc.to_json()))
+
+    assert json_data["nodes"][node.index][
+        "connection"
+    ] == WorldEntityReferenceWriter().write_reference(connection)
+
+    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    msc_copy = MotionStatechart.from_json(json_data, **tracker.create_kwargs())
+    assert msc_copy.get_node_by_index(node.index).connection is connection
 
 
 def test_start_condition(mini_world):
@@ -479,3 +535,93 @@ def test_duplicate_condition():
     msc_copy = MotionStatechart.from_json(new_json_data)
     msc_copy._add_transitions()
     assert len(msc_copy.unique_edges) == 3
+
+
+def test_node_referenced_by_another_node_is_one_instance_after_json_round_trip():
+    """
+    A node that another node refers to is deserialized as the node of the motion
+    statechart, not as a detached copy.
+    """
+    msc = MotionStatechart()
+    msc.add_node(watched := ConstTrueNode())
+    msc.add_node(still_progressing := StillProgressing(monitored_node=watched))
+    msc.add_node(EndMotion.when_true(watched))
+
+    new_json_data = json.loads(json.dumps(msc.to_json()))
+
+    msc_copy = MotionStatechart.from_json(new_json_data)
+    still_progressing_copy = msc_copy.get_node_by_index(still_progressing.index)
+    assert still_progressing_copy.monitored_node is msc_copy.get_node_by_index(
+        watched.index
+    )
+
+
+def test_child_added_to_goal_is_its_child_once_after_json_round_trip():
+    """
+    A child added to a goal before compilation is a child of the deserialized goal once.
+    """
+    msc = MotionStatechart()
+    msc.add_node(sequence := Sequence())
+    sequence.add_node(child := ConstTrueNode())
+    msc.add_node(EndMotion.when_true(sequence))
+
+    new_json_data = json.loads(json.dumps(msc.to_json()))
+
+    msc_copy = MotionStatechart.from_json(new_json_data)
+    sequence_copy = msc_copy.get_node_by_index(sequence.index)
+    assert [node.name for node in sequence_copy.nodes] == [child.name]
+
+
+def test_children_of_compiled_goal_are_its_children_once_after_json_round_trip():
+    """
+    Compiling adds the children of a goal to the motion statechart while the goal keeps
+    them in its own node list, and each is still a child of the deserialized goal once.
+    """
+    msc = MotionStatechart()
+    msc.add_node(
+        sequence := Sequence(nodes=[ConstTrueNode(name="a"), ConstTrueNode(name="b")])
+    )
+    msc.add_node(EndMotion.when_true(sequence))
+    executor = Executor(
+        context=MotionStatechartContext(
+            world=World(),
+            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
+        )
+    )
+    executor.compile(motion_statechart=msc)
+
+    new_json_data = json.loads(json.dumps(msc.to_json()))
+
+    msc_copy = MotionStatechart.from_json(new_json_data)
+    sequence_copy = msc_copy.get_node_by_index(sequence.index)
+    assert sequence_copy.nodes == [
+        msc_copy.get_node_by_index(node.index) for node in sequence.nodes
+    ]
+
+
+def test_nested_sequence_goal_json_round_trip_compilation():
+    """
+    A statechart with nested goals watched by a progress monitor can be deserialized and
+    compiled.
+    """
+    msc = MotionStatechart()
+    leaf_node = ConstTrueNode(name="ConstTrue")
+    child_sequence = Sequence(nodes=[leaf_node], name="SequentialNode")
+    root = Sequence(nodes=[child_sequence], name="ActionNode")
+    msc.add_node(root)
+    msc.add_node(still_progressing := StillProgressing(monitored_node=root))
+    msc.add_node(still_progressing.cancel_motion())
+    msc.add_node(EndMotion.when_true(root))
+
+    json_data = msc.to_json()
+    json_str = json.dumps(json_data)
+    new_json_data = json.loads(json_str)
+
+    msc_copy = MotionStatechart.from_json(new_json_data)
+    executor = Executor(
+        context=MotionStatechartContext(
+            world=World(),
+            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
+        )
+    )
+    executor.compile(motion_statechart=msc_copy)

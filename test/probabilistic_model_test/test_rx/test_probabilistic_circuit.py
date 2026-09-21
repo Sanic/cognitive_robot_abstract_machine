@@ -518,5 +518,84 @@ class NestedProductUnitSimplifyTestCase(unittest.TestCase):
         self.assertEqual(len(self.circuit.nodes()), 4)
 
 
+class SharedNestedUnitSimplifyTestCase(unittest.TestCase):
+    """
+    A same-type inner unit mounted as a child of two different outer units at once --
+    the shape relational grounding produces when Monte-Carlo mounting reuses one
+    grounded instance under every node whose local weighting agrees on it, rather than
+    building a separate copy per node.
+
+    Regression coverage for simplify()'s same-type merge unconditionally removing the
+    absorbed child: with a shared child, the first parent to merge it in deleted it out
+    from under every other parent still depending on it, silently dropping whatever
+    variables only the shared child modeled for those other parents.
+    """
+
+    x = Continuous("x")
+    y = Continuous("y")
+    z = Continuous("z")
+    w = Continuous("w")
+
+    def _build(self, outer_type, inner_type):
+        circuit = ProbabilisticCircuit()
+        shared_inner = inner_type(probabilistic_circuit=circuit)
+        leaf_x = leaf(
+            UniformDistribution(
+                variable=self.x, interval=SimpleInterval.from_data(0, 1)
+            ),
+            circuit,
+        )
+        leaf_y = leaf(
+            UniformDistribution(
+                variable=self.y, interval=SimpleInterval.from_data(0, 1)
+            ),
+            circuit,
+        )
+        shared_inner.add_subcircuit(leaf_x, log_weight=0.0)
+        shared_inner.add_subcircuit(leaf_y, log_weight=0.0)
+
+        leaf_z = leaf(
+            UniformDistribution(
+                variable=self.z, interval=SimpleInterval.from_data(0, 1)
+            ),
+            circuit,
+        )
+        leaf_w = leaf(
+            UniformDistribution(
+                variable=self.w, interval=SimpleInterval.from_data(0, 1)
+            ),
+            circuit,
+        )
+        outer_a = outer_type(probabilistic_circuit=circuit)
+        outer_a.add_subcircuit(shared_inner, log_weight=0.0)
+        outer_a.add_subcircuit(leaf_z, log_weight=0.0)
+        outer_b = outer_type(probabilistic_circuit=circuit)
+        outer_b.add_subcircuit(shared_inner, log_weight=0.0)
+        outer_b.add_subcircuit(leaf_w, log_weight=0.0)
+        return circuit, shared_inner, outer_a, outer_b, leaf_x, leaf_y, leaf_z, leaf_w
+
+    def test_simplifying_one_product_parent_does_not_orphan_the_shared_child_for_the_other(
+        self,
+    ):
+        _, _, outer_a, outer_b, leaf_x, leaf_y, leaf_z, leaf_w = self._build(
+            ProductUnit, ProductUnit
+        )
+        outer_a.simplify()
+        self.assertEqual(set(outer_a.subcircuits), {leaf_x, leaf_y, leaf_z})
+        outer_b.simplify()
+        self.assertEqual(set(outer_b.subcircuits), {leaf_x, leaf_y, leaf_w})
+
+    def test_simplifying_one_sum_parent_does_not_orphan_the_shared_child_for_the_other(
+        self,
+    ):
+        _, _, outer_a, outer_b, leaf_x, leaf_y, leaf_z, leaf_w = self._build(
+            SumUnit, SumUnit
+        )
+        outer_a.simplify()
+        self.assertEqual(set(outer_a.subcircuits), {leaf_x, leaf_y, leaf_z})
+        outer_b.simplify()
+        self.assertEqual(set(outer_b.subcircuits), {leaf_x, leaf_y, leaf_w})
+
+
 if __name__ == "__main__":
     unittest.main()

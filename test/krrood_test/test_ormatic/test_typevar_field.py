@@ -12,7 +12,7 @@ def test_typevar_field_dao_generation():
     """
     mapper = inspect(TypeVarFieldHolderDAO)
     assert hasattr(
-        TypeVarFieldHolderDAO, "typed_field_id"
+        TypeVarFieldHolderDAO, "_typed_field_id"
     ), "TypeVarFieldHolderDAO should have a typed_field_id column"
     assert (
         "typed_field" in mapper.relationships

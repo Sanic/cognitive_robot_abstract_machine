@@ -27,6 +27,7 @@ from giskardpy.motion_statechart.exceptions import (
     UnsupportedObservationVariableError,
 )
 from giskardpy.motion_statechart.graph_node import (
+    DeserializedNodeTracker,
     MotionStatechartNode,
     TrinaryCondition,
     Goal,
@@ -43,6 +44,9 @@ from giskardpy.motion_statechart.graph_node import (
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
 from giskardpy.qp.constraint_collection import ConstraintCollection
+from semantic_digital_twin.world_description.world_entity import (
+    WorldEntityReferenceWriter,
+)
 
 
 @dataclass(repr=False, eq=False)
@@ -154,11 +158,11 @@ class State(MutableMapping[MotionStatechartNode, float], SubclassJSONSerializer)
             data=self.data.copy(),
         )
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         """
         :return: The JSON representation of the base class, extended with the raw :attr:`data` array.
         """
-        return {**super().to_json(), "data": self.data.tolist()}
+        return {**super().to_json(**kwargs), "data": self.data.tolist()}
 
     @classmethod
     def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
@@ -338,9 +342,7 @@ class ObservationState(State):
         self._compiled_updater.bind_args_to_memory_view(
             arg_idx=2, numpy_array=context.world.state._data
         )
-        self._compiled_updater.bind_args_to_memory_view(
-            arg_idx=3, numpy_array=context.float_variable_data.data
-        )
+        context.float_variable_data.bind_argument(self._compiled_updater, 3)
 
     @staticmethod
     def _check_reads_no_predicate(node: MotionStatechartNode) -> None:
@@ -1179,17 +1181,22 @@ class MotionStatechart(SubclassJSONSerializer):
             self, second_width_in_cm=second_length_in_cm, context=context
         ).plot_gantt_chart(path)
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         """
+        World entities are written as references, because whoever reads a motion
+        statechart resolves them against its own world, which has the same entities.
+
         :return: The JSON representation of this motion statechart, including all nodes and their unique edges.
         .. warning:: This rebuilds the graph's edges from the nodes' current conditions as a side effect, see :meth:`_add_transitions`.
         """
+        kwargs = {**kwargs, **WorldEntityReferenceWriter().create_kwargs()}
         self._add_transitions()
-        result = super().to_json()
+        result = super().to_json(**kwargs)
         result["nodes"] = [
-            to_json(node) for node in sorted(self.nodes, key=lambda n: n.index)
+            to_json(node, **kwargs)
+            for node in sorted(self.nodes, key=lambda n: n.index)
         ]
-        result["unique_edges"] = [edge.to_json() for edge in self.unique_edges]
+        result["unique_edges"] = [edge.to_json(**kwargs) for edge in self.unique_edges]
         return result
 
     @classmethod
@@ -1197,7 +1204,8 @@ class MotionStatechart(SubclassJSONSerializer):
         """
         Reconstructs a motion statechart from its JSON representation, as produced by
         :meth:`to_json`: first all nodes, then their transition conditions, then
-        goal/child parent links.
+        goal/child parent links. A goal that serializes its own nodes already holds
+        them, so it is not handed them a second time.
 
         :param data: The JSON dict.
         :param kwargs: Forwarded to :func:`~krrood.adapters.json_serializer.from_json`
@@ -1205,6 +1213,7 @@ class MotionStatechart(SubclassJSONSerializer):
         :return: The deserialized motion statechart.
         """
         motion_statechart = cls()
+        DeserializedNodeTracker.from_kwargs(kwargs)
         for json_data in data["nodes"]:
             node = from_json(json_data, **kwargs)
             motion_statechart.add_node(node)
@@ -1214,10 +1223,10 @@ class MotionStatechart(SubclassJSONSerializer):
             )
             transition.owner._set_transition(transition)
         for node in motion_statechart.nodes:
-            if node.parent_node_index is not None:
-                parent_node = motion_statechart.get_node_by_index(
-                    node.parent_node_index
-                )
+            if node.parent_node_index is None:
+                continue
+            parent_node = motion_statechart.get_node_by_index(node.parent_node_index)
+            if node not in parent_node.nodes:
                 parent_node.nodes.append(node)
         return motion_statechart
 

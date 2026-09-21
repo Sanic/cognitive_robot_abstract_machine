@@ -399,58 +399,60 @@ class CausalCircuit:
         child_marginals: List[Any],
     ) -> bool:
         """
-        Return True if at least one pair of child marginals is disjoint.
+        Return True if the child marginals are not all the same.
 
-        A SumUnit is treated as a split node for a query Variable only when at least one
-        pair of its children has disjoint support on that Variable. SumUnits whose
-        children all share the same marginal (e.g. a sibling SumUnit in a ProductUnit
-        that has no relationship to this variable) are not split nodes and must be
-        skipped to avoid false positives.
+        A SumUnit is treated as a split node for a query Variable as soon as its
+        children differ in their support on that Variable, whether or not any pair of
+        them is disjoint: children that overlap without coinciding, as a mixture of one
+        copy of a template per sampled value builds, leave no disjoint regions to
+        intervene on either. SumUnits whose children all share the same marginal (for
+        example a sibling SumUnit in a ProductUnit that has no relationship to this
+        variable) are not split nodes and must be skipped to avoid false positives. A
+        SumUnit with fewer than two children has nothing to split on.
 
         :param child_marginals: Marginal support events, one per SumUnit child.
-        :returns: True if any pair of marginals is disjoint.
+        :returns: True if any two marginals differ.
         """
-        return any(
-            child_marginals[i].intersection_with(child_marginals[j]).is_empty()
-            for i, j in itertools.combinations(range(len(child_marginals)), 2)
-        )
+        if len(child_marginals) < 2:
+            return False
+        first, *others = child_marginals
+        return any(other != first for other in others)
 
     @staticmethod
     def _overlapping_pair_exists(child_marginals: List[Any]) -> bool:
         """
-        Return True if any pair of child marginals has non-empty intersection.
+        Return True if any pair of child marginals intersects in more than a boundary.
+
+        Two continuous regions that only touch at an endpoint, as neighbouring leaves of
+        a fitted tree do, intersect in a set of size zero and do not overlap.
 
         :param child_marginals: Marginal support events, one per SumUnit child.
         :returns: True if any pair overlaps.
         """
         return any(
-            not child_marginals[i].intersection_with(child_marginals[j]).is_empty()
-            for i, j in itertools.combinations(range(len(child_marginals)), 2)
+            first.intersection_with(second).size > 0
+            for first, second in itertools.combinations(child_marginals, 2)
         )
 
     def _check_sum_unit_for_variable(
         self,
         node: SumUnit,
-        child_support_events: List[Any],
+        child_marginals: List[Any],
         query_variable: Variable,
     ) -> Optional[OverlappingChildSupportsViolation]:
         """
-        Check a single SumUnit against a single query Variable.
+        Check a single SumUnit for disjoint children, given each child's support already
+        restricted to query_variable.
 
         Returns a violation if the SumUnit splits on the variable but has at least one
         overlapping child pair. Returns None if the SumUnit does not split on the
         variable, or if all splitting children are pairwise disjoint.
 
         :param node: The SumUnit to inspect.
-        :param child_support_events: result_of_current_query from each child.
-        :param query_variable: The query Variable to check marginal disjointness on.
+        :param child_marginals: Each child's own support, restricted to query_variable.
+        :param query_variable: The query Variable being checked.
         :returns: A violation if overlapping children are detected, else None.
         """
-        if not all(query_variable in event.variables for event in child_support_events):
-            return None
-        child_marginals = [
-            event.marginal([query_variable]) for event in child_support_events
-        ]
         if not self._child_marginals_split_on_variable(child_marginals):
             return None
         if self._overlapping_pair_exists(child_marginals):
@@ -467,35 +469,37 @@ class CausalCircuit:
         Check that for each declared query Variable, no SumUnit that splits on that
         Variable has children with overlapping marginal support.
 
-        Calls self.probabilistic_circuit.support once as a side-effecting traversal that
-        populates result_of_current_query on every node bottom-up. The returned event is
-        discarded; only the per-node side effect matters. Delegates per-node, per-
-        variable inspection to _check_sum_unit_for_variable.
+        Reads each child's own already-computed joint support directly and restricts it
+        to one query Variable with a pure ``Event.marginal`` projection, rather than
+        calling ``ProbabilisticCircuit.marginal`` per Variable: that path simplifies the
+        circuit, flattening nested SumUnits and erasing exactly the branch boundaries
+        this check needs.
 
         :param all_query_variables: Union of all Variables across all query_sets.
         :returns: List of violations, empty if all split nodes are support-disjoint.
         """
         violations: List[OverlappingChildSupportsViolation] = []
+        # Computed for its side effect: populates result_of_current_query on every
+        # node of the circuit's own (unflattened) structure, read directly off each
+        # SumUnit's children in the loop below.
         _ = self.probabilistic_circuit.support
 
         for layer in self.probabilistic_circuit.layers:
             for node in layer:
-                if (
-                    not isinstance(node, SumUnit)
-                    or len(node.subcircuits) < 2
-                    or len(node.variables) == 1
-                ):
-                    continue
-
-                child_support_events = [
-                    child.result_of_current_query for child in node.subcircuits
-                ]
-                if any(event is None for event in child_support_events):
+                if not isinstance(node, SumUnit) or len(node.subcircuits) < 2:
                     continue
 
                 for query_variable in all_query_variables:
+                    if query_variable not in node.variables:
+                        continue
+
+                    child_marginals = [
+                        child.result_of_current_query.marginal([query_variable])
+                        for child in node.subcircuits
+                    ]
+
                     violation = self._check_sum_unit_for_variable(
-                        node, child_support_events, query_variable
+                        node, child_marginals, query_variable
                     )
                     if violation is not None:
                         violations.append(violation)
@@ -775,16 +779,17 @@ class CausalCircuit:
         """
         effect_mixture = SumUnit(probabilistic_circuit=output_circuit)
         for adjustment_partition in adjustment_partitions:
-            joint_event = adjustment_partition.event.intersection_with(
-                cause_region.event
-            )
-            joint_conditioned_circuit, _ = copy.deepcopy(
-                self.probabilistic_circuit
-            ).log_truncated_in_place(
-                joint_event.fill_missing_variables_pure(
+            # fill first: intersection_with keeps only the left operand's variables.
+            joint_event = adjustment_partition.event.fill_missing_variables_pure(
+                self.probabilistic_circuit.variables
+            ).intersection_with(
+                cause_region.event.fill_missing_variables_pure(
                     self.probabilistic_circuit.variables
                 )
             )
+            joint_conditioned_circuit, _ = copy.deepcopy(
+                self.probabilistic_circuit
+            ).log_truncated_in_place(joint_event)
             if joint_conditioned_circuit is None:
                 continue
             self._attach_weighted_marginal(
@@ -795,6 +800,7 @@ class CausalCircuit:
             )
 
         if len(effect_mixture.log_weights) == 0:
+            output_circuit.remove_node(effect_mixture)
             return False
         effect_mixture.normalize()
 
@@ -806,12 +812,14 @@ class CausalCircuit:
             )
         )
         if cause_region_circuit is None:
+            # effect_mixture is already part of output_circuit; a skipped region
+            # must not leave it and its subtree behind as a second root.
+            output_circuit.remove_node_and_successor_structure(effect_mixture)
             return False
 
         product_unit = ProductUnit(probabilistic_circuit=output_circuit)
         product_unit.attach_marginal_circuit(cause_region_circuit, output_circuit)
-        # effect_mixture is already a node of output_circuit (built directly above,
-        # not copied in from an external circuit), so it attaches as a plain child
+        # effect_mixture already belongs to output_circuit, so attach it directly
         # rather than through attach_marginal_circuit.
         product_unit.add_subcircuit(effect_mixture)
         root_sum_unit.add_subcircuit(product_unit, math.log(cause_region.probability))
@@ -907,37 +915,19 @@ class CausalCircuit:
         Return a :class:`SupportRegion` for each structurally disjoint support region of
         variable, read from the circuit's unmarginalized joint support.
 
-        `_extract_leaf_regions_for_variable` marginalizes the joint support down to
-        variable alone first, which coalesces every disjoint per-branch range into one
-        Interval/Set-valued region -- correct as a description of variable's own
-        support, but unable to tell one SumUnit branch's region apart from another's.
-        This matters beyond region-search cosmetics: `backdoor_adjustment` builds its
-        output as one ProductUnit per region returned here, pairing each region's own
-        cause branch with its own effect branch: with the coalesced regions, a
-        multi-branch cause variable collapsed to a single ProductUnit spanning its
-        whole domain, silently discarding the cause-effect correlation each branch
-        encodes (marginal probabilities stayed correct either way, which is why this
-        went unnoticed by tests that only checked marginals). This method instead reads
-        variable's value directly off each of the joint support's own disjoint simple
-        sets, before marginalization discards which branch it came from, merging
-        branches that happen to share the same value by keeping a single entry
-        (`circuit.probability` already aggregates every contributing branch for that
-        value in one call, so no separate summation is needed). Query-set variables are
-        exactly where this separation is meaningful: support determinism (see
-        `verify_support_determinism`) guarantees SumUnit children have disjoint support
-        on them, so the regions returned here correspond to actual circuit branches
-        rather than an arbitrary decomposition.
+        Reads variable's value directly off the joint support's own disjoint simple
+        sets, rather than marginalizing down to variable alone first: marginalizing
+        first would coalesce separate SumUnit branches into one region, which
+        `backdoor_adjustment` cannot use since it builds one ProductUnit per region
+        here, pairing each region's own cause branch with its own effect branch.
+        Support determinism (see `verify_support_determinism`) guarantees these
+        branches are genuinely disjoint, so the regions returned here correspond to
+        actual circuit branches rather than an arbitrary decomposition.
 
-        Query variables with a discrete (:class:`~random_events.set.Set`) domain need
-        one further step: a single SumUnit branch can itself be a mixture over several
-        of the variable's values (unlike a continuous branch, whose own support is
-        already the atomic range a leaf distribution occupies), so
-        ``simple_region[variable]`` there is the *union* of every value with positive
-        probability in that branch, not one value. `_split_into_atomic_values` breaks
-        that union apart before grouping, so e.g. a branch giving 80% probability to
-        ``HIGH`` and 20% to ``LOW`` contributes two regions, not one spanning both --
-        the same distinction this method already makes between branches applies within
-        one branch's own mixture.
+        A discrete (:class:`~random_events.set.Set`) query variable needs one further
+        step: a single branch can itself mix several of the variable's values, so
+        `_split_into_atomic_values` splits that union into one region per value before
+        grouping.
 
         :param variable: The Variable whose disjoint support regions to extract.
         :param base_circuit: Circuit to query. Defaults to self.probabilistic_circuit.

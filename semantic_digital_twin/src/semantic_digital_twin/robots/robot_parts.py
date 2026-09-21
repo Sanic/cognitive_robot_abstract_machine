@@ -39,6 +39,7 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NoJointStateWithType,
     UselessConceptError,
@@ -55,7 +56,10 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     RobotPartMixin,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Agent
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Agent,
+    Table,
+)
 from semantic_digital_twin.spatial_types import (
     Quaternion,
     Vector3,
@@ -79,10 +83,13 @@ from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
     Scale,
 )
+from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.world_entity import (
     Body,
+    GravityCompensation,
     KinematicStructureEntity,
     Connection,
+    PositionServo,
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
@@ -376,6 +383,56 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
             if isinstance(connection, ActiveConnection)
         ]
 
+    def _setup_servos(self) -> None:
+        """
+        Declare the servos driving this part's joints in a physical simulation (see
+        :meth:`_declare_servo`). Does nothing by default: such a part is moved
+        kinematically.
+        """
+
+    def _declare_servo(
+        self, connection: ActiveConnection1DOF, servo: JointServo
+    ) -> None:
+        """
+        Drive one of this part's joints with a position servo in a physical simulation:
+        the servo's gains become a
+        :class:`~semantic_digital_twin.world_description.world_entity.PositionServo`
+        actuator on the joint's degree of freedom, its dynamics the joint's own.
+
+        A joint that follows another joint's degree of freedom, such as a gripper's
+        mimic joints, gets the dynamics but no actuator of its own: the servo already
+        driving that degree of freedom drives it too.
+
+        :param connection: The joint to drive.
+        :param servo: What drives it.
+        """
+        connection.dynamics = servo.dynamics
+        if any(
+            connection.raw_dof in actuator.dofs for actuator in self._world.actuators
+        ):
+            return
+        actuator = PositionServo(
+            name=PrefixedName(
+                f"{connection.raw_dof.name.name}_servo",
+                prefix=connection.raw_dof.name.prefix,
+            ),
+            gains=servo.gains,
+        )
+        actuator.add_dof(connection.raw_dof)
+        self._world.add_actuator(actuator)
+
+    def _compensate_gravity(self) -> None:
+        """
+        Let a physical simulation carry the weight of this part's bodies, as a servoed
+        part holds its own weight.
+        """
+        for body in self.bodies:
+            compensation = body.get_simulator_property_of_type(GravityCompensation)
+            if compensation is None:
+                body.add_simulator_property(GravityCompensation(fraction=1.0))
+                continue
+            compensation.fraction = 1.0
+
 
 @dataclass(eq=False)
 class KinematicChain(AbstractRobotPart, ABC):
@@ -554,13 +611,29 @@ class EndEffector(AbstractRobotPart, ABC):
 
     front_facing_axis: Vector3 = field(init=False)
     """
-    The axis of the end_effector's tool frame that is facing forward.
+The axis of the end_effector's tool frame that is facing forward.
     """
 
     def __post_init__(self):
         super().__post_init__()
         rotation_matrix = RotationMatrix.from_quaternion(self.front_facing_orientation)
         self.front_facing_axis = Vector3.from_iterable(rotation_matrix[:3, 0])
+
+    @property
+    def held_bodies(self) -> list[Body]:
+        """
+        :return: The bodies with collision attached below the tool frame, where a grasped
+            object hangs after a pick-up.
+        """
+        return [
+            entity
+            for entity in self._world.get_kinematic_structure_entities_of_branch(
+                self.tool_frame
+            )
+            if entity != self.tool_frame
+            and isinstance(entity, Body)
+            and entity.has_collision()
+        ]
 
 
 @dataclass(eq=False)
@@ -590,6 +663,27 @@ class Neck(
 
 
 TGenericDrive = TypeVar("TGenericDrive", bound=WheeledDrive)
+
+
+@dataclass(eq=False)
+class MountingTable(Table, AbstractRobotPart, ABC):
+    """
+    The table a stationary robot is bolted onto: the robot's base and, at the same
+    time, a table objects can stand on, with everything the :class:`Table` annotation
+    offers such as its supporting surface.
+    """
+
+    def setup_hardware_interfaces(self):
+        pass
+
+    def setup_joint_states(self) -> List[JointState]:
+        return []
+
+    @classmethod
+    def setup_default_configuration_in_world_below_robot_root(
+        cls, robot_root: KinematicStructureEntity
+    ) -> Self:
+        return cls(root=robot_root)
 
 
 @dataclass(eq=False)
@@ -644,6 +738,15 @@ class MobileBase(AbstractRobotPart, Generic[TGenericDrive], ABC):
         return self.root.collision.as_bounding_box_collection_in_frame(
             self._world.root
         ).bounding_box()
+
+    @property
+    def base_radius(self) -> float:
+        """
+        Approximates the radius of the mobile base, as the average between the radius in the x and y axis.
+
+        :return: The approximate radius of the mobile base, in meters.
+        """
+        return (self.bounding_box.depth / 2 + self.bounding_box.width / 2) / 2
 
 
 @dataclass(eq=False)
@@ -713,6 +816,21 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
     filled and that the robot can be synchronized without issues.
     """
 
+    @property
+    def is_in_collision(self) -> bool:
+        """
+        :return: Whether any body of this robot touches something under the collision
+            rules currently in force.
+
+        The rules the question is asked under are the caller's to set, so that the same
+        robot can be asked about the clearances of a plan or of a standing pose.
+        """
+        own_bodies = set(self.bodies_with_collision)
+        return any(
+            contact.body_a in own_bodies or contact.body_b in own_bodies
+            for contact in self._world.collision_manager.compute_collisions().contacts
+        )
+
     @classmethod
     @abstractmethod
     def get_ros_file_path(cls) -> str:
@@ -778,6 +896,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             for robot_part in self._robot_parts:
                 robot_part.setup_hardware_interfaces()
                 robot_part.add_joint_states(robot_part.setup_joint_states())
+                robot_part._setup_servos()
             self._setup_collision_rules()
             self._setup_velocity_limits()
             return self

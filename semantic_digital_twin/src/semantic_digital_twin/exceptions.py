@@ -1,6 +1,8 @@
 from __future__ import annotations, absolute_import
 
 from dataclasses import dataclass, field, Field
+from datetime import timedelta
+from http import HTTPStatus
 from pathlib import Path
 from typing import Dict, Set
 from uuid import UUID
@@ -16,14 +18,17 @@ from typing_extensions import (
     Any,
 )
 
-from krrood.adapters.exceptions import JSONSerializationError
+from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
-from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+    from semantic_digital_twin.adapters.ros.messages import MetaData
+    from semantic_digital_twin.semantic_annotations.mixins import (
+        HasRootBody,
+        HasSupportingSurface,
+    )
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
@@ -33,12 +38,13 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import (
         SemanticAnnotation,
         WorldEntity,
+        WorldEntityWithID,
         KinematicStructureEntity,
     )
     from semantic_digital_twin.spatial_types.spatial_types import (
         SpatialType,
     )
-    from semantic_digital_twin.spatial_types import Vector3, Point3
+    from semantic_digital_twin.spatial_types import Vector3, Point
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
         DegreeOfFreedom,
@@ -538,6 +544,37 @@ class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
 
     def suggest_correction(self) -> str:
         return "did you forget to call self.delete_orphaned_dofs()?"
+
+
+@dataclass
+class WorldEntityWithIDBelongsToAnotherWorld(WorldValidationError):
+    """
+    Raised when looking an id up in a world answers with an entity that reports
+    belonging to a different world.
+
+    A world's lookup tables are meant to hold only its own entities, so this means one
+    was left registered here after being added elsewhere. Only a
+    :class:`~semantic_digital_twin.world_description.world_entity.WorldEntityWithID` is
+    looked up by id, which is why an entity without one cannot reach this.
+    """
+
+    world_entity: WorldEntityWithID
+    """
+    The entity that was found under this world but reports another one.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Looking up id {self.world_entity.id} in world '{self.world.name}' returned "
+            f"'{self.world_entity.name}', which belongs to world "
+            f"'{self.world_entity._world.name if self.world_entity._world else None}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "The entity was left registered in this world after being added to another "
+            "one; remove it from this world before adding it elsewhere."
+        )
 
 
 @dataclass
@@ -1078,6 +1115,76 @@ class WorldHasNoSynchronizerError(UsageError):
 
 
 @dataclass
+class SynchronizerNotConnectedError(UsageError):
+    """
+    Raised when a synchronizer was created but its topic never became usable, so that
+    whatever it publishes would be dropped.
+    """
+
+    topic_name: str
+    """
+    The topic the synchronizer publishes on and listens to.
+    """
+
+    timeout: timedelta
+    """
+    The time that was spent waiting for the topic.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The synchronizer of '{self.topic_name}' did not reach a single subscriber "
+            f"within {self.timeout.total_seconds()}s, not even its own."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Check that the ros node of the synchronizer is alive and its middleware is running."
+
+
+@dataclass
+class WorldUpdateReferencesUnknownEntityError(UsageError):
+    """
+    Raised when an update refers to an entity this world never received, which leaves
+    everything the missing update carried out of reach.
+    """
+
+    publisher: MetaData
+    """
+    The synchronizer whose update could not be applied.
+    """
+
+    entity_id: UUID
+    """
+    The entity the update refers to.
+
+    Only its id is known, because the update that created it never arrived.
+    """
+
+    entity_name: Optional[PrefixedName]
+    """
+    The name the update calls that entity, or ``None`` where it carries none.
+    """
+
+    def error_message(self) -> str:
+        named_entity = (
+            f"'{self.entity_name}' ({self.entity_id})"
+            if self.entity_name is not None
+            else f"'{self.entity_id}'"
+        )
+        return (
+            f"The update of '{self.publisher.node_name}' refers to the entity "
+            f"{named_entity}, which this world never received."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Create the synchronizer of a world before modifying that world: changes made "
+            "before it exists reach nobody, and every later change that builds on them "
+            "cannot be applied."
+        )
+
+
+@dataclass
 class WorldHasMultipleSynchronizersError(UsageError):
     """
     Raised when the synchronizer of a world is asked for, but several of them publish
@@ -1334,6 +1441,35 @@ class PathResolutionError(ParsingError):
 
 
 @dataclass
+class DatasetServerError(ParsingError):
+    """
+    Raised when a dataset server does not answer with what was asked of it.
+    """
+
+    url: str = field(kw_only=True)
+    """
+    The address that was requested.
+    """
+
+    status_code: int = field(kw_only=True)
+    """
+    The status the server answered with.
+    """
+
+    def error_message(self) -> str:
+        return f"The dataset server answered {self.status_code} for '{self.url}'."
+
+    def suggest_correction(self) -> str:
+        if self.status_code == HTTPStatus.NOT_FOUND:
+            return (
+                "check that the dataset server serves the directory this path is under."
+            )
+        return (
+            "check that the dataset server is reachable and serving the dataset root."
+        )
+
+
+@dataclass
 class WorldEntityNotFoundError(UsageError):
     name_or_hash: Union[str, PrefixedName, int]
 
@@ -1442,32 +1578,34 @@ class DoesNotBelongToAWorldError(UsageError):
         )
 
 
-class NotJsonSerializable(JSONSerializationError): ...
-
-
 @dataclass
-class SpatialTypeNotJsonSerializable(NotJsonSerializable):
-    spatial_object: SymbolicMathType
+class WorldEntityWithIDNotInKwargs(UntrackedObjectError):
+    """
+    Raised when a JSON document refers to a world entity that was neither deserialized
+    from it nor is part of the world it is deserialized into.
+    """
+
+    key: UUID
+    """
+    The id of the world entity the document refers to.
+    """
+
+    world_entity_name: Optional[PrefixedName] = None
+    """
+    The name the reference to that entity went by when it was written.
+
+    Says which entity is meant where the id alone says nothing. ``None`` where the
+    reference carries no name, and never used to look an entity up: the id is its
+    identity.
+    """
 
     def error_message(self) -> str:
-        return (
-            f"Object of type '{self.spatial_object.__class__.__name__}' is not JSON serializable, because it has "
-            f"free variables: {self.spatial_object.free_variables()}"
+        named_entity = (
+            f"World entity '{self.world_entity_name}' ({self.key})"
+            if self.world_entity_name is not None
+            else f"World entity '{self.key}'"
         )
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class WorldEntityWithIDNotInKwargs(JSONSerializationError):
-    world_entity_id: UUID
-
-    def error_message(self) -> str:
-        return (
-            f"World entity '{self.world_entity_id}' is not in the kwargs of the "
-            f"method that created it."
-        )
+        return f"{named_entity} is not in the kwargs of the method that created it."
 
     def suggest_correction(self) -> str:
         return ""
@@ -1593,7 +1731,7 @@ class PointOccupiedError(DataclassException):
     Connectivity Graphs.
     """
 
-    point: Point3
+    point: Point
     """
     The point that is occupied.
     """
@@ -1824,3 +1962,95 @@ class ExerciseVerificationFailed(UsageError):
 
     def suggest_correction(self) -> str:
         return "revisit the task description of this exercise and adjust your solution."
+
+
+@dataclass
+class NoSupportingSurfaceError(UsageError):
+    """
+    Raised when an annotation's geometry offers no surface anything could be supported
+    on.
+    """
+
+    annotation: HasSupportingSurface
+    """
+    The annotation that was asked for its supporting surface.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.annotation.root.name}' has no supporting surface and none could "
+            f"be derived from its geometry."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "attach a supporting surface region to the annotation, or give its root "
+            "body geometry with an upward facing face."
+        )
+
+
+@dataclass
+class DuplicateSimulatorPropertyError(UsageError):
+    """
+    Raised when an entity carries more than one simulator property of a type of which a
+    simulator reads exactly one.
+    """
+
+    property_type: Type
+    """
+    The type of property attached more than once.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The entity already carries a {self.property_type.__name__} simulator "
+            "property."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Modify the existing property in place instead of attaching a second one; "
+            "HasSimulatorProperties.get_simulator_property_of_type returns it."
+        )
+
+
+@dataclass
+class SimulationNotStartedError(UsageError):
+    """
+    Raised when a simulation is advanced before it was started.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation was advanced too early.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The simulation of the world rooted at {self.world_name} has to be started "
+            "before it can be advanced."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Call start() first, or drive the simulation inside a with block."
+
+
+@dataclass
+class SimulationAlreadyRunningError(UsageError):
+    """
+    Raised when a simulation is started while it is already running.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation was started twice.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The simulation of the world rooted at {self.world_name} is already "
+            "running."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Stop the simulation before starting it again."

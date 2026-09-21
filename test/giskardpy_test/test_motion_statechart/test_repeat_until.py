@@ -9,6 +9,8 @@ is exercised against a motion that really does stop making progress.
 
 from datetime import timedelta
 
+import pytest
+
 from giskardpy.executor import Executor
 from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.data_types import (
@@ -25,6 +27,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
 from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
     ConstFalseNode,
     ConstTrueNode,
+    TestNodeAssertionError,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from semantic_digital_twin.spatial_types.spatial_types import Point3
@@ -140,6 +143,34 @@ def test_repeat_until_does_not_retry_after_giving_up():
     assert loop.stop_retry_monitor.resets == resets_when_given_up
     assert task.life_cycle_state == LifeCycleValues.NOT_STARTED
     assert loop.observation_state == ObservationStateValues.FALSE
+
+
+def test_repeat_until_ends_the_motion_with_its_exception_once_retrying_stops():
+    """
+    A loop handed an exception reports running out of attempts by ending the motion with
+    it, rather than only observing False.
+    """
+    task = ConstFalseNode(name="task")
+    exception = TestNodeAssertionError(reason="attempts exhausted")
+    loop = RepeatUntil(
+        name="loop",
+        task=task,
+        stop_retry_monitor=CountNodeResets(name="counter", node=task, target=2),
+        failure_monitor=CountControlCycles(
+            name="timeout", control_cycles=ATTEMPT_CYCLES
+        ),
+        exception=exception,
+    )
+    motion_statechart = MotionStatechart()
+    motion_statechart.add_node(loop)
+    motion_statechart.add_node(EndMotion.when_true(loop))
+    executor = Executor(MotionStatechartContext(world=World()))
+    executor.compile(motion_statechart=motion_statechart)
+
+    with pytest.raises(type(exception)) as error:
+        executor.tick_until_end(SETTLE_CYCLES)
+
+    assert error.value is exception
 
 
 # %% the stall timeout

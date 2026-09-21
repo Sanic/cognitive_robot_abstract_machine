@@ -233,7 +233,7 @@ def test_equal(session, database):
 
     query_by_hand = select(FixedConnectionDAO).join(
         PrismaticConnectionDAO,
-        onclause=PrismaticConnectionDAO.child_id == FixedConnectionDAO.parent_id,
+        onclause=PrismaticConnectionDAO._child_id == FixedConnectionDAO._parent_id,
     )
 
     assert len(session.scalars(query_by_hand).all()) == 1
@@ -297,13 +297,13 @@ def test_complicated_equal(session, database):
         select(ContainerDAO)
         .join(
             prismatic_alias,
-            onclause=prismatic_alias.parent_id == ContainerDAO.database_id,
+            onclause=prismatic_alias._parent_id == ContainerDAO.database_id,
         )
         .join(
-            drawer_alias, onclause=prismatic_alias.child_id == drawer_alias.database_id
+            drawer_alias, onclause=prismatic_alias._child_id == drawer_alias.database_id
         )
-        .join(fixed_alias, onclause=fixed_alias.parent_id == drawer_alias.database_id)
-        .join(handle_alias, onclause=fixed_alias.child_id == handle_alias.database_id)
+        .join(fixed_alias, onclause=fixed_alias._parent_id == drawer_alias.database_id)
+        .join(handle_alias, onclause=fixed_alias._child_id == handle_alias.database_id)
         .with_only_columns(drawer_alias)
     )
 
@@ -314,7 +314,7 @@ def test_complicated_equal(session, database):
     assert str(translator.sql_query) == str(expected)
 
     # SQL result matches EQL result
-    sql_result = translator.evaluate()
+    [sql_result] = translator.evaluate()
     assert sql_result.name == eql_result[0].name
 
 
@@ -819,12 +819,12 @@ def test_set_of_multi_variable(session, database):
         select(ContainerDAO, HandleDAO, FixedConnectionDAO, PrismaticConnectionDAO)
         .join(
             FixedConnectionDAO,
-            onclause=FixedConnectionDAO.parent_id == ContainerDAO.database_id,
+            onclause=FixedConnectionDAO._parent_id == ContainerDAO.database_id,
         )
-        .join(HandleDAO, onclause=FixedConnectionDAO.child_id == HandleDAO.database_id)
+        .join(HandleDAO, onclause=FixedConnectionDAO._child_id == HandleDAO.database_id)
         .join(
             PrismaticConnectionDAO,
-            onclause=PrismaticConnectionDAO.child_id == ContainerDAO.database_id,
+            onclause=PrismaticConnectionDAO._child_id == ContainerDAO.database_id,
         )
     )
     assert str(translator.sql_query) == str(expected)
@@ -868,7 +868,7 @@ def test_set_of_move_action_transitive(session):
         grasp_alias.approach_direction,
         grasp_alias.manipulation_offset,
     ).join(
-        grasp_alias, onclause=grasp_alias.database_id == MoveActionDAO.grasp_config_id
+        grasp_alias, onclause=grasp_alias.database_id == MoveActionDAO._grasp_config_id
     )
 
     assert str(translator.sql_query) == str(expected)
@@ -897,7 +897,7 @@ def test_set_of_with_where(session):
         select(KRROODPoseDAO)
         .join(
             position_alias,
-            onclause=position_alias.database_id == KRROODPoseDAO.position_id,
+            onclause=position_alias.database_id == KRROODPoseDAO._position_id,
         )
         .with_only_columns(
             position_alias.x,
@@ -943,8 +943,8 @@ def test_set_of_same_table_twice(session):
     sql = str(translator.sql_query)
     assert "FixedConnectionDAO" in sql
     assert sql.count("JOIN") >= 2
-    assert "parent_id" in sql
-    assert "child_id" in sql
+    assert "_parent_id" in sql
+    assert "_child_id" in sql
     assert str(ContainerDAO.__tablename__) in sql
 
 
@@ -996,11 +996,11 @@ def test_plan_like_query(session):
         )
         .join(
             GraspConfigDAO,
-            onclause=GraspConfigDAO.database_id == MoveActionDAO.grasp_config_id,
+            onclause=GraspConfigDAO.database_id == MoveActionDAO._grasp_config_id,
         )
         .join(
             FixedConnectionDAO,
-            onclause=FixedConnectionDAO.parent_id == MoveActionDAO.grasp_config_id,
+            onclause=FixedConnectionDAO._parent_id == MoveActionDAO._grasp_config_id,
         )
         .where(MoveActionDAO.robot_x > 0.0)
     )
@@ -1140,7 +1140,7 @@ def test_big_query_select_part(session):
         )
         .join(
             grasp_alias,
-            onclause=grasp_alias.database_id == MoveActionDAO.grasp_config_id,
+            onclause=grasp_alias.database_id == MoveActionDAO._grasp_config_id,
         )
         .where(grasp_alias.rotate_gripper < 0.9)
         .order_by(MoveActionDAO.robot_x)
@@ -1421,7 +1421,7 @@ def test_exists_in_where_clause(session, database):
     FROM MoveActionDAO
     WHERE EXISTS (
         SELECT 1 FROM GraspConfigDAO
-        WHERE MoveActionDAO.grasp_config_id = GraspConfigDAO.database_id
+        WHERE MoveActionDAO._grasp_config_id = GraspConfigDAO.database_id
     )
 
     so only MoveActions that have an associated GraspConfig are returned.

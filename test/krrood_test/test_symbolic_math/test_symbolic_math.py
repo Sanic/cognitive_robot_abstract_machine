@@ -1,5 +1,7 @@
 import copy
+import gc
 import operator
+import weakref
 
 import casadi as ca
 import numpy as np
@@ -8,7 +10,9 @@ import scipy
 import scipy.sparse as sp
 
 import krrood.symbolic_math.symbolic_math as sm
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.exceptions import (
+    FloatVariableAlreadyHasResolveError,
     HasFreeVariablesError,
     NotColumnVectorError,
     NotEnoughArgumentsError,
@@ -172,6 +176,52 @@ class TestTrinaryPredicates:
     """
     The predicate that holds for each trinary truth value.
     """
+
+    def test_or3_accepts_a_constant_comparison_result(self):
+        constant_comparison = sm.Scalar(0) <= 0.05
+        assert isinstance(constant_comparison, sm.Scalar)
+        result = sm.trinary_logic_or(sm.Scalar(0), constant_comparison)
+        assert isinstance(result, sm.Scalar)
+        assert bool(result) is True
+
+    def test_and3_accepts_a_constant_comparison_result(self):
+        constant_comparison = sm.Scalar(0) <= 0.05
+        assert isinstance(constant_comparison, sm.Scalar)
+        result = sm.trinary_logic_and(sm.Scalar(1), constant_comparison)
+        assert isinstance(result, sm.Scalar)
+        assert bool(result) is True
+
+    def test_predicate_return_types_are_primitive_bool(self):
+        """
+        Verify that is_const_true, is_const_false, and is_const_unknown return primitive
+        bool values rather than Scalar expressions.
+        """
+        s_true = sm.Scalar(0) <= 0.05
+        s_false = sm.Scalar(1) <= 0.05
+        s_unknown = sm.Scalar(0.5)
+
+        assert isinstance(s_true.is_constant_true(), bool)
+        assert s_true.is_constant_true() is True
+        assert isinstance(s_true.is_constant_false(), bool)
+        assert s_true.is_constant_false() is False
+
+        assert isinstance(s_false.is_constant_true(), bool)
+        assert s_false.is_constant_true() is False
+        assert isinstance(s_false.is_constant_false(), bool)
+        assert s_false.is_constant_false() is True
+
+        assert isinstance(s_unknown.is_constant_unknown(), bool)
+        assert s_unknown.is_constant_unknown() is True
+        assert isinstance(s_true.is_constant_unknown(), bool)
+        assert s_true.is_constant_unknown() is False
+
+        v = sm.FloatVariable(name="v")
+        assert isinstance(v.is_constant_true(), bool)
+        assert v.is_constant_true() is False
+        assert isinstance(v.is_constant_false(), bool)
+        assert v.is_constant_false() is False
+        assert isinstance(v.is_constant_unknown(), bool)
+        assert v.is_constant_unknown() is False
 
     def test_each_predicate_holds_only_for_its_own_value(self):
         for value in self.predicate_of_value:
@@ -908,6 +958,7 @@ class TestScalar:
             operator.lt,
             operator.le,
             operator.eq,
+            operator.ne,
             operator.ge,
             operator.gt,
         ]
@@ -918,8 +969,8 @@ class TestScalar:
         for f in operators:
             r_np = f(f1, f2)
             r_cas = f(e1_cas, e2_cas)
-            assert isinstance(r_cas, bool), f"{f.__name__} result is not Scalar"
-            assert r_np == r_cas, f"{f.__name__} result is wrong"
+            assert isinstance(r_cas, sm.Scalar), f"{f.__name__} result is not Scalar"
+            assert bool(r_cas) == r_np, f"{f.__name__} result is wrong"
 
     def test_comparisons_with_variable(self):
         operators = [
@@ -1583,3 +1634,152 @@ class TestMatrix:
         assert isinstance(m[2, :], sm.Vector)
         assert np.allclose(m[:2, :2], np.eye(2))
         assert isinstance(m[:2, :2], sm.Matrix)
+
+
+# %% JSON serialization
+
+
+def scalar_expression(x: sm.FloatVariable, y: sm.FloatVariable) -> sm.Scalar:
+    return sm.sin(x) * y + x
+
+
+def vector_expression(x: sm.FloatVariable, y: sm.FloatVariable) -> sm.Vector:
+    return sm.Vector([x, y * 2, 3])
+
+
+def matrix_expression(x: sm.FloatVariable, y: sm.FloatVariable) -> sm.Matrix:
+    return sm.Matrix([[x, y], [x * y, 1]])
+
+
+class TestJsonSerialization:
+    """
+    A symbolic math value round-trips through JSON, and the variables it depends on come
+    back as the variables they were while those still exist.
+    """
+
+    @pytest.mark.parametrize(
+        "constant",
+        [
+            sm.Scalar(1.5),
+            sm.Vector([1, 2]),
+            sm.Matrix([[1, 2], [3, 4]]),
+            sm.Matrix([[1, 2]]),
+        ],
+        ids=["scalar", "vector", "matrix", "row matrix"],
+    )
+    def test_constant_round_trips(self, constant: sm.SymbolicMathType):
+        constant_copy = from_json(to_json(constant))
+
+        assert type(constant_copy) is type(constant)
+        assert constant_copy.shape == constant.shape
+        assert np.array_equal(constant_copy.to_np(), constant.to_np())
+
+    def test_variable_round_trips_to_itself(self):
+        variable = sm.FloatVariable("x")
+
+        assert from_json(to_json(variable)) is variable
+
+    def test_variable_without_a_living_original_is_recreated(self):
+        variable = sm.FloatVariable("x")
+        variable_json = to_json(variable)
+        variable_id, variable_name = variable.id, variable.name
+        del variable
+        gc.collect()
+
+        variable_copy = from_json(variable_json)
+
+        assert type(variable_copy) is sm.FloatVariable
+        assert variable_copy.id == variable_id
+        assert variable_copy.name == variable_name
+
+    @pytest.mark.parametrize(
+        "build_expression",
+        [scalar_expression, vector_expression, matrix_expression],
+        ids=["scalar", "vector", "matrix"],
+    )
+    def test_expression_round_trips(self, build_expression):
+        x, y = sm.FloatVariable("x"), sm.FloatVariable("y")
+        expression = build_expression(x, y)
+        values = [2.0, 3.0]
+
+        expression_copy = from_json(to_json(expression))
+
+        assert type(expression_copy) is type(expression)
+        assert expression_copy.shape == expression.shape
+        assert {id(variable) for variable in expression_copy.free_variables()} == {
+            id(x),
+            id(y),
+        }
+        assert np.array_equal(
+            expression_copy.substitute([x, y], values).to_np(),
+            expression.substitute([x, y], values).to_np(),
+        )
+
+    def test_variables_sharing_a_name_stay_apart(self):
+        first, second = sm.FloatVariable("x"), sm.FloatVariable("x")
+        expression = sm.Vector([first, second * 2])
+        values = [2.0, 3.0]
+
+        expression_copy = from_json(to_json(expression))
+
+        assert np.array_equal(
+            expression_copy.substitute([first, second], values).to_np(),
+            expression.substitute([first, second], values).to_np(),
+        )
+
+    def test_recreated_variables_sharing_a_name_stay_apart(self):
+        first, second = sm.FloatVariable("x"), sm.FloatVariable("x")
+        expression = sm.Vector([first, second * 2])
+        values = [2.0, 3.0]
+        expected = expression.substitute([first, second], values).to_np()
+        expression_json = to_json(expression)
+        first_id, second_id = first.id, second.id
+        originals = [weakref.ref(first), weakref.ref(second)]
+        del first, second, expression
+        gc.collect()
+        assert [original() for original in originals] == [None, None]
+
+        expression_copy = from_json(expression_json)
+
+        variables_by_id = {
+            variable.id: variable for variable in expression_copy.free_variables()
+        }
+        assert variables_by_id.keys() == {first_id, second_id}
+        assert np.array_equal(
+            expression_copy.substitute(
+                [variables_by_id[first_id], variables_by_id[second_id]], values
+            ).to_np(),
+            expected,
+        )
+
+    def test_expression_keeps_shared_subexpressions(self):
+        x, y = sm.FloatVariable("x"), sm.FloatVariable("y")
+        shared = x * y
+        expression = sm.Vector([sm.sin(shared), sm.cos(shared)])
+
+        expression_copy = from_json(to_json(expression))
+
+        assert ca.n_nodes(expression_copy.casadi_sx) == ca.n_nodes(expression.casadi_sx)
+
+    def test_variable_shared_by_two_expressions_is_deserialized_once(self):
+        variable = sm.FloatVariable("x")
+        expressions_json = to_json([variable + 1, variable * 2])
+        del variable
+        gc.collect()
+
+        first, second = from_json(
+            expressions_json, **sm.FloatVariableTracker().create_kwargs()
+        )
+
+        (first_variable,) = first.free_variables()
+        (second_variable,) = second.free_variables()
+        assert first_variable is second_variable
+
+    def test_error_holding_a_variable_round_trips_it(self):
+        variable = sm.FloatVariable("x")
+
+        error_copy = from_json(
+            to_json(FloatVariableAlreadyHasResolveError(variable=variable))
+        )
+
+        assert error_copy.variable is variable
