@@ -221,6 +221,55 @@ class CameraInterface(object):
             ),
         )
 
+    @staticmethod
+    def camera_info_from_camera_model(
+        camera_model: PinholeCameraModel,
+        frame_id: str,
+    ) -> CameraInfo:
+        """Convert a semantic pinhole model into ROS camera calibration.
+
+        :param camera_model: Effective pinhole calibration of an image stream.
+        :param frame_id: Optical frame stored in the ROS message header.
+        :return: ROS camera-info message matching the semantic model.
+        """
+        camera_info = CameraInfo()
+        camera_info.header.frame_id = frame_id
+        camera_info.width = camera_model.resolution.width
+        camera_info.height = camera_model.resolution.height
+        if camera_model.distortion.model == CameraDistortionModel.NONE:
+            camera_info.distortion_model = CameraDistortionModel.PLUMB_BOB.value
+            camera_info.d = [0.0] * CameraDistortionModel.PLUMB_BOB.coefficient_count
+        else:
+            camera_info.distortion_model = camera_model.distortion.model.value
+            camera_info.d = list(camera_model.distortion.coefficients)
+        camera_info.k = [
+            camera_model.focal_length_x,
+            0.0,
+            camera_model.principal_point_x,
+            0.0,
+            camera_model.focal_length_y,
+            camera_model.principal_point_y,
+            0.0,
+            0.0,
+            1.0,
+        ]
+        camera_info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        camera_info.p = [
+            camera_model.focal_length_x,
+            0.0,
+            camera_model.principal_point_x,
+            0.0,
+            0.0,
+            camera_model.focal_length_y,
+            camera_model.principal_point_y,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+        ]
+        return camera_info
+
     def store_camera_observation(
         self,
         cas: CAS,

@@ -161,6 +161,25 @@ def test_camera_info_conversion_preserves_effective_calibration(
     assert camera_model.distortion.coefficients == tuple(camera_info.d)
 
 
+def test_camera_model_conversion_preserves_ros_calibration(
+    camera_info: CameraInfo,
+) -> None:
+    """The reverse conversion recreates the ROS calibration values."""
+    camera_model = CameraInterface.camera_model_from_camera_info(camera_info)
+
+    converted_info = CameraInterface.camera_info_from_camera_model(
+        camera_model,
+        frame_id=camera_info.header.frame_id,
+    )
+
+    assert converted_info.header.frame_id == camera_info.header.frame_id
+    assert converted_info.width == camera_info.width
+    assert converted_info.height == camera_info.height
+    assert converted_info.distortion_model == camera_info.distortion_model
+    assert converted_info.d == camera_info.d
+    np.testing.assert_allclose(converted_info.k, camera_info.k)
+
+
 # %% Semantic camera resolution
 
 

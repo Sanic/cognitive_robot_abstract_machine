@@ -53,6 +53,61 @@ class UnknownMode(RoboKudoError, ValueError):
         return "use one of the modes supported by this component."
 
 
+# %% Semantic robot selection
+
+
+@dataclass
+class RobotAnnotationMissing(RoboKudoError):
+    """
+    Raised when no semantic robot matches the runtime-world selection.
+    """
+
+    robot_name: str | None = None
+    """
+    Requested robot name, or ``None`` when no name was configured.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing robot selection.
+        """
+        if self.robot_name is None:
+            return (
+                "The runtime Semantic Digital Twin world contains no robot annotation."
+            )
+        return f"No robot annotation named '{self.robot_name}' exists in the runtime world."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to make a runtime robot selectable.
+        """
+        return "synchronize a robot into the runtime world or select an existing robot."
+
+
+@dataclass
+class RobotAnnotationAmbiguous(RoboKudoError):
+    """
+    Raised when runtime-world robot selection has multiple valid results.
+    """
+
+    robot_names: tuple[str, ...]
+    """
+    Names of robot annotations that satisfy the selection.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the ambiguous robot selection.
+        """
+        return f"Robot selection is ambiguous between {self.robot_names}."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to select one runtime robot.
+        """
+        return "configure the name of the robot whose default camera should be used."
+
+
 # %% Semantic camera selection
 
 
