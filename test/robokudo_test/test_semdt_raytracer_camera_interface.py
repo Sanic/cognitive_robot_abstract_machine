@@ -61,7 +61,7 @@ def test_interface_publishes_effective_model_for_field_of_view_camera():
     interface.set_data(cas)
 
     assert cas.camera_observation.camera is context.camera
-    assert cas.camera_observation.camera_model.resolution is resolution
+    assert cas.camera_observation.effective_camera_model.resolution is resolution
     assert np.isclose(
         cas.camera_observation.field_of_view.horizontal_angle,
         native_field_of_view.horizontal_angle,

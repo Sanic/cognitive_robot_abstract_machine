@@ -25,7 +25,6 @@ from robokudo.exceptions import ColorToDepthRatioMissing
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
-from robokudo.utils.o3d_helper import scale_o3d_camera_intrinsics
 from robokudo.utils.transform import (
     get_transform_matrix_from_q,
     get_translation_from_transform_matrix,
@@ -145,15 +144,10 @@ def get_camera_to_world_transform_matrix(cas: CAS) -> npt.NDArray:
 
     :param cas: CAS containing camera-to-world transform
     :return: 4x4 camera-to-world transform matrix
-    :raises KeyError: If camera-to-world transform not in CAS
+    :raises CameraObservationMissing: If the CAS has no camera observation.
+    :raises CameraPoseMissing: If the observation has no sampled pose.
     """
-    if cas.camera_to_world_transform is None:
-        raise KeyError(
-            "Camera-to-world transform not found in CAS. "
-            "Is lookup_viewpoint in camera config set to True? "
-            "Or if reading from a database: Has the data been recorded with lookup_viewpoint set to true?"
-        )
-    return cas.camera_to_world_transform.to_np()
+    return cas.require_camera_observation().world_T_camera_or_raise().to_np()
 
 
 def get_world_to_camera_transform_matrix(cas: CAS) -> npt.NDArray:
@@ -162,11 +156,10 @@ def get_world_to_camera_transform_matrix(cas: CAS) -> npt.NDArray:
 
     :param cas: CAS containing camera-to-world transform
     :return: 4x4 world-to-camera transform matrix
-    :raises KeyError: If camera-to-world transform not in CAS
+    :raises CameraObservationMissing: If the CAS has no camera observation.
+    :raises CameraPoseMissing: If the observation has no sampled pose.
     """
-    world_to_camera_transform = np.linalg.inv(get_camera_to_world_transform_matrix(cas))
-
-    return world_to_camera_transform
+    return cas.require_camera_observation().camera_T_world.to_np()
 
 
 def draw_bounding_boxes_from_object_hypotheses(
@@ -201,28 +194,6 @@ def draw_bounding_boxes_from_object_hypotheses(
             (oh_roi.pos.x + oh_roi.width, oh_roi.pos.y + oh_roi.height),
             (0, 0, 255),
             2,
-        )
-
-
-def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
-    """
-    Scale camera intrinsics based on color-to-depth ratio.
-
-    If the color2depth ratio is not 1,1, we will usually scale the color image to the
-    same size the depth image has. This also requires an adjustment of the camera
-    intrinsics.
-
-    If color2depth ratio is not 1,1, we'll scale the camera intrinsics in annotator. You
-    need to have a self.camera_intrinsics variable!
-
-    :param annotator: Annotator containing camera parameters
-    """
-    color2depth_ratio = annotator.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-    c2d_ratio_x = color2depth_ratio[0]
-    c2d_ratio_y = color2depth_ratio[1]
-    if color2depth_ratio != (1, 1):
-        annotator.camera_intrinsics = scale_o3d_camera_intrinsics(
-            annotator.camera_intrinsics, c2d_ratio_x, c2d_ratio_y
         )
 
 

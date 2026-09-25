@@ -19,6 +19,8 @@ import json
 import pathlib
 import re
 import warnings
+from decimal import Decimal
+from enum import StrEnum
 from pathlib import Path
 
 import ament_index_python.packages
@@ -27,12 +29,17 @@ from typing_extensions import Any, Dict, List, Optional, TypeVar
 
 from robokudo.cas import CAS, CASViews
 from robokudo.io.camera_interface import CameraInterface
-from robokudo.utils.type_conversion import (
-    o3d_camera_intrinsics_from_ros_camera_info,
-    ros_camera_info_from_dict,
-)
+from robokudo.utils.type_conversion import ros_camera_info_from_dict
+from semantic_digital_twin.datastructures.camera_model import CameraModality
 
 T = TypeVar("T")
+
+
+class FileFrameField(StrEnum):
+    """Name metadata stored beside one loaded file frame."""
+
+    TIMESTAMP_NANOSECONDS = "timestamp_nanoseconds"
+    """Timestamp parsed from the shared filename prefix."""
 
 
 class FileReaderInterface(CameraInterface):
@@ -169,7 +176,7 @@ class FileReaderInterface(CameraInterface):
         else:
             if not camera_config.target_dir:
                 raise Exception(
-                    f"FileReaderInterface: target_ros_package AND target_dir not properly set. Check CameraConfig"
+                    "FileReaderInterface: target_ros_package AND target_dir not properly set. Check CameraConfig"
                 )
 
             self.target_dir: str = camera_config.target_dir
@@ -207,7 +214,11 @@ class FileReaderInterface(CameraInterface):
             matched_data_type = regexp_result.groups()[1]
             if matched_timestamp not in self.loaded_paths:
                 self.loaded_paths[matched_timestamp] = dict()
-                self.loaded_data[matched_timestamp] = dict()
+                self.loaded_data[matched_timestamp] = {
+                    FileFrameField.TIMESTAMP_NANOSECONDS: int(
+                        Decimal(matched_timestamp)
+                    )
+                }
 
             self.loaded_paths[matched_timestamp][matched_data_type] = file_path
 
@@ -279,6 +290,8 @@ class RGBDFileReaderInterface(FileReaderInterface):
         :param cas: Common Analysis Structure to update
         """
         data = self.data_reader.get_next_data()
+        if data is None:
+            return
 
         cas.set(CASViews.COLOR_IMAGE, data[CASViews.COLOR_IMAGE])
         cas.set(CASViews.DEPTH_IMAGE, data[CASViews.DEPTH_IMAGE])
@@ -288,9 +301,22 @@ class RGBDFileReaderInterface(FileReaderInterface):
             camera_info.height = 960  # Kinect hack ...
         cas.set(CASViews.CAMERA_INFO, camera_info)
 
-        cas.set(
-            CASViews.CAMERA_INTRINSIC,
-            o3d_camera_intrinsics_from_ros_camera_info(data[CASViews.CAMERA_INFO]),
-        )
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
-        self.store_static_camera_transform_if_configured(cas)
+        world_T_camera = self.static_world_T_camera_if_configured()
+        timestamp_nanoseconds = (
+            camera_info.header.stamp.sec * 1_000_000_000
+            + camera_info.header.stamp.nanosec
+        )
+        if timestamp_nanoseconds == 0:
+            timestamp_nanoseconds = data[FileFrameField.TIMESTAMP_NANOSECONDS]
+        camera_frame = camera_info.header.frame_id or self.camera_config.tf_from
+        if world_T_camera is not None and world_T_camera.child_frame is not None:
+            camera_frame = world_T_camera.child_frame.name.name
+        self.store_camera_observation(
+            cas=cas,
+            camera_info=camera_info,
+            camera_frame=camera_frame,
+            timestamp_nanoseconds=timestamp_nanoseconds,
+            modalities=(CameraModality.COLOR, CameraModality.DEPTH),
+            world_T_camera=world_T_camera,
+        )

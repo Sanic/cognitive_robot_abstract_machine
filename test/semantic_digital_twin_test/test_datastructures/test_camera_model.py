@@ -80,6 +80,48 @@ def test_pinhole_camera_model_rejects_nonpositive_focal_length():
         )
 
 
+def test_pinhole_camera_model_exposes_intrinsic_matrix():
+    model = PinholeCameraModel(
+        image_resolution=CameraResolution(width=640, height=480),
+        focal_length_x=500.0,
+        focal_length_y=510.0,
+        principal_point_x=321.0,
+        principal_point_y=239.0,
+    )
+
+    assert np.array_equal(
+        model.intrinsic_matrix,
+        np.array(
+            [
+                [model.focal_length_x, 0.0, model.principal_point_x],
+                [0.0, model.focal_length_y, model.principal_point_y],
+                [0.0, 0.0, 1.0],
+            ]
+        ),
+    )
+
+
+def test_pinhole_camera_model_scales_projection_and_preserves_distortion():
+    distortion = PlumbBobCameraDistortion(radial_coefficient_1=0.1)
+    model = PinholeCameraModel(
+        image_resolution=CameraResolution(width=640, height=480),
+        focal_length_x=500.0,
+        focal_length_y=510.0,
+        principal_point_x=321.0,
+        principal_point_y=239.0,
+        distortion=distortion,
+    )
+
+    scaled_model = model.scaled(scale_x=0.5, scale_y=0.25)
+
+    assert scaled_model.resolution == CameraResolution(width=320, height=120)
+    assert scaled_model.focal_length_x == model.focal_length_x * 0.5
+    assert scaled_model.focal_length_y == model.focal_length_y * 0.25
+    assert scaled_model.principal_point_x == model.principal_point_x * 0.5
+    assert scaled_model.principal_point_y == model.principal_point_y * 0.25
+    assert scaled_model.distortion is distortion
+
+
 def test_camera_range_rejects_empty_interval():
     with pytest.raises(InvalidCameraRangeError):
         CameraRange(minimum_distance=1.0, maximum_distance=1.0)

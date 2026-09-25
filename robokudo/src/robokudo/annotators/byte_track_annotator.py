@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 
 import numpy as np
-import open3d as o3d
 import supervision as sv
 from py_trees.common import Status
 from supervision.config import CLASS_NAME_DATA_FIELD
@@ -50,8 +49,9 @@ class ByteTrackAnnotator(BaseAnnotator):
 
     def update(self) -> Status:
         cas = self.get_cas()
+        observation = cas.require_camera_observation()
 
-        data_ts = cas.get(CASViews.DATA_TIMESTAMP)
+        data_ts = observation.timestamp_nanoseconds
         if data_ts < self.last_ts:
             # This is expected when looping data
             self.rk_logger.debug("Time moved backward, resetting tracker.")
@@ -76,15 +76,15 @@ class ByteTrackAnnotator(BaseAnnotator):
         masks = [oh.roi.mask for oh in ohs]
         masks = list(filter(lambda m: m is not None, masks))
         if len(masks) == len(rois_xyxy):
-            camera_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
-                CASViews.CAMERA_INTRINSIC
-            )
-
             # Masks must be restored to full color image size
             restored_masks = []
             for roi, mask in zip(rois_xyxy, masks):
                 restored_mask = np.zeros(
-                    (camera_intrinsic.height, camera_intrinsic.width), dtype=np.uint8
+                    (
+                        observation.resolution.height,
+                        observation.resolution.width,
+                    ),
+                    dtype=np.uint8,
                 )
                 restored_mask[roi[1] : roi[3], roi[0] : roi[2]] = mask
                 restored_masks.append(restored_mask)

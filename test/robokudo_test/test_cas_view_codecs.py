@@ -104,7 +104,7 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     )
     observation = CameraObservation(
         camera=camera,
-        camera_model=camera_model,
+        effective_camera_model=camera_model,
         world_T_camera=root.global_transform if has_world_pose else None,
         timestamp_nanoseconds=123,
     )
@@ -115,7 +115,7 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
 
     assert decoded_name == "camera_observation"
     assert decoded_observation.camera is camera
-    assert decoded_observation.camera_model == camera_model
+    assert decoded_observation.effective_camera_model == camera_model
     if has_world_pose:
         np.testing.assert_allclose(
             decoded_observation.world_T_camera.to_np(),

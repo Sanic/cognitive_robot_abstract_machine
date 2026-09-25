@@ -21,7 +21,6 @@ from robokudo.exceptions import (
     PointCloudThresholdError,
     PointCloudThresholdRelation,
     PointCloudTooSmallForClustering,
-    StoredCameraTransformFrameMetadataMissing,
     UnknownMode,
     WorldDescriptorBootstrapError,
     WorldDescriptorLoadError,
@@ -119,16 +118,6 @@ class TestRoboKudoExceptions:
         assert "Unsupported dtype for ROS image conversion" in str(exception)
         assert "dtype=bool" in str(exception)
         assert "channels=1" in str(exception)
-
-    def test_stored_camera_transform_frame_metadata_missing_message(self):
-        exception = StoredCameraTransformFrameMetadataMissing()
-
-        assert "CAMERA_TO_WORLD_TRANSFORM is missing frame-name metadata" in str(
-            exception
-        )
-        assert "Recreate the recording with the current storage format" in str(
-            exception
-        )
 
     def test_cas_check_configuration_error_message(self):
         exception = CASCheckConfigurationError(component_name="CASCheckFunc")

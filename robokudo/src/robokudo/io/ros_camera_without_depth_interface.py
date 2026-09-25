@@ -25,7 +25,6 @@ import builtin_interfaces.msg
 import cv2
 import message_filters
 import numpy as np
-import open3d as o3d
 from message_filters import Subscriber
 from sensor_msgs.msg import CameraInfo, Image
 from typing_extensions import Any, Tuple, TYPE_CHECKING, Optional, List
@@ -94,9 +93,6 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
         self.camera_info: Optional[CameraInfo] = None
         """Latest camera calibration info"""
-
-        self.camera_intrinsic: Optional[o3d.camera.PinholeCameraIntrinsic] = None
-        """Camera intrinsic parameters in Open3D format"""
 
         self.color2depth_ratio: Optional[Tuple[float, float]] = (1.0, 1.0)
         """Always (1.0, 1.0) since no depth data"""
@@ -280,8 +276,6 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
         self.lock.acquire()
 
-        # Construct o3d camera intrinsics from camera info in CAS
-        self.camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
         width = self.camera_info.width
         height = self.camera_info.height
 
@@ -289,9 +283,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cx = self.camera_info.k[2]
         fy = self.camera_info.k[4]
         cy = self.camera_info.k[5]
-        if self.camera_config.rotate_image is None:
-            self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
-        else:
+        if self.camera_config.rotate_image is not None:
             # Rotate the image as desired AND fix camera parameters.
             K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
             # 1) calculate camera intrinsics
@@ -313,7 +305,6 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
                 distortion_model=self.camera_info.distortion_model,
                 rotation=self.camera_config.rotate_image,
             )
-            self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
 
         self.camera_info.width = width
         self.camera_info.height = height
@@ -321,9 +312,8 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, None)
         cas.set(CASViews.CAMERA_INFO, self.camera_info)
-        cas.set(CASViews.CAMERA_INTRINSIC, self.camera_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, (1, 1))
-        self.store_camera_to_world_transform_from_tf(cas, self.timestamp)
+        world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
         self.store_camera_observation(
             cas=cas,
@@ -333,6 +323,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
                 self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec
             ),
             modalities=(CameraModality.COLOR,),
+            world_T_camera=world_T_camera,
         )
 
         self._has_new_data = False

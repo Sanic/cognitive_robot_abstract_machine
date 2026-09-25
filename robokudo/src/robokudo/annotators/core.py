@@ -27,6 +27,7 @@ from concurrent.futures import Future
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
+from builtin_interfaces.msg import Time
 from sensor_msgs.msg import JointState
 from typing_extensions import (
     Any,
@@ -431,7 +432,7 @@ class BaseAnnotator(Behaviour):
         """
         try:
             self.published_variables[name] = value
-        except Exception as e:
+        except Exception:
             pass
 
     def setup_done_for_published_variables(self) -> bool:
@@ -458,9 +459,13 @@ class BaseAnnotator(Behaviour):
 
             # Create a joint state message to have a common data structure for all values
             msg = JointState()
-            msg.header.stamp = (
-                self.get_cas().get(CASViews.CAMERA_INFO).header.stamp
-            )  # This is always the time of recording the data.
+            timestamp_nanoseconds = (
+                self.get_cas().require_camera_observation().timestamp_nanoseconds
+            )
+            msg.header.stamp = Time(
+                sec=int(timestamp_nanoseconds // 1_000_000_000),
+                nanosec=int(timestamp_nanoseconds % 1_000_000_000),
+            )
 
             # msg.header.stamp = rospy.Time(self.get_cas().timestamp) # This might be the current time!
             for key, value in self.published_variables.items():

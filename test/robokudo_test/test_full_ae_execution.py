@@ -291,7 +291,10 @@ class TestFullAEExecution(object):
         assert tree_result is py_trees.common.Status.SUCCESS
 
         camera_observation = seq.cas.camera_observation
-        assert camera_observation.camera_model is camera_observation.camera.camera_model
+        assert (
+            camera_observation.effective_camera_model
+            is camera_observation.camera.camera_model
+        )
         assert camera_observation.camera in (
             seq.cas.ground_truth_world_ref.get_semantic_annotations_by_type(Camera)
         )

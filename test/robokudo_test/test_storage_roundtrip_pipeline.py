@@ -25,7 +25,6 @@ from robokudo.io.storage import Storage
 from robokudo.pipeline import Pipeline
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
-
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
     reason="module temporarily disabled until storage functionality is migrated to ormatic",
@@ -136,13 +135,15 @@ class TestStorageRoundtripPipeline:
                 reader_camera_info
             )
 
-            writer_camera_intrinsic = writer_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
-            reader_camera_intrinsic = reader_pipeline.cas.get(CASViews.CAMERA_INTRINSIC)
-            assert writer_camera_intrinsic.width == reader_camera_intrinsic.width
-            assert writer_camera_intrinsic.height == reader_camera_intrinsic.height
-            np.testing.assert_allclose(
-                writer_camera_intrinsic.intrinsic_matrix,
-                reader_camera_intrinsic.intrinsic_matrix,
+            writer_observation = writer_pipeline.cas.require_camera_observation()
+            reader_observation = reader_pipeline.cas.require_camera_observation()
+            assert (
+                writer_observation.effective_camera_model
+                == reader_observation.effective_camera_model
+            )
+            assert (
+                writer_observation.timestamp_nanoseconds
+                == reader_observation.timestamp_nanoseconds
             )
 
             assert writer_pipeline.cas.get(CASViews.COLOR2DEPTH_RATIO) == (

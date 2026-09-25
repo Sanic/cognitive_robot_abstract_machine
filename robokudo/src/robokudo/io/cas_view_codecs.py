@@ -19,7 +19,6 @@ from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.cas_annotation_codecs import krrood_to_json, krrood_from_json
 from robokudo.types.camera import CameraObservation
 from robokudo.io.open3d_codec_utils import (
-    o3d,
     is_open3d_point_cloud,
     encode_open3d_point_cloud_to_base64_pcd,
     decode_open3d_point_cloud_from_base64_pcd,
@@ -115,20 +114,6 @@ def _load_type(type_name: str) -> type[Any]:
     module_name, class_name = type_name.rsplit(".", 1)
     module = importlib.import_module(module_name)
     return getattr(module, class_name)
-
-
-def _is_open3d_pinhole_camera_intrinsic(value: Any) -> bool:
-    """
-    Check whether a value is an Open3D pinhole camera intrinsic object.
-    """
-    value_type = value.__class__
-    return (
-        value_type.__name__ == "PinholeCameraIntrinsic"
-        and value_type.__module__.startswith("open3d.")
-        and hasattr(value, "intrinsic_matrix")
-        and hasattr(value, "width")
-        and hasattr(value, "height")
-    )
 
 
 @dataclass
@@ -380,69 +365,6 @@ class Open3DPointCloudCodec(ViewCodec):
         return decode_open3d_point_cloud_from_base64_pcd(payload.payload)
 
 
-class Open3DPinholeCameraIntrinsicCodec(ViewCodec):
-    """
-    Codec for Open3D pinhole camera intrinsic values.
-    """
-
-    serializer_id: str = "open3d_pinhole_camera_intrinsic_v1"
-
-    def can_encode(self, value: Any) -> bool:
-        """
-        Check whether the value is an Open3D pinhole camera intrinsic.
-        """
-        return _is_open3d_pinhole_camera_intrinsic(value)
-
-    def encode(self, value: Any) -> ViewPayload:
-        """
-        Encode an Open3D pinhole intrinsic into JSON-compatible payload data.
-        """
-        intrinsic_matrix = np.asarray(value.intrinsic_matrix, dtype=float)
-        if intrinsic_matrix.shape != (3, 3):
-            raise ValueError(
-                "Open3D pinhole camera intrinsic matrix must have shape (3, 3)."
-            )
-        return ViewPayload(
-            serializer_id=self.serializer_id,
-            payload={
-                "width": int(value.width),
-                "height": int(value.height),
-                "intrinsic_matrix": intrinsic_matrix.tolist(),
-            },
-            type_name=_full_type_name(value),
-        )
-
-    def decode(self, payload: ViewPayload) -> Any:
-        """
-        Decode payload data to an Open3D pinhole intrinsic object.
-        """
-        payload_data: Dict[str, Any] = payload.payload
-        width = int(payload_data["width"])
-        height = int(payload_data["height"])
-        intrinsic_matrix = np.asarray(payload_data["intrinsic_matrix"], dtype=float)
-        if intrinsic_matrix.shape != (3, 3):
-            raise ValueError(
-                "Serialized Open3D camera intrinsic matrix must have shape (3, 3)."
-            )
-
-        fx = float(intrinsic_matrix[0, 0])
-        fy = float(intrinsic_matrix[1, 1])
-        cx = float(intrinsic_matrix[0, 2])
-        cy = float(intrinsic_matrix[1, 2])
-
-        try:
-            camera_intrinsic_type = _load_type(payload.type_name)
-        except Exception:  # pragma: no cover - fallback for cpu/cuda module differences
-            camera_intrinsic_type = o3d.camera.PinholeCameraIntrinsic
-
-        try:
-            return camera_intrinsic_type(width, height, fx, fy, cx, cy)
-        except Exception:
-            camera_intrinsic = camera_intrinsic_type()
-            camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
-            return camera_intrinsic
-
-
 class StampedTransformCodec(ViewCodec):
     """
     Codec for RoboKudo ``StampedTransform`` values.
@@ -537,7 +459,7 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
 class CameraObservationCodec(ViewCodec):
     """Codec for frame metadata containing a semantic camera reference."""
 
-    serializer_id: str = "robokudo_camera_observation_v1"
+    serializer_id: str = "robokudo_camera_observation"
 
     def can_encode(self, value: Any) -> bool:
         """Check whether a value is camera observation metadata."""
@@ -549,7 +471,9 @@ class CameraObservationCodec(ViewCodec):
             serializer_id=self.serializer_id,
             payload={
                 CameraObservationField.CAMERA_ID: str(value.camera.id),
-                CameraObservationField.MODEL: krrood_to_json(value.camera_model),
+                CameraObservationField.MODEL: krrood_to_json(
+                    value.effective_camera_model
+                ),
                 CameraObservationField.WORLD_T_CAMERA: (
                     value.world_T_camera.to_json()
                     if value.world_T_camera is not None
@@ -584,7 +508,7 @@ class CameraObservationCodec(ViewCodec):
         )
         return CameraObservation(
             camera=camera,
-            camera_model=camera_model,
+            effective_camera_model=camera_model,
             world_T_camera=world_T_camera,
             timestamp_nanoseconds=int(
                 payload.payload[CameraObservationField.TIMESTAMP]
@@ -598,7 +522,7 @@ class CameraObservationField(StrEnum):
     CAMERA_ID = "camera_id"
     """Identifier of the semantic camera."""
 
-    MODEL = "camera_model"
+    MODEL = "effective_camera_model"
     """Effective projection model."""
 
     WORLD_T_CAMERA = "world_T_camera"
@@ -662,7 +586,6 @@ class CASViewCodecRegistry:
                 BytesCodec(),
                 NumpyCodec(),
                 Open3DPointCloudCodec(),
-                Open3DPinholeCameraIntrinsicCodec(),
                 StampedTransformCodec(),
                 CameraObservationCodec(),
                 HomogeneousTransformationMatrixCodec(),

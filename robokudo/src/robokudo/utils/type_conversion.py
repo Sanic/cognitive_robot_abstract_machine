@@ -239,27 +239,6 @@ def get_o3d_obb_from_bounding_box_annotation(
     return get_obb_from_size_and_transform(bb_size, transform_matrix)
 
 
-def o3d_camera_intrinsics_from_ros_camera_info(
-    camera_info: CameraInfo,
-) -> o3d.camera.PinholeCameraIntrinsic:
-    """
-    Convert ROS CameraInfo to Open3D camera intrinsics.
-
-    :param camera_info: ROS camera info message
-    :return: Open3D camera intrinsics
-    """
-    camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
-    width = camera_info.width
-    height = camera_info.height
-    fx = camera_info.k[0]
-    cx = camera_info.k[2]
-    fy = camera_info.k[4]
-    cy = camera_info.k[5]
-    camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
-
-    return camera_intrinsic
-
-
 def convert_ros_to_cv_image(ros_image: Image) -> npt.NDArray:
     """
     Convert ROS image message to OpenCV image.

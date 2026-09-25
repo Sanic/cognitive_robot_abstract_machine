@@ -28,9 +28,6 @@ from robokudo.io.camera_interface import CameraInterface
 from robokudo.cas import CASViews
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.exceptions import CameraDataMissing, InvalidCameraObservation
-from robokudo.utils.type_conversion import (
-    o3d_camera_intrinsics_from_ros_camera_info,
-)
 from semantic_digital_twin.datastructures.camera_model import CameraModality
 
 import cv2
@@ -217,17 +214,13 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
                     f"{image_width}x{image_height}"
                 )
             )
-        camera_intrinsic = o3d_camera_intrinsics_from_ros_camera_info(camera_info)
-
         if self.camera_config.update_global_with_depth_parameter:
             AnnotatorPredefinedParameters.global_with_depth = depth is not None
 
         cas.set(CASViews.COLOR_IMAGE, color)
         cas.set(CASViews.DEPTH_IMAGE, depth)
         cas.set(CASViews.CAMERA_INFO, camera_info)
-        cas.set(CASViews.CAMERA_INTRINSIC, camera_intrinsic)
         cas.set(CASViews.COLOR2DEPTH_RATIO, color2depth_ratio)
-        cas.data_timestamp = timestamp_nanoseconds
         camera_frame = camera_info.header.frame_id or self.camera_config.camera_frame
         modalities = (
             (CameraModality.COLOR, CameraModality.DEPTH)
@@ -240,4 +233,5 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
             camera_frame=camera_frame,
             timestamp_nanoseconds=timestamp_nanoseconds,
             modalities=modalities,
+            world_T_camera=None,
         )

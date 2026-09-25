@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import copy
 import time
-import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
@@ -37,12 +36,10 @@ from typing_extensions import (
     TypeVar,
 )
 
-from robokudo.types.tf import StampedTransform
+from robokudo.exceptions import CameraObservationMissing
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.spatial_types.spatial_types import (
-        HomogeneousTransformationMatrix,
-    )
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
     from semantic_digital_twin.world import World
 
     from robokudo.types.core import Annotation
@@ -72,41 +69,17 @@ class CASViews(StrEnum):
     CAMERA_INFO = "cam_info"
     """ROS camera info message coming from ROS"""
 
-    CAMERA_INTRINSIC = "cam_intrinsic"
-    """Open3D pinhole camera intrinsic model for RGB to be set by the camera driver."""
-
     CAMERA_OBSERVATION = "camera_observation"
     """Semantic camera and effective projection metadata for the current frame."""
 
-    POINTCLOUD_CAMERA_INTRINSIC = "pc_cam_intrinsic"
-    """Camera intrinsic that has been used for point cloud generation. This can be different, 
-    because depth and RGB resolutions might mismatch."""
+    POINTCLOUD_CAMERA_MODEL = "pointcloud_camera_model"
+    """Effective pinhole model used to generate the current point cloud."""
 
     CLOUD = "cloud"
     """Point cloud data"""
 
     QUERY = "query"
     """Query information"""
-
-    WORLD_FRAME = "world_frame"
-    """Name of the world frame."""
-
-    CAMERA_FRAME = "camera_frame"
-    """Name of the camera frame."""
-
-    VIEWPOINT_CAMERA_TO_WORLD = "viewpoint_cam_to_world"
-    """Deprecated: Use CAMERA_TO_WORLD_TRANSFORM instead.
-    Camera to world transform.
-    Type: robokudo.types.tf.StampedTransform"""
-
-    CAMERA_TO_WORLD_TRANSFORM = "cam_to_world_transform"
-    """Camera to world. 
-    Type: semantic_digital_twin.spatial_types.spatial_types.HomogeneousTransformationMatrix"""
-
-    DATA_TIMESTAMP = "data_timestamp"
-    """Nanoseconds since epoch at which the sensor data has been received.
-    type: Int
-    """
 
     CAS_ID = "cas_id"
     """Monotonic ID of the CAS instance within a single pipeline run.
@@ -199,14 +172,6 @@ class CAS:
         self.views[CASViews.CAMERA_INFO] = value
 
     @property
-    def camera_intrinsic(self) -> Optional[o3d.camera.PinholeCameraIntrinsic]:
-        return self.views.get(CASViews.CAMERA_INTRINSIC)
-
-    @camera_intrinsic.setter
-    def camera_intrinsic(self, value: o3d.camera.PinholeCameraIntrinsic) -> None:
-        self.views[CASViews.CAMERA_INTRINSIC] = value
-
-    @property
     def camera_observation(self) -> Optional[CameraObservation]:
         """Return the semantic camera metadata for the current frame."""
         return self.views.get(CASViews.CAMERA_OBSERVATION)
@@ -216,17 +181,26 @@ class CAS:
         """Store camera metadata by reference to preserve semantic identity."""
         self.views[CASViews.CAMERA_OBSERVATION] = value
 
-    @property
-    def pointcloud_camera_intrinsic(
-        self,
-    ) -> Optional[o3d.camera.PinholeCameraIntrinsic]:
-        return self.views.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
+    def require_camera_observation(self) -> CameraObservation:
+        """Return camera metadata required by frame-dependent processing.
 
-    @pointcloud_camera_intrinsic.setter
-    def pointcloud_camera_intrinsic(
-        self, value: o3d.camera.PinholeCameraIntrinsic
-    ) -> None:
-        self.views[CASViews.POINTCLOUD_CAMERA_INTRINSIC] = value
+        :return: Camera observation for the current frame.
+        :raises CameraObservationMissing: If no camera interface supplied metadata.
+        """
+        observation = self.camera_observation
+        if observation is None:
+            raise CameraObservationMissing()
+        return observation
+
+    @property
+    def pointcloud_camera_model(self) -> Optional[PinholeCameraModel]:
+        """Return the calibration used to generate the current point cloud."""
+        return self.views.get(CASViews.POINTCLOUD_CAMERA_MODEL)
+
+    @pointcloud_camera_model.setter
+    def pointcloud_camera_model(self, value: PinholeCameraModel) -> None:
+        """Store the calibration used to generate the current point cloud."""
+        self.views[CASViews.POINTCLOUD_CAMERA_MODEL] = value
 
     @property
     def cloud(self) -> Optional[o3d.geometry.PointCloud]:
@@ -235,60 +209,6 @@ class CAS:
     @cloud.setter
     def cloud(self, value: o3d.geometry.PointCloud) -> None:
         self.views[CASViews.CLOUD] = value
-
-    @property
-    def world_frame(self) -> Optional[str]:
-        """Name of the world frame."""
-        return self.views.get(CASViews.WORLD_FRAME)
-
-    @world_frame.setter
-    def world_frame(self, value: str) -> None:
-        self.views[CASViews.WORLD_FRAME] = value
-
-    @property
-    def camera_frame(self) -> Optional[str]:
-        """Name of the camera frame."""
-        return self.views.get(CASViews.CAMERA_FRAME)
-
-    @camera_frame.setter
-    def camera_frame(self, value: str) -> None:
-        self.views[CASViews.CAMERA_FRAME] = value
-
-    @property
-    def viewpoint_camera_to_world(self) -> Optional[StampedTransform]:
-        warnings.warn(
-            "CAS.viewpoint_camera_to_world is deprecated. "
-            "Use CAS.camera_to_world_transform instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.views.get(CASViews.VIEWPOINT_CAMERA_TO_WORLD)
-
-    @viewpoint_camera_to_world.setter
-    def viewpoint_camera_to_world(self, value: StampedTransform) -> None:
-        warnings.warn(
-            "CAS.viewpoint_camera_to_world is deprecated. "
-            "Use CAS.camera_to_world_transform instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self.views[CASViews.VIEWPOINT_CAMERA_TO_WORLD] = value
-
-    @property
-    def camera_to_world_transform(self) -> Optional[HomogeneousTransformationMatrix]:
-        return self.views.get(CASViews.CAMERA_TO_WORLD_TRANSFORM)
-
-    @camera_to_world_transform.setter
-    def camera_to_world_transform(self, value: HomogeneousTransformationMatrix) -> None:
-        self.views[CASViews.CAMERA_TO_WORLD_TRANSFORM] = value
-
-    @property
-    def data_timestamp(self) -> Optional[int]:
-        return self.views.get(CASViews.DATA_TIMESTAMP)
-
-    @data_timestamp.setter
-    def data_timestamp(self, value: int) -> None:
-        self.views[CASViews.DATA_TIMESTAMP] = value
 
     @property
     def query(self) -> Optional[Any]:

@@ -45,11 +45,13 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
         cas = self.get_cas()
         params = self.descriptor.parameters
 
-        CameraInterface.store_camera_to_world_transform_in_cas(
-            cas=cas,
+        world_T_camera = CameraInterface.bind_world_T_camera(
             world_frame=params.world_frame,
             camera_frame=params.camera_frame,
             world_T_camera=params.world_T_camera,
+        )
+        cas.camera_observation = cas.require_camera_observation().with_world_T_camera(
+            world_T_camera
         )
 
         end_timer = default_timer()

@@ -202,6 +202,44 @@ class InvalidCameraObservation(RoboKudoError, TypeError):
 
 
 @dataclass
+class CameraObservationMissing(RoboKudoError):
+    """
+    Raised when processing requires camera metadata for the current frame.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing frame metadata.
+        """
+        return "The CAS contains no camera observation."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to provide frame metadata.
+        """
+        return "run a camera interface before camera-dependent annotators."
+
+
+@dataclass
+class CameraPoseMissing(RoboKudoError):
+    """
+    Raised when camera metadata has no sampled world pose.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing sampled pose.
+        """
+        return "The camera observation contains no camera pose in the world frame."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to provide the sampled pose.
+        """
+        return "configure camera TF or a static camera transform."
+
+
+@dataclass
 class CameraDataMissing(RoboKudoError):
     """
     Raised when a camera callback requires a message that was not provided.
@@ -411,19 +449,6 @@ class CVBridgeUnsupportedTargetEncoding(RoboKudoError, ValueError):
 
     def suggest_correction(self) -> str:
         return "request passthrough, bgr8, 32FC1, or add support for the desired conversion."
-
-
-@dataclass
-class StoredCameraTransformFrameMetadataMissing(RoboKudoError):
-    """
-    Raised when stored camera transform frame metadata is missing.
-    """
-
-    def error_message(self) -> str:
-        return "Stored CAMERA_TO_WORLD_TRANSFORM is missing frame-name metadata."
-
-    def suggest_correction(self) -> str:
-        return "Recreate the recording with the current storage format."
 
 
 @dataclass

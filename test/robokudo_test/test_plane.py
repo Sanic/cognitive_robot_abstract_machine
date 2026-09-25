@@ -17,7 +17,7 @@ from py_trees.common import Status
 
 # robokudo.pipeline must be imported before robokudo.annotators.outputs: importing
 # outputs first trips a circular import between it and robokudo.annotators.core.
-import robokudo.pipeline
+import robokudo.pipeline  # noqa: F401
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap, AnnotatorOutputs
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.cas import CAS, CASViews
@@ -59,7 +59,6 @@ def cas_with_a_noisy_plane() -> CAS:
     cas.set_ref(CASViews.CLOUD, cloud)
     cas.set(CASViews.COLOR_IMAGE, np.zeros((200, 200, 3), dtype=np.uint8))
     cas.set(CASViews.DEPTH_IMAGE, np.zeros((200, 200), dtype=np.uint16))
-    cas.set(CASViews.CAMERA_INTRINSIC, o3d.camera.PinholeCameraIntrinsic())
     return cas
 
 

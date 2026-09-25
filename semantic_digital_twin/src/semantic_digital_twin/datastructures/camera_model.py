@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+import numpy as np
 from typing_extensions import Optional
 
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
@@ -151,6 +152,36 @@ class PinholeCameraModel(CameraModel):
         return FieldOfView(
             horizontal_angle=horizontal_angle,
             vertical_angle=vertical_angle,
+        )
+
+    @property
+    def intrinsic_matrix(self) -> np.ndarray:
+        """Return the pinhole calibration matrix."""
+        return np.array(
+            [
+                [self.focal_length_x, 0.0, self.principal_point_x],
+                [0.0, self.focal_length_y, self.principal_point_y],
+                [0.0, 0.0, 1.0],
+            ]
+        )
+
+    def scaled(self, scale_x: float, scale_y: float) -> PinholeCameraModel:
+        """Return the calibration for an image scaled along both axes.
+
+        :param scale_x: Horizontal image scale.
+        :param scale_y: Vertical image scale.
+        :return: Calibration matching the scaled image.
+        """
+        return PinholeCameraModel(
+            image_resolution=CameraResolution(
+                width=int(self.image_resolution.width * scale_x),
+                height=int(self.image_resolution.height * scale_y),
+            ),
+            focal_length_x=self.focal_length_x * scale_x,
+            focal_length_y=self.focal_length_y * scale_y,
+            principal_point_x=self.principal_point_x * scale_x,
+            principal_point_y=self.principal_point_y * scale_y,
+            distortion=self.distortion,
         )
 
 
