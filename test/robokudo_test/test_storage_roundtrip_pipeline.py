@@ -31,18 +31,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _camera_info_k_values(camera_info):
-    if hasattr(camera_info, "k"):
-        return list(camera_info.k)
-    return list(camera_info.K)
-
-
 def _build_writer_pipeline(db_name: str) -> Pipeline:
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
-        kinect_height_fix_mode=True,
         color2depth_ratio=(0.5, 0.5),
     )
 
@@ -125,14 +118,6 @@ class TestStorageRoundtripPipeline:
                 writer_pipeline.cas.get(CASViews.DEPTH_IMAGE),
                 reader_pipeline.cas.get(CASViews.DEPTH_IMAGE),
                 equal_nan=True,
-            )
-
-            writer_camera_info = writer_pipeline.cas.get(CASViews.CAMERA_INFO)
-            reader_camera_info = reader_pipeline.cas.get(CASViews.CAMERA_INFO)
-            assert writer_camera_info.width == reader_camera_info.width
-            assert writer_camera_info.height == reader_camera_info.height
-            assert _camera_info_k_values(writer_camera_info) == _camera_info_k_values(
-                reader_camera_info
             )
 
             writer_observation = writer_pipeline.cas.require_camera_observation()

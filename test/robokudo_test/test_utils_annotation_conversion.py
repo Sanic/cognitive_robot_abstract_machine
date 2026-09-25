@@ -3,12 +3,11 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-import sensor_msgs.msg
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped
 from scipy.spatial.transform import Rotation as R
 
-from robokudo.cas import CAS, CASViews
+from robokudo.cas import CAS
 from robokudo.types.annotation import (
     PoseAnnotation,
     StampedPoseAnnotation,
@@ -62,19 +61,10 @@ class TestUtilsAnnotationConversion(object):
     def cas_with_tf(self):
         cas = CAS()
 
-        kinect_camera_info = sensor_msgs.msg.CameraInfo()
-        kinect_camera_info.header.frame_id = "some_weird_non_default_frame_id"
-        kinect_camera_info.header.stamp.sec = 123
-        kinect_camera_info.header.stamp.nanosec = 456
-        kinect_camera_info.width = 1024
-        kinect_camera_info.height = 1280
-        kinect_camera_info.k[0] = 1050.0
-        kinect_camera_info.k[2] = 1050.0
-        kinect_camera_info.k[4] = 639.5
-        kinect_camera_info.k[5] = 479.5
-        cas.set(CASViews.CAMERA_INFO, kinect_camera_info)
+        camera_frame = "some_weird_non_default_frame_id"
+        timestamp_nanoseconds = 123_000_000_456
         world_body = Body(name=PrefixedName(name="map"))
-        camera_body = Body(name=PrefixedName(name=kinect_camera_info.header.frame_id))
+        camera_body = Body(name=PrefixedName(name=camera_frame))
         camera_model = PinholeCameraModel(
             image_resolution=CameraResolution(width=1024, height=1280),
             focal_length_x=1050.0,
@@ -102,10 +92,7 @@ class TestUtilsAnnotationConversion(object):
             ),
             effective_camera_model=camera_model,
             world_T_camera=world_T_camera,
-            timestamp_nanoseconds=(
-                kinect_camera_info.header.stamp.sec * 1_000_000_000
-                + kinect_camera_info.header.stamp.nanosec
-            ),
+            timestamp_nanoseconds=timestamp_nanoseconds,
         )
         return cas
 
@@ -276,8 +263,6 @@ class TestUtilsAnnotationConversion(object):
             .to_quaternion()
             .to_list()
         )
-        cas_with_tf.get(CASViews.CAMERA_INFO)
-
         od = ObjectDesignator()
 
         converter = Pose2ODConverter()

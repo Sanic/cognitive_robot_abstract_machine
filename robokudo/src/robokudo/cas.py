@@ -24,7 +24,6 @@ from enum import StrEnum
 
 import numpy as np
 import open3d as o3d
-from sensor_msgs.msg import CameraInfo
 from typing_extensions import (
     TYPE_CHECKING,
     Any,
@@ -51,7 +50,7 @@ class CASViews(StrEnum):
 
     This class defines the standard keys used to store and access different types
     of data in the CAS. These keys ensure consistent access to common data types
-    like images, point clouds, and camera information.
+    like images, point clouds, and camera observations.
     """
 
     COLOR_IMAGE = "color_image"
@@ -65,9 +64,6 @@ class CASViews(StrEnum):
     
     Example: 1280x960 RGB, 640x480 DEPTH -> 0.5 along X and Y
     """
-
-    CAMERA_INFO = "cam_info"
-    """ROS camera info message coming from ROS"""
 
     CAMERA_OBSERVATION = "camera_observation"
     """Semantic camera and effective projection metadata for the current frame."""
@@ -124,7 +120,7 @@ class CAS:
     views: Dict[str, Any] = field(default_factory=dict)
     """Dictionary storing view data, each view stores data that is typically singular for a single CAS.
     
-    Example: Sensor data, camera info and cloud which are read from the sensors.
+    Example: Sensor data, a camera observation, and a point cloud.
     """
 
     annotations: List[Annotation] = field(default_factory=list)
@@ -162,14 +158,6 @@ class CAS:
     @color2depth_ratio.setter
     def color2depth_ratio(self, value: Tuple[float, float]) -> None:
         self.views[CASViews.COLOR2DEPTH_RATIO] = value
-
-    @property
-    def camera_info(self) -> Optional[CameraInfo]:
-        return self.views.get(CASViews.CAMERA_INFO)
-
-    @camera_info.setter
-    def camera_info(self, value: CameraInfo) -> None:
-        self.views[CASViews.CAMERA_INFO] = value
 
     @property
     def camera_observation(self) -> Optional[CameraObservation]:

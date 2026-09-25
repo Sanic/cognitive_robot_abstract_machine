@@ -1,13 +1,10 @@
 import sys
 
 import numpy as np
-import sensor_msgs.msg
 import std_msgs.msg
 
 from robokudo.types.annotation import PoseAnnotation, PositionAnnotation
 from robokudo.utils.type_conversion import (
-    ros_camera_info_to_dict,
-    ros_camera_info_from_dict,
     get_geometry_msgs_pose_from_pose_annotation,
     get_geometry_msgs_pose_from_position_annotation,
     get_geometry_msgs_pose_stamped_from_pose_annotation,
@@ -17,102 +14,6 @@ from robokudo.utils.type_conversion import (
 
 
 class TestUtilsTypeConversion(object):
-    def test_ros_camera_info_to_dict(self):
-        kinect_camera_info = sensor_msgs.msg.CameraInfo()
-        kinect_camera_info.width = 1024
-        kinect_camera_info.height = 1280
-        kinect_camera_info.k[0] = 1050.0
-        kinect_camera_info.k[2] = 1050.0
-        kinect_camera_info.k[4] = 639.5
-        kinect_camera_info.k[5] = 479.5
-
-        camera_info_dict = ros_camera_info_to_dict(kinect_camera_info)
-
-        assert camera_info_dict["width"] == 1024
-        assert camera_info_dict["height"] == 1280
-        assert camera_info_dict["k"] == [
-            1050.0,
-            0.0,
-            1050.0,
-            0.0,
-            639.5,
-            479.5,
-            0.0,
-            0.0,
-            0.0,
-        ]
-
-    def test_ros_camera_info_from_dict(self):
-        camera_info_dict = {
-            "header": {"frame_id": "camera_link", "stamp": {"secs": 100, "nsecs": 100}},
-            "width": 1024,
-            "height": 1280,
-            "K": [1050.0, 0.0, 1050.0, 0.0, 639.5, 479.5, 0.0, 0.0, 0.0],
-            "D": np.random.rand(5),
-            "P": np.random.rand(12),
-            "R": np.random.rand(9),
-            "binning_x": 2.0,
-            "binning_y": 2.0,
-            "roi": {
-                "x_offset": 5,
-                "y_offset": 10,
-                "height": 15,
-                "width": 20,
-                "do_rectify": True,
-            },
-        }
-
-        kinect_camera_info = ros_camera_info_from_dict(camera_info_dict)
-
-        assert kinect_camera_info.header.frame_id == "camera_link"
-        assert kinect_camera_info.header.stamp.sec == 100
-        assert kinect_camera_info.header.stamp.nanosec == 100
-
-        assert kinect_camera_info.width == 1024
-        assert kinect_camera_info.height == 1280
-        assert np.all(camera_info_dict["K"] == kinect_camera_info.k)
-        assert np.all(camera_info_dict["D"] == kinect_camera_info.d)
-        assert np.all(camera_info_dict["P"] == kinect_camera_info.p)
-
-        assert kinect_camera_info.binning_x == 2.0
-        assert kinect_camera_info.binning_y == 2.0
-
-        assert kinect_camera_info.roi.x_offset == 5
-        assert kinect_camera_info.roi.y_offset == 10
-        assert kinect_camera_info.roi.height == 15
-        assert kinect_camera_info.roi.width == 20
-        assert kinect_camera_info.roi.do_rectify
-
-    def test_ros_camera_info_from_dict_header_frame_id_only(self):
-        camera_info_dict = {"header": {"frame_id": "camera_link"}}
-
-        kinect_camera_info = ros_camera_info_from_dict(camera_info_dict)
-
-        assert isinstance(kinect_camera_info, sensor_msgs.msg.CameraInfo)
-        assert kinect_camera_info.header.frame_id == "camera_link"
-
-    def test_ros_camera_info_from_dict_header_stamp_only(self):
-        camera_info_dict = {"header": {"stamp": {"secs": 100, "nsecs": 100}}}
-
-        kinect_camera_info = ros_camera_info_from_dict(camera_info_dict)
-
-        assert isinstance(kinect_camera_info, sensor_msgs.msg.CameraInfo)
-        assert kinect_camera_info.header.stamp.sec == 100
-        assert kinect_camera_info.header.stamp.nanosec == 100
-
-    def test_ros_camera_info_from_dict_empty_dict(self):
-        kinect_camera_info = ros_camera_info_from_dict({})
-        assert isinstance(kinect_camera_info, sensor_msgs.msg.CameraInfo)
-
-    def test_ros_camera_info_from_dict_invalid_dict(self):
-        camera_info_dict = {
-            "header": {"invalid_key": "invalid_value"},
-            "invalid_key": "invalid_value",
-            "roi": {"invalid_key": "invalid_value"},
-        }
-        kinect_camera_info = ros_camera_info_from_dict(camera_info_dict)
-        assert isinstance(kinect_camera_info, sensor_msgs.msg.CameraInfo)
-
     def test_get_geometry_msgs_pose_from_position_annotation(self):
         position_ann = PositionAnnotation()
         position_ann.translation = np.random.rand(3)

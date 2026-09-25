@@ -1,4 +1,5 @@
 import numpy as np
+from sensor_msgs.msg import CameraInfo
 
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_semdt_raytracer import (
@@ -31,8 +32,7 @@ def test_interface_publishes_aligned_semantic_rgbd_frame():
 
     assert cas.color_image.shape[:2] == cas.depth_image.shape
     assert cas.get(CASViews.OBJECT_IMAGE).shape == cas.depth_image.shape
-    assert cas.camera_info.width == cas.camera_observation.resolution.width
-    assert cas.camera_info.height == cas.camera_observation.resolution.height
+    assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
     context = interface.context_resolver.resolve()
     assert cas.camera_observation.camera is context.camera
     assert cas.ground_truth_world_ref is context.world
@@ -70,5 +70,4 @@ def test_interface_publishes_effective_model_for_field_of_view_camera():
         cas.camera_observation.field_of_view.vertical_angle,
         native_field_of_view.vertical_angle,
     )
-    assert cas.camera_info.width == resolution.width
-    assert cas.camera_info.height == resolution.height
+    assert not any(isinstance(view, CameraInfo) for view in cas.views.values())

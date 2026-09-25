@@ -29,6 +29,7 @@ from robokudo.cas import CASViews
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.exceptions import CameraDataMissing, InvalidCameraObservation
 from semantic_digital_twin.datastructures.camera_model import CameraModality
+from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 
 import cv2
 
@@ -219,7 +220,6 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, color)
         cas.set(CASViews.DEPTH_IMAGE, depth)
-        cas.set(CASViews.CAMERA_INFO, camera_info)
         cas.set(CASViews.COLOR2DEPTH_RATIO, color2depth_ratio)
         camera_frame = camera_info.header.frame_id or self.camera_config.camera_frame
         modalities = (
@@ -229,7 +229,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         )
         self.store_camera_observation(
             cas=cas,
-            camera_info=camera_info,
+            camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
             camera_frame=camera_frame,
             timestamp_nanoseconds=timestamp_nanoseconds,
             modalities=modalities,

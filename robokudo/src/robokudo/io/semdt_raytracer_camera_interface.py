@@ -6,14 +6,11 @@ from __future__ import annotations
 
 import time
 
-from sensor_msgs.msg import CameraInfo
-
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_semdt_raytracer import (
     SemDTRayTracerCameraConfig,
 )
 from robokudo.io.camera_interface import CameraInterface
-from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 from robokudo.io.semdt_camera_context import (
     RayTracingContext,
     SemDTCameraContextResolver,
@@ -73,19 +70,12 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         frame = self.renderer.render(context)
         camera_model = frame.camera_model
 
-        camera_info = RosCameraModelAdapter.to_camera_info(
-            camera_model=camera_model,
-            frame_id=context.camera.root.name.name,
-        )
         timestamp_ns = time.time_ns()
-        camera_info.header.stamp.sec = int(timestamp_ns // 1_000_000_000)
-        camera_info.header.stamp.nanosec = int(timestamp_ns % 1_000_000_000)
         self._write_frame_to_cas(
             cas=cas,
             context=context,
             frame=frame,
             camera_model=camera_model,
-            camera_info=camera_info,
             timestamp_ns=timestamp_ns,
         )
 
@@ -95,7 +85,6 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         context: RayTracingContext,
         frame: RenderedRGBDFrame,
         camera_model: PinholeCameraModel,
-        camera_info: CameraInfo,
         timestamp_ns: int,
     ) -> None:
         """
@@ -105,7 +94,6 @@ class SemDTRayTracerCameraInterface(CameraInterface):
         :param context: World and camera used to render the frame.
         :param frame: Aligned rendered image products.
         :param camera_model: Effective pinhole model used for rendering.
-        :param camera_info: ROS compatibility calibration for the frame.
         :param timestamp_ns: Frame timestamp in nanoseconds since the epoch.
         """
         world = context.world
@@ -114,7 +102,6 @@ class SemDTRayTracerCameraInterface(CameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, frame.color_bgr)
         cas.set(CASViews.DEPTH_IMAGE, frame.depth_mm)
-        cas.set(CASViews.CAMERA_INFO, camera_info)
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
         cas.set(CASViews.OBJECT_IMAGE, frame.segmentation)
         cas.set(CASViews.OBJECT_COLOR_MAP, frame.object_color_map)

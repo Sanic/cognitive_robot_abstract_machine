@@ -213,7 +213,7 @@ def test_camera_observation_reuses_camera_rooted_in_stream_frame(
 
     interface.store_camera_observation(
         cas=cas,
-        camera_info=camera_info,
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
         camera_frame=camera_info.header.frame_id,
         timestamp_nanoseconds=123,
         modalities=(CameraModality.COLOR,),
@@ -239,7 +239,7 @@ def test_camera_observation_creates_standalone_camera_without_world_pose(
 
     interface.store_camera_observation(
         cas=cas,
-        camera_info=camera_info,
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
         camera_frame=camera_info.header.frame_id,
         timestamp_nanoseconds=456,
         modalities=(CameraModality.COLOR,),
@@ -268,7 +268,7 @@ def test_camera_observation_connects_new_camera_in_rooted_world_without_pose(
 
     interface.store_camera_observation(
         cas=cas,
-        camera_info=camera_info,
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
         camera_frame=camera_info.header.frame_id,
         timestamp_nanoseconds=456,
         modalities=(CameraModality.COLOR,),
@@ -313,6 +313,7 @@ def test_rgbd_reader_stores_camera_observation(
         height=camera_info.height,
     )
     assert cas.camera_observation.timestamp_nanoseconds == 10_000_000_020
+    assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
 
 
 def test_rgb_only_reader_stores_camera_observation(
@@ -341,13 +342,14 @@ def test_rgb_only_reader_stores_camera_observation(
         height=camera_info.height,
     )
     assert cas.camera_observation.timestamp_nanoseconds == 30_000_000_040
+    assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
 
 
-def test_rgb_only_rotation_updates_every_effective_calibration_view(
+def test_rgb_only_rotation_updates_effective_calibration(
     runtime_world: World,
     camera_info: CameraInfo,
 ) -> None:
-    """A rotated frame publishes one matching calibration through every CAS API."""
+    """A rotated frame publishes calibration matching the delivered image."""
     original_width = camera_info.width
     original_height = camera_info.height
     original_focal_length_x = camera_info.k[0]
@@ -389,12 +391,6 @@ def test_rgb_only_rotation_updates_every_effective_calibration_view(
         expected_resolution.height,
         expected_resolution.width,
     )
-    assert cas.camera_info.width == expected_resolution.width
-    assert cas.camera_info.height == expected_resolution.height
-    np.testing.assert_allclose(
-        np.asarray(cas.camera_info.k).reshape(3, 3),
-        expected_intrinsic_matrix,
-    )
     np.testing.assert_allclose(
         cas.camera_observation.effective_camera_model.intrinsic_matrix,
         expected_intrinsic_matrix,
@@ -410,6 +406,7 @@ def test_rgb_only_rotation_updates_every_effective_calibration_view(
     assert isinstance(distortion, RationalPolynomialCameraDistortion)
     assert distortion.tangential_coefficient_1 == -original_tangential_y
     assert distortion.tangential_coefficient_2 == original_tangential_x
+    assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
 
 
 def test_rgbd_high_resolution_crop_updates_effective_resolution(
@@ -439,8 +436,6 @@ def test_rgbd_high_resolution_crop_updates_effective_resolution(
         expected_resolution.height,
         expected_resolution.width,
     )
-    assert cas.camera_info.width == expected_resolution.width
-    assert cas.camera_info.height == expected_resolution.height
     assert (
         cas.camera_observation.effective_camera_model.resolution == expected_resolution
     )
@@ -448,6 +443,7 @@ def test_rgbd_high_resolution_crop_updates_effective_resolution(
         cas.camera_observation.effective_camera_model.principal_point_y
         == camera_info.k[5]
     )
+    assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
 
 
 def test_opencv_reader_stores_camera_observation(
@@ -484,3 +480,4 @@ def test_opencv_reader_stores_camera_observation(
     )
     assert cas.camera_observation.world_T_camera is None
     assert cas.camera_observation.timestamp_nanoseconds == timestamp_nanoseconds
+    assert not any(isinstance(view, CameraInfo) for view in cas.views.values())

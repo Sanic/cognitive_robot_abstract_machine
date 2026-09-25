@@ -32,6 +32,7 @@ from typing_extensions import Any, Tuple, TYPE_CHECKING, Optional, List
 from robokudo.cas import CASViews
 from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.camera_interface import ROSCameraInterface
+from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortionModel,
@@ -266,7 +267,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         This method:
         * Applies any configured image rotation
         * Updates camera intrinsics accordingly
-        * Sets RGB image, camera info, and transform data in the CAS
+        * Sets the RGB image and camera observation in the CAS
         * Handles thread synchronization
 
         :param cas: Common Analysis Structure to update
@@ -311,13 +312,12 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, None)
-        cas.set(CASViews.CAMERA_INFO, self.camera_info)
         cas.set(CASViews.COLOR2DEPTH_RATIO, (1, 1))
         world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
         self.store_camera_observation(
             cas=cas,
-            camera_info=self.camera_info,
+            camera_model=RosCameraModelAdapter.from_camera_info(self.camera_info),
             camera_frame=camera_frame,
             timestamp_nanoseconds=(
                 self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec

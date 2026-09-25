@@ -156,7 +156,7 @@ class CameraInterface(object):
     def store_camera_observation(
         self,
         cas: CAS,
-        camera_info: CameraInfo,
+        camera_model: PinholeCameraModel,
         camera_frame: str,
         timestamp_nanoseconds: int,
         modalities: tuple[CameraModality, ...],
@@ -165,13 +165,12 @@ class CameraInterface(object):
         """Store semantic identity and effective calibration for a camera frame.
 
         :param cas: CAS receiving the observation.
-        :param camera_info: Effective calibration of the delivered image.
+        :param camera_model: Effective calibration of the delivered image.
         :param camera_frame: Optical frame associated with the calibration.
         :param timestamp_nanoseconds: Acquisition time in nanoseconds since the epoch.
         :param modalities: Kinds of image data delivered by the interface.
         :param world_T_camera: Sampled camera pose, if available.
         """
-        camera_model = RosCameraModelAdapter.from_camera_info(camera_info)
         camera = self._resolve_or_create_camera(
             camera_frame=camera_frame,
             camera_model=camera_model,
@@ -639,14 +638,13 @@ class KinectCameraInterface(ROSCameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, self.depth)
-        cas.set(CASViews.CAMERA_INFO, self.camera_info)
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.color2depth_ratio)
 
         world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
         self.store_camera_observation(
             cas=cas,
-            camera_info=self.camera_info,
+            camera_model=RosCameraModelAdapter.from_camera_info(self.camera_info),
             camera_frame=camera_frame,
             timestamp_nanoseconds=(
                 self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec
