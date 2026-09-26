@@ -13,7 +13,7 @@ from robokudo import world as rk_world
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
 import robokudo.utils.data_downloader
-import robokudo.utils.tree_execution
+from robokudo.pipeline import Pipeline
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.annotators.storage import StorageWriter
@@ -22,8 +22,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.io.storage import Storage
-from robokudo.pipeline import Pipeline
-from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+import robokudo.utils.tree_execution
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -94,15 +93,8 @@ class TestStorageRoundtripPipeline:
             assert "state" in world_snapshot_payload
             assert {"ids", "states"}.issubset(world_snapshot_payload["state"])
 
-            tracker = rk_world.init_world_with_entity_tracker()
-            WorldModelSnapshot.apply_to_json_snapshot_to_world(
-                rk_world.world_instance(),
-                world_snapshot_payload,
-                **tracker.create_kwargs(),
-            )
-            assert len(rk_world.world_instance().state.keys()) == len(
-                world_snapshot_payload["state"]["ids"]
-            )
+            rk_world.init_world_with_entity_tracker()
+            assert rk_world.world_instance().is_empty()
 
             reader_pipeline = _build_reader_pipeline(db_name)
             reader_status = robokudo.utils.tree_execution.run_tree_once(
@@ -122,6 +114,26 @@ class TestStorageRoundtripPipeline:
 
             writer_observation = writer_pipeline.cas.require_camera_observation()
             reader_observation = reader_pipeline.cas.require_camera_observation()
+            assert reader_observation.camera.id != writer_observation.camera.id
+            assert (
+                reader_observation.camera.root.id != writer_observation.camera.root.id
+            )
+            assert reader_observation.camera.name == writer_observation.camera.name
+            assert (
+                reader_observation.camera.camera_model
+                == writer_observation.camera.camera_model
+            )
+            assert (
+                reader_observation.camera.camera_range
+                == writer_observation.camera.camera_range
+            )
+            assert (
+                reader_observation.camera.modalities
+                == writer_observation.camera.modalities
+            )
+            assert {
+                str(key) for key in rk_world.world_instance().state.keys()
+            }.isdisjoint({str(key) for key in world_snapshot_payload["state"]["ids"]})
             assert (
                 writer_observation.effective_camera_model
                 == reader_observation.effective_camera_model

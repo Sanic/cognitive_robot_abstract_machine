@@ -10,13 +10,17 @@ import importlib
 import io
 from dataclasses import dataclass, field
 from enum import StrEnum
-from uuid import UUID
 
 import numpy as np
 from typing_extensions import Any, Dict, Iterable, List, Optional
 from robokudo import world
 from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.cas_annotation_codecs import krrood_to_json, krrood_from_json
+from robokudo.io.camera_replay import (
+    RecordedCameraPose,
+    RecordedCameraRegistry,
+    RecordedCameraSnapshot,
+)
 from robokudo.types.camera import CameraObservation
 from robokudo.io.open3d_codec_utils import (
     is_open3d_point_cloud,
@@ -25,7 +29,6 @@ from robokudo.io.open3d_codec_utils import (
 )
 from robokudo.types.tf import StampedTransform
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
-from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 
@@ -457,25 +460,29 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
 
 
 class CameraObservationCodec(ViewCodec):
-    """Codec for frame metadata containing a semantic camera reference."""
+    """Codec for self-contained recorded camera observations."""
 
-    serializer_id: str = "robokudo_camera_observation"
+    serializer_id: str = "robokudo_camera_observation_v2"
 
     def can_encode(self, value: Any) -> bool:
         """Check whether a value is camera observation metadata."""
         return isinstance(value, CameraObservation)
 
     def encode(self, value: CameraObservation) -> ViewPayload:
-        """Encode an observation while preserving camera identity."""
+        """Encode all sensor properties needed to reconstruct the observation."""
         return ViewPayload(
             serializer_id=self.serializer_id,
             payload={
-                CameraObservationField.CAMERA_ID: str(value.camera.id),
+                CameraObservationField.CAMERA: RecordedCameraSnapshot.from_camera(
+                    value.camera
+                ).to_document(),
                 CameraObservationField.MODEL: krrood_to_json(
                     value.effective_camera_model
                 ),
                 CameraObservationField.WORLD_T_CAMERA: (
-                    value.world_T_camera.to_json()
+                    RecordedCameraPose.from_transform(
+                        value.world_T_camera
+                    ).to_document()
                     if value.world_T_camera is not None
                     else None
                 ),
@@ -484,27 +491,32 @@ class CameraObservationCodec(ViewCodec):
             type_name=_full_type_name(value),
         )
 
-    def decode(self, payload: ViewPayload) -> CameraObservation:
-        """Decode an observation and resolve its camera in the active world."""
-        tracker = world.get_world_entity_tracker()
-        camera = tracker.get(UUID(payload.payload[CameraObservationField.CAMERA_ID]))
-        if not isinstance(camera, Camera):
-            raise InvalidCameraObservation(
-                reason=f"the referenced entity '{camera.name}' is not a camera"
-            )
+    def decode(
+        self,
+        payload: ViewPayload,
+        camera_registry: RecordedCameraRegistry | None = None,
+    ) -> CameraObservation:
+        """Reconstruct a recorded observation in the active reasoning world."""
+        camera_registry = camera_registry or RecordedCameraRegistry()
+        pose_document = payload.payload[CameraObservationField.WORLD_T_CAMERA]
+        pose = (
+            RecordedCameraPose.from_document(pose_document)
+            if pose_document is not None
+            else None
+        )
+        camera = camera_registry.resolve(
+            RecordedCameraSnapshot.from_document(
+                payload.payload[CameraObservationField.CAMERA]
+            ),
+            pose.reference_frame if pose is not None else None,
+        )
         camera_model = krrood_from_json(payload.payload[CameraObservationField.MODEL])
         if not isinstance(camera_model, PinholeCameraModel):
             raise InvalidCameraObservation(
                 reason="the payload does not contain a pinhole camera model"
             )
-        world_T_camera_payload = payload.payload[CameraObservationField.WORLD_T_CAMERA]
         world_T_camera = (
-            HomogeneousTransformationMatrix.from_json(
-                world_T_camera_payload,
-                **tracker.create_kwargs(),
-            )
-            if world_T_camera_payload is not None
-            else None
+            camera_registry.resolve_pose(pose, camera) if pose is not None else None
         )
         return CameraObservation(
             camera=camera,
@@ -519,8 +531,8 @@ class CameraObservationCodec(ViewCodec):
 class CameraObservationField(StrEnum):
     """Name each field in a persisted camera observation."""
 
-    CAMERA_ID = "camera_id"
-    """Identifier of the semantic camera."""
+    CAMERA = "camera"
+    """Complete definition of the recorded sensor."""
 
     MODEL = "effective_camera_model"
     """Effective projection model."""
@@ -628,13 +640,19 @@ class CASViewCodecRegistry:
             return None
         return codec.encode(value).to_document(view_name=view_name)
 
-    def decode_view(self, document: Dict[str, Any]) -> tuple[str, Any]:
+    def decode_view(
+        self,
+        document: Dict[str, Any],
+        camera_registry: RecordedCameraRegistry | None = None,
+    ) -> tuple[str, Any]:
         """
         Decode a single storage document into one CAS view.
         """
         view_name = document["view_name"]
         payload = ViewPayload.from_document(document)
         codec = self._find_decoder(payload.serializer_id)
+        if isinstance(codec, CameraObservationCodec):
+            return view_name, codec.decode(payload, camera_registry)
         return view_name, codec.decode(payload)
 
     def encode_views(

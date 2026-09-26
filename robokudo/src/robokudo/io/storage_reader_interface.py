@@ -25,6 +25,7 @@ from robokudo.descriptors.camera_configs.config_mongodb_playback import (
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.cas import CAS
 from robokudo.io.camera_interface import CameraInterface
+from robokudo.io.camera_replay import RecordedCameraRegistry
 from robokudo.io.storage import Storage
 
 
@@ -54,6 +55,10 @@ class StorageReaderInterface(CameraInterface):
         self.reader: Storage.ListReader = self.storage.ListReader(camera_config.db_name)
         """
         List-based reader for MongoDB data.
+        """
+        self.recorded_cameras = RecordedCameraRegistry()
+        """
+        Camera instances shared by frames from this recording.
         """
 
     def has_new_data(self) -> bool:
@@ -89,7 +94,9 @@ class StorageReaderInterface(CameraInterface):
             return
 
         cas_frame["views"] = {}
-        self.storage.load_views_from_mongo_in_cas(cas_frame)
+        self.storage.load_views_from_mongo_in_cas(
+            cas_frame, camera_registry=self.recorded_cameras
+        )
 
         # Bring flat CAS representation into the proper CAS class
         for view_name, view_content in cas_frame["views"].items():

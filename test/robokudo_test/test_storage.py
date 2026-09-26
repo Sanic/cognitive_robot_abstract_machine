@@ -344,11 +344,14 @@ class TestStorage:
         )
         assert retrieved_cas_record is not None
         retrieved_cas_record["views"] = {}
+        rk_world.init_world_with_entity_tracker()
         storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
         restored_observation = retrieved_cas_record["views"][
             CASViews.CAMERA_OBSERVATION
         ]
-        assert restored_observation.camera is camera
+        assert restored_observation.camera is not camera
+        assert restored_observation.camera.name == camera.name
+        assert restored_observation.camera.camera_model == camera.camera_model
         assert restored_observation.effective_camera_model == camera_model
         assert (
             restored_observation.timestamp_nanoseconds
@@ -358,5 +361,6 @@ class TestStorage:
         np.testing.assert_allclose(
             restored_transform.to_np(), observation.world_T_camera_or_raise().to_np()
         )
-        assert restored_transform.reference_frame is world_body
-        assert restored_transform.child_frame is camera_body
+        assert restored_transform.reference_frame is not world_body
+        assert restored_transform.reference_frame.name == world_body.name
+        assert restored_transform.child_frame is restored_observation.camera.root

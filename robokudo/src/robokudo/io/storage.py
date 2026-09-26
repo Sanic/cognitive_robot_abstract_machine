@@ -29,6 +29,7 @@ from robokudo.io.cas_annotation_codecs import (
     deserialize_annotations,
 )
 from robokudo.io.cas_view_codecs import CASViewCodecRegistry
+from robokudo.io.camera_replay import RecordedCameraRegistry
 
 if TYPE_CHECKING:
     from pymongo.results import InsertOneResult
@@ -179,11 +180,14 @@ class Storage:
         return document
 
     @staticmethod
-    def decode_view_document(view_document: Dict[str, Any]) -> tuple[str, Any]:
+    def decode_view_document(
+        view_document: Dict[str, Any],
+        camera_registry: RecordedCameraRegistry | None = None,
+    ) -> tuple[str, Any]:
         """
         Decode one serialized view document into a CAS view value.
         """
-        return Storage.cas_view_codecs.decode_view(view_document)
+        return Storage.cas_view_codecs.decode_view(view_document, camera_registry)
 
     def store_views_in_mongo(self, cas_dict: Dict[str, Any]) -> None:
         """
@@ -211,6 +215,7 @@ class Storage:
         self,
         cas_document: Dict[str, Any],
         excluded_view_names: Optional[set[str]] = None,
+        camera_registry: RecordedCameraRegistry | None = None,
     ) -> None:
         """
         Load views from MongoDB into a CAS document.
@@ -233,7 +238,7 @@ class Storage:
                     f"Couldn't find view '{expected_view_name}' with id={view_id}."
                 )
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
-                view_document
+                view_document, camera_registry
             )
             if decoded_view_name != expected_view_name:
                 raise RuntimeError(
