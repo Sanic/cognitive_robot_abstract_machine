@@ -21,8 +21,9 @@ from robokudo.cas import CASViews
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
-from robokudo.io.storage import Storage
+from robokudo.io.storage import Storage, StorageDocumentField
 import robokudo.utils.tree_execution
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -36,6 +37,19 @@ def _build_writer_pipeline(db_name: str) -> Pipeline:
         loop=False,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
         color2depth_ratio=(0.5, 0.5),
+    )
+    camera_config = file_reader_descriptor.parameters.camera_config
+    camera_config.static_camera_transform_enabled = True
+    camera_config.static_world_T_camera = (
+        HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.1,
+            pos_y=0.2,
+            pos_z=0.3,
+            quat_x=0.0,
+            quat_y=0.0,
+            quat_z=0.0,
+            quat_w=1.0,
+        )
     )
 
     writer_descriptor = StorageWriter.Descriptor()
@@ -69,6 +83,7 @@ def _build_reader_pipeline(db_name: str) -> Pipeline:
 
 class TestStorageRoundtripPipeline:
     def test_store_and_replay_sensor_data_roundtrip(self):
+        rk_world.init_world_with_entity_tracker()
         db_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
         storage = Storage(db_name)
         writer_node = Node(
@@ -93,6 +108,21 @@ class TestStorageRoundtripPipeline:
             assert "state" in world_snapshot_payload
             assert {"ids", "states"}.issubset(world_snapshot_payload["state"])
 
+            query_document = Storage.encode_view_document(
+                CASViews.QUERY, {"recorded": True}
+            )
+            query_id = (
+                storage.db[Storage.VIEW_COLLECTION_NAME]
+                .insert_one(query_document)
+                .inserted_id
+            )
+            view_ids = dict(stored_record[StorageDocumentField.VIEW_IDS])
+            view_ids[CASViews.QUERY] = query_id
+            storage.db.cas.update_one(
+                {"_id": stored_record["_id"]},
+                {"$set": {StorageDocumentField.VIEW_IDS: view_ids}},
+            )
+
             rk_world.init_world_with_entity_tracker()
             assert rk_world.world_instance().is_empty()
 
@@ -101,6 +131,7 @@ class TestStorageRoundtripPipeline:
                 reader_pipeline, reader_node
             )
             assert reader_status is py_trees.common.Status.SUCCESS
+            assert not reader_pipeline.cas.contains(CASViews.QUERY)
 
             np.testing.assert_array_equal(
                 writer_pipeline.cas.get(CASViews.COLOR_IMAGE),
@@ -114,9 +145,16 @@ class TestStorageRoundtripPipeline:
 
             writer_observation = writer_pipeline.cas.require_camera_observation()
             reader_observation = reader_pipeline.cas.require_camera_observation()
-            assert reader_observation.camera.id != writer_observation.camera.id
+            assert reader_observation.camera is not writer_observation.camera
             assert (
-                reader_observation.camera.root.id != writer_observation.camera.root.id
+                reader_observation.camera
+                is rk_world.world_instance().get_semantic_annotation_by_id(
+                    reader_observation.camera.id
+                )
+            )
+            assert reader_observation.camera.id == writer_observation.camera.id
+            assert (
+                reader_observation.camera.root.id == writer_observation.camera.root.id
             )
             assert reader_observation.camera.name == writer_observation.camera.name
             assert (
@@ -127,9 +165,8 @@ class TestStorageRoundtripPipeline:
                 reader_observation.camera.camera_range
                 == writer_observation.camera.camera_range
             )
-            assert (
-                reader_observation.camera.modalities
-                == writer_observation.camera.modalities
+            assert tuple(reader_observation.camera.modalities) == tuple(
+                writer_observation.camera.modalities
             )
             assert {
                 str(key) for key in rk_world.world_instance().state.keys()
@@ -141,6 +178,15 @@ class TestStorageRoundtripPipeline:
             assert (
                 writer_observation.timestamp_nanoseconds
                 == reader_observation.timestamp_nanoseconds
+            )
+            reader_pose = reader_observation.world_T_camera_or_raise()
+            writer_pose = writer_observation.world_T_camera_or_raise()
+            np.testing.assert_array_equal(reader_pose.to_np(), writer_pose.to_np())
+            assert reader_pose.reference_frame.id == writer_pose.reference_frame.id
+            assert reader_pose.child_frame is reader_observation.camera.root
+            assert (
+                reader_observation.camera.root.parent_connection.parent
+                is reader_pose.reference_frame
             )
 
             assert writer_pipeline.cas.get(CASViews.COLOR2DEPTH_RATIO) == (

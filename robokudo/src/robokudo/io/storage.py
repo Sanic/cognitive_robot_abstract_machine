@@ -18,6 +18,7 @@ The module handles:
 
 from __future__ import annotations
 import os
+from enum import StrEnum
 
 from pymongo import MongoClient
 from typing_extensions import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
@@ -29,11 +30,31 @@ from robokudo.io.cas_annotation_codecs import (
     deserialize_annotations,
 )
 from robokudo.io.cas_view_codecs import CASViewCodecRegistry
-from robokudo.io.camera_replay import RecordedCameraRegistry
 
 if TYPE_CHECKING:
     from pymongo.results import InsertOneResult
     from pymongo.synchronous.database import Database
+
+
+class StorageDocumentField(StrEnum):
+    """
+    Identify fields shared by recorded CAS documents.
+    """
+
+    WORLD = "world"
+    """
+    Full semantic-world snapshot at the recorded frame.
+    """
+
+    VIEW_IDS = "view_ids"
+    """
+    References to persisted CAS view documents.
+    """
+
+    VIEWS = "views"
+    """
+    Decoded CAS views attached during playback.
+    """
 
 
 class Storage:
@@ -180,14 +201,11 @@ class Storage:
         return document
 
     @staticmethod
-    def decode_view_document(
-        view_document: Dict[str, Any],
-        camera_registry: RecordedCameraRegistry | None = None,
-    ) -> tuple[str, Any]:
+    def decode_view_document(view_document: Dict[str, Any]) -> tuple[str, Any]:
         """
         Decode one serialized view document into a CAS view value.
         """
-        return Storage.cas_view_codecs.decode_view(view_document, camera_registry)
+        return Storage.cas_view_codecs.decode_view(view_document)
 
     def store_views_in_mongo(self, cas_dict: Dict[str, Any]) -> None:
         """
@@ -215,7 +233,7 @@ class Storage:
         self,
         cas_document: Dict[str, Any],
         excluded_view_names: Optional[set[str]] = None,
-        camera_registry: RecordedCameraRegistry | None = None,
+        included_view_names: Optional[set[str]] = None,
     ) -> None:
         """
         Load views from MongoDB into a CAS document.
@@ -225,27 +243,43 @@ class Storage:
         :param cas_document: CAS document to update with loaded views
         :param excluded_view_names: View names to leave undecoded for caller-specific
             handling.
+        :param included_view_names: View names to decode when a reader selects inputs.
         """
         excluded_view_names = excluded_view_names or set()
-        for expected_view_name, view_id in cas_document["view_ids"].items():
+        for expected_view_name, view_id in cas_document[
+            StorageDocumentField.VIEW_IDS
+        ].items():
             if expected_view_name in excluded_view_names:
                 continue
-            view_document = self.db[Storage.VIEW_COLLECTION_NAME].find_one(
-                {"_id": view_id}
-            )
-            if not view_document:
-                raise RuntimeError(
-                    f"Couldn't find view '{expected_view_name}' with id={view_id}."
-                )
+            if (
+                included_view_names is not None
+                and expected_view_name not in included_view_names
+            ):
+                continue
+            view_document = self.load_view_document(cas_document, expected_view_name)
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
-                view_document, camera_registry
+                view_document
             )
             if decoded_view_name != expected_view_name:
                 raise RuntimeError(
                     f"Decoded view name '{decoded_view_name}' does not match expected "
                     f"view name '{expected_view_name}' for id={view_id}."
                 )
-            cas_document["views"][decoded_view_name] = decoded_view_value
+            cas_document[StorageDocumentField.VIEWS][
+                decoded_view_name
+            ] = decoded_view_value
+
+    def load_view_document(
+        self, cas_document: Dict[str, Any], view_name: str
+    ) -> Dict[str, Any]:
+        """
+        Fetch one CAS view document referenced by a recorded frame.
+        """
+        view_id = cas_document[StorageDocumentField.VIEW_IDS][view_name]
+        document = self.db[Storage.VIEW_COLLECTION_NAME].find_one({"_id": view_id})
+        if document is None:
+            raise RuntimeError(f"Couldn't find view '{view_name}' with id={view_id}.")
+        return document
 
     @staticmethod
     def load_annotations_from_mongo_in_cas(
