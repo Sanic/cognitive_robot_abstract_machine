@@ -25,6 +25,7 @@ from __future__ import annotations
 import logging
 import struct
 from threading import Lock
+from typing import ClassVar
 
 import builtin_interfaces.msg
 import cv2
@@ -44,15 +45,15 @@ from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import (
     CameraAnnotationAmbiguous,
     CameraDataMissing,
+    InvalidCameraObservation,
 )
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.camera import CameraObservation
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
+from robokudo.utils.ros_frames import normalize_ros_frame_id
 from robokudo.world import (
     init_world_entity_tracker_from_world,
-    setup_world_for_camera_frame,
-    update_connection_transform,
     world_instance,
 )
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
@@ -66,6 +67,7 @@ from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -80,6 +82,9 @@ class CameraInterface(object):
     This class defines the basic interface that all camera implementations must provide.
     It handles configuration and data availability tracking.
     """
+
+    STANDALONE_MOUNT_PREFIX: ClassVar[str] = "robokudo_camera_mount_"
+    """Connection-name prefix reserved for camera bodies created by RoboKudo."""
 
     def __init__(self, camera_config: Any) -> None:
         """
@@ -114,34 +119,96 @@ class CameraInterface(object):
         camera_frame: str,
         world_T_camera: HomogeneousTransformationMatrix,
     ) -> HomogeneousTransformationMatrix:
-        """Bind a sampled camera pose to bodies in the runtime world.
+        """Bind a sampled pose without changing a robot camera's attachment.
 
         :param world_frame: Name of the pose reference frame.
         :param camera_frame: Name of the camera frame.
         :param world_T_camera: Sampled numeric camera pose.
         :return: Camera pose bound to runtime-world bodies.
         """
-        setup_world_for_camera_frame(world_frame=world_frame, camera_frame=camera_frame)
-
         world = world_instance()
-        camera_body = world.get_body_by_name(name=camera_frame)
-        world_body = world.get_body_by_name(name=world_frame)
+        reference_name = normalize_ros_frame_id(world_frame)
+        camera_name = normalize_ros_frame_id(camera_frame)
+        if reference_name == camera_name:
+            raise InvalidCameraObservation(
+                reason="the camera and world reference frames are identical"
+            )
+        reference_matches = CameraInterface._bodies_for_ros_frame(world, reference_name)
+        camera_matches = CameraInterface._bodies_for_ros_frame(world, camera_name)
+        if len(reference_matches) > 1 or len(camera_matches) > 1:
+            raise InvalidCameraObservation(reason="camera pose frame is ambiguous")
+
+        world_body = reference_matches[0] if reference_matches else None
+        camera_body = camera_matches[0] if camera_matches else None
+        current_root = world.root
+        if (
+            world_body is None
+            and current_root is not None
+            and current_root is not camera_body
+        ):
+            raise InvalidCameraObservation(
+                reason=f"world reference frame '{reference_name}' is absent"
+            )
+
+        mount = None
+        if (
+            world_body is None
+            or camera_body is None
+            or camera_body.parent_connection is None
+        ):
+            with world.modify_world():
+                if world_body is None:
+                    world_body = Body(name=PrefixedName(name=reference_name))
+                    world.add_body(world_body)
+                if camera_body is None:
+                    camera_body = Body(name=PrefixedName(name=camera_name))
+                    world.add_body(camera_body)
+                if camera_body.parent_connection is None:
+                    mount = Connection6DoF.create_with_dofs(
+                        parent=world_body,
+                        child=camera_body,
+                        world=world,
+                        name=CameraInterface._standalone_mount_name(camera_body),
+                    )
+                    world.add_connection(mount)
+        if (
+            mount is None
+            and camera_body.parent_connection is not None
+            and camera_body.parent_connection.parent is world_body
+            and camera_body.parent_connection.name
+            == CameraInterface._standalone_mount_name(camera_body)
+        ):
+            mount = camera_body.parent_connection
 
         runtime_world_T_camera = HomogeneousTransformationMatrix(
             data=world_T_camera,
             reference_frame=world_body,
             child_frame=camera_body,
         )
-
-        update_connection_transform(
-            to_name=world_body.name,
-            from_name=camera_body.name,
-            transform=runtime_world_T_camera,
-        )
+        if mount is not None:
+            with world.modify_world():
+                mount.origin = runtime_world_T_camera
         return runtime_world_T_camera
 
+    @staticmethod
+    def _standalone_mount_name(camera_body: Body) -> PrefixedName:
+        """Identify the adjustable mount created for one standalone camera."""
+        return PrefixedName(
+            name=f"{CameraInterface.STANDALONE_MOUNT_PREFIX}{camera_body.id}"
+        )
+
+    @staticmethod
+    def _bodies_for_ros_frame(world: World, frame_id: str) -> list[Body]:
+        """Find bodies whose names identify the same ROS frame."""
+        normalized = normalize_ros_frame_id(frame_id)
+        return [
+            body
+            for body in world.bodies
+            if normalize_ros_frame_id(body.name.name) == normalized
+        ]
+
     def static_world_T_camera_if_configured(
-        self,
+        self, camera_frame: str
     ) -> HomogeneousTransformationMatrix | None:
         """Return the configured static camera pose bound to the runtime world."""
         if not self.camera_config.static_camera_transform_enabled:
@@ -149,7 +216,7 @@ class CameraInterface(object):
 
         return self.bind_world_T_camera(
             world_frame=self.camera_config.static_world_frame,
-            camera_frame=self.camera_config.static_camera_frame,
+            camera_frame=camera_frame,
             world_T_camera=self.camera_config.static_world_T_camera,
         )
 
@@ -171,11 +238,34 @@ class CameraInterface(object):
         :param modalities: Kinds of image data delivered by the interface.
         :param world_T_camera: Sampled camera pose, if available.
         """
+        camera_frame = normalize_ros_frame_id(camera_frame)
+        if world_T_camera is not None:
+            pose_child = world_T_camera.child_frame
+            if (
+                pose_child is not None
+                and normalize_ros_frame_id(pose_child.name.name) != camera_frame
+            ):
+                raise InvalidCameraObservation(
+                    reason="sampled pose child frame differs from the camera root"
+                )
+            if world_T_camera.reference_frame is None:
+                raise InvalidCameraObservation(
+                    reason="sampled camera pose has no reference frame"
+                )
         camera = self._resolve_or_create_camera(
             camera_frame=camera_frame,
             camera_model=camera_model,
             modalities=modalities,
         )
+        if world_T_camera is not None:
+            if pose_child is None:
+                world_T_camera.child_frame = camera.root
+            elif pose_child is not camera.root:
+                world_T_camera = HomogeneousTransformationMatrix(
+                    data=world_T_camera,
+                    reference_frame=world_T_camera.reference_frame,
+                    child_frame=camera.root,
+                )
         cas.camera_observation = CameraObservation(
             camera=camera,
             effective_camera_model=camera_model,
@@ -197,13 +287,13 @@ class CameraInterface(object):
         :return: Camera annotation representing the physical image source.
         :raises CameraAnnotationAmbiguous: If several cameras use the stream frame.
         """
+        camera_frame = normalize_ros_frame_id(camera_frame)
         runtime_world = world_instance()
         cameras = runtime_world.get_semantic_annotations_by_type(Camera)
         frame_cameras = [
             camera
             for camera in cameras
-            if camera.root.name.name == camera_frame
-            or str(camera.root.name) == camera_frame
+            if normalize_ros_frame_id(camera.root.name.name) == camera_frame
         ]
         if len(frame_cameras) == 1:
             return frame_cameras[0]
@@ -212,7 +302,9 @@ class CameraInterface(object):
                 camera_names=tuple(str(camera.name) for camera in frame_cameras)
             )
 
-        camera_bodies = runtime_world.get_bodies_by_name(camera_frame)
+        camera_bodies = self._bodies_for_ros_frame(runtime_world, camera_frame)
+        if len(camera_bodies) > 1:
+            raise InvalidCameraObservation(reason="camera frame is ambiguous")
         existing_root = runtime_world.root
         with runtime_world.modify_world():
             if len(camera_bodies) == 0:
@@ -225,9 +317,7 @@ class CameraInterface(object):
                         parent=existing_root,
                         child=camera_body,
                         world=runtime_world,
-                        name=PrefixedName(
-                            name=f"{camera_frame}_T_{existing_root.name.name}"
-                        ),
+                        name=self._standalone_mount_name(camera_body),
                     )
                     runtime_world.add_connection(camera_mount)
             else:
@@ -279,11 +369,19 @@ class ROSCameraInterface(CameraInterface):
         if hasattr(self.camera_config, "lookup_viewpoint"):
             self.lookup_viewpoint: bool = self.camera_config.lookup_viewpoint
 
-            self.tf_from: str = camera_config.tf_from
+            self.tf_from: str = (
+                normalize_ros_frame_id(camera_config.tf_from)
+                if self.lookup_viewpoint
+                else camera_config.tf_from
+            )
             """
             Transform source frame.
             """
-            self.tf_to: str = camera_config.tf_to
+            self.tf_to: str = (
+                normalize_ros_frame_id(camera_config.tf_to)
+                if self.lookup_viewpoint
+                else camera_config.tf_to
+            )
             """
             Transform target frame.
             """
@@ -360,6 +458,15 @@ class ROSCameraInterface(CameraInterface):
             camera_frame=self.tf_from,
             world_T_camera=world_T_camera,
         )
+
+    def validate_camera_frame_for_tf(self, camera_frame: str) -> None:
+        """Require the image optical frame to match the configured TF source."""
+        if self.lookup_viewpoint and normalize_ros_frame_id(
+            camera_frame
+        ) != normalize_ros_frame_id(self.tf_from):
+            raise InvalidCameraObservation(
+                reason="image camera frame differs from the configured TF source"
+            )
 
 
 def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
@@ -640,8 +747,9 @@ class KinectCameraInterface(ROSCameraInterface):
         cas.set(CASViews.DEPTH_IMAGE, self.depth)
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.color2depth_ratio)
 
-        world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
+        self.validate_camera_frame_for_tf(camera_frame)
+        world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         self.store_camera_observation(
             cas=cas,
             camera_model=RosCameraModelAdapter.from_camera_info(self.camera_info),

@@ -56,7 +56,6 @@ class TestFullAEExecution(object):
             color2depth_ratio=(0.5, 0.5),
             static_camera_transform_enabled=True,
             static_world_frame="map",
-            static_camera_frame="camera",
         )
 
         # Restrict FOV of pointcloud to robustly get only one object
@@ -98,7 +97,6 @@ class TestFullAEExecution(object):
             color2depth_ratio=(0.5, 0.5),
             static_camera_transform_enabled=True,
             static_world_frame="map",
-            static_camera_frame="camera",
         )
 
         pc_crop_config = (

@@ -313,8 +313,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, None)
         cas.set(CASViews.COLOR2DEPTH_RATIO, (1, 1))
-        world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
+        self.validate_camera_frame_for_tf(camera_frame)
+        world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         self.store_camera_observation(
             cas=cas,
             camera_model=RosCameraModelAdapter.from_camera_info(self.camera_info),

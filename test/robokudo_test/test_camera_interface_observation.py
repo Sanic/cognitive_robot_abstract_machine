@@ -7,11 +7,14 @@ import cv2
 import numpy as np
 import pytest
 from builtin_interfaces.msg import Time
+from py_trees.common import Status
 from sensor_msgs.msg import CameraInfo
 
 import robokudo.world as robokudo_world
+from robokudo.annotators.static_camera_transform import StaticCameraTransformAnnotator
 from robokudo.cas import CAS
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.camera_interface import CameraInterface, KinectCameraInterface
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 from robokudo.io.camera_without_depth_interface import (
@@ -30,8 +33,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -187,6 +191,186 @@ def test_camera_model_conversion_preserves_ros_calibration(
 # %% Semantic camera resolution
 
 
+def _mounted_camera_bodies(world: World) -> tuple[Body, Body]:
+    """Create a world-anchored camera body beneath a robot body."""
+    reference = Body(name=PrefixedName(name="map"))
+    robot_body = Body(name=PrefixedName(name="robot_head"))
+    camera_body = Body(name=PrefixedName(name="color_optical_frame"))
+    with world.modify_world():
+        for body in (reference, robot_body, camera_body):
+            world.add_body(body)
+        for parent, child in (
+            (reference, robot_body),
+            (robot_body, camera_body),
+        ):
+            world.add_connection(
+                Connection6DoF.create_with_dofs(parent=parent, child=child, world=world)
+            )
+    return reference, camera_body
+
+
+def test_ros_frame_alias_reuses_robot_optical_body(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """A leading slash in CameraInfo does not duplicate a robot optical body."""
+    _, camera_body = _mounted_camera_bodies(runtime_world)
+    camera_info.header.frame_id = "/color_optical_frame"
+    interface = CameraInterface(BaseCameraConfig(interface_type="test"))
+    cas = CAS()
+
+    interface.store_camera_observation(
+        cas=cas,
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+        camera_frame=camera_info.header.frame_id,
+        timestamp_nanoseconds=123,
+        modalities=(CameraModality.COLOR,),
+        world_T_camera=None,
+    )
+
+    assert cas.require_camera_observation().camera.root is camera_body
+    assert len(runtime_world.bodies) == 3
+
+
+def test_tf_binding_preserves_robot_camera_mount(runtime_world: World) -> None:
+    """A sampled TF pose does not add a parent to a robot optical body."""
+    reference, camera_body = _mounted_camera_bodies(runtime_world)
+    original_parent = camera_body.parent_connection
+    numeric_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=0.4,
+        pos_y=0.2,
+        pos_z=1.3,
+        quat_x=0.0,
+        quat_y=0.0,
+        quat_z=0.0,
+        quat_w=1.0,
+    )
+
+    pose = CameraInterface.bind_world_T_camera(
+        world_frame="map",
+        camera_frame="/color_optical_frame",
+        world_T_camera=numeric_pose,
+    )
+
+    assert pose.reference_frame is reference
+    assert pose.child_frame is camera_body
+    assert camera_body.parent_connection is original_parent
+    assert len(runtime_world.connections) == 2
+    np.testing.assert_allclose(pose.to_np(), numeric_pose.to_np())
+
+
+def test_mismatched_pose_child_is_rejected_at_acquisition(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """Do not label another physical frame's pose as the image camera pose."""
+    reference, camera_body = _mounted_camera_bodies(runtime_world)
+    other_frame = camera_body.parent_connection.parent
+    pose = HomogeneousTransformationMatrix(
+        reference_frame=reference, child_frame=other_frame
+    )
+    interface = CameraInterface(BaseCameraConfig(interface_type="test"))
+
+    with pytest.raises(InvalidCameraObservation):
+        interface.store_camera_observation(
+            cas=CAS(),
+            camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+            camera_frame=camera_info.header.frame_id,
+            timestamp_nanoseconds=123,
+            modalities=(CameraModality.COLOR,),
+            world_T_camera=pose,
+        )
+    assert runtime_world.get_semantic_annotations_by_type(Camera) == []
+
+
+def test_static_pose_uses_observation_camera_without_reparenting_robot(
+    runtime_world: World,
+    camera_info: CameraInfo,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A static numeric pose overrides the observation, not the robot chain."""
+    reference, camera_body = _mounted_camera_bodies(runtime_world)
+    camera_info.header.frame_id = "/color_optical_frame"
+    cas = CAS()
+    CameraInterface(BaseCameraConfig(interface_type="test")).store_camera_observation(
+        cas=cas,
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+        camera_frame=camera_info.header.frame_id,
+        timestamp_nanoseconds=123,
+        modalities=(CameraModality.COLOR,),
+        world_T_camera=None,
+    )
+    descriptor = StaticCameraTransformAnnotator.Descriptor()
+    descriptor.parameters.world_frame = "map"
+    descriptor.parameters.world_T_camera = (
+        HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.4,
+            pos_y=0.2,
+            pos_z=1.3,
+            quat_x=0.0,
+            quat_y=0.0,
+            quat_z=0.0,
+            quat_w=1.0,
+        )
+    )
+    annotator = StaticCameraTransformAnnotator(descriptor=descriptor)
+    monkeypatch.setattr(annotator, "get_cas", lambda: cas)
+    original_parent = camera_body.parent_connection
+
+    assert annotator.update() is Status.SUCCESS
+
+    pose = cas.require_camera_observation().world_T_camera_or_raise()
+    assert pose.reference_frame is reference
+    assert pose.child_frame is camera_body
+    assert camera_body.parent_connection is original_parent
+    assert len(runtime_world.connections) == 2
+    np.testing.assert_allclose(
+        pose.to_np(), descriptor.parameters.world_T_camera.to_np()
+    )
+
+
+def test_static_pose_creates_isolated_world_reference(
+    runtime_world: World,
+    camera_info: CameraInfo,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A static pose anchors a standalone camera without a robot model."""
+    cas = CAS()
+    CameraInterface(BaseCameraConfig(interface_type="test")).store_camera_observation(
+        cas=cas,
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+        camera_frame=camera_info.header.frame_id,
+        timestamp_nanoseconds=123,
+        modalities=(CameraModality.COLOR,),
+        world_T_camera=None,
+    )
+    camera_root = cas.require_camera_observation().camera.root
+    numeric_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        pos_x=0.4,
+        pos_y=0.2,
+        pos_z=1.3,
+        quat_x=0.0,
+        quat_y=0.0,
+        quat_z=0.0,
+        quat_w=1.0,
+    )
+    descriptor = StaticCameraTransformAnnotator.Descriptor()
+    descriptor.parameters.world_T_camera = numeric_pose
+    annotator = StaticCameraTransformAnnotator(descriptor=descriptor)
+    monkeypatch.setattr(annotator, "get_cas", lambda: cas)
+
+    assert annotator.update() is Status.SUCCESS
+
+    pose = cas.require_camera_observation().world_T_camera_or_raise()
+    assert pose.child_frame is camera_root
+    assert runtime_world.root is pose.reference_frame
+    assert camera_root.parent_connection.parent is pose.reference_frame
+    assert len(runtime_world.bodies) == 2
+    np.testing.assert_allclose(
+        camera_root.parent_connection.origin.to_np(), numeric_pose.to_np()
+    )
+
+
 def test_camera_observation_reuses_camera_rooted_in_stream_frame(
     runtime_world: World,
     camera_info: CameraInfo,
@@ -280,6 +464,100 @@ def test_camera_observation_connects_new_camera_in_rooted_world_without_pose(
 
 
 # %% Live reader contracts
+
+
+def test_live_reader_rejects_tf_source_for_a_different_optical_frame(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """Reject a configured TF source that is not the image optical frame."""
+    interface = object.__new__(KinectCameraInterface)
+    interface.camera_config = LiveRGBDCameraConfig()
+    interface._has_new_data = True
+    interface.lookup_viewpoint = True
+    interface.tf_from = "another_optical_frame"
+    interface.color = np.zeros(
+        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    )
+    interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
+    interface.camera_info = camera_info
+    interface.timestamp = Time(sec=10, nanosec=20)
+    interface.lock = Lock()
+
+    with pytest.raises(InvalidCameraObservation):
+        interface.set_data(CAS())
+
+    assert runtime_world.bodies == []
+
+
+def test_live_reader_uses_robot_optical_body_for_tf_pose(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """The live reader does not add a second robot camera mount."""
+    reference, camera_body = _mounted_camera_bodies(runtime_world)
+    camera_info.header.frame_id = "/color_optical_frame"
+    original_parent = camera_body.parent_connection
+    interface = object.__new__(KinectCameraInterface)
+    interface.camera_config = LiveRGBDCameraConfig()
+    interface._has_new_data = True
+    interface.lookup_viewpoint = True
+    interface.tf_from = "color_optical_frame"
+    interface.tf_to = "map"
+    interface.camera_translation = [0.4, 0.2, 1.3]
+    interface.camera_quaternion = [0.0, 0.0, 0.0, 1.0]
+    interface.color = np.zeros(
+        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    )
+    interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
+    interface.camera_info = camera_info
+    interface.timestamp = Time(sec=10, nanosec=20)
+    interface.lock = Lock()
+    cas = CAS()
+
+    interface.set_data(cas)
+
+    observation = cas.require_camera_observation()
+    assert observation.camera.root is camera_body
+    assert observation.world_T_camera.reference_frame is reference
+    assert observation.world_T_camera.child_frame is camera_body
+    assert camera_body.parent_connection is original_parent
+    assert len(runtime_world.connections) == 2
+
+
+def test_live_reader_creates_isolated_camera_mount_for_tf_pose(
+    runtime_world: World,
+    camera_info: CameraInfo,
+) -> None:
+    """An isolated live camera gets a world reference and sampled mount."""
+    interface = object.__new__(KinectCameraInterface)
+    interface.camera_config = LiveRGBDCameraConfig()
+    interface._has_new_data = True
+    interface.lookup_viewpoint = True
+    interface.tf_from = "color_optical_frame"
+    interface.tf_to = "map"
+    interface.camera_translation = [0.4, 0.2, 1.3]
+    interface.camera_quaternion = [0.0, 0.0, 0.0, 1.0]
+    interface.color = np.zeros(
+        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    )
+    interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
+    interface.camera_info = camera_info
+    interface.timestamp = Time(sec=10, nanosec=20)
+    interface.lock = Lock()
+    cas = CAS()
+
+    interface.set_data(cas)
+
+    observation = cas.require_camera_observation()
+    assert runtime_world.root is observation.world_T_camera.reference_frame
+    assert observation.camera.root is observation.world_T_camera.child_frame
+    assert observation.camera.root.parent_connection.parent is runtime_world.root
+    assert len(runtime_world.bodies) == 2
+    np.testing.assert_allclose(
+        observation.camera.root.parent_connection.origin.to_np(),
+        observation.world_T_camera.to_np(),
+    )
 
 
 def test_rgbd_reader_stores_camera_observation(

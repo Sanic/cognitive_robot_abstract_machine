@@ -186,7 +186,7 @@ class CameraPoseOverrideUnavailable(RoboKudoError):
 @dataclass
 class InvalidCameraObservation(RoboKudoError, TypeError):
     """
-    Raised when persisted camera metadata contains incompatible values.
+    Raised when camera metadata contains incompatible values.
     """
 
     reason: str
@@ -198,7 +198,7 @@ class InvalidCameraObservation(RoboKudoError, TypeError):
         return f"Invalid camera observation: {self.reason}."
 
     def suggest_correction(self) -> str:
-        return "store an observation whose camera and projection model are compatible."
+        return "use compatible camera, pose-frame, and projection-model data."
 
 
 @dataclass

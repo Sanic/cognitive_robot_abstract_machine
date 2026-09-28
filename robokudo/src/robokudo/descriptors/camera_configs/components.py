@@ -59,9 +59,6 @@ class StaticCameraTransformComponent:
     static_world_frame: str = "map"
     """World frame ID for the configured static camera transform."""
 
-    static_camera_frame: str = "camera"
-    """Camera frame ID for the configured static camera transform."""
-
     static_world_T_camera: HomogeneousTransformationMatrix = field(
         default_factory=HomogeneousTransformationMatrix
     )

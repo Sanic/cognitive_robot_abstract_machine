@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from robokudo.exceptions import InvalidCameraObservation
 from robokudo.types.camera import CameraObservation
+from robokudo.utils.ros_frames import normalize_ros_frame_id
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
@@ -39,7 +40,8 @@ class SensorWorldProjector:
         return (
             pose_child.name.prefix == camera_root.name.prefix
             and pose_child.name.name != camera_root.name.name
-            and pose_child.name.name.lstrip("/") == camera_root.name.name.lstrip("/")
+            and normalize_ros_frame_id(pose_child.name.name)
+            == normalize_ros_frame_id(camera_root.name.name)
         )
 
     def project(self) -> World:

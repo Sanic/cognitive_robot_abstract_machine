@@ -287,10 +287,8 @@ class RGBDFileReaderInterface(FileReaderInterface):
 
         recorded_observation = data[CASViews.CAMERA_OBSERVATION]
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
-        world_T_camera = self.static_world_T_camera_if_configured()
         camera_frame = recorded_observation["camera_frame"]
-        if world_T_camera is not None and world_T_camera.child_frame is not None:
-            camera_frame = world_T_camera.child_frame.name.name
+        world_T_camera = self.static_world_T_camera_if_configured(camera_frame)
         self.store_camera_observation(
             cas=cas,
             camera_model=recorded_observation["effective_camera_model"],
