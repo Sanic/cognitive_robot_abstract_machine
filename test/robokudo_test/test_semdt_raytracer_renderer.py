@@ -42,6 +42,7 @@ def test_renderer_derives_effective_pinhole_model_from_field_of_view():
     )
     assert frame.color_bgr.shape[:2] == frame.depth_mm.shape
     assert frame.depth_mm.shape == frame.segmentation.shape
+    assert frame.segmentation.shape == (resolution.height, resolution.width)
 
 
 def test_renderer_converts_projective_depth_to_millimeters():

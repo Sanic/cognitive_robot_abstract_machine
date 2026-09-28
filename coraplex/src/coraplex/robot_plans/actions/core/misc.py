@@ -83,12 +83,18 @@ class DetectAction(ActionDescription):
     :class:`~coraplex.exceptions.UnidentifiedDetections` instead of being chosen between.
     """
 
+    use_robokudo: bool = False
+    """
+    Whether simulation queries RoboKudo for this detection.
+    """
+
     @property
     def _action_plan(self) -> PlanNode:
         return execute_single(
             DetectingMotion(
                 query=self._build_query(),
                 accept_first_if_multiple=self.accept_first_if_multiple,
+                use_robokudo=self.use_robokudo,
             )
         )
 

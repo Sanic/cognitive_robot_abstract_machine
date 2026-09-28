@@ -110,6 +110,18 @@ def test_source_is_chosen_by_execution_type(execution_type, expected_source):
     assert type(source) is expected_source
 
 
+def test_simulated_query_can_use_robokudo_explicitly(rclpy_node):
+    """
+    A simulated query may opt into the ROS perception action.
+    """
+    source = PerceptionInterface.for_execution_type(
+        ExecutionType.SIMULATED, ros_node=rclpy_node, use_robokudo=True
+    )
+
+    assert isinstance(source, RoboKudoPerception)
+    assert source.ros_node is rclpy_node
+
+
 # %% applying detections
 
 
@@ -648,6 +660,24 @@ def test_robokudo_detection_moves_the_body_in_the_world(
 # %% pipelines that localize without recognizing
 
 
+def test_robokudo_can_request_all_objects(rclpy_node, query_server_reporting):
+    """
+    An empty request returns every object without choosing a semantic type.
+    """
+    server = query_server_reporting(
+        [
+            ReportedObject("", PERCEIVED_MILK_POSITION),
+            ReportedObject("", (1.0, 1.0, 1.0)),
+        ]
+    )
+
+    objects = RoboKudoPerception(ros_node=rclpy_node).query_objects()
+
+    assert server.received_types == [""]
+    assert len(objects) == 2
+    assert all(not detected_object.type for detected_object in objects)
+
+
 def test_untyped_detection_is_identified_from_the_query(
     immutable_model_world, whole_scene_region, rclpy_node, query_server_reporting
 ):
@@ -771,6 +801,26 @@ def build_perception_task(
     context.add_extension(RosContextExtension(ros_node))
     task.build(context)
     return context
+
+
+def test_simulated_perception_task_uses_robokudo_when_requested(
+    immutable_model_world, whole_scene_region, rclpy_node
+):
+    """
+    The motion task carries the simulated RoboKudo choice to its source.
+    """
+    world, view, _ = immutable_model_world
+    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    task = PerceptionTask(
+        query=query,
+        execution_type=ExecutionType.SIMULATED,
+        use_robokudo=True,
+    )
+
+    build_perception_task(task, world, rclpy_node)
+
+    assert isinstance(task.perception_source, RoboKudoPerception)
+    assert task.perception_source.ros_node is rclpy_node
 
 
 def run_perception_task(task: PerceptionTask, context: MotionStatechartContext) -> None:

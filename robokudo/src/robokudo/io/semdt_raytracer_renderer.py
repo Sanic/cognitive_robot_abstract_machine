@@ -27,6 +27,7 @@ from semantic_digital_twin.datastructures.camera_model import (
 )
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -123,6 +124,12 @@ class SemDTRayTracerRenderer:
         field_of_view = camera_model.field_of_view
         ray_tracer = world.ray_tracer
         camera_to_world = camera.root_T_forward_view
+        robot_body_indices = {
+            body.index
+            for robot in world.get_semantic_annotations_by_type(AbstractRobot)
+            for body in world.get_kinematic_structure_entities_of_branch(robot.root)
+            if isinstance(body, Body)
+        }
         segmentation, depth_m = self._render_segmentation_and_depth(
             ray_tracer=ray_tracer,
             camera_to_world=camera_to_world,
@@ -130,6 +137,7 @@ class SemDTRayTracerRenderer:
             field_of_view=field_of_view,
             min_distance=camera.camera_range.minimum_distance,
             max_distance=camera.camera_range.maximum_distance,
+            excluded_body_indices=robot_body_indices,
         )
         color_bgr, object_color_map = self._render_color_image(
             world=world,
@@ -172,6 +180,7 @@ class SemDTRayTracerRenderer:
         field_of_view: FieldOfView,
         min_distance: float,
         max_distance: float,
+        excluded_body_indices: set[int] | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Render object segmentation and projective depth with one intersection pass.
@@ -189,13 +198,14 @@ class SemDTRayTracerRenderer:
         :param field_of_view: Camera field of view.
         :param min_distance: Minimum valid ray-hit distance.
         :param max_distance: Maximum valid ray-hit distance.
+        :param excluded_body_indices: Bodies belonging to the camera's own robot.
         :return: Segmentation indices and depth image in meters.
         """
         segmentation = (
-            np.zeros((resolution.width, resolution.height), dtype=np.int32) - 1
+            np.zeros((resolution.height, resolution.width), dtype=np.int32) - 1
         )
         depth_m = (
-            np.zeros((resolution.width, resolution.height), dtype=np.float32) - 1.0
+            np.zeros((resolution.height, resolution.width), dtype=np.float32) - 1.0
         )
 
         ray_origins, ray_directions, pixels = ray_tracer.create_camera_rays(
@@ -214,6 +224,16 @@ class SemDTRayTracerRenderer:
         if len(index_ray) == 0:
             return segmentation, depth_m
 
+        visible_hits = np.asarray(
+            [body.index not in (excluded_body_indices or set()) for body in bodies],
+            dtype=bool,
+        )
+        points = points[visible_hits]
+        index_ray = index_ray[visible_hits]
+        bodies = [body for body, visible in zip(bodies, visible_hits) if visible]
+        if len(index_ray) == 0:
+            return segmentation, depth_m
+
         unique_index = np.unique(index_ray, return_index=True)[1]
         index_ray = index_ray[unique_index]
         points = points[unique_index]
@@ -221,7 +241,9 @@ class SemDTRayTracerRenderer:
             unique_index
         ]
         pixel_ray = pixels[index_ray]
-        segmentation[pixel_ray[:, 0], pixel_ray[:, 1]] = body_indices
+        # Trimesh's camera pixels run right-to-left for this optical frame.
+        image_columns = resolution.width - 1 - pixel_ray[:, 0]
+        segmentation[pixel_ray[:, 1], image_columns] = body_indices
 
         # Trimesh camera looks along -z in its local frame. Convert hit points to
         # that camera frame and use projective z-depth (not range) for RGB-D.
@@ -237,7 +259,8 @@ class SemDTRayTracerRenderer:
         valid_depth = z_depth > 0.0
         pixel_ray = pixel_ray[valid_depth]
         z_depth = z_depth[valid_depth]
-        depth_m[pixel_ray[:, 0], pixel_ray[:, 1]] = z_depth.astype(np.float32)
+        image_columns = resolution.width - 1 - pixel_ray[:, 0]
+        depth_m[pixel_ray[:, 1], image_columns] = z_depth.astype(np.float32)
         return segmentation, depth_m
 
     def _render_color_image(

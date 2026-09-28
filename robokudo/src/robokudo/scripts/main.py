@@ -33,6 +33,7 @@ from robokudo.annotators.query import QueryActionServer
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE, PACKAGE_NAME
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
+from robokudo.world_sync import WorldSyncManager
 from robokudo.utils.logging_configuration import configure_logging
 from robokudo.utils.module_loader import ModuleLoader
 from robokudo.utils.tree import setup_with_descendants_rk
@@ -192,6 +193,8 @@ def main() -> None:
         ],
     )
     node_registry.register(node1)
+    world_sync_manager = WorldSyncManager(node1)
+    world_sync_manager.bind_to_node()
     logger.info(f"Created node: {node_name}")
 
     # 5. Create any action servers or supporting nodes
@@ -222,37 +225,35 @@ def main() -> None:
     thread_main.start()
     thread_asrv.start()
 
-    # 7. Dynamically load the requested Analysis Engine (AE) using the **refactored** ModuleLoader
-    loader = ModuleLoader()
-    logger.info(f"Loading AE '{args.ae}' from package '{args.ros_pkg}'...")
-    loaded_ae = loader.load_ae(ros_pkg_name=args.ros_pkg, module_name=args.ae)
-
-    # 8. Build your Behavior Tree from the loaded AE
-    #    (Assuming loaded_ae.implementation() returns a py_trees root or something similar)
-    visualizer_types = None
-    if args.no3d:
-        visualizer_types = [
-            CVVisualizer,
-            SharedROSVisualizer,
-            AllAnnotatorROSVisualizer,
-        ]
-    ae_root = grow_tree(
-        loaded_ae.implementation(),
-        node=node1,
-        include_gui=not args.headless,
-        visualizer_types=visualizer_types,
-    )
-
-    # If you have a custom version of `setup_with_descendants`, call it:
-    setup_with_descendants_rk(ae_root)
-
     try:
+        # 7. Dynamically load the requested Analysis Engine (AE)
+        loader = ModuleLoader()
+        logger.info(f"Loading AE '{args.ae}' from package '{args.ros_pkg}'...")
+        loaded_ae = loader.load_ae(ros_pkg_name=args.ros_pkg, module_name=args.ae)
+
+        # 8. Build and set up its behavior tree
+        visualizer_types = None
+        if args.no3d:
+            visualizer_types = [
+                CVVisualizer,
+                SharedROSVisualizer,
+                AllAnnotatorROSVisualizer,
+            ]
+        ae_root = grow_tree(
+            loaded_ae.implementation(),
+            node=node1,
+            include_gui=not args.headless,
+            visualizer_types=visualizer_types,
+        )
+        setup_with_descendants_rk(ae_root)
+
         # 9. Start ticking the Behavior Tree
         run_ae(ae_name=args.ae, ae_root=ae_root, tickrate=args.tickrate)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received; shutting down.")
     finally:
         # 10. Shutdown executors cleanly
+        world_sync_manager.close()
         executor_main.shutdown()
         executor_asrv.shutdown()
 

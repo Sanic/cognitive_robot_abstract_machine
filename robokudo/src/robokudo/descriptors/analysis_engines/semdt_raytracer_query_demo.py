@@ -1,62 +1,59 @@
 """
 Analysis engine for simulated RGB-D input from SemDT RayTracer with query functionality.
 
-This pipeline mirrors the standard tabletop segmentation flow but uses the
-`semdt_raytracer` camera descriptor, which renders color/depth images from a
-world descriptor instead of reading a physical camera stream.
+This pipeline renders the synchronized robot world and returns detected objects with
+their poses and colors.
 """
 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
+from robokudo.behaviours.ensure_world_synchronized import EnsureWorldSynchronized
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
-from robokudo.annotators.plane import PlaneAnnotator
-from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
-from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
-from robokudo.behaviours.action_server_checks import ActionServerCheck
+from robokudo.annotators.semdt_segmented_objects import SegmentedObjectAnnotator
 from robokudo.descriptors.camera_configs.config_semdt_raytracer import (
-    WorldDescriptorSource,
+    RuntimeRobotWorldSource,
 )
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
-from robokudo.idioms import pipeline_init
+from robokudo.idioms import non_query_pipeline_init
 from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Build the query pipeline for a served simulated robot world.
+    """
+
     def name(self) -> str:
+        """
+        Return the module's analysis-engine name.
+        """
         return "semdt_raytracer_query_demo"
 
     def implementation(self) -> Pipeline:
+        """
+        Render and report every visible object with its pose and colors.
+        """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             "semdt_raytracer",
-            source=WorldDescriptorSource(
-                descriptor_name="world_semdt_raytracer_tabletop"
-            ),
+            source=RuntimeRobotWorldSource(),
         )
-        plane_desc = PlaneAnnotator.Descriptor()
-        plane_desc.parameters.distance_threshold = 0.01
-
-        query_result_desc = GenerateQueryResult.Descriptor()
-        query_result_desc.parameters.filter_by_query = True
-
         seq = Pipeline("SemDTRayTracerPipeline")
         seq.add_children(
             [
-                pipeline_init(),
+                # Waiting for an active goal at the beginning or end of the
+                # pipeline can block a new query before it is processed.
+                non_query_pipeline_init(),
                 QueryAnnotator(),
+                EnsureWorldSynchronized(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
-                PointcloudCropAnnotator(),
-                PlaneAnnotator(descriptor=plane_desc),
-                PointCloudClusterExtractor(),
+                SegmentedObjectAnnotator(),
                 ClusterColorAnnotator(),
-                ClusterPoseBBAnnotator(),
-                GenerateQueryResult(descriptor=query_result_desc),
-                ActionServerCheck(),
+                GenerateQueryResult(),
             ]
         )
         return seq

@@ -45,6 +45,11 @@ class PerceptionTask(Task):
     rejects.
     """
 
+    use_robokudo: bool = False
+    """
+    Whether a simulated query uses RoboKudo as its perception source.
+    """
+
     perception_source: Optional[PerceptionInterface] = field(init=False, default=None)
     """
     The source answering the query, resolved during :meth:`build`.
@@ -67,6 +72,7 @@ class PerceptionTask(Task):
         self.perception_source = PerceptionInterface.for_execution_type(
             self.execution_type,
             context.require_extension(RosContextExtension).ros_node,
+            use_robokudo=self.use_robokudo,
         )
         return NodeArtifacts()
 
@@ -102,6 +108,11 @@ class DetectingMotion(BaseMotion):
     Query for the perception system that should be answered.
     """
 
+    use_robokudo: bool = False
+    """
+    Whether a simulated query uses RoboKudo as its perception source.
+    """
+
     accept_first_if_multiple: bool = False
     """
     Whether several candidates may be resolved by taking the first one.
@@ -115,5 +126,6 @@ class DetectingMotion(BaseMotion):
         return PerceptionTask(
             query=self.query,
             execution_type=GiskardExecutable.execution_type,
+            use_robokudo=self.use_robokudo,
             accept_first_if_multiple=self.accept_first_if_multiple,
         )

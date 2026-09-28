@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -45,6 +46,8 @@ ROBOKUDO_QUERY_ACTION_NAME = "robokudo/query"
 """
 Name of the action RoboKudo answers perception queries on.
 """
+
+logger = logging.getLogger(__name__)
 
 # %% queries
 
@@ -296,7 +299,9 @@ class PerceptionInterface(ABC):
 
     @staticmethod
     def for_execution_type(
-        execution_type: Optional[ExecutionType], ros_node: Optional[Node] = None
+        execution_type: Optional[ExecutionType],
+        ros_node: Optional[Node] = None,
+        use_robokudo: bool = False,
     ) -> PerceptionInterface:
         """
         Pick the source that matches how the plan is being executed.
@@ -304,9 +309,12 @@ class PerceptionInterface(ABC):
         :param execution_type: Whether the plan drives the real robot or a simulated
             one; None when nothing is executing the plan.
         :param ros_node: Node a real source reaches its perception pipeline through.
+        :param use_robokudo: Whether a simulated plan queries RoboKudo.
         :return: The source to answer queries with.
         :raises UnknownExecutionType: If the execution type has no source.
         """
+        if execution_type == ExecutionType.SIMULATED and use_robokudo:
+            return RoboKudoPerception(ros_node=ros_node)
         if execution_type in (ExecutionType.SIMULATED, ExecutionType.NO_EXECUTION):
             return WorldPerception()
         if execution_type == ExecutionType.REAL:
@@ -367,12 +375,15 @@ class RoboKudoPerception(PerceptionInterface):
     How long to wait for the action server before giving up.
     """
 
-    def detect(
-        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
-    ) -> Detection:
-        # RoboKudo's messages only exist where its pipeline is installed, so they are
-        # imported here rather than at module level: reading the world in simulation must
-        # not depend on them.
+    def query_objects(
+        self, requested_object: ObjectDesignator | None = None
+    ) -> List[ObjectDesignator]:
+        """
+        Return every object reported for a RoboKudo query.
+
+        An empty request lets pipelines that report all objects answer without a
+        semantic type supplied by the caller.
+        """
         from robokudo_msgs.action import Query
         from robokudo_msgs.msg import ObjectDesignator
 
@@ -380,13 +391,41 @@ class RoboKudoPerception(PerceptionInterface):
         if not client.wait_for_server(timeout_sec=self.server_timeout.total_seconds()):
             raise PerceptionSourceUnavailable(self.action_name)
 
-        goal = Query.Goal(
-            obj=ObjectDesignator(type=query.semantic_annotation.__name__.lower())
-        )
+        goal = Query.Goal(obj=requested_object or ObjectDesignator())
         result = client.send_goal(goal).result
+        logger.info("RoboKudo query returned %d object(s)", len(result.res))
+        for designator in result.res:
+            pose = designator.pose[0] if designator.pose else None
+            if pose is None:
+                position = "unavailable"
+            else:
+                point = pose.pose.position
+                position = (
+                    f"{pose.header.frame_id} "
+                    f"({point.x:.3f}, {point.y:.3f}, {point.z:.3f})"
+                )
+            logger.info(
+                "RoboKudo object: %s color=%s pose=%s",
+                designator.type or "unclassified",
+                ",".join(designator.color) or "unknown",
+                position,
+            )
+        return result.res
+
+    def detect(
+        self, query: PerceptionQuery, accept_first_if_multiple: bool = False
+    ) -> Detection:
+        # RoboKudo's messages only exist where its pipeline is installed, so they are
+        # imported here rather than at module level: reading the world in simulation must
+        # not depend on them.
+        from robokudo_msgs.msg import ObjectDesignator
+
+        designators = self.query_objects(
+            ObjectDesignator(type=query.semantic_annotation.__name__.lower())
+        )
         detections = [
             self._to_detection(designator, query)
-            for designator in result.res
+            for designator in designators
             if designator.pose and self._can_be_requested_object(designator, query)
         ]
 
