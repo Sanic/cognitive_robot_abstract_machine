@@ -31,6 +31,7 @@ from robokudo.cas import CASViews
 from robokudo.exceptions import (
     EmptyPointCloud,
     PlaneModelMissing,
+    PointCloudCameraModelMissing,
     PointCloudTooSmallForClustering,
 )
 from robokudo.types.annotation import Plane
@@ -297,6 +298,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         * Visualizes clusters with unique colors
 
         :return: SUCCESS if clusters are found, FAILURE if no clusters or errors
+        :raises PointCloudCameraModelMissing: If the CAS lacks the point cloud camera model
         :raises PlaneModelMissing: If no plane model exists in CAS
         :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
         """
@@ -306,7 +308,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
         if pointcloud_camera_model is None:
-            raise KeyError(CASViews.POINTCLOUD_CAMERA_MODEL)
+            raise PointCloudCameraModelMissing()
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         height, width, d = color.shape
@@ -491,6 +493,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         * Visualizes clusters with unique colors
 
         :return: SUCCESS if clusters found, FAILURE if no clusters or errors
+        :raises PointCloudCameraModelMissing: If the CAS lacks the point cloud camera model
         :raises EmptyPointCloud: If the input cloud is empty
         """
         start_timer = default_timer()
@@ -498,7 +501,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
         if pointcloud_camera_model is None:
-            raise KeyError(CASViews.POINTCLOUD_CAMERA_MODEL)
+            raise PointCloudCameraModelMissing()
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         height, width, d = color.shape

@@ -541,6 +541,19 @@ class PlaneModelMissing(AnalysisPreconditionError):
 
 
 @dataclass
+class PointCloudCameraModelMissing(AnalysisPreconditionError):
+    """
+    Raised when the CAS lacks the projection model for its point cloud.
+    """
+
+    def error_message(self) -> str:
+        return "The CAS contains no point cloud camera model."
+
+    def suggest_correction(self) -> str:
+        return "provide the camera model used to create the point cloud."
+
+
+@dataclass
 class PointCloudTooSmallForClustering(AnalysisPreconditionError):
     """
     Raised when too few points are available for point-cloud clustering.
