@@ -89,7 +89,7 @@ class FileWriter(BaseAnnotator):
                 f"{self.descriptor.parameters.target_dir} is not existing or not a directory"
             )
 
-    def generate_full_file_path_(self, data_type: str, file_extension: str) -> str:
+    def generate_full_file_path_(self, data_type: CASViews, file_extension: str) -> str:
         """Generate the full filename and path where data should be stored.
 
         Creates a filepath using:
@@ -127,7 +127,7 @@ class FileWriter(BaseAnnotator):
         start_timer = default_timer()
 
         if not self.initialized:
-            print(
+            self.rk_logger(
                 "FileWriter has not been properly instantiated. Check error log for __init__ errors."
             )
             return Status.FAILURE
