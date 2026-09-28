@@ -74,8 +74,3 @@ class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     Define the prefix of all the files that shall be loaded into the
     FileReaderInterface.
     """
-
-    kinect_height_fix_mode: bool = True
-    """
-    Apply kinect hack.
-    """

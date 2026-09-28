@@ -30,7 +30,7 @@ from typing_extensions import Any
 
 import robokudo.world
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.io.storage import Storage
+from robokudo.io.storage import Storage, StorageDocumentField
 
 
 class StorageWriter(BaseAnnotator):
@@ -120,7 +120,7 @@ class StorageWriter(BaseAnnotator):
 
         payload = snapshot.to_json()
         json_str = json.dumps(payload)
-        flat_cas["world"] = json_str
+        flat_cas[StorageDocumentField.WORLD] = json_str
 
         # step 1: persist each view
         self.storage.store_views_in_mongo(flat_cas)

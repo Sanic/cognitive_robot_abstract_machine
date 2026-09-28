@@ -29,8 +29,8 @@ from typing_extensions import TYPE_CHECKING, Dict, Optional, Tuple
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing, ImageContourMissing
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.annotator_helper import scale_camera_intrinsics
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
@@ -223,7 +223,8 @@ class ImageClusterExtractor(BaseAnnotator):
         pixels that wrapped to just above 0).
 
         :param hsv_min: Lower HSV bound.
-        :param hsv_max: Upper HSV bound. A hue lower than ``hsv_min``'s signals wraparound.
+        :param hsv_max: Upper HSV bound. A hue lower than ``hsv_min``'s signals
+            wraparound.
         :return: Binary mask of pixels within the (possibly wrapped) bounds.
         """
         if hsv_min[0] <= hsv_max[0]:
@@ -262,17 +263,24 @@ class ImageClusterExtractor(BaseAnnotator):
 
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        self.camera_intrinsics = copy.deepcopy(
-            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
-        )
+        cas = self.get_cas()
 
         # Scale the image down so that it matches the depth image size
         resized_color = None
         try:
-            resized_color = get_scaled_color_image_for_depth_image(
-                self.get_cas(), self.color
+            resized_color = get_scaled_color_image_for_depth_image(cas, self.color)
+            color2depth_ratio = cas.color2depth_ratio
+            if color2depth_ratio is None:
+                raise ColorToDepthRatioMissing()
+            pointcloud_camera_model = (
+                cas.require_camera_observation().effective_camera_model.scaled(
+                    scale_x=color2depth_ratio[0],
+                    scale_y=color2depth_ratio[1],
+                )
             )
-            scale_camera_intrinsics(self)
+            self.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
+                pointcloud_camera_model
+            )
         except ColorToDepthRatioMissing:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."

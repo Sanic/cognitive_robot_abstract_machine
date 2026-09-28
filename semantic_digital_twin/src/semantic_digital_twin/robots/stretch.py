@@ -19,6 +19,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -32,7 +33,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     Finger,
     Neck,
     Torso,
@@ -194,7 +195,7 @@ class StretchArm(Arm[StretchGripper]):
 
 
 @dataclass(eq=False)
-class StretchCameraColor(Camera):
+class StretchCameraColor(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
@@ -213,13 +214,15 @@ class StretchCameraColor(Camera):
             forward_facing_axis=Vector3.Z(),
             minimal_height=1.322,
             maximal_height=1.322,
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             default_camera=True,
         )
 
 
 @dataclass(eq=False)
-class StretchCameraDepth(Camera):
+class StretchCameraDepth(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
@@ -238,12 +241,14 @@ class StretchCameraDepth(Camera):
             forward_facing_axis=Vector3.Z(),
             minimal_height=1.307,
             maximal_height=1.307,
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
         )
 
 
 @dataclass(eq=False)
-class StretchCameraInfra1(Camera):
+class StretchCameraInfra1(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
@@ -262,12 +267,14 @@ class StretchCameraInfra1(Camera):
             forward_facing_axis=Vector3.Z(),
             minimal_height=1.307,
             maximal_height=1.307,
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
         )
 
 
 @dataclass(eq=False)
-class StretchCameraInfra2(Camera):
+class StretchCameraInfra2(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
@@ -286,7 +293,9 @@ class StretchCameraInfra2(Camera):
             forward_facing_axis=Vector3.Z(),
             minimal_height=1.257,
             maximal_height=1.257,
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
         )
 
 

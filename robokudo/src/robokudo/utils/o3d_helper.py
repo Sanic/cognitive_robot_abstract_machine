@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     import cv2.typing as cv2t
     import numpy.typing as npt
     from robokudo.cas import CAS
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
     from semantic_digital_twin.world_description.geometry import Mesh
 
 
@@ -116,9 +117,10 @@ def get_2d_corner_points_from_3d_bb(
     :return: Array of 2D corner points
     """
     # Create the 2D Boundingbox/ROI based on the OBB
-    pointcloud_camera_intrinsics = cas.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
-    assert isinstance(pointcloud_camera_intrinsics, o3d.camera.PinholeCameraIntrinsic)
-    k = pointcloud_camera_intrinsics.intrinsic_matrix
+    pointcloud_camera_model = cas.pointcloud_camera_model
+    if pointcloud_camera_model is None:
+        raise KeyError(CASViews.POINTCLOUD_CAMERA_MODEL)
+    k = pointcloud_camera_model.intrinsic_matrix
     corner_points = np.asarray(object_bb.get_box_points())
     uvd = corner_points @ k.T
     if np.any(uvd[:, 2] == 0):
@@ -141,8 +143,10 @@ def project_points_to_image(
     """
     Project 3D camera-frame points to 2D image pixels and validity mask.
     """
-    pointcloud_camera_intrinsics = cas.get(CASViews.POINTCLOUD_CAMERA_INTRINSIC)
-    k = pointcloud_camera_intrinsics.intrinsic_matrix
+    pointcloud_camera_model = cas.pointcloud_camera_model
+    if pointcloud_camera_model is None:
+        raise KeyError(CASViews.POINTCLOUD_CAMERA_MODEL)
+    k = pointcloud_camera_model.intrinsic_matrix
     uvd = points_camera @ k.T
     z = uvd[:, 2]
     valid = z > 1e-6
@@ -243,7 +247,7 @@ def draw_wireframe_of_obb_into_image(
 def get_mask_from_pointcloud(
     input_cloud: o3d.geometry.PointCloud,
     ref_image: npt.NDArray,
-    camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
+    camera_intrinsics: PinholeCameraModel,
     mask_scale_factor: float = None,
     crop_to_ref: bool = None,
 ) -> npt.NDArray:
@@ -293,35 +297,6 @@ def get_mask_from_pointcloud(
         mask = mask[0:height, 0:width]
 
     return mask
-
-
-def scale_o3d_camera_intrinsics(
-    camera_intrinsic: o3d.camera.PinholeCameraIntrinsic, scalex: float, scaley: float
-) -> o3d.camera.PinholeCameraIntrinsic:
-    """Scale camera intrinsics by x and y factors.
-
-    Create and return a new camera intrinsic by scaling an input camera_intrinsic
-    based on a scale factor scalex and scaley.
-    Scaling will be done by multipling the factors with the relevant properties.
-    Example: new_height = height * scaley
-
-    :param camera_intrinsic: Original camera intrinsics
-    :param scalex: Scale factor for width/x
-    :param scaley: Scale factor for height/y
-    :return: Scaled camera intrinsics
-    """
-    new_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
-
-    width = int(camera_intrinsic.width * scalex)
-    height = int(camera_intrinsic.height * scaley)
-    fx = camera_intrinsic.intrinsic_matrix[0][0] * scalex
-    cx = camera_intrinsic.intrinsic_matrix[0][2] * scalex
-    fy = camera_intrinsic.intrinsic_matrix[1][1] * scaley
-    cy = camera_intrinsic.intrinsic_matrix[1][2] * scaley
-
-    new_camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
-
-    return new_camera_intrinsic
 
 
 def concatenate_clouds(

@@ -23,7 +23,6 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 from krrood.inheritance_path_length import inheritance_path_length
 from random_events.interval import Interval
-from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_computations.ik_solver import (
@@ -99,10 +98,9 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     """
     rt = RayTracer(camera._world)
     rt.update_scene()
-
     seg = rt.create_segmentation_mask(
         camera.root_T_forward_view,
-        resolution=CameraResolution(width=256, height=256),
+        resolution=camera.resolution,
         min_distance=0.2,
         field_of_view=camera.field_of_view,
     )
@@ -158,7 +156,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     segmentation_mask_without_occlusion = (
         ray_tracer_without_occlusion.create_segmentation_mask(
             camera_pose,
-            resolution=CameraResolution(width=256, height=256),
+            resolution=camera.resolution,
             min_distance=0.1,
             field_of_view=camera.field_of_view,
         )
@@ -170,7 +168,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     segmentation_mask_with_occlusion = (
         ray_tracer_with_occlusion.create_segmentation_mask(
             camera_pose,
-            resolution=CameraResolution(width=256, height=256),
+            resolution=camera.resolution,
             min_distance=0.1,
             field_of_view=camera.field_of_view,
         )

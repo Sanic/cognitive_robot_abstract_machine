@@ -11,11 +11,11 @@ from typing_extensions import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.types.annotation import PoseAnnotation, TSDFAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.comparators import TranslationComparator
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
-from robokudo.utils.o3d_helper import scale_o3d_camera_intrinsics
 from robokudo.utils.transform import get_transform_matrix_from_q
 
 if TYPE_CHECKING:
@@ -137,11 +137,10 @@ class TSDFAnnotator(ThreadedAnnotator):
         if len(oh_data) == 0:
             return Status.FAILURE
 
-        camera_intrinsic: o3d.camera.PinholeCameraIntrinsic = (
-            scale_o3d_camera_intrinsics(
-                cas.get(CASViews.CAMERA_INTRINSIC),
-                color2depth_ratio[0],
-                color2depth_ratio[1],
+        camera_intrinsic = Open3DCameraModelAdapter.to_intrinsic(
+            cas.require_camera_observation().effective_camera_model.scaled(
+                scale_x=color2depth_ratio[0],
+                scale_y=color2depth_ratio[1],
             )
         )
         color_image: npt.NDArray[np.uint8] = get_scaled_color_image_for_depth_image(

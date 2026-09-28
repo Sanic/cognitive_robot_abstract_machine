@@ -261,10 +261,13 @@ def _get_world_body_from_cas(cas: CAS, rk_world: World) -> Body | None:
     """
     Return the world-frame body referenced by the CAS, if available.
     """
-    world_frame = cas.world_frame
-    if world_frame is None:
+    observation = cas.camera_observation
+    if observation is None or observation.world_T_camera is None:
         return None
-    return rk_world.get_body_by_name(PrefixedName(name=world_frame))
+    reference_frame = observation.world_T_camera.reference_frame
+    if reference_frame is None:
+        return None
+    return rk_world.get_body_by_name(reference_frame.name)
 
 
 def _create_world_origin_and_scale_from_latest_bbox(

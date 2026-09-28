@@ -224,11 +224,10 @@ class MyRobotRightFinger(Finger):
 
 ```
 
-A Camera only needs a root body plus optical parameters.
-forward_facing_axis: the axis of the camera frame that points forward into the scene.
-field_of_view: horizontal and vertical opening angles in radians.
-default_camera=True marks this as the camera returned by robot.get_default_camera().
-Exactly one camera across the entire robot must have default_camera=True.
+A robot camera needs a root body plus a camera model.
+`forward_facing_axis` is the axis of the camera frame that points forward into the scene.
+`default_camera=True` marks this as the camera returned by `robot.get_default_camera()`.
+Exactly one camera across the entire robot must have `default_camera=True`.
 
 ```python
 from __future__ import annotations
@@ -236,14 +235,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self, List
 
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
-from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.robots.robot_parts import RobotCamera
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
 
 @dataclass(eq=False)
-class MyRobotCamera(Camera):
+class MyRobotCamera(RobotCamera):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -254,7 +254,9 @@ class MyRobotCamera(Camera):
                 robot_root, "camera_optical_frame"
             ),
             forward_facing_axis=Vector3.Z(),
-            field_of_view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
+            ),
             minimal_height=0.8,
             maximal_height=1.5,
             default_camera=True,

@@ -4,6 +4,7 @@ from typing import List
 
 import numpy as np
 
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.predicates import (
@@ -752,7 +753,9 @@ def test_nothing_occludes_a_body_in_clear_line_of_sight():
             name=PrefixedName("camera", prefix="review"),
             root=camera_body,
             forward_facing_axis=Vector3.X(),
-            field_of_view=FieldOfView(horizontal_angle=0.99, vertical_angle=0.75),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99, vertical_angle=0.75)
+            ),
         )
         world.add_semantic_annotation(camera)
 

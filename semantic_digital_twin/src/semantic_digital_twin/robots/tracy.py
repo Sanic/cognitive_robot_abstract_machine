@@ -29,10 +29,11 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     MountingTable,
-    Camera,
+    RobotCamera,
     EndEffector,
     Finger,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.robots.robotiq_85_gripper import Robotiq85Gripper
 from semantic_digital_twin.robots.ur10e_arm import UR10eArm
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
@@ -312,7 +313,7 @@ class TracyRightArm(UR10eArm[TracyRightGripper]):
 
 
 @dataclass(eq=False)
-class TracyCamera(Camera):
+class TracyCamera(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
@@ -329,7 +330,9 @@ class TracyCamera(Camera):
                 robot_root, "camera_link"
             ),
             forward_facing_axis=Vector3.Z(),
-            field_of_view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
+            ),
             minimal_height=0.8,
             maximal_height=1.7,
             default_camera=True,
@@ -408,9 +411,11 @@ class Tracy(
     def _setup_velocity_limits(self):
         """
         Slow the arms down to 0.2 rad/s at their fastest joint, keeping the joints'
-        proportions. The grippers keep the description's own limits: a finger is no
-        danger at that speed, and scaling it down with the arms would leave it too slow
-        to close within a motion.
+        proportions.
+
+        The grippers keep the description's own limits: a finger is no danger at that
+        speed, and scaling it down with the arms would leave it too slow to close within
+        a motion.
         """
         end_effector_connections = {
             connection

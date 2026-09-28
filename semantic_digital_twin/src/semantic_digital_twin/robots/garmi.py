@@ -18,6 +18,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -31,7 +32,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     EndEffector,
     Finger,
     MobileBase,
@@ -49,7 +50,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(eq=False)
-class GarmiCamera(Camera):
+class GarmiCamera(RobotCamera):
     """
     The head camera of the GARMI robot.
     """
@@ -75,7 +76,9 @@ class GarmiCamera(Camera):
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
             forward_facing_axis=Vector3(1, 0, 0),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=0.75049,
             maximal_height=0.99483,
             default_camera=True,

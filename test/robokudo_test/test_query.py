@@ -48,7 +48,6 @@ def query_simple_pipeline(node):
         "file_reader",
         loop=True,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
-        kinect_height_fix_mode=True,
         color2depth_ratio=(0.5, 0.5),
     )
 

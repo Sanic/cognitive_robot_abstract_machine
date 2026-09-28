@@ -3,9 +3,9 @@ import pooch
 
 # ---- Configuration ----
 DATA_PACKAGE_NAME: str = "robokudo_test_data"
-DATA_VERSION: str = "b991b2f15cd734672f449349a9e566fb67aad81e"
+DATA_VERSION: str = "52fedaf2f2e56f52a78eb9ea0a64a15d53a7294b"
 KNOWN_HASH: str = (
-    "sha256:b9150798870b7e7d067387dc295e661a55e2360c8c9cd944b6815d0ec59047e5"
+    "sha256:336c328d324f8c0023f924cb6fd0808aaabce8b11270597db427ebde333b3dd6"
 )
 
 URL: str = (

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import colorsys
-import copy
 
 import cv2
 import numpy as np
@@ -13,13 +12,16 @@ from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
 from robokudo.types.annotation import SIFTAnnotation
 from robokudo.types.scene import ObjectHypothesis
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
 
 class SIFTAnnotator(ThreadedAnnotator):
-    """Annotator for SIFT feature extraction and matching using OpenCV."""
+    """
+    Annotator for SIFT feature extraction and matching using OpenCV.
+    """
 
     def __init__(
         self,
@@ -28,10 +30,13 @@ class SIFTAnnotator(ThreadedAnnotator):
         super().__init__(name)
 
         self._sift: cv2.SIFT = cv2.SIFT_create()
-        """SIFT feature extractor."""
+        """
+        SIFT feature extractor.
+        """
 
     def compute(self) -> Status:
-        """Compute the SIFT features of the current image and match them to the last image.
+        """
+        Compute the SIFT features of the current image and match them to the last image.
 
         :return: The status of the computation.
         """
@@ -41,9 +46,7 @@ class SIFTAnnotator(ThreadedAnnotator):
         if len(ohs) == 0:
             return Status.FAILURE
 
-        intrinsic = cas.camera_intrinsic
-        if intrinsic is None:
-            return Status.FAILURE
+        camera_model = cas.require_camera_observation().effective_camera_model
 
         depth_ratio = cas.color2depth_ratio
         if depth_ratio is None:
@@ -86,7 +89,7 @@ class SIFTAnnotator(ThreadedAnnotator):
             )
 
         pcd = self._keypoints_to_point_cloud(
-            all_keypoints, depth_image, intrinsic, depth_ratio
+            all_keypoints, depth_image, camera_model, depth_ratio
         )
         self.get_annotator_output_struct().set_image(vis_image)
         self.get_annotator_output_struct().set_geometries(pcd)
@@ -98,7 +101,8 @@ class SIFTAnnotator(ThreadedAnnotator):
         vis_image: npt.NDArray[np.uint8],
         current_kp: Sequence[cv2.KeyPoint],
     ) -> npt.NDArray[np.uint8]:
-        """Add visualizations to the image.
+        """
+        Add visualizations to the image.
 
         :param color_image: The current color image.
         :param vis_image: The image to add visualizations to.
@@ -117,12 +121,13 @@ class SIFTAnnotator(ThreadedAnnotator):
         self,
         keypoints: List[cv2.KeyPoint],
         depth_image: npt.NDArray,
-        intrinsics: o3d.camera.PinholeCameraIntrinsic,
+        intrinsics: PinholeCameraModel,
         depth_ratio: Tuple[float, float] = (1.0, 1.0),
         depth_scale: float = 1000.0,
         max_depth: float = 3.0,
     ) -> o3d.geometry.PointCloud:
-        """Project the keypoints to a 3D point cloud.
+        """
+        Project the keypoints to a 3D point cloud.
 
         :param keypoints: The keypoints to project to 3D.
         :param depth_image: The depth image used for projection.
@@ -164,7 +169,8 @@ class SIFTAnnotator(ThreadedAnnotator):
         keypoints: List[cv2.KeyPoint],
         responses: npt.NDArray,
     ) -> npt.NDArray[np.float64]:
-        """Get rgb colors for keypoints based on their responses and angles.
+        """
+        Get rgb colors for keypoints based on their responses and angles.
 
         :param keypoints: The keypoints.
         :param responses: The keypoints responses.
