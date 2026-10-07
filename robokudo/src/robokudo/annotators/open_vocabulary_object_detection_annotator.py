@@ -7,21 +7,21 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import py_trees
-from semantic_digital_twin.world_description.geometry import Color
 import torch
 from transformers import Owlv2Processor, Owlv2ForObjectDetection
-from ultralytics import SAM
 from typing_extensions import TYPE_CHECKING
+from ultralytics import SAM
 
 import robokudo.annotators.core
 import robokudo.types
+import robokudo.types.annotation
 import robokudo.types.scene
 import robokudo.utils.annotator_helper
 import robokudo.utils.cv_helper
 from robokudo.cas import CASViews
-import robokudo.types.annotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
+from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:
     import numpy.typing as npt
