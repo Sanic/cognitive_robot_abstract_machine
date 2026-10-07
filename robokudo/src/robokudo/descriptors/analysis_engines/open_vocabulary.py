@@ -3,6 +3,7 @@ Detect objects matching configured text labels in preprocessed images.
 """
 
 from robokudo.analysis_engine import AnalysisEngineInterface
+from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVisualizer
 from robokudo.annotators.open_vocabulary_object_detection_annotator import (
     OpenVocabularyObjectDetectionAnnotator,
 )
@@ -32,6 +33,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         open_vocabulary_descriptor.parameters.classes = [
             "electric device",
         ]
+        open_vocabulary_descriptor.parameters.precision_mode = True
 
         seq = Pipeline("RWPipeline")
         seq.add_children(
@@ -42,6 +44,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 OpenVocabularyObjectDetectionAnnotator(
                     descriptor=open_vocabulary_descriptor
                 ),
+                ObjectHypothesisVisualizer(),
             ]
         )
         return seq
