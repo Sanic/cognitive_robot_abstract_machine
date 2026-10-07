@@ -110,14 +110,6 @@ class OpenVocabularyObjectDetectionAnnotator(
             self.descriptor.parameters.detection_processor
         )
 
-        self.id2name = {
-            str(i): name for i, name in enumerate(self.descriptor.parameters.classes)
-        }
-        self.id2rgb = {
-            i: (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-            for i, _ in enumerate(self.descriptor.parameters.classes)
-        }
-
         if self.descriptor.parameters.precision_mode:
             self.sam = SAM(self.descriptor.parameters.sam_model)
 
