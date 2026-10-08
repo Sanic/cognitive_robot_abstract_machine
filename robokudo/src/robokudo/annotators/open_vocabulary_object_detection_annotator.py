@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 from enum import IntEnum, StrEnum
 from timeit import default_timer
 
