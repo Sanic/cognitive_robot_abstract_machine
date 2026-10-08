@@ -5,7 +5,7 @@ Verify NumPy image inputs for open-vocabulary detection and mask prediction.
 from unittest.mock import MagicMock
 
 import cv2
-import numpy as np
+import numpy
 import pytest
 import torch
 from py_trees.common import Status
@@ -54,7 +54,7 @@ def numpy_image_annotator(
     monkeypatch.setattr(annotator, "get_annotator_output_struct", MagicMock())
     pipeline = Pipeline("Detection")
     pipeline.add_child(annotator)
-    image = np.arange(4 * 6 * 3, dtype=np.uint8).reshape(4, 6, 3)
+    image = numpy.arange(4 * 6 * 3, dtype=numpy.uint8).reshape(4, 6, 3)
     annotator.get_cas().set(CASViews.COLOR_IMAGE, image)
     return annotator
 
@@ -68,8 +68,8 @@ def test_detector_receives_rgb_numpy_image(
     image = numpy_image_annotator.get_cas().get(CASViews.COLOR_IMAGE)
     assert numpy_image_annotator.compute() == Status.SUCCESS
     received_image = numpy_image_annotator.processor.call_args.kwargs["images"]
-    assert isinstance(received_image, np.ndarray)
-    np.testing.assert_array_equal(
+    assert isinstance(received_image, numpy.ndarray)
+    numpy.testing.assert_array_equal(
         received_image, cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     )
 
@@ -97,10 +97,10 @@ def test_mask_predictor_receives_original_bgr_numpy_image(
     image = numpy_image_annotator.get_cas().get(CASViews.COLOR_IMAGE)
     height, width = image.shape[:2]
     numpy_image_annotator.descriptor.parameters.precision_mode = True
-    numpy_image_annotator.sam = MagicMock()
-    numpy_image_annotator.sam.predict.return_value[
+    numpy_image_annotator.segment_anything_model = MagicMock()
+    numpy_image_annotator.segment_anything_model.predict.return_value[
         0
-    ].masks.data.cpu.return_value.numpy.return_value = np.ones((1, height, width))
+    ].masks.data.cpu.return_value.numpy.return_value = numpy.ones((1, height, width))
     numpy_image_annotator.processor.post_process_grounded_object_detection.return_value = [
         {
             DetectionResultField.BOXES: torch.Tensor([[0, 0, width, height]]),
@@ -109,7 +109,9 @@ def test_mask_predictor_receives_original_bgr_numpy_image(
         }
     ]
     assert numpy_image_annotator.compute() == Status.SUCCESS
-    assert numpy_image_annotator.sam.predict.call_args.args[0] is image
+    assert (
+        numpy_image_annotator.segment_anything_model.predict.call_args.args[0] is image
+    )
 
 
 # %% Precision-mode mask processing
@@ -126,9 +128,9 @@ def precision_mask_annotator(
     image = annotator.get_cas().get(CASViews.COLOR_IMAGE)
     height, width = image.shape[:2]
     annotator.descriptor.parameters.precision_mode = True
-    annotator.sam = MagicMock()
-    mask = np.arange(height * width, dtype=np.uint8).reshape(height, width) % 2
-    annotator.sam.predict.return_value[
+    annotator.segment_anything_model = MagicMock()
+    mask = numpy.arange(height * width, dtype=numpy.uint8).reshape(height, width) % 2
+    annotator.segment_anything_model.predict.return_value[
         0
     ].masks.data.cpu.return_value.numpy.return_value = mask[None]
     annotator.processor.post_process_grounded_object_detection.return_value = [
@@ -147,22 +149,23 @@ def test_precision_mask_preserves_color_coordinates(
     color_to_depth_ratio: tuple[float, float] | None,
 ) -> None:
     """
-    Crop SAM's color-resolution mask independently of the color-to-depth ratio.
+    Crop Segment Anything's color-resolution mask independently of the color-to-depth
+    ratio.
     """
     annotator = precision_mask_annotator
     annotator.descriptor.parameters.global_with_depth = color_to_depth_ratio is not None
     annotator.get_cas().set(CASViews.COLOR2DEPTH_RATIO, color_to_depth_ratio)
-    mask = annotator.sam.predict.return_value[
+    mask = annotator.segment_anything_model.predict.return_value[
         0
     ].masks.data.cpu.return_value.numpy.return_value[0]
-    expected_mask = mask * np.iinfo(np.uint8).max
+    expected_mask = mask * numpy.iinfo(numpy.uint8).max
 
     assert annotator.compute() == Status.SUCCESS
 
     object_hypothesis = annotator.get_cas().filter_annotations_by_type(
         ObjectHypothesis
     )[0]
-    np.testing.assert_array_equal(
+    numpy.testing.assert_array_equal(
         object_hypothesis.roi.mask,
         crop_image_roi(expected_mask, object_hypothesis.roi),
     )
@@ -172,7 +175,7 @@ def test_precision_mask_does_not_require_color_to_depth_ratio(
     precision_mask_annotator: OpenVocabularyObjectDetectionAnnotator,
 ) -> None:
     """
-    Process color-resolution SAM masks without depth scaling information.
+    Process color-resolution Segment Anything masks without depth scaling information.
     """
     annotator = precision_mask_annotator
     annotator.descriptor.parameters.global_with_depth = True
@@ -181,21 +184,21 @@ def test_precision_mask_does_not_require_color_to_depth_ratio(
     assert annotator.compute() == Status.SUCCESS
 
 
-def test_precision_bounding_box_uses_sam_mask_color_coordinates(
+def test_precision_bounding_box_uses_segment_anything_mask_color_coordinates(
     precision_mask_annotator: OpenVocabularyObjectDetectionAnnotator,
 ) -> None:
     """
     Keep mask-derived bounding boxes in color-image coordinates with depth enabled.
     """
     annotator = precision_mask_annotator
-    annotator.descriptor.parameters.precision_mode_can_fix_boundingbox = True
+    annotator.descriptor.parameters.refine_bounding_boxes = True
     annotator.descriptor.parameters.global_with_depth = True
     annotator.get_cas().set(CASViews.COLOR2DEPTH_RATIO, (0.5, 0.5))
     mask = (
-        annotator.sam.predict.return_value[
+        annotator.segment_anything_model.predict.return_value[
             0
         ].masks.data.cpu.return_value.numpy.return_value[0]
-        * np.iinfo(np.uint8).max
+        * numpy.iinfo(numpy.uint8).max
     )
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     expected_rectangle = cv2.boundingRect(contours[0])
@@ -249,22 +252,23 @@ def test_predict_mask_returns_full_color_resolution_byte_mask(
     precision_mask_annotator: OpenVocabularyObjectDetectionAnnotator,
 ) -> None:
     """
-    Return SAM foreground values scaled to bytes without cropping or depth resizing.
+    Return Segment Anything foreground values scaled to bytes without cropping or depth
+    resizing.
     """
     annotator = precision_mask_annotator
     image = annotator.get_cas().get(CASViews.COLOR_IMAGE)
     box = annotator.processor.post_process_grounded_object_detection.return_value[0][
         DetectionResultField.BOXES
     ][0].tolist()
-    source_mask = annotator.sam.predict.return_value[
+    source_mask = annotator.segment_anything_model.predict.return_value[
         0
     ].masks.data.cpu.return_value.numpy.return_value[0]
-    expected_mask = source_mask * np.iinfo(np.uint8).max
+    expected_mask = source_mask * numpy.iinfo(numpy.uint8).max
 
     mask = annotator.predict_mask(image, box)
 
-    assert mask.dtype == np.uint8
-    np.testing.assert_array_equal(mask, expected_mask)
+    assert mask.dtype == numpy.uint8
+    numpy.testing.assert_array_equal(mask, expected_mask)
 
 
 @pytest.mark.parametrize(
@@ -298,10 +302,10 @@ def test_visualize_objects_draws_roi_mask_without_mutating_source(
 
     visualization = annotator.visualize_objects(image, hypotheses * (mask_index + 1))
 
-    foreground = object_hypothesis.roi.mask == np.iinfo(np.uint8).max
+    foreground = object_hypothesis.roi.mask == numpy.iinfo(numpy.uint8).max
     image_region = crop_image_roi(visualization, object_hypothesis.roi)
-    np.testing.assert_array_equal(
-        image_region[foreground] / np.iinfo(np.uint8).max,
-        np.broadcast_to(color.to_rgb()[::-1], image_region[foreground].shape),
+    numpy.testing.assert_array_equal(
+        image_region[foreground] / numpy.iinfo(numpy.uint8).max,
+        numpy.broadcast_to(color.to_rgb()[::-1], image_region[foreground].shape),
     )
-    np.testing.assert_array_equal(image, original_image)
+    numpy.testing.assert_array_equal(image, original_image)

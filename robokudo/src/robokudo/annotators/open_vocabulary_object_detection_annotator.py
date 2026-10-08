@@ -5,12 +5,12 @@ from enum import IntEnum, StrEnum
 from timeit import default_timer
 
 import cv2
-import numpy as np
+import numpy
 import py_trees
 import torch
 from transformers import Owlv2Processor, Owlv2ForObjectDetection
 from typing_extensions import TYPE_CHECKING
-from ultralytics import SAM
+from ultralytics import SAM as SegmentAnythingModel
 
 import robokudo.annotators.core
 import robokudo.types
@@ -24,7 +24,7 @@ from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:
-    import numpy.typing as npt
+    import numpy.typing as numpy_typing
 
 
 # %% Detection and segmentation values
@@ -53,20 +53,20 @@ class SegmentPromptLabel(IntEnum):
 # %% Bounding-box labels
 
 
-def get_box_text(oh):
-    max_conf = -1
+def get_box_text(object_hypothesis):
+    maximum_confidence = -1
     best_classification = None
 
-    for oh_anno in oh.annotations:
-        if isinstance(oh_anno, robokudo.types.annotation.Classification):
-            if oh_anno.confidence > max_conf:
-                max_conf = oh_anno.confidence
-                best_classification = oh_anno
+    for annotation in object_hypothesis.annotations:
+        if isinstance(annotation, robokudo.types.annotation.Classification):
+            if annotation.confidence > maximum_confidence:
+                maximum_confidence = annotation.confidence
+                best_classification = annotation
 
     if best_classification is None:
-        return f"ROI-{oh.id}"
+        return f"ROI-{object_hypothesis.id}"
     else:
-        return f"{oh.id}: {best_classification.classname}, {best_classification.confidence:.2f}"
+        return f"{object_hypothesis.id}: {best_classification.classname}, {best_classification.confidence:.2f}"
 
 
 # %% Open-vocabulary object detection
@@ -84,19 +84,18 @@ class OpenVocabularyObjectDetectionAnnotator(
                 self.detection_processor = "google/owlv2-base-patch16-ensemble"
                 self.detection_threshold = 0.2
 
-                # Use SAM in precision mode to generate masks
-                self.sam_model = "mobile_sam.pt"
+                self.segment_anything_model_path = "mobile_sam.pt"
+                """Checkpoint for the Segment Anything model."""
                 self.precision_mode = False
-                # Some object detectors might undersegment the object.
-                # Applying SAM can sometimes fix this problem. If this is set to true,
-                # use the BB as suggested by SAM
-                self.precision_mode_can_fix_boundingbox = False
+                """Whether to predict object masks with Segment Anything."""
+                self.refine_bounding_boxes = False
+                """Whether to refine detection boxes using Segment Anything masks."""
 
         parameters = Parameters()
 
     def __init__(
         self,
-        name="OpenVocabObjectDetectionAnnotator",
+        name="OpenVocabularyObjectDetectionAnnotator",
         descriptor=Descriptor(),
     ) -> None:
         super(OpenVocabularyObjectDetectionAnnotator, self).__init__(name, descriptor)
@@ -111,7 +110,9 @@ class OpenVocabularyObjectDetectionAnnotator(
         )
 
         if self.descriptor.parameters.precision_mode:
-            self.sam = SAM(self.descriptor.parameters.sam_model)
+            self.segment_anything_model = SegmentAnythingModel(
+                self.descriptor.parameters.segment_anything_model_path
+            )
 
     @catch_and_raise_to_blackboard
     def compute(self) -> py_trees.common.Status:
@@ -125,8 +126,10 @@ class OpenVocabularyObjectDetectionAnnotator(
         self.feedback_message = f"Processing took {default_timer() - start_timer:.4f}s"
         return py_trees.common.Status.SUCCESS
 
-    def detect_objects(self, image: npt.NDArray[np.uint8]) -> list[ObjectHypothesis]:
-        """Return classified object hypotheses with optional cropped SAM masks."""
+    def detect_objects(
+        self, image: numpy_typing.NDArray[numpy.uint8]
+    ) -> list[ObjectHypothesis]:
+        """Return classified object hypotheses with optional cropped Segment Anything masks."""
         inputs = self.processor(
             text=self.classes,
             images=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
@@ -166,7 +169,7 @@ class OpenVocabularyObjectDetectionAnnotator(
             object_hypothesis.roi.roi.height = int(bottom - top)
             if self.descriptor.parameters.precision_mode:
                 object_hypothesis.roi.mask = self.predict_mask(image, box)
-                if self.descriptor.parameters.precision_mode_can_fix_boundingbox:
+                if self.descriptor.parameters.refine_bounding_boxes:
                     self.refine_bounding_box(object_hypothesis)
                 object_hypothesis.roi.mask = robokudo.utils.cv_helper.crop_image_roi(
                     object_hypothesis.roi.mask, object_hypothesis.roi
@@ -182,14 +185,14 @@ class OpenVocabularyObjectDetectionAnnotator(
         return object_hypotheses
 
     def predict_mask(
-        self, image: npt.NDArray[np.uint8], box: list[float]
-    ) -> npt.NDArray[np.uint8]:
+        self, image: numpy_typing.NDArray[numpy.uint8], box: list[float]
+    ) -> numpy_typing.NDArray[numpy.uint8]:
         """Return a binary byte mask at the original color-image resolution."""
-        result = self.sam.predict(
+        result = self.segment_anything_model.predict(
             image, bboxes=[box], labels=[SegmentPromptLabel.FOREGROUND]
         )[0]
-        mask = result.masks.data.cpu().numpy()[0].astype(np.uint8)
-        return mask * np.iinfo(np.uint8).max
+        mask = result.masks.data.cpu().numpy()[0].astype(numpy.uint8)
+        return mask * numpy.iinfo(numpy.uint8).max
 
     def refine_bounding_box(self, object_hypothesis: ObjectHypothesis) -> None:
         """Adjust the box to the first mask contour, leaving empty masks unchanged."""
@@ -207,8 +210,10 @@ class OpenVocabularyObjectDetectionAnnotator(
         self.rk_logger.info(f"After fix: {object_hypothesis.roi.roi}")
 
     def visualize_objects(
-        self, image: npt.NDArray[np.uint8], object_hypotheses: list[ObjectHypothesis]
-    ) -> npt.NDArray[np.uint8]:
+        self,
+        image: numpy_typing.NDArray[numpy.uint8],
+        object_hypotheses: list[ObjectHypothesis],
+    ) -> numpy_typing.NDArray[numpy.uint8]:
         """Return an image copy with detection labels, boxes, and optional masks."""
         visualization = image.copy()
         robokudo.utils.annotator_helper.draw_bounding_boxes_from_object_hypotheses(
@@ -224,15 +229,15 @@ class OpenVocabularyObjectDetectionAnnotator(
             Color.CYAN(),
         )
         # Convert normalized RGB colors to OpenCV's byte-valued BGR.
-        mask_colors = np.rint(
-            np.array([color.to_rgb()[::-1] for color in palette])
-            * np.iinfo(np.uint8).max
-        ).astype(np.uint8)
+        mask_colors = numpy.rint(
+            numpy.array([color.to_rgb()[::-1] for color in palette])
+            * numpy.iinfo(numpy.uint8).max
+        ).astype(numpy.uint8)
         for index, object_hypothesis in enumerate(object_hypotheses):
             image_region = robokudo.utils.cv_helper.crop_image_roi(
                 visualization, object_hypothesis.roi
             )
-            image_region[object_hypothesis.roi.mask == np.iinfo(np.uint8).max] = (
+            image_region[object_hypothesis.roi.mask == numpy.iinfo(numpy.uint8).max] = (
                 mask_colors[index % len(mask_colors)]
             )
         return visualization
