@@ -24,7 +24,13 @@ from typing_extensions import TYPE_CHECKING, Dict, List, Optional
 import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.exceptions import ColorToDepthRatioMissing, UnknownMode
+from robokudo.exceptions import (
+    CameraObservationMissing,
+    CameraPoseMissing,
+    ColorToDepthRatioMissing,
+    UnknownMode,
+)
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     Classification,
@@ -35,7 +41,6 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.types.tf import Pose
 from robokudo.utils.annotator_helper import (
     get_world_to_camera_transform_matrix,
-    scale_camera_intrinsics,
 )
 from robokudo.utils.cv_helper import (
     clamp_bounding_rect,
@@ -358,9 +363,6 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
         self.cloud = self.get_cas().get(CASViews.CLOUD)
-        self.camera_intrinsics = copy.deepcopy(
-            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
-        )
 
         world_frame_required = False
         world_to_camera_transform_matrix = None
@@ -398,7 +400,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 world_to_camera_transform_matrix = get_world_to_camera_transform_matrix(
                     self.get_cas()
                 )
-            except:
+            except (CameraObservationMissing, CameraPoseMissing):
                 self.rk_logger.warning(
                     "Couldn't find world-to-camera transform in the CAS"
                 )
@@ -409,7 +411,20 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             resized_color = get_scaled_color_image_for_depth_image(
                 self.get_cas(), self.color
             )
-            scale_camera_intrinsics(self)
+            color2depth_ratio = self.get_cas().color2depth_ratio
+            if color2depth_ratio is None:
+                raise ColorToDepthRatioMissing()
+            pointcloud_camera_model = (
+                self.get_cas()
+                .require_camera_observation()
+                .effective_camera_model.scaled(
+                    scale_x=color2depth_ratio[0],
+                    scale_y=color2depth_ratio[1],
+                )
+            )
+            self.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
+                pointcloud_camera_model
+            )
         except ColorToDepthRatioMissing:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."

@@ -1476,10 +1476,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         root = self._condition_leaves_in_place(point)
         if root is None:
             return None, -np.inf
+        # read before marginalizing, which may simplify the root away
+        log_probability = root.result_of_current_query
 
         if preserve_structure:
             self.normalize()
-            return self, root.result_of_current_query
+            return self, log_probability
 
         # simplify dirac parts
         remaining_variables = [v for v in self.variables if v not in point]
@@ -1498,12 +1500,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         for variable, value in point.items():
             new_root.add_subcircuit(leaf(make_dirac(variable, value), self))
 
-        new_root.result_of_current_query = root.result_of_current_query
+        new_root.result_of_current_query = log_probability
 
         self.simplify()
         self.normalize()
 
-        return self, root.result_of_current_query
+        return self, log_probability
 
     def log_conditional(
         self, point: Dict[Variable, Any]
@@ -1700,7 +1702,8 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         Rename each variable in this circuit to include ``prefix`` as a namespace.
 
         Produces names of the form ``"{prefix}.{variable.name}"``. Variables in
-        ``excluded_variables`` are left unchanged.
+        ``excluded_variables``, and variables already inside that namespace, are left
+        unchanged.
 
         :param prefix: String prefix to prepend to every variable name.
         :param excluded_variables: Variables that should keep their current names.
@@ -1711,6 +1714,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
             )
             for variable in self.variables
             if variable not in excluded_variables
+            and not variable.name.startswith(f"{prefix}.")
         }
         self.update_variables(variable_renames)
 
@@ -2280,6 +2284,20 @@ class MultivariateLeaf(LeafUnit):
         self.distribution, self.result_of_current_query = (
             self.distribution.log_conditional(own_point)
         )
+
+    def moment(self, order, center, variable_to_index_map):
+        result = np.zeros(len(variable_to_index_map))
+        requested = [
+            variable for variable in self.distribution.variables if variable in order
+        ]
+        if requested:
+            moment = self.distribution.moment(
+                {variable: order[variable] for variable in requested},
+                {variable: center[variable] for variable in requested},
+            )
+            for variable in requested:
+                result[variable_to_index_map[variable]] = moment[variable]
+        self.result_of_current_query = result
 
     def replace_by_dirac_product(self, point: Dict[Variable, Any]) -> ProductUnit:
         """

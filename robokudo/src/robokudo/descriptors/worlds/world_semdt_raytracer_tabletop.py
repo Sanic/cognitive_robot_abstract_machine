@@ -1,6 +1,7 @@
 from importlib.util import find_spec
 from pathlib import Path
 
+from robokudo.descriptors.worlds.pinhole_rgbd_camera import PinholeRGBDCameraSpec
 from robokudo.world_descriptor import (
     BaseWorldDescriptor,
     ObjectSpec,
@@ -14,9 +15,13 @@ from semantic_digital_twin.world_description.geometry import Color, Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
+# %% World descriptor
+
 
 class WorldDescriptor(BaseWorldDescriptor):
-    """A compact tabletop world for SemDT RayTracer-based camera simulation."""
+    """
+    A compact tabletop world for SemDT RayTracer-based camera simulation.
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -148,3 +153,17 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
 
         self.build_regions(root, region_specs)
+        self.build_camera(
+            root,
+            PinholeRGBDCameraSpec(
+                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-1.20,
+                    y=0.40,
+                    z=1.05,
+                    roll=-2.2689280275926285,
+                    pitch=0.0,
+                    yaw=-0.2707963267948965,
+                    reference_frame=root,
+                ),
+            ),
+        )

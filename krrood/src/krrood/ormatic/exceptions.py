@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import zoneinfo
 from dataclasses import dataclass
 from typing_extensions import Type, Any, List, TYPE_CHECKING
 
@@ -59,6 +60,28 @@ class NoDAOFoundError(DataclassException, TypeError):
             "up to date by running the script that generates the ormatic interface, and that the target class is "
             "actually mapped."
         )
+
+
+@dataclass
+class QueryCannotBePersisted(DataclassException, TypeError):
+    """
+    Raised when an object that is to be stored holds an entity query language query in
+    place of a value.
+
+    A query describes the objects that would satisfy it rather than one of them, so
+    there is nothing to store until it is answered.
+    """
+
+    query: Any
+    """
+    The query that was to be stored.
+    """
+
+    def error_message(self) -> str:
+        return f"The query {self.query} cannot be stored."
+
+    def suggest_correction(self) -> str:
+        return "Store the objects the query was answered with instead of the query."
 
 
 @dataclass
@@ -159,6 +182,27 @@ class UnsupportedColumnType(DataclassException, TypeError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class ZoneInfoWithoutKey(DataclassException, ValueError):
+    """
+    Raised when a timezone that has no IANA key, such as one read from a file, is
+    written to the database, where timezones are stored by their key.
+    """
+
+    zone: zoneinfo.ZoneInfo
+    """
+    The timezone that has no key.
+    """
+
+    def error_message(self) -> str:
+        return f"The timezone {self.zone!r} has no IANA key to store it by."
+
+    def suggest_correction(self) -> str:
+        return (
+            "create the timezone from its key, e.g. zoneinfo.ZoneInfo('Europe/Berlin')."
+        )
 
 
 @dataclass

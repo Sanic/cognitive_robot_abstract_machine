@@ -13,7 +13,6 @@ This module provides an annotator for:
 
 from __future__ import annotations
 
-import copy
 from enum import StrEnum
 from timeit import default_timer
 
@@ -26,7 +25,7 @@ from typing_extensions import TYPE_CHECKING, Optional
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing
-from robokudo.utils.annotator_helper import scale_camera_intrinsics
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 
 if TYPE_CHECKING:
@@ -106,16 +105,24 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
 
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        self.camera_intrinsics = copy.deepcopy(
-            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
+        cas = self.get_cas()
+        color2depth_ratio = cas.color2depth_ratio
+        if color2depth_ratio is None:
+            raise ColorToDepthRatioMissing()
+        pointcloud_camera_model = (
+            cas.require_camera_observation().effective_camera_model.scaled(
+                scale_x=color2depth_ratio[0],
+                scale_y=color2depth_ratio[1],
+            )
+        )
+        self.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
+            pointcloud_camera_model
         )
 
         if self.display_mode is self.ViewMode.DEPTH:
             self.get_annotator_output_struct().set_image(self.depth)
         else:
             self.get_annotator_output_struct().set_image(self.color)
-
-        scale_camera_intrinsics(self)
 
         resized_color = None
         try:
@@ -151,7 +158,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
             rgbd_image, self.camera_intrinsics
         )
 
-        self.get_cas().set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, self.camera_intrinsics)
+        cas.pointcloud_camera_model = pointcloud_camera_model
 
         self.get_cas().set_ref(CASViews.CLOUD, cloud)
         self.get_annotator_output_struct().set_geometries(

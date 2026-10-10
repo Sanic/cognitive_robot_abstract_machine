@@ -25,12 +25,10 @@ import ament_index_python.packages
 import cv2
 from typing_extensions import Any, Dict, List, Optional, TypeVar
 
+from krrood.adapters.json_serializer import from_json
 from robokudo.cas import CAS, CASViews
 from robokudo.io.camera_interface import CameraInterface
-from robokudo.utils.type_conversion import (
-    o3d_camera_intrinsics_from_ros_camera_info,
-    ros_camera_info_from_dict,
-)
+from semantic_digital_twin.datastructures.camera_model import CameraModality
 
 T = TypeVar("T")
 
@@ -43,10 +41,10 @@ class FileReaderInterface(CameraInterface):
     Files must follow the naming convention:
     * rk_TIMESTAMP_color_image.jpg - Color image data
     * rk_TIMESTAMP_depth_image.png - Depth image data
-    * rk_TIMESTAMP_cam_info.json - Camera calibration data
+    * rk_TIMESTAMP_camera_observation.json - Camera observation metadata
 
-    The 'rk_' prefix is configurable. Data types in filenames must match
-    CASViews definitions.
+    The 'rk_' prefix is configurable. Data suffixes use the corresponding
+    :class:`robokudo.cas.CASViews` names.
 
     .. note::
         This interface is primarily for testing and demos. For production,
@@ -169,7 +167,7 @@ class FileReaderInterface(CameraInterface):
         else:
             if not camera_config.target_dir:
                 raise Exception(
-                    f"FileReaderInterface: target_ros_package AND target_dir not properly set. Check CameraConfig"
+                    "FileReaderInterface: target_ros_package AND target_dir not properly set. Check CameraConfig"
                 )
 
             self.target_dir: str = camera_config.target_dir
@@ -197,7 +195,7 @@ class FileReaderInterface(CameraInterface):
         for file_path in file_paths_found:
             # Lookup the timestamp from the filename. Match also by the prefix, but ignore it by having a capture
             # group for the actual timestamp with '()'
-            # Additionally, capture the stored data suffix (e.g. color, depth, cam_info, etc.)
+            # Additionally, capture the stored data suffix.
             regexp_result = re.search(
                 rf"{self.filename_prefix}([0-9\.]+)_(.*)\.", file_path.name
             )
@@ -211,8 +209,7 @@ class FileReaderInterface(CameraInterface):
 
             self.loaded_paths[matched_timestamp][matched_data_type] = file_path
 
-            # Load the actual content
-            # data is named by the CASViews during recording time. So mathc against these
+            # Load the actual content according to its recorded data suffix.
             if matched_data_type == CASViews.COLOR_IMAGE:
                 data = cv2.imread(str(file_path))
                 if data is None:
@@ -223,12 +220,15 @@ class FileReaderInterface(CameraInterface):
                 if data is None:
                     raise Exception(f"OpenCV couldn't read {str(file_path)}")
                 self.loaded_data[matched_timestamp][matched_data_type] = data
-            elif matched_data_type == CASViews.CAMERA_INFO:
+            elif matched_data_type == CASViews.CAMERA_OBSERVATION:
                 with open(str(file_path)) as fp:
-                    camera_info_json = json.load(fp)
-                    self.loaded_data[matched_timestamp][matched_data_type] = (
-                        ros_camera_info_from_dict(camera_info_json)
+                    camera_observation_data = json.load(fp)
+                    camera_observation_data["effective_camera_model"] = from_json(
+                        camera_observation_data["effective_camera_model"]
                     )
+                    self.loaded_data[matched_timestamp][
+                        matched_data_type
+                    ] = camera_observation_data
 
         # Initialize the main datastructure that we use to access the data
         # iteratively and to be able to peek into it for checking if data is available
@@ -272,25 +272,28 @@ class RGBDFileReaderInterface(FileReaderInterface):
 
         This method:
         * Reads the next color and depth images
-        * Applies any necessary fixes (e.g., Kinect height fix)
-        * Sets camera calibration and transformation data
+        * Reads the recorded camera frame, model, and timestamp
+        * Applies the configured static camera transform, if enabled
         * Updates the CAS with all loaded data
 
         :param cas: Common Analysis Structure to update
         """
         data = self.data_reader.get_next_data()
+        if data is None:
+            return
 
         cas.set(CASViews.COLOR_IMAGE, data[CASViews.COLOR_IMAGE])
         cas.set(CASViews.DEPTH_IMAGE, data[CASViews.DEPTH_IMAGE])
 
-        camera_info = data[CASViews.CAMERA_INFO]
-        if self.camera_config.kinect_height_fix_mode:
-            camera_info.height = 960  # Kinect hack ...
-        cas.set(CASViews.CAMERA_INFO, camera_info)
-
-        cas.set(
-            CASViews.CAMERA_INTRINSIC,
-            o3d_camera_intrinsics_from_ros_camera_info(data[CASViews.CAMERA_INFO]),
-        )
+        recorded_observation = data[CASViews.CAMERA_OBSERVATION]
         cas.set(CASViews.COLOR2DEPTH_RATIO, self.camera_config.color2depth_ratio)
-        self.store_static_camera_transform_if_configured(cas)
+        camera_frame = recorded_observation["camera_frame"]
+        world_T_camera = self.static_world_T_camera_if_configured(camera_frame)
+        self.store_camera_observation(
+            cas=cas,
+            camera_model=recorded_observation["effective_camera_model"],
+            camera_frame=camera_frame,
+            timestamp_nanoseconds=recorded_observation["timestamp_nanoseconds"],
+            modalities=(CameraModality.COLOR, CameraModality.DEPTH),
+            world_T_camera=world_T_camera,
+        )

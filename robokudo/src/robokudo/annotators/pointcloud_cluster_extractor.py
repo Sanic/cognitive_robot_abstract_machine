@@ -31,6 +31,7 @@ from robokudo.cas import CASViews
 from robokudo.exceptions import (
     EmptyPointCloud,
     PlaneModelMissing,
+    PointCloudCameraModelMissing,
     PointCloudTooSmallForClustering,
 )
 from robokudo.types.annotation import Plane
@@ -40,6 +41,7 @@ from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypo
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import concatenate_clouds, put_obb_on_target_obb
 from robokudo.utils.transform import get_transform_matrix
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -50,7 +52,7 @@ DILATION_KERNEL = np.ones((3, 3), np.uint8)
 def generate_roi_with_mask_from_points(
     image_height: int,
     image_width: int,
-    pointcloud_camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
+    pointcloud_camera_model: PinholeCameraModel,
     cloud: o3d.geometry.PointCloud,
     color2depth_ratio: Tuple[int, int] = (1, 1),
 ) -> Tuple[ImageROI, npt.NDArray]:
@@ -64,7 +66,7 @@ def generate_roi_with_mask_from_points(
 
     :param image_height: Height of the target image
     :param image_width: Width of the target image
-    :param pointcloud_camera_intrinsics: Camera intrinsic parameters
+    :param pointcloud_camera_model: Projection model used to create the point cloud.
     :param cloud: Point cloud to project
     :param color2depth_ratio: Scale ratio between color and depth images
     :return: Tuple of (ROI with mask, full image mask)
@@ -73,7 +75,7 @@ def generate_roi_with_mask_from_points(
 
     # Project 3D points to image plane for ROI generation
     # This will project the matched points into the full-size input image
-    k = pointcloud_camera_intrinsics.intrinsic_matrix
+    k = pointcloud_camera_model.intrinsic_matrix
     cropped_3d_points = np.asarray(cloud.points)
     uvd = cropped_3d_points @ k.T
     x = (uvd[:, 0] / uvd[:, 2]).astype(int)
@@ -296,6 +298,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         * Visualizes clusters with unique colors
 
         :return: SUCCESS if clusters are found, FAILURE if no clusters or errors
+        :raises PointCloudCameraModelMissing: If the CAS lacks the point cloud camera model
         :raises PlaneModelMissing: If no plane model exists in CAS
         :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
         """
@@ -303,12 +306,9 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         self.rk_logger.info("PCE Start")
         cloud = self.get_cas().get(CASViews.CLOUD)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        pointcloud_camera_intrinsics = self.get_cas().get(
-            CASViews.POINTCLOUD_CAMERA_INTRINSIC
-        )
-        assert isinstance(
-            pointcloud_camera_intrinsics, o3d.camera.PinholeCameraIntrinsic
-        )
+        pointcloud_camera_model = self.get_cas().pointcloud_camera_model
+        if pointcloud_camera_model is None:
+            raise PointCloudCameraModelMissing()
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         height, width, d = color.shape
@@ -384,7 +384,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
                 generate_roi_with_mask_from_points(
                     image_height=height,
                     image_width=width,
-                    pointcloud_camera_intrinsics=pointcloud_camera_intrinsics,
+                    pointcloud_camera_model=pointcloud_camera_model,
                     cloud=cluster_cloud,
                     color2depth_ratio=color2depth_ratio,
                 )
@@ -397,7 +397,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             cluster_idx += 1
 
         if len(object_hypotheses) == 0:
-            self.rk_logger.warning(f"No Clusters have been found.")
+            self.rk_logger.warning("No Clusters have been found.")
             end_timer = default_timer()
             self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
             return Status.FAILURE
@@ -493,17 +493,15 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         * Visualizes clusters with unique colors
 
         :return: SUCCESS if clusters found, FAILURE if no clusters or errors
+        :raises PointCloudCameraModelMissing: If the CAS lacks the point cloud camera model
         :raises EmptyPointCloud: If the input cloud is empty
         """
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
         color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
-        pointcloud_camera_intrinsics = self.get_cas().get(
-            CASViews.POINTCLOUD_CAMERA_INTRINSIC
-        )
-        assert isinstance(
-            pointcloud_camera_intrinsics, o3d.camera.PinholeCameraIntrinsic
-        )
+        pointcloud_camera_model = self.get_cas().pointcloud_camera_model
+        if pointcloud_camera_model is None:
+            raise PointCloudCameraModelMissing()
 
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
         height, width, d = color.shape
@@ -560,7 +558,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
                 generate_roi_with_mask_from_points(
                     image_height=height,
                     image_width=width,
-                    pointcloud_camera_intrinsics=pointcloud_camera_intrinsics,
+                    pointcloud_camera_model=pointcloud_camera_model,
                     cloud=cluster_cloud,
                     color2depth_ratio=color2depth_ratio,
                 )
@@ -573,7 +571,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             cluster_idx += 1
 
         if len(object_hypotheses) == 0:
-            self.rk_logger.warning(f"No Clusters have been found.")
+            self.rk_logger.warning("No Clusters have been found.")
             end_timer = default_timer()
             self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
             return Status.FAILURE

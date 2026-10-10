@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from functools import lru_cache
 from typing import Type, Optional, Any, TYPE_CHECKING
 from typing_extensions import get_origin
@@ -16,6 +17,42 @@ if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 
 
+def _same_domain_class(candidate: Type, original_clazz: Type) -> bool:
+    """
+    Whether *candidate* is the domain class a DAO subclass was mapped against, allowing
+    for one of the two to have been loaded as a process's entry point.
+
+    A module run as a script's or ``-m``'s entry point executes under the name
+    ``__main__``. The ``spawn`` multiprocessing start method then re-executes that same
+    module in every worker it starts, under the name ``__mp_main__`` -- a synthetic name
+    CPython uses precisely to keep this reload from colliding with a worker's own,
+    separate ``__main__``. Either way, a class the module defines is a distinct object
+    there from the one obtained by importing the module normally elsewhere in the same
+    process, even though both come from the same class body. Plain identity comparison
+    would then treat whichever one is not *original_clazz* as an unmapped class, so this
+    falls back to matching by defining file and qualified name -- but only when one side
+    was loaded under one of those two entry-point names, so two classes that merely
+    share a name in genuinely different modules are never conflated.
+
+    :param candidate: A candidate class found while searching DAO subclasses.
+    :param original_clazz: The domain class being resolved.
+    :return: Whether they are the same domain class.
+    """
+    if candidate == original_clazz:
+        return True
+    if not {"__main__", "__mp_main__"} & {
+        candidate.__module__,
+        original_clazz.__module__,
+    }:
+        return False
+    if candidate.__qualname__ != original_clazz.__qualname__:
+        return False
+    try:
+        return inspect.getfile(candidate) == inspect.getfile(original_clazz)
+    except TypeError:
+        return False
+
+
 @lru_cache(maxsize=None)
 def _get_clazz_by_original_clazz(
     base_clazz: Type, original_clazz: Type
@@ -29,7 +66,7 @@ def _get_clazz_by_original_clazz(
     """
     for subclass in recursive_subclasses(base_clazz):
         try:
-            if subclass.original_class() == original_clazz:
+            if _same_domain_class(subclass.original_class(), original_clazz):
                 return subclass
         except (AttributeError, TypeError, NoGenericError):
             continue
@@ -95,7 +132,7 @@ def _get_concrete_generic_subclass(
 
 
 @lru_cache(maxsize=None)
-def get_dao_class(
+def get_data_access_object_class(
     original_clazz: Type, expected_type: Optional[Type] = None
 ) -> Optional[Type[DataAccessObject]]:
     """
@@ -148,7 +185,7 @@ def clear_dao_lookup_caches() -> None:
     """
     _get_clazz_by_original_clazz.cache_clear()
     _get_concrete_generic_subclass.cache_clear()
-    get_dao_class.cache_clear()
+    get_data_access_object_class.cache_clear()
     get_alternative_mapping.cache_clear()
 
 
@@ -181,7 +218,7 @@ def to_dao(
     """
     from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 
-    dao_clazz = get_dao_class(type(source_object))
+    dao_clazz = get_data_access_object_class(type(source_object))
     if dao_clazz is None:
         raise NoDAOFoundError(source_object)
     state = state or ToDataAccessObjectState()

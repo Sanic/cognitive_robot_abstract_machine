@@ -132,13 +132,6 @@ class PlaneAnnotator(ThreadedAnnotator):
         self.rk_logger.info("Plane compute start")
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
-        color_image = self.get_cas().get(
-            CASViews.COLOR_IMAGE
-        )  # shape [H, W, 3], usually RGB
-        depth_image = self.get_cas().get(
-            CASViews.DEPTH_IMAGE
-        )  # shape [H, W], float or uint16
-        camera_intrinsics = self.get_cas().get(CASViews.CAMERA_INTRINSIC)
         # print(f"Loaded cloud with {len(cloud.points)} points")
 
         random_seed = self.descriptor.parameters.random_seed

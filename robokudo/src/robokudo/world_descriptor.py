@@ -8,7 +8,14 @@ It builds semantic_digital_twin entities into a shared World instance.
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraModality,
+    CameraModel,
+    CameraRange,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -61,6 +68,29 @@ class RegionSpec:
     box_scale: Scale
     parent_name: Optional[str] = None
     color: Color = field(default_factory=Color)
+
+
+@dataclass
+class CameraSpec:
+    """Describe a semantic camera and its attachment to a world."""
+
+    name: str
+    """Name shared by the camera annotation and its root body."""
+
+    pose: HomogeneousTransformationMatrix
+    """Camera-root pose relative to the parent body."""
+
+    forward_facing_axis: Vector3
+    """Viewing direction expressed in the camera root frame."""
+
+    camera_model: CameraModel
+    """Native projection model of the camera."""
+
+    camera_range: CameraRange = field(default_factory=CameraRange)
+    """Usable distance interval of the camera."""
+
+    modalities: tuple[CameraModality, ...] = field(default_factory=tuple)
+    """Kinds of image data the camera can produce."""
 
 
 @dataclass(eq=False)
@@ -209,6 +239,36 @@ class BaseWorldDescriptor:
                 connections[spec.name].origin = spec.pose
 
         return connections
+
+    def build_camera(self, parent: Body, spec: CameraSpec) -> Camera:
+        """Create and attach one semantic camera.
+
+        :param parent: Body to which the camera root is attached.
+        :param spec: Semantic camera description and relative pose.
+        :return: Camera annotation added to this descriptor's world.
+        """
+        with self.world.modify_world():
+            camera_body = Body(name=PrefixedName(name=spec.name))
+            connection = Connection6DoF.create_with_dofs(
+                parent=parent,
+                child=camera_body,
+                world=self.world,
+            )
+            self.world.add_connection(connection)
+            camera = Camera(
+                name=PrefixedName(name=spec.name),
+                root=camera_body,
+                forward_facing_axis=spec.forward_facing_axis,
+                camera_model=spec.camera_model,
+                camera_range=spec.camera_range,
+                modalities=spec.modalities,
+            )
+            self.world.add_semantic_annotation(camera)
+
+        with self.world.modify_world():
+            connection.origin = spec.pose
+
+        return camera
 
     def get_predefined_object_bodies(self) -> List[Body]:
         """

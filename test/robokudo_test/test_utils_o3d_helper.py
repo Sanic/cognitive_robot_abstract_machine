@@ -1,7 +1,6 @@
 import numpy as np
 import open3d as o3d
 import pytest
-import sensor_msgs.msg
 
 import robokudo.cas
 from robokudo.cas import CAS, CASViews
@@ -13,19 +12,30 @@ from robokudo.utils.o3d_helper import (
     get_2d_bounding_rect_from_3d_bb,
     draw_wireframe_of_obb_into_image,
     get_mask_from_pointcloud,
-    scale_o3d_camera_intrinsics,
     concatenate_clouds,
     get_cloud_from_rgb_depth_and_mask,
     create_line_for_visualization,
     create_sphere_from_translation,
 )
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
 
 class TestUtilsO3DHelper(object):
     @pytest.fixture
     def cas(self, kinect_intrinsics: o3d.camera.PinholeCameraIntrinsic) -> CAS:
         cas = robokudo.cas.CAS()
-        cas.set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, kinect_intrinsics)
+        intrinsic_matrix = kinect_intrinsics.intrinsic_matrix
+        cas.pointcloud_camera_model = PinholeCameraModel(
+            image_resolution=CameraResolution(
+                width=kinect_intrinsics.width,
+                height=kinect_intrinsics.height,
+            ),
+            focal_length_x=intrinsic_matrix[0, 0],
+            focal_length_y=intrinsic_matrix[1, 1],
+            principal_point_x=intrinsic_matrix[0, 2],
+            principal_point_y=intrinsic_matrix[1, 2],
+        )
         cas.set(CASViews.COLOR2DEPTH_RATIO, (1.0, 1.0))
         return cas
 
@@ -289,17 +299,16 @@ class TestUtilsO3DHelper(object):
             ]
         ), f"unexpected corner points, did the camera intrinsics change? {result}"
 
-    def test_get_2d_corner_points_from_3d_bb_invalid_intrinsics(self, cas: CAS):
-        cas.set(
-            robokudo.cas.CASViews.POINTCLOUD_CAMERA_INTRINSIC,
-            "anything but CameraIntrinsics",
-        )
+    def test_get_2d_corner_points_from_3d_bb_requires_camera_model(self, cas: CAS):
+        cas.views.pop(CASViews.POINTCLOUD_CAMERA_MODEL)
 
         obb = o3d.geometry.OrientedBoundingBox(
             center=[0, 0, 1], R=np.eye(3), extent=[1, 1, 1]
         )
 
-        assert pytest.raises(AssertionError, get_2d_corner_points_from_3d_bb, cas, obb)
+        with pytest.raises(KeyError) as exception:
+            get_2d_corner_points_from_3d_bb(cas, obb)
+        assert exception.value.args[0] == CASViews.POINTCLOUD_CAMERA_MODEL
 
     def test_get_2d_corner_points_from_3d_bb_zero_depth(self, cas: CAS):
         obb = o3d.geometry.OrientedBoundingBox(
@@ -394,83 +403,6 @@ class TestUtilsO3DHelper(object):
         )
 
         assert np.all(mask == 0)
-
-    def test_scale_o3d_camera_intrinsics(
-        self, kinect_intrinsics: o3d.camera.PinholeCameraIntrinsic
-    ):
-        new_intrinsics = scale_o3d_camera_intrinsics(kinect_intrinsics, 1.0, 1.0)
-
-        assert np.all(
-            kinect_intrinsics.intrinsic_matrix == new_intrinsics.intrinsic_matrix
-        )
-        assert (
-            kinect_intrinsics.width == new_intrinsics.width
-        ), "Image width was changed unexpectedly."
-        assert (
-            kinect_intrinsics.height == new_intrinsics.height
-        ), "Image height was changed unexpectedly."
-
-    def test_scale_o3d_camera_intrinsics_scale_x(
-        self, kinect_intrinsics: o3d.camera.PinholeCameraIntrinsic
-    ):
-        new_intrinsics = scale_o3d_camera_intrinsics(kinect_intrinsics, 2.0, 1.0)
-
-        assert np.all(
-            kinect_intrinsics.intrinsic_matrix[1, :2]
-            == new_intrinsics.intrinsic_matrix[1, :2]
-        ), "fy and cy changed unexpectedly."
-        assert (
-            kinect_intrinsics.height == new_intrinsics.height
-        ), "Image height was changed unexpectedly."
-
-        assert np.allclose(
-            new_intrinsics.intrinsic_matrix[0, :2],
-            kinect_intrinsics.intrinsic_matrix[0, :2] * 2.0,
-        ), "fx and cx were not scaled correctly."
-        assert (
-            kinect_intrinsics.width * 2.0 == new_intrinsics.width
-        ), "Image width was not scaled correctly."
-
-    def test_scale_o3d_camera_intrinsics_scale_y(
-        self, kinect_intrinsics: o3d.camera.PinholeCameraIntrinsic
-    ):
-        new_intrinsics = scale_o3d_camera_intrinsics(kinect_intrinsics, 1.0, 2.0)
-
-        assert np.all(
-            kinect_intrinsics.intrinsic_matrix[0, :2]
-            == new_intrinsics.intrinsic_matrix[0, :2]
-        ), "fx and cx changed unexpectedly."
-        assert (
-            kinect_intrinsics.width == new_intrinsics.width
-        ), "Image width was changed unexpectedly."
-
-        assert np.allclose(
-            new_intrinsics.intrinsic_matrix[1, :2],
-            kinect_intrinsics.intrinsic_matrix[1, :2] * 2.0,
-        ), "fy and cy were not scaled correctly."
-        assert (
-            kinect_intrinsics.height * 2.0 == new_intrinsics.height
-        ), "Image height was not scaled correctly."
-
-    def test_scale_o3d_camera_intrinsics_scale_xy(
-        self, kinect_intrinsics: o3d.camera.PinholeCameraIntrinsic
-    ):
-        new_intrinsics = scale_o3d_camera_intrinsics(kinect_intrinsics, 2.0, 2.0)
-
-        assert np.allclose(
-            new_intrinsics.intrinsic_matrix[1, :2],
-            kinect_intrinsics.intrinsic_matrix[1, :2] * 2.0,
-        ), "fy and cy were not scaled correctly."
-        assert np.allclose(
-            new_intrinsics.intrinsic_matrix[0, :2],
-            kinect_intrinsics.intrinsic_matrix[0, :2] * 2.0,
-        ), "fx and cx were not scaled correctly."
-        assert (
-            kinect_intrinsics.width * 2.0 == new_intrinsics.width
-        ), "Image width was not scaled correctly."
-        assert (
-            kinect_intrinsics.height * 2.0 == new_intrinsics.height
-        ), "Image height was not scaled correctly."
 
     def test_concatenate_clouds_single_cloud(self, pointcloud: o3d.geometry.PointCloud):
         output_cloud = concatenate_clouds([pointcloud])
