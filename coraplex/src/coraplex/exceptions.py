@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, Type, List
+from typing_extensions import TYPE_CHECKING, Type
 
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from krrood.entity_query_language.factories import ConditionType, get_false_statements
 from krrood.exceptions import DataclassException
 from coraplex.datastructures.enums import (
-    Arms,
     ExecutionType,
     VisualizationBackend,
     VisualizationOption,
@@ -17,10 +15,11 @@ from coraplex.plans.failures import PlanFailure
 
 if TYPE_CHECKING:
     from coraplex.plans.designator import Designator
+    from coraplex.plans.plan_node import PlanNode
     from coraplex.robot_plans.actions.base import ActionDescription
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
+    from semantic_digital_twin.grasping.grasp_candidates import HasGraspCandidates
     from semantic_digital_twin.world_description.world_entity import (
-        KinematicStructureEntity,
         SemanticAnnotation,
     )
 
@@ -105,27 +104,89 @@ class ContextIsUnavailable(DataclassException):
 
 
 @dataclass
-class TipLinkDoesNotMatchAnyArm(DataclassException):
+class CannotMatchOnType(DataclassException):
     """
-    Raised when a reachability validator's tip link is not the tool frame of any arm of
-    the robot, so no arm can be selected to reach the requested pose.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    The tip link that did not match any arm.
+    Raised when a plan transformation is bound to a type that is neither a plan node nor
+    a designator, leaving no rule by which it could select the nodes it rewrites.
     """
 
-    robot: AbstractRobot
+    transformation: Type
     """
-    The robot whose arms were searched.
+    The transformation class that carries the binding.
+    """
+
+    matched_type: Type
+    """
+    The type it is bound to.
     """
 
     def error_message(self) -> str:
-        return f"tip_link {self.tip_link} does not match any arm of {self.robot}"
+        return (
+            f"{self.transformation.__name__} is bound to {self.matched_type}, which is "
+            f"neither a plan node nor a designator."
+        )
 
     def suggest_correction(self) -> str:
-        return "ensure the tip_link is the tool frame of one of the robot's arms."
+        return "bind the transformation to a plan node type or a designator type"
+
+
+@dataclass
+class CannotInsertBesideRoot(DataclassException):
+    """
+    Raised when a node is to be inserted before or after the root node, which has no
+    parent that could hold the new sibling.
+    """
+
+    root: PlanNode
+    """
+    The root node that was given as the reference node.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.root} is the root of the plan and has no parent to hold a sibling."
+        )
+
+    def suggest_correction(self) -> str:
+        return "insert the node as the last child of the root instead"
+
+
+@dataclass
+class NodeNotInPlanTree(DataclassException):
+    """
+    Raised when the nodes before a node are asked for, but the node cannot be reached
+    from the root of its plan.
+    """
+
+    node: PlanNode
+    """
+    The node that is not part of its plan's tree.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.node} cannot be reached from the root of its plan."
+
+    def suggest_correction(self) -> str:
+        return "add the node below the plan's root before asking what precedes it"
+
+
+@dataclass
+class ReachHasNoFinalApproach(DataclassException):
+    """
+    Raised when the final approach of a reach is asked for, but no tool center point
+    motion lies below the reach's node.
+    """
+
+    plan_node: PlanNode
+    """
+    The node of the reach.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.plan_node} has no tool center point motion below it."
+
+    def suggest_correction(self) -> str:
+        return "ask for the final approach only once the reach has been expanded"
 
 
 @dataclass
@@ -165,30 +226,12 @@ class WipingTargetMissing(DataclassException):
 
 
 @dataclass
-class PerceptionTargetMissing(DataclassException):
-    """
-    Raised when an action is asked to perceive before grasping but names no object.
-    """
-
-    instance: Designator
-    """
-    The action that has no object to detect.
-    """
-
-    def error_message(self) -> str:
-        return f"{self.instance} perceives before grasping but names no object."
-
-    def suggest_correction(self) -> str:
-        return "provide an object_designator or leave perceive_before_grasp off."
-
-
-@dataclass
 class MissingToolFrame(DataclassException):
     """
     Raised when no tool frame is available for the requested arm.
     """
 
-    arm: Arms
+    arm: Arm
     """
     The arm whose tool frame was requested.
     """
@@ -217,30 +260,29 @@ class ConditionNotSatisfied(PlanFailure):
         if isinstance(self.condition, bool):
             return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied"
         false_statements = get_false_statements(self.condition)
-        return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied, following statements are false: {[s._name_ for s in false_statements]}"
+        return f"{prefix}-Condition for Action '{self.action.__name__}' is not satisfied, following statements could not be satisfied: {[s._name_ for s in false_statements]}"
 
     def suggest_correction(self) -> str:
         return ""
 
 
 @dataclass
-class MotionDidNotFinish(PlanFailure):
-
-    unfinished_motions: List[MotionStatechartNode]
+class ObjectIsNotHeld(DataclassException):
     """
-    The nodes that did not succeed, whether they failed, were interrupted or never
-    ended.
+    Raised when a place is asked for an object that no arm holds and no pick-up before
+    it is going to take.
+    """
+
+    object_designator: HasGraspCandidates
+    """
+    The object that was to be placed.
     """
 
     def error_message(self) -> str:
-        reports = ", ".join(
-            f"{motion.unique_name} ({motion.life_cycle_state.name})"
-            for motion in self.unfinished_motions
-        )
-        return f"Motion did not finish, following motions did not succeed: {reports}"
+        return f"no arm holds {self.object_designator.name} to place it."
 
     def suggest_correction(self) -> str:
-        return ""
+        return "place the object after a pick-up of it."
 
 
 @dataclass
@@ -420,29 +462,3 @@ class NotOnASingleLevelException(DataclassException):
 
     def suggest_correction(self) -> str:
         return f"Move the robot to a recognized level"
-
-
-@dataclass
-class BodyIsNotHeld(DataclassException):
-    """
-    Raised when a grasp should be read off a body that no end effector is holding.
-    """
-
-    body: KinematicStructureEntity
-    """
-    The body that was expected to be held.
-    """
-
-    end_effector: EndEffector
-    """
-    The end effector that was expected to hold it.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.body.name}' is not held by '{self.end_effector.name}', so there is "
-            f"no grasp to read from the world."
-        )
-
-    def suggest_correction(self) -> str:
-        return "pick the body up before reading its grasp."

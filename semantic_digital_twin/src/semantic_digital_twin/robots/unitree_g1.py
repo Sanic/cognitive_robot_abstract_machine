@@ -47,7 +47,7 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -276,6 +276,14 @@ class UnitreeG1LeftHand(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -287,7 +295,6 @@ class UnitreeG1LeftHand(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "left_hand_tool_frame"
             ),
-            front_facing_orientation=Quaternion(),
         )
 
 
@@ -321,6 +328,14 @@ class UnitreeG1RightHand(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -332,7 +347,6 @@ class UnitreeG1RightHand(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "right_hand_tool_frame"
             ),
-            front_facing_orientation=Quaternion(),
         )
 
 

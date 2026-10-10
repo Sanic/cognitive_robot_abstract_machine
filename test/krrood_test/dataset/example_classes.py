@@ -4,7 +4,7 @@ import importlib
 import uuid
 from abc import ABC
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
 from types import FunctionType, NoneType
@@ -853,6 +853,18 @@ class PathAssociation:
     path: Path
 
 
+@dataclass
+class DurationAssociation:
+    """
+    Holds a duration, to test that the ORM stores a time span.
+    """
+
+    duration: timedelta
+    """
+    The stored time span.
+    """
+
+
 class SceneObjectType(Enum):
     TABLE = "table"
     CHAIR = "chair"
@@ -890,7 +902,7 @@ class SceneRoom:
 
 
 @dataclass
-class TestExParts:
+class SceneWithExchangeableParts:
     objects: List[SceneObject]
     rooms: List[SceneRoom]
 
@@ -947,9 +959,11 @@ class SceneRoomAggregations(SceneObjectAggregationBase[SceneRoom]):
 
 
 @dataclass
-class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
+class SceneWithExchangeablePartsAggregations(
+    SceneObjectAggregationBase[SceneWithExchangeableParts]
+):
     """
-    Aggregation statistics for :class:`TestExParts` over its ``objects`` and
+    Aggregation statistics for :class:`SceneWithExchangeableParts` over its ``objects`` and
     ``rooms`` fields.
     """
 
@@ -959,6 +973,61 @@ class TestExPartsAggregations(SceneObjectAggregationBase[TestExParts]):
         Total number of rooms.
         """
         [cou] = count(variable(SceneRoom, self.instance.rooms)).tolist()
+        return cou
+
+
+@dataclass
+class SceneFloor:
+    """
+    A level of a building, holding rooms; a mimic of an entity that is itself an
+    exchangeable part and holds exchangeable parts.
+    """
+
+    rooms: List[SceneRoom]
+    """
+    The rooms on this floor.
+    """
+
+
+@dataclass
+class SceneBuilding:
+    """
+    A building, holding floors; the root of a three-level chain of exchangeable parts.
+    """
+
+    floors: List[SceneFloor]
+    """
+    The floors of this building.
+    """
+
+
+@dataclass
+class SceneFloorAggregations(AggregationStatistic[SceneFloor]):
+    """
+    Aggregation statistics for :class:`SceneFloor` over its ``rooms`` field.
+    """
+
+    @aggregation_statistic("rooms")
+    def room_count(self) -> int:
+        """
+        Total number of rooms on the floor.
+        """
+        [cou] = count(variable(SceneRoom, self.instance.rooms)).tolist()
+        return cou
+
+
+@dataclass
+class SceneBuildingAggregations(AggregationStatistic[SceneBuilding]):
+    """
+    Aggregation statistics for :class:`SceneBuilding` over its ``floors`` field.
+    """
+
+    @aggregation_statistic("floors")
+    def floor_count(self) -> int:
+        """
+        Total number of floors in the building.
+        """
+        [cou] = count(variable(SceneFloor, self.instance.floors)).tolist()
         return cou
 
 

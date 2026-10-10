@@ -24,12 +24,8 @@ from rclpy.node import Node
 from typing_extensions import List, Tuple
 
 from coraplex.datastructures.enums import (
-    ApproachDirection,
-    Arms,
     ExecutionType,
-    VerticalAlignment,
 )
-from coraplex.datastructures.grasp import GraspDescription
 from coraplex.exceptions import (
     AmbiguousDetection,
     NothingDetected,
@@ -114,13 +110,13 @@ def test_source_is_chosen_by_execution_type(execution_type, expected_source):
 
 
 def test_detection_moves_the_annotated_body_to_the_perceived_pose(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     Applying a detection is what makes perception load-bearing: the body ends up where
     the source saw it, not where it was spawned.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     perceived_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, reference_frame=world.root
@@ -132,20 +128,20 @@ def test_detection_moves_the_annotated_body_to_the_perceived_pose(
 
     assert annotations == world.get_semantic_annotations_by_type(Milk)
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
 
 
 def test_detection_of_an_object_the_world_does_not_hold_is_rejected(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     An annotation with nothing behind it in the world has no body to write a pose to, so
     it must not pass silently.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
 
     with pytest.raises(PerceivedObjectNotInWorld):
         Detection(
@@ -154,15 +150,12 @@ def test_detection_of_an_object_the_world_does_not_hold_is_rejected(
         ).apply_to(world)
 
 
-def test_detection_matching_several_bodies_is_rejected(mutable_model_world):
+def test_detection_matching_several_bodies_is_rejected(pr2_apartment_context):
     """
     With the annotation on two different bodies there is no way to tell which one was
     seen, so the ambiguity is reported instead of guessed away.
-
-    Uses the mutable world because adding an annotation is a model change, which the
-    immutable fixture does not roll back.
     """
-    world, view, context = mutable_model_world
+    world, view, context = pr2_apartment_context
     with world.modify_world():
         world.add_semantic_annotation(Milk(root=world.get_body_by_name("spoon.stl")))
 
@@ -172,12 +165,12 @@ def test_detection_matching_several_bodies_is_rejected(mutable_model_world):
         ).apply_to(world)
 
 
-def test_several_annotations_on_one_body_are_not_ambiguous(mutable_model_world):
+def test_several_annotations_on_one_body_are_not_ambiguous(pr2_apartment_context):
     """
     Two annotations describing the same body name one object, so the detection applies
     to both rather than being rejected.
     """
-    world, view, context = mutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     with world.modify_world():
         world.add_semantic_annotation(Milk(root=milk_body))
@@ -192,21 +185,21 @@ def test_several_annotations_on_one_body_are_not_ambiguous(mutable_model_world):
     assert len(annotations) == 2
     assert {annotation.root for annotation in annotations} == {milk_body}
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
 
 
 def test_an_upside_down_detection_is_flipped_without_moving_the_body(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     An object reported upside down is turned back z up before it is written.
 
     That correction is a rotation, so the body still ends up at the reported position.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     upside_down_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, roll=np.pi, reference_frame=world.root
@@ -215,26 +208,24 @@ def test_an_upside_down_detection_is_flipped_without_moving_the_body(
     Detection(semantic_annotation=Milk, pose=upside_down_pose).apply_to(world)
 
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
-    assert (
-        milk_body.global_pose.to_rotation_matrix().z_vector().to_np().flatten()[2] > 0
-    )
+    assert milk_body.global_pose.rotation_matrix.z_vector().to_np().flatten()[2] > 0
 
 
 # %% distrusting a source's orientation
 
 
 def test_untrusted_orientation_still_moves_the_body_to_the_perceived_position(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     With ``trust_orientation=False``, the position still comes from the detection: only
     the orientation is left alone.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     perceived_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, yaw=np.pi / 2, reference_frame=world.root
@@ -245,23 +236,23 @@ def test_untrusted_orientation_still_moves_the_body_to_the_perceived_position(
     )
 
     np.testing.assert_allclose(
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
 
 
 def test_untrusted_orientation_keeps_the_bodys_existing_orientation(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     The detected rotation (a 90 degree yaw here) must not reach the body: it keeps
     whatever rotation it already had before the detection was applied.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     orientation_before_detection = (
-        milk_body.parent_connection.origin.to_rotation_matrix().to_np()
+        milk_body.parent_connection.origin.rotation_matrix.to_np()
     )
     perceived_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, yaw=np.pi / 2, reference_frame=world.root
@@ -272,7 +263,7 @@ def test_untrusted_orientation_keeps_the_bodys_existing_orientation(
     )
 
     np.testing.assert_allclose(
-        milk_body.parent_connection.origin.to_rotation_matrix().to_np(),
+        milk_body.parent_connection.origin.rotation_matrix.to_np(),
         orientation_before_detection,
         atol=1e-9,
     )
@@ -293,13 +284,13 @@ def test_trusting_orientation_is_the_default():
 
 
 def test_world_perception_reports_the_pose_the_world_holds(
-    immutable_model_world, whole_scene_region
+    pr2_apartment_context, whole_scene_region
 ):
     """
     The simulated source stands in for a perfect sensor, so its detection must match the
     body's current pose rather than any stored or spawned value.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, reference_frame=world.root
@@ -310,20 +301,20 @@ def test_world_perception_reports_the_pose_the_world_holds(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
-        milk_body.global_pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
+        milk_body.global_pose.position.to_np().flatten()[:3],
         atol=1e-9,
     )
 
 
 def test_a_body_carrying_several_annotations_is_reported_once(
-    mutable_model_world, whole_scene_region
+    pr2_apartment_context, whole_scene_region
 ):
     """
     Two annotations describing the same body name one object, so the world answers with
     that object once rather than with a candidate per annotation.
     """
-    world, view, context = mutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     with world.modify_world():
         world.add_semantic_annotation(SpecializedMilk(root=milk_body))
@@ -337,13 +328,13 @@ def test_a_body_carrying_several_annotations_is_reported_once(
 
 
 def test_world_perception_follows_the_robots_head(
-    immutable_model_world, whole_scene_region
+    pr2_apartment_context, whole_scene_region
 ):
     """
     The simulated source answers from the robot's camera, so turning the head away from
     a body has to take it out of the answer.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
@@ -357,12 +348,12 @@ def test_world_perception_follows_the_robots_head(
 
 
 def test_world_perception_reports_nothing_outside_the_queried_region(
-    immutable_model_world,
+    pr2_apartment_context,
 ):
     """
     The region is part of the question, so a body outside it is not an answer.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     empty_region = VolumetricBoundingBox(
         origin=HomogeneousTransformationMatrix(reference_frame=world.root),
         min_x=-10,
@@ -379,13 +370,13 @@ def test_world_perception_reports_nothing_outside_the_queried_region(
 
 
 def test_ambiguity_is_reported_with_the_number_of_candidates(
-    immutable_model_world, whole_scene_region
+    pr2_apartment_context, whole_scene_region
 ):
     """
     What a source refuses to choose between is the candidates it saw, so that is the
     number the failure carries, whatever else the world holds.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     candidates = [
         Detection(semantic_annotation=Milk, pose=world.root.global_pose),
@@ -401,13 +392,13 @@ def test_ambiguity_is_reported_with_the_number_of_candidates(
 
 
 def test_accepting_the_first_candidate_answers_with_one_detection(
-    immutable_model_world, whole_scene_region
+    pr2_apartment_context, whole_scene_region
 ):
     """
     A caller that has said it may take any of the candidates gets a single detection
     instead of the ambiguity failure.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     first = Detection(semantic_annotation=Milk, pose=world.root.global_pose)
     candidates = [
@@ -426,7 +417,7 @@ def test_accepting_the_first_candidate_answers_with_one_detection(
 # %% perception correcting a grasp
 
 
-def test_detection_corrects_a_grasp_planned_before_it(immutable_model_world):
+def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     """
     What the whole seam is for: the plan is expanded (and the grasp planned) against
     whatever pose the world happened to hold, and the detection that runs afterwards
@@ -434,7 +425,7 @@ def test_detection_corrects_a_grasp_planned_before_it(immutable_model_world):
 
     Without this, a wrong prior in the world silently aims the reach at empty space.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     milk_body = milk.root
     wrong_prior = (1.0, 1.0, 1.0)
@@ -443,15 +434,7 @@ def test_detection_corrects_a_grasp_planned_before_it(immutable_model_world):
     )
 
     plan = execute_single(
-        PickUpAction(
-            milk,
-            Arms.RIGHT,
-            GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                view.right_arm.end_effector,
-            ),
-        ),
+        PickUpAction(milk.grasp_candidates()[0], context.robot.right_arm),
         context=context,
     )
     plan.notify()
@@ -466,10 +449,7 @@ def test_detection_corrects_a_grasp_planned_before_it(immutable_model_world):
         return [
             float(
                 np.linalg.norm(
-                    world.transform(target, world.root)
-                    .to_position()
-                    .to_np()
-                    .flatten()[:3]
+                    world.transform(target, world.root).position.to_np().flatten()[:3]
                     - np.array(position)
                 )
             )
@@ -603,13 +583,13 @@ def query_server_reporting(rclpy_node):
 
 
 def test_robokudo_detection_is_named_and_placed_by_the_pipeline(
-    immutable_model_world, whole_scene_region, rclpy_node, robokudo_query_server
+    pr2_apartment_context, whole_scene_region, rclpy_node, robokudo_query_server
 ):
     """
     The real source is asked for the queried annotation and contributes the pose;
     everything downstream treats its detection the same as a simulated one.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
@@ -617,29 +597,26 @@ def test_robokudo_detection_is_named_and_placed_by_the_pipeline(
     assert robokudo_query_server.received_types == ["milk"]
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
 
 
 def test_robokudo_detection_moves_the_body_in_the_world(
-    immutable_model_world, whole_scene_region, rclpy_node, robokudo_query_server
+    pr2_apartment_context, whole_scene_region, rclpy_node, robokudo_query_server
 ):
     """
     End to end for the real path: what the pipeline reports is what the world ends up
     holding, which is what the grasp is later planned against.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
     RoboKudoPerception(ros_node=rclpy_node).detect(query).apply_to(world)
 
     np.testing.assert_allclose(
-        world.get_body_by_name("milk.stl")
-        .global_pose.to_position()
-        .to_np()
-        .flatten()[:3],
+        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -649,13 +626,13 @@ def test_robokudo_detection_moves_the_body_in_the_world(
 
 
 def test_untyped_detection_is_identified_from_the_query(
-    immutable_model_world, whole_scene_region, rclpy_node, query_server_reporting
+    pr2_apartment_context, whole_scene_region, rclpy_node, query_server_reporting
 ):
     """
     A pipeline of plane and cluster annotators reports where an object is but not what
     it is, so the annotation comes from what was asked for.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query_server_reporting([ReportedObject("", PERCEIVED_MILK_POSITION)])
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
@@ -663,20 +640,20 @@ def test_untyped_detection_is_identified_from_the_query(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
 
 
 def test_pipeline_reporting_nothing_is_an_error(
-    immutable_model_world, whole_scene_region, rclpy_node, query_server_reporting
+    pr2_apartment_context, whole_scene_region, rclpy_node, query_server_reporting
 ):
     """
     Finding nothing must not pass as "saw nothing worth moving": the plan would then
     grasp at the pose the object was spawned with, believing it was confirmed.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query_server_reporting([])
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
@@ -685,13 +662,13 @@ def test_pipeline_reporting_nothing_is_an_error(
 
 
 def test_several_untyped_candidates_are_not_guessed_between(
-    immutable_model_world, whole_scene_region, rclpy_node, query_server_reporting
+    pr2_apartment_context, whole_scene_region, rclpy_node, query_server_reporting
 ):
     """
     Without a class label there is nothing to tell two clusters apart, so the ambiguity
     is reported rather than resolved by picking one.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query_server_reporting(
         [
             ReportedObject("", PERCEIVED_MILK_POSITION),
@@ -705,13 +682,13 @@ def test_several_untyped_candidates_are_not_guessed_between(
 
 
 def test_a_caller_that_accepts_any_candidate_gets_one_of_them(
-    immutable_model_world, whole_scene_region, rclpy_node, query_server_reporting
+    pr2_apartment_context, whole_scene_region, rclpy_node, query_server_reporting
 ):
     """
     Ambiguity is only refused for a caller that needs the right object; one that has
     said any of them will do is answered with the first the pipeline reported.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query_server_reporting(
         [
             ReportedObject("", PERCEIVED_MILK_POSITION),
@@ -726,20 +703,20 @@ def test_a_caller_that_accepts_any_candidate_gets_one_of_them(
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
-        detection.pose.to_position().to_np().flatten()[:3],
+        detection.pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
 
 
 def test_labelled_candidates_are_narrowed_to_the_requested_type(
-    immutable_model_world, whole_scene_region, rclpy_node, query_server_reporting
+    pr2_apartment_context, whole_scene_region, rclpy_node, query_server_reporting
 ):
     """
     Once a classifying annotator is in the pipeline its labels are used to discard the
     objects that were not asked for, instead of reporting them as ambiguous.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query_server_reporting(
         [
             ReportedObject("Milk", PERCEIVED_MILK_POSITION),
@@ -785,23 +762,20 @@ def run_perception_task(task: PerceptionTask, context: MotionStatechartContext) 
 
 
 def test_perception_task_moves_the_detected_body(
-    immutable_model_world, whole_scene_region, rclpy_node, robokudo_query_server
+    pr2_apartment_context, whole_scene_region, rclpy_node, robokudo_query_server
 ):
     """
     Answering the query inside the chart has to be worth as much as answering it between
     charts: the body ends up where the pipeline saw it.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     task = PerceptionTask(query=query, execution_type=ExecutionType.REAL)
 
     run_perception_task(task, build_perception_task(task, world, rclpy_node))
 
     np.testing.assert_allclose(
-        world.get_body_by_name("milk.stl")
-        .global_pose.to_position()
-        .to_np()
-        .flatten()[:3],
+        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -828,7 +802,7 @@ class UnanswerablePerception(PerceptionInterface):
 
 
 def test_perception_task_reports_a_failed_query_as_itself(
-    immutable_model_world, whole_scene_region, rclpy_node
+    pr2_apartment_context, whole_scene_region, rclpy_node
 ):
     """
     A detection that could not be made must reach the plan as the failure it was, not as
@@ -837,7 +811,7 @@ def test_perception_task_reports_a_failed_query_as_itself(
     The source raises on the tick, which is the same way a
     :class:`~giskardpy.motion_statechart.graph_node.CancelMotion` aborts a chart.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     task = PerceptionTask(query=query, execution_type=ExecutionType.SIMULATED)
     build_context = build_perception_task(task, world, rclpy_node)
@@ -850,13 +824,13 @@ def test_perception_task_reports_a_failed_query_as_itself(
 
 
 def test_perception_task_answers_its_query_only_once(
-    immutable_model_world, whole_scene_region, rclpy_node, robokudo_query_server
+    pr2_apartment_context, whole_scene_region, rclpy_node, robokudo_query_server
 ):
     """
     The query is expensive, so a task that is ticked again after it answered must report
     what it already found instead of asking the pipeline a second time.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     task = PerceptionTask(query=query, execution_type=ExecutionType.REAL)
     build_context = build_perception_task(task, world, rclpy_node)
@@ -879,7 +853,7 @@ def receiving_world_kwargs(world: World) -> dict:
 
 
 def test_perception_task_survives_a_json_round_trip(
-    immutable_model_world, whole_scene_region
+    pr2_apartment_context, whole_scene_region
 ):
     """
     On the real robot the chart is serialized to a controller holding its own copy of
@@ -890,7 +864,7 @@ def test_perception_task_survives_a_json_round_trip(
     and the region's frame by id can only be seen to work when the objects behind those
     ids are not the ones that were serialized.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     receiving_world = deepcopy(world)
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     task = PerceptionTask(query=query, execution_type=ExecutionType.REAL)
@@ -907,14 +881,14 @@ def test_perception_task_survives_a_json_round_trip(
 
 
 def test_perception_task_without_an_execution_type_is_rejected(
-    immutable_model_world, whole_scene_region, rclpy_node
+    pr2_apartment_context, whole_scene_region, rclpy_node
 ):
     """
     A chart built while nothing is executing the plan has no source to answer with,
     which has to be said plainly rather than silently defaulting to reading the world
     model.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     task = PerceptionTask(query=query, execution_type=None)
 
@@ -923,13 +897,13 @@ def test_perception_task_without_an_execution_type_is_rejected(
 
 
 def test_detecting_motion_takes_the_execution_type_of_the_environment(
-    immutable_model_world, whole_scene_region
+    pr2_apartment_context, whole_scene_region
 ):
     """
     The motion is written once and run in both worlds, so which source answers it is
     decided by the environment executing the plan rather than by the plan itself.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     plan = execute_single(DetectingMotion(query=query), context=context)
 
@@ -942,7 +916,7 @@ def test_detecting_motion_takes_the_execution_type_of_the_environment(
 
 
 def test_perception_task_survives_a_chart_round_trip(
-    immutable_model_world, whole_scene_region
+    pr2_apartment_context, whole_scene_region
 ):
     """
     What actually crosses to the controller is the whole motion state chart as JSON
@@ -951,7 +925,7 @@ def test_perception_task_survives_a_chart_round_trip(
     Going through :func:`json.dumps` is part of the point: a value that survives
     ``to_json`` but is not JSON at all would pass a round trip that skipped the text.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     receiving_world = deepcopy(world)
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     chart = MotionStatechart()
@@ -977,14 +951,14 @@ def test_perception_task_survives_a_chart_round_trip(
 
 
 def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
-    immutable_model_world, whole_scene_region, rclpy_node, robokudo_query_server
+    pr2_apartment_context, whole_scene_region, rclpy_node, robokudo_query_server
 ):
     """
     Why perception belongs in the chart at all: a reach compiled alongside the detection
     still binds its goal when it starts, so it follows the object to where the detection
     put it rather than to the pose the plan was expanded against.
     """
-    world, view, context = immutable_model_world
+    world, view, context = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     detection = PerceptionTask(query=query, execution_type=ExecutionType.REAL)
@@ -1001,7 +975,7 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
     reach.on_start(build_context)
 
     np.testing.assert_allclose(
-        reach.root_T_goal_reference_frame.to_position().evaluate().flatten()[:3],
+        reach.root_T_goal_reference_frame.position.evaluate().flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )

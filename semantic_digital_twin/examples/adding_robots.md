@@ -262,6 +262,10 @@ class MyRobotCamera(RobotCamera):
             default_camera=True,
         )
 
+    @property
+    def forward_facing_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.root)
+
     def setup_hardware_interfaces(self):
         return None
 
@@ -272,8 +276,9 @@ class MyRobotCamera(RobotCamera):
 ### End-effector
 
 An :class:`~semantic_digital_twin.robots.robot_parts.EndEffector` needs a root body, a tool-frame body (the point the robot aligns
-with objects), and a `front_facing_orientation` quaternion that describes the
-forward-facing direction of the tool frame.
+with objects), and it states two axes in its tool frame: `approach_axis`, the direction it travels toward an object,
+and `closing_axis`, the axis its fingers close along. They are the grasp frame's x- and y-axis, so they have to be
+perpendicular.
 
 ```python
 from __future__ import annotations
@@ -286,7 +291,7 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.spatial_types import Quaternion
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
 
 
@@ -310,8 +315,15 @@ class MyRobotGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "tool_center_point"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
+
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
 
     def setup_hardware_interfaces(self):
         # _setup_hardware_interfaces_for_active_connections marks every active

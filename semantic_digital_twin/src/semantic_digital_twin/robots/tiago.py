@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 from abc import ABC
 from collections import defaultdict
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Self, List
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidSelfCollisions,
@@ -22,7 +24,9 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.robots.robot_part_mixins import (
+    HasLidar,
     HasLeftRightArm,
     HasMobileBase,
     HasNeck,
@@ -31,7 +35,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     TGenericLeftFinger,
     TGenericRightFinger,
     HasEndEffector,
-    HasSensors,
 )
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
@@ -45,7 +48,7 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     DifferentialDrive,
@@ -213,6 +216,14 @@ class TiagoLeftGripper(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -224,7 +235,6 @@ class TiagoLeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "gripper_left_grasping_frame"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -260,6 +270,14 @@ class TiagoRightGripper(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -271,7 +289,6 @@ class TiagoRightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "gripper_right_grasping_frame"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -475,7 +492,39 @@ class TiagoTorso(
 
 
 @dataclass(eq=False)
-class TiagoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoTorso]):
+class TiagoBaseLidar(Lidar):
+    """
+    The SICK TIM551 scanner sweeping the floor in front of the Tiago's base.
+
+    ..note:: The description's own beam count is not a whole number, so the scanner's
+        angular resolution of a third of a degree gives the angle between two beams.
+    """
+
+    @classmethod
+    def with_source(
+        cls, robot_root: KinematicStructureEntity, source: LidarSource
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "base_laser_link"
+            ),
+            scan_pattern=ScanPattern(
+                minimum_angle=-1.658133,
+                maximum_angle=1.66347956,
+                angle_increment=0.00581718,
+                minimum_range=0.05,
+                maximum_range=10.0,
+            ),
+            source=source,
+        )
+
+
+@dataclass(eq=False)
+class TiagoMobileBase(
+    MobileBase[DifferentialDrive],
+    HasTorso[TiagoTorso],
+    HasLidar[TiagoBaseLidar],
+):
 
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -656,6 +705,14 @@ class TiagoMujocoLeftGripper(
         )
         return [gripper_close, gripper_open]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -667,7 +724,6 @@ class TiagoMujocoLeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "arm_left_7_link"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
@@ -693,6 +749,14 @@ class TiagoMujocoRightGripper(
         )
         return [gripper_close, gripper_open]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -704,7 +768,6 @@ class TiagoMujocoRightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "arm_right_7_link"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 

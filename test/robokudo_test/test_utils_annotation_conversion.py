@@ -260,8 +260,7 @@ class TestUtilsAnnotationConversion(object):
         camera_to_world_quat = (
             cas_with_tf.require_camera_observation()
             .world_T_camera_or_raise()
-            .to_quaternion()
-            .to_list()
+            .quaternion.to_list()
         )
         od = ObjectDesignator()
 
@@ -310,8 +309,7 @@ class TestUtilsAnnotationConversion(object):
         camera_to_world_quat = (
             cas_with_tf.require_camera_observation()
             .world_T_camera_or_raise()
-            .to_quaternion()
-            .to_list()
+            .quaternion.to_list()
         )
 
         od = ObjectDesignator()
@@ -348,8 +346,7 @@ class TestUtilsAnnotationConversion(object):
         camera_to_world_quat = (
             cas_with_tf.require_camera_observation()
             .world_T_camera_or_raise()
-            .to_quaternion()
-            .to_list()
+            .quaternion.to_list()
         )
         od = ObjectDesignator()
 

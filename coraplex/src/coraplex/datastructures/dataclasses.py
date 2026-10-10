@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from coraplex.plans.plan import Plan
     from semantic_digital_twin.world import World
     from coraplex.alternative_motion_mapping import AlternativeMotion
+    from coraplex.plans.plan_transformation import PlanTransformation
 
 try:
     import rclpy
@@ -105,9 +106,29 @@ class Context(PlanEntity):
     use their default motion chart.
     """
 
+    plan_transformations: List[PlanTransformation] = field(default_factory=list)
+    """
+    The transformations that rewrite the plans of this context while they are expanded.
+
+    A transformation is applied to every node it applies to, right after that node
+    has been expanded. If empty, actions are performed as they describe themselves.
+    """
+
     _debug: bool = field(default=False)
     """
     Should debug information be printed or visualized.
+    """
+
+    sampling_seed: Optional[int] = field(default=None, kw_only=True)
+    """
+    Seed for the locations of this plan that have none of their own, so a run can be
+    repeated; ``None`` samples afresh each run.
+    """
+
+    candidates_to_try: int = field(default=50, kw_only=True)
+    """
+    How many candidates an underspecified step of this plan tries before giving up,
+    unless the step has a limit of its own.
     """
 
     motion_tolerances: MotionToleranceConfig = field(
@@ -116,14 +137,6 @@ class Context(PlanEntity):
     """
     Default goal-achievement tolerances motions fall back to when they leave their own
     thresholds unset.
-    """
-
-    ticks_per_motion: int = 2000
-    """
-    How many ticks each motion of a chart may take before the run gives up on it.
-
-    Also the budget a reachability check gives the same motions, so a pose is not
-    rejected for running out of time sooner than the run that would perform it.
     """
 
     def __post_init__(self):
