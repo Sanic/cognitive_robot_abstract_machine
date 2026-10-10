@@ -1,3 +1,5 @@
+"""Open-vocabulary object detection with optional Segment Anything masks."""
+
 from __future__ import annotations
 
 from enum import IntEnum, StrEnum
@@ -53,6 +55,11 @@ class SegmentPromptLabel(IntEnum):
 
 
 def get_box_text(object_hypothesis):
+    """Label a hypothesis with its most confident classification or ROI identifier.
+
+    :param object_hypothesis: Hypothesis whose classifications determine the label.
+    :return: Identifier, class name, and confidence, or an identifier-only label.
+    """
     maximum_confidence = -1
     best_classification = None
 
@@ -74,48 +81,67 @@ def get_box_text(object_hypothesis):
 class OpenVocabularyObjectDetectionAnnotator(
     robokudo.annotators.core.ThreadedAnnotator
 ):
+    """Detect configured text classes and optionally segment their image regions."""
+
     class Descriptor(robokudo.annotators.core.BaseAnnotator.Descriptor):
         class Parameters:
             def __init__(self):
+                """Set default detection and segmentation settings."""
                 self.classes = ["Cat", "Dog"]
-                # This refers to 'transformers' terminology
+                """Text labels to detect in the color image."""
                 self.detection_model = "google/owlv2-base-patch16-ensemble"
+                """Pretrained OWLv2 model name or local checkpoint directory."""
                 self.detection_processor = "google/owlv2-base-patch16-ensemble"
+                """Pretrained OWLv2 processor name or local checkpoint directory."""
                 self.detection_threshold = 0.2
+                """Confidence threshold for retaining detections."""
 
                 self.segment_anything_model_path = "mobile_sam.pt"
                 """Checkpoint for the Segment Anything model."""
                 self.precision_mode = False
                 """Whether to predict object masks with Segment Anything."""
                 self.refine_bounding_boxes = False
-                """Whether to refine detection boxes using Segment Anything masks."""
+                """Whether to refine boxes when ``precision_mode`` is enabled."""
 
         parameters = Parameters()
+        """Detection and segmentation configuration defaults."""
 
     def __init__(
         self,
         name="OpenVocabularyObjectDetectionAnnotator",
         descriptor=Descriptor(),
     ) -> None:
+        """Initialize the threaded annotator and load the configured models.
+
+        :param name: Name of the behaviour-tree node.
+        :param descriptor: Detection and segmentation configuration.
+        """
         super(OpenVocabularyObjectDetectionAnnotator, self).__init__(name, descriptor)
 
         self.classes = self.descriptor.parameters.classes
+        """Text labels supplied to the detection processor."""
 
         self.model = Owlv2ForObjectDetection.from_pretrained(
             self.descriptor.parameters.detection_model
         )
+        """Loaded OWLv2 object detection model."""
         self.processor = Owlv2Processor.from_pretrained(
             self.descriptor.parameters.detection_processor
         )
+        """Processor for the detection model's text and image inputs."""
 
         if self.descriptor.parameters.precision_mode:
             self.segment_anything_model = SegmentAnythingModel(
                 self.descriptor.parameters.segment_anything_model_path
             )
+            """Segmentation model available when ``precision_mode`` is enabled."""
 
     @catch_and_raise_to_blackboard
     def compute(self) -> py_trees.common.Status:
-        """Detect objects, publish their hypotheses, and update the visualization."""
+        """Main method: Detect objects based on configured classes and update the visualization.
+
+        :return: ``py_trees.common.Status.SUCCESS`` after processing the color image.
+        """
         start_timer = default_timer()
         image = self.get_cas().get(CASViews.COLOR_IMAGE)
         object_hypotheses = self.detect_objects(image)
@@ -128,7 +154,11 @@ class OpenVocabularyObjectDetectionAnnotator(
     def detect_objects(
         self, image: numpy_typing.NDArray[numpy.uint8]
     ) -> list[ObjectHypothesis]:
-        """Return classified object hypotheses with optional cropped Segment Anything masks."""
+        """Detect configured classes with optional masks cropped to their regions.
+
+        :param image: Color image in BGR channel order.
+        :return: Classified hypotheses with bounding boxes and optional masks.
+        """
         inputs = self.processor(
             text=self.classes,
             images=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
@@ -186,7 +216,12 @@ class OpenVocabularyObjectDetectionAnnotator(
     def predict_mask(
         self, image: numpy_typing.NDArray[numpy.uint8], box: list[float]
     ) -> numpy_typing.NDArray[numpy.uint8]:
-        """Return a binary byte mask at the original color-image resolution."""
+        """Predict a mask at the original color-image resolution.
+
+        :param image: Color image in BGR channel order.
+        :param box: Bounding box as ``[left, top, right, bottom]`` in image pixels.
+        :return: Mask with foreground pixels set to 255 and background pixels to 0.
+        """
         result = self.segment_anything_model.predict(
             image, bboxes=[box], labels=[SegmentPromptLabel.FOREGROUND]
         )[0]
@@ -194,7 +229,12 @@ class OpenVocabularyObjectDetectionAnnotator(
         return mask * numpy.iinfo(numpy.uint8).max
 
     def refine_bounding_box(self, object_hypothesis: ObjectHypothesis) -> None:
-        """Adjust the box to the first mask contour, leaving empty masks unchanged."""
+        """Adjust a hypothesis's bounding box to the first contour of its mask.
+
+        Empty masks leave the bounding box unchanged.
+
+        :param object_hypothesis: Object Hypothesis with a full-image mask; updated in place.
+        """
         contours, _ = cv2.findContours(
             object_hypothesis.roi.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
@@ -213,7 +253,13 @@ class OpenVocabularyObjectDetectionAnnotator(
         image: numpy_typing.NDArray[numpy.uint8],
         object_hypotheses: list[ObjectHypothesis],
     ) -> numpy_typing.NDArray[numpy.uint8]:
-        """Return an image copy with detection labels, boxes, and optional masks."""
+        """Draw detection labels, bounding boxes, and optional colored masks.
+
+        :param image: Color image in BGR channel order.
+        :param object_hypotheses: Hypotheses with optional masks cropped to their
+            regions.
+        :return: Annotated copy of the color image.
+        """
         visualization = image.copy()
         robokudo.utils.annotator_helper.draw_bounding_boxes_from_object_hypotheses(
             visualization, object_hypotheses, get_box_text
