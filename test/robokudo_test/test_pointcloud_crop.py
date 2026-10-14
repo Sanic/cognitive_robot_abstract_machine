@@ -12,34 +12,43 @@ anything even when the camera-to-world transform was available.
 import numpy as np
 import open3d as o3d
 import pytest
+from dataclasses import replace
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 
 # robokudo.pipeline must be imported before robokudo.annotators.outputs: importing
 # outputs first trips a circular import between it and robokudo.annotators.core.
-import robokudo.pipeline
+import robokudo.pipeline  # noqa: F401
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap, AnnotatorOutputs
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.pipeline import Pipeline
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from robokudo.types.camera import CameraObservation
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.world_description.world_entity import Body
 
 
 @pytest.fixture()
-def camera_intrinsics() -> o3d.camera.PinholeCameraIntrinsic:
+def camera_model() -> PinholeCameraModel:
     """
     Intrinsics sized so the test cloud's points project well inside the color image.
     """
-    intrinsics = o3d.camera.PinholeCameraIntrinsic()
-    intrinsics.set_intrinsics(
-        width=200, height=200, fx=100.0, fy=100.0, cx=100.0, cy=100.0
+    return PinholeCameraModel(
+        image_resolution=CameraResolution(width=200, height=200),
+        focal_length_x=100.0,
+        focal_length_y=100.0,
+        principal_point_x=100.0,
+        principal_point_y=100.0,
     )
-    return intrinsics
 
 
 @pytest.fixture()
 def cas_with_cloud_at_world_origin(
-    camera_intrinsics: o3d.camera.PinholeCameraIntrinsic,
+    camera_model: PinholeCameraModel,
 ) -> CAS:
     """
     A CAS whose cloud sits at the world origin, one metre in front of the camera, with
@@ -47,7 +56,7 @@ def cas_with_cloud_at_world_origin(
     here, keeping the fixture's geometry simple).
     """
     cas = CAS()
-    cas.camera_to_world_transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=0.0,
         pos_y=0.0,
         pos_z=0.0,
@@ -55,6 +64,18 @@ def cas_with_cloud_at_world_origin(
         quat_y=0.0,
         quat_z=0.0,
         quat_w=1.0,
+    )
+    camera_body = Body(name=PrefixedName(name="camera"))
+    cas.camera_observation = CameraObservation(
+        camera=Camera(
+            name=PrefixedName(name="camera"),
+            root=camera_body,
+            forward_facing_axis=Vector3.Z(),
+            camera_model=camera_model,
+        ),
+        effective_camera_model=camera_model,
+        world_T_camera=world_T_camera,
+        timestamp_nanoseconds=123,
     )
 
     points_inside_the_crop = np.array([[0.0, 0.0, 1.0], [0.05, 0.05, 1.0]])
@@ -66,7 +87,7 @@ def cas_with_cloud_at_world_origin(
 
     cas.set_ref(CASViews.CLOUD, cloud)
     cas.set(CASViews.COLOR_IMAGE, np.zeros((200, 200, 3), dtype=np.uint8))
-    cas.set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, camera_intrinsics)
+    cas.pointcloud_camera_model = camera_model
     cas.set(CASViews.COLOR2DEPTH_RATIO, (1.0, 1.0))
     return cas
 
@@ -119,7 +140,10 @@ def test_world_relative_crop_actually_crops_the_cloud(
 def test_world_relative_crop_fails_without_a_camera_to_world_transform(
     crop_annotator_in_pipeline: PointcloudCropAnnotator,
 ):
-    crop_annotator_in_pipeline.get_cas().camera_to_world_transform = None
+    cas = crop_annotator_in_pipeline.get_cas()
+    cas.camera_observation = replace(
+        cas.require_camera_observation(), world_T_camera=None
+    )
 
     status = crop_annotator_in_pipeline.update()
 

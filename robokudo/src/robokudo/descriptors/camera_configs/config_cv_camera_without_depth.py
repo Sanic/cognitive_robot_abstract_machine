@@ -7,7 +7,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import cv2
-from typing_extensions import TYPE_CHECKING, Optional, Dict, Any, Tuple, Union, ClassVar
+from sensor_msgs.msg import CameraInfo
+from typing_extensions import TYPE_CHECKING, Optional, Tuple, Union, ClassVar
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 
@@ -62,11 +63,12 @@ class OpenCVCameraConfig(BaseCameraConfig):
     """
 
     loop_mode: int = -1
-    """Loop after iterating over all frames of the video file
+    """
+    Loop after iterating over all frames of the video file
     > 0: number of repetitions before to stop
     = 0: never loop
     < 0: infinite loop
-    
+
     ... note::
         Only works with a file as source
     """
@@ -81,9 +83,14 @@ class OpenCVCameraConfig(BaseCameraConfig):
     Flag to update global depth parameters.
     """
 
-    camera_info: Dict[str, Any] = None
+    camera_info: Optional[CameraInfo] = None
     """
-    Camera config as dict.
+    Calibration matching the configured capture resolution.
+    """
+
+    camera_frame: str = "opencv_optical_frame"
+    """
+    Optical frame used when :attr:`camera_info` declares no frame.
     """
 
     camera_intrinsic = None

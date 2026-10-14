@@ -1,4 +1,5 @@
-"""Image preprocessing and point cloud generation.
+"""
+Image preprocessing and point cloud generation.
 
 This module provides an annotator for:
 
@@ -13,7 +14,6 @@ This module provides an annotator for:
 
 from __future__ import annotations
 
-import copy
 from enum import StrEnum
 from timeit import default_timer
 
@@ -26,7 +26,7 @@ from typing_extensions import TYPE_CHECKING, Optional
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing
-from robokudo.utils.annotator_helper import scale_camera_intrinsics
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 
 if TYPE_CHECKING:
@@ -34,7 +34,8 @@ if TYPE_CHECKING:
 
 
 class ImagePreprocessorAnnotator(BaseAnnotator):
-    """RGB-D image preprocessor and point cloud generator.
+    """
+    RGB-D image preprocessor and point cloud generator.
 
     This annotator:
 
@@ -48,20 +49,28 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
     """
 
     class ViewMode(StrEnum):
-        """Visualization mode enumeration."""
+        """
+        Visualization mode enumeration.
+        """
 
         COLOR = "color"
         DEPTH = "depth"
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for image preprocessing."""
+        """
+        Configuration descriptor for image preprocessing.
+        """
 
         class Parameters:
-            """Parameters for configuring preprocessing."""
+            """
+            Parameters for configuring preprocessing.
+            """
 
             def __init__(self):
                 self.depth_trunc: float = 9.0
-                """Maximum depth distance in meters, points beyond are discarded from cloud creation"""
+                """
+                Maximum depth distance in meters, points beyond are discarded from cloud creation
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -71,7 +80,8 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         name: str = "ImagePreprocessor",
         descriptor: ImagePreprocessorAnnotator.Descriptor | None = None,
     ) -> None:
-        """Initialize the image preprocessor.
+        """
+        Initialize the image preprocessor.
 
         :param name: Name of this annotator instance
         :param descriptor: Configuration descriptor
@@ -80,16 +90,23 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.color: Optional[npt.NDArray] = None
-        """Optional color image currently being worked with"""
+        """
+        Optional color image currently being worked with
+        """
 
         self.depth: Optional[npt.NDArray] = None
-        """Optional depth image currently being worked with"""
+        """
+        Optional depth image currently being worked with
+        """
 
         self.display_mode: ImagePreprocessorAnnotator.ViewMode = self.ViewMode.COLOR
-        """The display mode to use (color or depth)"""
+        """
+        The display mode to use (color or depth)
+        """
 
     def update(self) -> Status:
-        """Process RGB-D images and generate point cloud.
+        """
+        Process RGB-D images and generate point cloud.
 
         The method:
 
@@ -106,16 +123,22 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
 
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        self.camera_intrinsics = copy.deepcopy(
-            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
+        cas = self.get_cas()
+        color2depth_ratio = cas.color2depth_ratio
+        pointcloud_camera_model = (
+            cas.require_camera_observation().effective_camera_model.scaled(
+                scale_x=color2depth_ratio[0],
+                scale_y=color2depth_ratio[1],
+            )
+        )
+        self.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
+            pointcloud_camera_model
         )
 
         if self.display_mode is self.ViewMode.DEPTH:
             self.get_annotator_output_struct().set_image(self.depth)
         else:
             self.get_annotator_output_struct().set_image(self.color)
-
-        scale_camera_intrinsics(self)
 
         resized_color = None
         try:
@@ -151,7 +174,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
             rgbd_image, self.camera_intrinsics
         )
 
-        self.get_cas().set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, self.camera_intrinsics)
+        cas.pointcloud_camera_model = pointcloud_camera_model
 
         self.get_cas().set_ref(CASViews.CLOUD, cloud)
         self.get_annotator_output_struct().set_geometries(
@@ -163,7 +186,8 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         return Status.SUCCESS
 
     def key_callback(self, key: int) -> None:
-        """Handle keyboard input for view mode switching.
+        """
+        Handle keyboard input for view mode switching.
 
         :param key: ASCII value of pressed key
 

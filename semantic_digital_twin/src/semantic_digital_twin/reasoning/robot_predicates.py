@@ -1,3 +1,4 @@
+# %% Imports
 from __future__ import annotations
 
 from copy import deepcopy
@@ -29,7 +30,6 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Copula,
     Noun,
 )
-from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.collision_checking.collision_detector import (
     ClosestPoints,
@@ -60,6 +60,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
+# %% Robot predicates
 @symbolic_function
 def robot_in_collision(
     robot: AbstractRobot,
@@ -178,11 +179,12 @@ def bodies_in_gripper(gripper: HasTwoFingers, sample_size: int = 100) -> List[Bo
     finger_points = trimesh.sample.sample_surface(finger_mesh, sample_size)[0]
     thumb_points = trimesh.sample.sample_surface(thumb_mesh, sample_size)[0]
 
-    rt = gripper._world.ray_tracer
-    rt.update_scene()
-
-    points, index_ray, bodies = rt.ray_test(finger_points, thumb_points)
-    return list(set(bodies) - set(gripper.finger.bodies) - set(gripper.thumb.bodies))
+    ray_intersections = gripper._world.ray_tracer.ray_test(finger_points, thumb_points)
+    return list(
+        set(ray_intersections.bodies)
+        - set(gripper.finger.bodies)
+        - set(gripper.thumb.bodies)
+    )
 
 
 @symbolic_function
@@ -248,7 +250,7 @@ def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose) -> bool:
 
 
 @symbolic_function
-def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
+def get_visible_bodies(camera: Camera) -> list[KinematicStructureEntity]:
     """
     Get all bodies and regions that are visible from the given camera using a
     segmentation mask.
@@ -261,7 +263,7 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
 
     seg = rt.create_segmentation_mask(
         camera.root_T_forward_view,
-        resolution=CameraResolution(width=256, height=256),
+        resolution=camera.resolution,
         min_distance=0.2,
         field_of_view=camera.field_of_view,
     )
@@ -316,7 +318,7 @@ class VisibleTo(Triple[TKinematicStructureEntity, TCamera]):
 
 
 @symbolic_function
-def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
+def occluding_bodies(camera: Camera, body: Body) -> list[Body]:
     """
     Determines the bodies that occlude a given body in the scene as seen from a
     specified camera.
@@ -352,7 +354,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     segmentation_mask_without_occlusion = (
         ray_tracer_without_occlusion.create_segmentation_mask(
             camera_pose,
-            resolution=CameraResolution(width=256, height=256),
+            resolution=camera.resolution,
             min_distance=0.1,
             field_of_view=camera.field_of_view,
         )
@@ -364,7 +366,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     segmentation_mask_with_occlusion = (
         ray_tracer_with_occlusion.create_segmentation_mask(
             camera_pose,
-            resolution=CameraResolution(width=256, height=256),
+            resolution=camera.resolution,
             min_distance=0.1,
             field_of_view=camera.field_of_view,
         )

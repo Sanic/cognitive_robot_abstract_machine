@@ -1,9 +1,26 @@
 from dataclasses import dataclass
+from enum import StrEnum
 
 from typing_extensions import ClassVar
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import WorldDescriptorComponent
+
+
+class MongoReplayMode(StrEnum):
+    """
+    Choose which part of a recorded world playback restores.
+    """
+
+    SENSOR_CONTEXT = "sensor_context"
+    """
+    Restore only the camera and its required reference frames.
+    """
+
+    FULL_WORLD = "full_world"
+    """
+    Restore the complete recorded world for each frame.
+    """
 
 
 @dataclass(slots=True)
@@ -37,4 +54,9 @@ class MongoCameraConfig(BaseCameraConfig, WorldDescriptorComponent):
     restore_annotations: bool = False
     """
     Whether to restore stored CAS annotations during playback.
+    """
+
+    replay_mode: MongoReplayMode = MongoReplayMode.SENSOR_CONTEXT
+    """
+    World content restored before decoding each recorded frame.
     """

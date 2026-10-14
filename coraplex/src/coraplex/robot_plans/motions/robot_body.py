@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+# %% Imports
 from dataclasses import dataclass
 from typing import Optional
 
@@ -17,6 +20,7 @@ from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
 
+# %% Joint motions
 @dataclass
 class MoveJointsMotion(BaseMotion, HasMaxJointVelocity):
     """
@@ -80,10 +84,11 @@ class MoveJointsMotion(BaseMotion, HasMaxJointVelocity):
         )
 
 
+# %% Camera pointing
 @dataclass
 class LookingMotion(BaseMotion):
     """
-    Lets the robot look at a point.
+    Align the camera's optical forward direction with the target.
     """
 
     target: Pose
@@ -96,14 +101,14 @@ class LookingMotion(BaseMotion):
     Camera annotation that should look at the target.
     """
 
-    def perform(self):
+    def perform(self) -> None:
         return
 
     @property
-    def _motion_chart(self):
+    def _motion_chart(self) -> Pointing:
         return Pointing(
             root_link=self.robot.get_torso().root,
             tip_link=self.camera.root,
             goal_point=self.target.position,
-            pointing_axis=self.camera.forward_facing_axis,
+            pointing_axis=self.camera.viewing_direction,
         )

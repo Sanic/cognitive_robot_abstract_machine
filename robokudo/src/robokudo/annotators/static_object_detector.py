@@ -24,7 +24,13 @@ from typing_extensions import TYPE_CHECKING, Dict, List, Optional
 import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.exceptions import ColorToDepthRatioMissing, UnknownMode
+from robokudo.exceptions import (
+    CameraObservationMissing,
+    CameraPoseMissing,
+    ColorToDepthRatioMissing,
+    UnknownMode,
+)
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     Classification,
@@ -35,7 +41,6 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.types.tf import Pose
 from robokudo.utils.annotator_helper import (
     get_world_to_camera_transform_matrix,
-    scale_camera_intrinsics,
 )
 from robokudo.utils.cv_helper import (
     clamp_bounding_rect,
@@ -69,7 +74,8 @@ class StaticObjectMode(Enum):
 
 
 class StaticObjectDetectorAnnotator(BaseAnnotator):
-    """Find a cluster based on a preconfigured Bounding Box, Pose and Class name.
+    """
+    Find a cluster based on a preconfigured Bounding Box, Pose and Class name.
 
     This annotator can:
 
@@ -84,7 +90,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for the StaticObjectDetectorAnnotator.
+        """
+        Configuration descriptor for the StaticObjectDetectorAnnotator.
 
         Defines all configurable parameters including:
 
@@ -95,7 +102,9 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         """
 
         class Parameters:
-            """Parameters controlling the static object detection behavior."""
+            """
+            Parameters controlling the static object detection behavior.
+            """
 
             def __init__(self) -> None:
                 self.bounding_box_x: int = 1
@@ -104,7 +113,9 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 self.bounding_box_height: int = 10
 
                 self.mode: StaticObjectMode = StaticObjectMode.BOUNDING_BOX
-                """Defines the mode which mainly decide which sources of information are used to generate the Object Hypothesis"""
+                """
+                Defines the mode which mainly decide which sources of information are used to generate the Object Hypothesis
+                """
 
                 # # If setting this to True, we detect a certain object stored in the ObjectKnowledgeBase
                 # # This allows us to automatically infer the BoundingBox coordinates
@@ -117,22 +128,28 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 """
 
                 self.class_names: List[str] = []
-                """Used for StaticObjectMode.WORLD_DESCRIPTOR"""
+                """
+                Used for StaticObjectMode.WORLD_DESCRIPTOR
+                """
 
                 self.create_pose_annotation: bool = False
-                """If True a Pose will be created for the object. Pose is relative to the camera frame by default.
+                """
+                If True a Pose will be created for the object. Pose is relative to the camera frame by default.
 
                 Only effective in Mode=StaticObjectDetectorAnnotator.Mode.WORLD_DESCRIPTOR
                 """
 
                 self.create_bounding_box_annotation: bool = False
-                """If True a BoundingBox will be created for the object.
+                """
+                If True a BoundingBox will be created for the object.
 
                 Only effective in Mode=StaticObjectDetectorAnnotator.Mode.WORLD_DESCRIPTOR
                 """
 
                 self.create_mask: bool = True
-                """If this is a true, a mask based on the ROI will be generated that marks every pixel as ON"""
+                """
+                If this is a true, a mask based on the ROI will be generated that marks every pixel as ON
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -142,7 +159,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         name: str = "StaticObjectDetector",
         descriptor: StaticObjectDetectorAnnotator.Descriptor | None = None,
     ) -> None:
-        """Default construction. Minimal one-time init!
+        """
+        Default construction. Minimal one-time init!
 
         :param name: Name of the annotator instance
         :param descriptor: Configuration descriptor
@@ -231,7 +249,9 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         object_id: int = 0,
         world_to_camera_transform_matrix: np.ndarray | None = None,
     ) -> ObjectHypothesis | None:
-        """Detect from singular, passed SDT Body instance"""
+        """
+        Detect from singular, passed SDT Body instance
+        """
         object_hypothesis = ObjectHypothesis()
         object_hypothesis.id = str(object_id)
         object_hypothesis.source = self.name
@@ -335,7 +355,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
-        """Process current scene to detect configured static objects.
+        """
+        Process current scene to detect configured static objects.
 
         Steps:
 
@@ -358,9 +379,6 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
         self.cloud = self.get_cas().get(CASViews.CLOUD)
-        self.camera_intrinsics = copy.deepcopy(
-            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
-        )
 
         world_frame_required = False
         world_to_camera_transform_matrix = None
@@ -398,7 +416,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 world_to_camera_transform_matrix = get_world_to_camera_transform_matrix(
                     self.get_cas()
                 )
-            except:
+            except (CameraObservationMissing, CameraPoseMissing):
                 self.rk_logger.warning(
                     "Couldn't find world-to-camera transform in the CAS"
                 )
@@ -409,7 +427,18 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             resized_color = get_scaled_color_image_for_depth_image(
                 self.get_cas(), self.color
             )
-            scale_camera_intrinsics(self)
+            color2depth_ratio = self.get_cas().color2depth_ratio
+            pointcloud_camera_model = (
+                self.get_cas()
+                .require_camera_observation()
+                .effective_camera_model.scaled(
+                    scale_x=color2depth_ratio[0],
+                    scale_y=color2depth_ratio[1],
+                )
+            )
+            self.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
+                pointcloud_camera_model
+            )
         except ColorToDepthRatioMissing:
             self.rk_logger.error(
                 "No color to depth ratio set by your camera driver! Can't scale image for Point Cloud creation."
@@ -482,7 +511,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
     def add_classification_annotation(
         object_hypothesis: ObjectHypothesis, class_name: str
     ) -> None:
-        """Add a classification annotation to the given object hypothesis.
+        """
+        Add a classification annotation to the given object hypothesis.
 
         :param object_hypothesis: The object hypothesis to annotate.
         :param class_name: The name of the annotation class.
@@ -496,7 +526,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
     def get_rotation_list_based_on_parameters(
         self, rotation_x: float, rotation_y: float, rotation_z: float, rotation_w: float
     ) -> List[float]:
-        """Return a quaternion based on the parametrization of the Annotator.
+        """
+        Return a quaternion based on the parametrization of the Annotator.
 
         :param rotation_x: rotation about x-axis
         :param rotation_y: rotation about y-axis
@@ -529,7 +560,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             + self.descriptor.parameters.bounding_box_height
         )
         # Respect possible color2depth scaling also for BoundingBox coordinates
-        color2depth_ratio = self.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
+        color2depth_ratio = self.get_cas().color2depth_ratio
         sx1, sy1 = get_scale_coordinates(color2depth_ratio, (x1, y1))
         sx2, sy2 = get_scale_coordinates(color2depth_ratio, (x2, y2))
         mask[int(sy1) : int(sy2), int(sx1) : int(sx2)] = 255

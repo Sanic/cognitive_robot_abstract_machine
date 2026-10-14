@@ -4,9 +4,12 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING, Type
 
+from krrood.exceptions import DataclassException
 from semantic_digital_twin.exceptions import UsageError
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+    from semantic_digital_twin.spatial_types import Vector3
     from semantic_digital_twin.robots.input_source import InputSource
     from semantic_digital_twin.robots.robot_part_mixins import RobotPartMixin
 
@@ -272,4 +275,30 @@ class MissingDriveConnectionError(RobotPartValidationError):
         return (
             f"{type(self.robot_part).__name__} has no drive connection its pose could "
             f"be written into."
+        )
+
+
+# %% Optical frame conventions
+@dataclass
+class CameraOpticalConventionUndefined(DataclassException):
+    """
+    A viewing axis has no defined default optical orientation.
+    """
+
+    camera_name: PrefixedName
+    """
+    Camera requiring an explicit root-relative optical pose.
+    """
+
+    viewing_axis: Vector3
+    """
+    Viewing axis whose image right and down directions are unspecified.
+    """
+
+    def error_message(self) -> str:
+        return f"Camera {self.camera_name} has no optical convention for viewing axis {self.viewing_axis}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Provide root_T_optical, or select the positive unit x or z viewing axis."
         )

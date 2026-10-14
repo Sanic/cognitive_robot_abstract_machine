@@ -80,12 +80,7 @@ def get_scaled_color_image_for_depth_image(
         unchanged color_image is returned.
     :raises ColorToDepthRatioMissing: If color-to-depth ratio not set in CAS
     """
-    color2depth_ratio = cas.get(CASViews.COLOR2DEPTH_RATIO)
-
-    if not color2depth_ratio:
-        raise ColorToDepthRatioMissing(
-            operation="scale color image to depth image resolution"
-        )
+    color2depth_ratio = cas.color2depth_ratio
 
     if color2depth_ratio == (1, 1):
         resized_color = color_image

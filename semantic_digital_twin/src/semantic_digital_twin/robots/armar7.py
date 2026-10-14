@@ -10,6 +10,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -23,7 +24,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     Finger,
     Neck,
     Torso,
@@ -478,11 +479,7 @@ class Armar7RightArm(Arm[Armar7RightGripper]):
 
 
 @dataclass(eq=False)
-class AzureKinectRGB(Camera):
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
+class AzureKinectRGB(RobotCamera):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -492,7 +489,10 @@ class AzureKinectRGB(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "AzureKinect_RGB_link"
             ),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            forward_facing_axis=Vector3.Z(),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=1.3715,
             maximal_height=1.7365,
             default_camera=True,

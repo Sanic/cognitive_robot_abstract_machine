@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
-from typing import Self, List
+from typing_extensions import Self, List
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
@@ -21,6 +21,7 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -39,11 +40,11 @@ from semantic_digital_twin.robots.robot_parts import (
     Arm,
     Neck,
     Finger,
-    Camera,
+    RobotCamera,
     AbstractRobot,
     EndEffector,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     OmniDrive,
@@ -102,27 +103,36 @@ class PR2Joint(StrEnum):
 
 
 @dataclass(eq=False)
-class PR2KinectV1(Camera):
+class PR2KinectV1(RobotCamera):
+    """
+    Kinect V1 camera attached to its RGB optical frame.
+    """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
+        """
+        Attach the camera to the Kinect RGB optical frame below the robot root.
+
+        :param robot_root: Root of the robot branch containing the optical frame.
+        :return: Camera configured for the model's optical frame.
+        """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "wide_stereo_optical_frame"
+                robot_root, "head_mount_kinect_rgb_optical_frame"
             ),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            forward_facing_axis=Vector3.Z(),
+            root_T_optical=HomogeneousTransformationMatrix(),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=1.27,
             maximal_height=1.60,
             default_camera=True,

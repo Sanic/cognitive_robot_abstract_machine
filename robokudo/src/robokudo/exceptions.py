@@ -53,6 +53,192 @@ class UnknownMode(RoboKudoError, ValueError):
         return "use one of the modes supported by this component."
 
 
+# %% Semantic robot selection
+
+
+@dataclass
+class RobotAnnotationMissing(RoboKudoError):
+    """
+    Raised when no semantic robot matches the runtime-world selection.
+    """
+
+    robot_name: str | None = None
+    """
+    Requested robot name, or ``None`` when no name was configured.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing robot selection.
+        """
+        if self.robot_name is None:
+            return (
+                "The runtime Semantic Digital Twin world contains no robot annotation."
+            )
+        return f"No robot annotation named '{self.robot_name}' exists in the runtime world."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to make a runtime robot selectable.
+        """
+        return "synchronize a robot into the runtime world or select an existing robot."
+
+
+@dataclass
+class RobotAnnotationAmbiguous(RoboKudoError):
+    """
+    Raised when runtime-world robot selection has multiple valid results.
+    """
+
+    robot_names: tuple[str, ...]
+    """
+    Names of robot annotations that satisfy the selection.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the ambiguous robot selection.
+        """
+        return f"Robot selection is ambiguous between {self.robot_names}."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to select one runtime robot.
+        """
+        return "configure the name of the robot whose default camera should be used."
+
+
+# %% Semantic camera selection
+
+
+@dataclass
+class CameraAnnotationMissing(RoboKudoError):
+    """
+    Raised when no semantic camera matches the configured selection.
+    """
+
+    camera_name: str | None = None
+    """
+    Requested camera name, or ``None`` when no name was configured.
+    """
+
+    def error_message(self) -> str:
+        if self.camera_name is None:
+            return "The Semantic Digital Twin world contains no camera annotation."
+        return f"No camera annotation named '{self.camera_name}' exists in the world."
+
+    def suggest_correction(self) -> str:
+        return "add a Camera annotation to the world or select an existing camera."
+
+
+@dataclass
+class CameraAnnotationAmbiguous(RoboKudoError):
+    """
+    Raised when camera selection has more than one valid result.
+    """
+
+    camera_names: tuple[str, ...]
+    """
+    Names of camera annotations that satisfy the selection.
+    """
+
+    def error_message(self) -> str:
+        return f"Camera selection is ambiguous between {self.camera_names}."
+
+    def suggest_correction(self) -> str:
+        return "configure the name of the camera that should provide perception data."
+
+
+@dataclass
+class CameraPoseOverrideUnavailable(RoboKudoError):
+    """
+    Raised when the selected camera attachment cannot accept a pose override.
+    """
+
+    camera_name: str
+    """
+    Name of the semantic camera whose pose cannot be changed.
+    """
+
+    connection_type: str | None
+    """
+    Camera-root connection type, or ``None`` when the camera is the world root.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe why the configured pose cannot be applied.
+        """
+        if self.connection_type is None:
+            return f"Camera '{self.camera_name}' has no parent connection."
+        return (
+            f"Camera '{self.camera_name}' is attached through immutable connection "
+            f"type '{self.connection_type}'."
+        )
+
+    def suggest_correction(self) -> str:
+        """
+        Describe the attachment required for configurable camera placement.
+        """
+        return "attach the camera root through a Connection6DoF or omit camera_pose."
+
+
+@dataclass
+class InvalidCameraObservation(RoboKudoError, TypeError):
+    """
+    Raised when camera metadata contains incompatible values.
+    """
+
+    reason: str
+    """
+    Reason the persisted observation is invalid.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid camera observation: {self.reason}."
+
+    def suggest_correction(self) -> str:
+        return "use compatible camera, pose-frame, and projection-model data."
+
+
+@dataclass
+class CameraObservationMissing(RoboKudoError):
+    """
+    Raised when processing requires camera metadata for the current frame.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing frame metadata.
+        """
+        return "The CAS contains no camera observation."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to provide frame metadata.
+        """
+        return "run a camera interface before camera-dependent annotators."
+
+
+@dataclass
+class CameraPoseMissing(RoboKudoError):
+    """
+    Raised when camera metadata has no sampled world pose.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing sampled pose.
+        """
+        return "The camera observation contains no camera pose in the world frame."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to provide the sampled pose.
+        """
+        return "configure camera TF or a static camera transform."
+
+
 @dataclass
 class CameraDataMissing(RoboKudoError):
     """
@@ -266,19 +452,6 @@ class CVBridgeUnsupportedTargetEncoding(RoboKudoError, ValueError):
 
 
 @dataclass
-class StoredCameraTransformFrameMetadataMissing(RoboKudoError):
-    """
-    Raised when stored camera transform frame metadata is missing.
-    """
-
-    def error_message(self) -> str:
-        return "Stored CAMERA_TO_WORLD_TRANSFORM is missing frame-name metadata."
-
-    def suggest_correction(self) -> str:
-        return "Recreate the recording with the current storage format."
-
-
-@dataclass
 class AnalysisPreconditionError(RoboKudoError, ABC):
     """
     Base class for unmet analysis preconditions.
@@ -365,6 +538,19 @@ class PlaneModelMissing(AnalysisPreconditionError):
         return (
             "run a plane annotator before this algorithm or provide a plane annotation."
         )
+
+
+@dataclass
+class PointCloudCameraModelMissing(AnalysisPreconditionError):
+    """
+    Raised when the CAS lacks the projection model for its point cloud.
+    """
+
+    def error_message(self) -> str:
+        return "The CAS contains no point cloud camera model."
+
+    def suggest_correction(self) -> str:
+        return "provide the camera model used to create the point cloud."
 
 
 @dataclass

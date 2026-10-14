@@ -32,6 +32,12 @@ from krrood.class_diagrams.attribute_introspector import (
 from krrood.entity_query_language.factories import variable, contains, a, entity
 from krrood.ormatic.utils import classproperty
 from krrood.utils import get_generic_type_parameters
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraModel,
+    CameraModality,
+    CameraRange,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
@@ -46,7 +52,10 @@ from semantic_digital_twin.exceptions import (
     MissingDefaultCameraError,
 )
 from semantic_digital_twin.input_synchronization import InputSynchronizer
-from semantic_digital_twin.robots.exceptions import MissingDriveConnectionError
+from semantic_digital_twin.robots.exceptions import (
+    MissingDriveConnectionError,
+    CameraOpticalConventionUndefined,
+)
 from semantic_digital_twin.robots.input_source import (
     BasePoseSource,
     JointPositionSource,
@@ -559,62 +568,167 @@ class Sensor(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class Camera(Sensor, ABC):
+class Camera(HasRootBody):
     """
-    A camera is a sensor that captures images of the environment.
-    """
-
-    field_of_view: FieldOfView = field(kw_only=True)
-    """
-    The field of view of the camera, defined by the vertical and horizontal angles of
-    the camera's view.
+    A camera that captures images of the environment.
     """
 
-    default_camera: bool = False
+    forward_facing_axis: Vector3 = field(kw_only=True)
     """
-    Whether this camera is the default camera of the robot.
+    Root-frame viewing axis selecting the default optical convention.
 
-    Used for quick access.
-    """
-
-    minimal_height: float = 0.0
-    """
-    The minimal height of the camera above the ground, in meters.
+    Positive unit z uses x-right, y-down optical axes. Positive unit x uses y-left, z-up body
+    axes. :attr:`root_T_optical` supplies the full orientation for other conventions.
     """
 
-    maximal_height: float = 1.0
+    camera_model: CameraModel = field(kw_only=True)
     """
-    The maximal height of the camera above the ground, in meters.
+    Native projection model of the camera.
     """
+
+    root_T_optical: HomogeneousTransformationMatrix | None = field(
+        default=None, kw_only=True
+    )
+    """
+    Fixed optical pose relative to the camera root, with x right, y down, and z forward.
+
+    When omitted, :attr:`forward_facing_axis` selects a fixed root-relative convention.
+    """
+
+    camera_range: CameraRange = field(default_factory=CameraRange, kw_only=True)
+    """
+    Usable distance interval of the camera.
+    """
+
+    modalities: tuple[CameraModality, ...] = field(default_factory=tuple, kw_only=True)
+    """
+    Kinds of image data the camera can produce.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Express the viewing direction and optical attachment in the camera root frame.
+        """
+        super().__post_init__()
+        self.forward_facing_axis.reference_frame = self.root
+        self.root_T_optical = self.optical_attachment
+        self.root_T_optical.reference_frame = self.root
+        if self.root_T_optical.child_frame is None and np.array_equal(
+            self.root_T_optical.to_np(), np.eye(4)
+        ):
+            self.root_T_optical.child_frame = self.root
 
     @property
-    @abstractmethod
-    def forward_facing_axis(self) -> Vector3:
+    def field_of_view(self) -> FieldOfView:
         """
-        The direction the camera looks, expressed in :attr:`root`'s frame.
+        Return the angular extent of the native camera model.
         """
+        return self.camera_model.field_of_view
+
+    @property
+    def resolution(self) -> CameraResolution:
+        """
+        Return the native image resolution.
+        """
+        return self.camera_model.resolution
+
+    @property
+    def optical_attachment(self) -> HomogeneousTransformationMatrix:
+        """
+        Return the optical pose relative to the camera root, independent of world pose.
+
+        :return: Fixed root-relative optical attachment.
+        :raises CameraOpticalConventionUndefined: If the viewing axis requires an
+            explicit optical orientation.
+        """
+        if self.root_T_optical is not None:
+            return self.root_T_optical
+        if np.array_equal(self.forward_facing_axis.to_np(), Vector3.Z().to_np()):
+            return HomogeneousTransformationMatrix()
+        if np.array_equal(self.forward_facing_axis.to_np(), Vector3.X().to_np()):
+            return self.x_forward_R_optical
+        raise CameraOpticalConventionUndefined(
+            camera_name=self.name, viewing_axis=self.forward_facing_axis
+        )
+
+    @classproperty
+    def x_forward_R_optical(cls: type[Camera]) -> HomogeneousTransformationMatrix:
+        """
+        Express right-down-forward optical axes in an x-forward, y-left, z-up root.
+
+        :return: Optical rotation relative to body axes.
+        """
+        return HomogeneousTransformationMatrix(
+            data=RotationMatrix.from_vectors(
+                x=-Vector3.Y(), y=-Vector3.Z(), z=Vector3.X()
+            )
+        )
+
+    @property
+    def viewing_direction(self) -> Vector3:
+        """
+        Return the optical forward direction expressed in the camera root.
+
+        :return: Viewing direction following the fixed optical attachment.
+        """
+        root_V_forward = self.optical_attachment.rotation_matrix @ Vector3.Z()
+        root_V_forward.reference_frame = self.root
+        return root_V_forward
+
+    @property
+    def world_T_optical(self) -> HomogeneousTransformationMatrix:
+        """
+        Return the optical pose from the world root pose and fixed optical attachment.
+
+        :return: World-space optical pose preserving camera roll and image axes.
+        """
+        return self.root.global_transform @ self.optical_attachment
+
+    @classproperty
+    def optical_R_forward_view(cls: type[Camera]) -> HomogeneousTransformationMatrix:
+        """
+        Express the x-forward viewing frame in right-down-forward optical axes.
+
+        :return: Rotation from the forward-view frame into optical axes.
+        """
+        return HomogeneousTransformationMatrix.from_xyz_rpy(pitch=-np.pi / 2)
 
     @property
     def root_T_forward_view(self) -> HomogeneousTransformationMatrix:
         """
-        The camera's pose in the world root frame, with its x axis along the direction
-        the camera looks.
+        Return the world-space x-forward pose with the optical image orientation.
 
-        The y and z axes only complete the frame and carry no meaning.
+        :return: Forward-view pose preserving the fixed camera-relative image axes.
         """
-        root_T_camera = self.root.global_transform
-        root_V_forward = root_T_camera.rotation_matrix @ self.forward_facing_axis
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=root_T_camera.position,
-            rotation_matrix=RotationMatrix.from_x_axis(root_V_forward),
-            reference_frame=root_T_camera.reference_frame,
-        )
+        return self.world_T_optical @ self.optical_R_forward_view
 
 
 TCamera = TypeVar("TCamera", bound=Camera)
 """
 A kind of camera.
 """
+
+
+@dataclass(eq=False)
+class RobotCamera(Camera, Sensor, ABC):
+    """
+    A camera that participates in robot-part lifecycle handling.
+    """
+
+    default_camera: bool = False
+    """
+    Whether this camera is the robot's default camera.
+    """
+
+    minimal_height: float = 0.0
+    """
+    Minimal camera height above the ground in meters.
+    """
+
+    maximal_height: float = 1.0
+    """
+    Maximal camera height above the ground in meters.
+    """
 
 
 @dataclass(eq=False)
@@ -1337,12 +1451,12 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
                 return part.right_arm
         return None
 
-    def get_default_camera(self) -> Camera:
+    def get_default_camera(self) -> RobotCamera:
         """
         Returns the default camera of the robot.
         """
         for robot_part in self._robot_parts:
-            if isinstance(robot_part, Camera) and robot_part.default_camera:
+            if isinstance(robot_part, RobotCamera) and robot_part.default_camera:
                 return robot_part
         raise MissingDefaultCameraError(type(self))
 

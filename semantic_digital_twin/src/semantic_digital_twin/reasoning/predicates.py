@@ -232,14 +232,16 @@ class SupportedBy(Triple[TBody, TBody]):
 
     maximum_intersection_height: float = 0.1
     """
-    How deep, in metres, the two may sink into each other. Sunk deeper, they are a
-    clipping the simulation did not resolve, and the reading is refused.
+    How deep, in metres, the two may sink into each other.
+
+    Sunk deeper, they are a clipping the simulation did not resolve, and the reading is
+    refused.
     """
 
     contact_tolerance: float = 0.005
     """
-    How far apart, in metres, the two may be and still count as touching, and so how
-    far above the supporting body the supported body may stand and still rest on it.
+    How far apart, in metres, the two may be and still count as touching, and so how far
+    above the supporting body the supported body may stand and still rest on it.
 
     A body is set down by a motion that stops where it can rather than exactly on the
     surface, so a support read from overlapping volume alone would hold for almost no

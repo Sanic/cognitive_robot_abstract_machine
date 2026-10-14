@@ -23,6 +23,7 @@ from semantic_digital_twin.datastructures.definitions import (
     StaticJointState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -39,7 +40,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     Finger,
     Neck,
     Torso,
@@ -190,17 +191,13 @@ class HSRBGripper(EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger]):
 
 
 @dataclass(eq=False)
-class HSRBHandCamera(Camera):
+class HSRBHandCamera(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
 
     def setup_joint_states(self) -> List[JointState]:
         return []
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -210,7 +207,10 @@ class HSRBHandCamera(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "hand_camera_frame"
             ),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            forward_facing_axis=Vector3.Z(),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=0.75049,
             maximal_height=0.99483,
         )
@@ -260,17 +260,13 @@ class HSRBArm(Arm[HSRBGripper], HasSensors[HSRBHandCamera]):
 
 
 @dataclass(eq=False)
-class HSRBHeadCenterCamera(Camera):
+class HSRBHeadCenterCamera(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
 
     def setup_joint_states(self) -> List[JointState]:
         return []
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -280,7 +276,10 @@ class HSRBHeadCenterCamera(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "head_center_camera_frame"
             ),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            forward_facing_axis=Vector3.Z(),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=0.75049,
             maximal_height=0.99483,
             default_camera=True,
@@ -288,17 +287,13 @@ class HSRBHeadCenterCamera(Camera):
 
 
 @dataclass(eq=False)
-class HSRBHeadLeftCamera(Camera):
+class HSRBHeadLeftCamera(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
 
     def setup_joint_states(self) -> List[JointState]:
         return []
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -308,24 +303,23 @@ class HSRBHeadLeftCamera(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "head_l_stereo_camera_link"
             ),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            forward_facing_axis=Vector3.Z(),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=0.75049,
             maximal_height=0.99483,
         )
 
 
 @dataclass(eq=False)
-class HSRBHeadRightCamera(Camera):
+class HSRBHeadRightCamera(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
 
     def setup_joint_states(self) -> List[JointState]:
         return []
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -335,24 +329,23 @@ class HSRBHeadRightCamera(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "head_r_stereo_camera_link"
             ),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            forward_facing_axis=Vector3.Z(),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=0.75049,
             maximal_height=0.99483,
         )
 
 
 @dataclass(eq=False)
-class HSRBHeadRGBDCamera(Camera):
+class HSRBHeadRGBDCamera(RobotCamera):
 
     def setup_hardware_interfaces(self):
         pass
 
     def setup_joint_states(self) -> List[JointState]:
         return []
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -362,7 +355,10 @@ class HSRBHeadRGBDCamera(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "head_rgbd_sensor_link"
             ),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            forward_facing_axis=Vector3.Z(),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=0.75049,
             maximal_height=0.99483,
             default_camera=True,

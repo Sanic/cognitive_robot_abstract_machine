@@ -1,4 +1,5 @@
-"""Analysis engine for simulated RGB-D input from SemDT RayTracer.
+"""
+Analysis engine for simulated RGB-D input from SemDT RayTracer.
 
 This pipeline mirrors the standard tabletop segmentation flow but uses the
 `semdt_raytracer` camera descriptor, which renders color/depth images from a
@@ -13,6 +14,9 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
+from robokudo.descriptors.camera_configs.config_semdt_raytracer import (
+    WorldDescriptorSource,
+)
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -27,7 +31,9 @@ class AnalysisEngine(AnalysisEngineInterface):
     def implementation(self) -> Pipeline:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             "semdt_raytracer",
-            world_descriptor_name="world_semdt_raytracer_tabletop",
+            source=WorldDescriptorSource(
+                descriptor_name="world_semdt_raytracer_tabletop"
+            ),
         )
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01

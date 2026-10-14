@@ -1,10 +1,19 @@
-from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec, RegionSpec
+from robokudo.descriptors.worlds.pinhole_rgbd_camera import PinholeRGBDCameraSpec
+from robokudo.world_descriptor import (
+    BaseWorldDescriptor,
+    ObjectSpec,
+    RegionSpec,
+)
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import Scale, Color
 
+# %% World descriptor
+
 
 class WorldDescriptor(BaseWorldDescriptor):
-    """A compact tabletop world for SemDT RayTracer with cylindrical target objects."""
+    """
+    A compact tabletop world for SemDT RayTracer with cylindrical target objects.
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -75,3 +84,17 @@ class WorldDescriptor(BaseWorldDescriptor):
 
         self.build_objects(root, object_specs)
         self.build_regions(root, region_specs)
+        self.build_camera(
+            root,
+            PinholeRGBDCameraSpec(
+                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-1.20,
+                    y=0.40,
+                    z=1.05,
+                    roll=-2.2689280275926285,
+                    pitch=0.0,
+                    yaw=-0.2707963267948965,
+                    reference_frame=root,
+                ),
+            ),
+        )

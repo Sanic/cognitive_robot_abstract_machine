@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from robokudo.cas import CASViews
+from robokudo.cas import CAS, CASViews
 from robokudo.exceptions import (
     CASCheckConfigurationError,
     CASCheckFailed,
@@ -21,7 +21,6 @@ from robokudo.exceptions import (
     PointCloudThresholdError,
     PointCloudThresholdRelation,
     PointCloudTooSmallForClustering,
-    StoredCameraTransformFrameMetadataMissing,
     UnknownMode,
     WorldDescriptorBootstrapError,
     WorldDescriptorLoadError,
@@ -120,16 +119,6 @@ class TestRoboKudoExceptions:
         assert "dtype=bool" in str(exception)
         assert "channels=1" in str(exception)
 
-    def test_stored_camera_transform_frame_metadata_missing_message(self):
-        exception = StoredCameraTransformFrameMetadataMissing()
-
-        assert "CAMERA_TO_WORLD_TRANSFORM is missing frame-name metadata" in str(
-            exception
-        )
-        assert "Recreate the recording with the current storage format" in str(
-            exception
-        )
-
     def test_cas_check_configuration_error_message(self):
         exception = CASCheckConfigurationError(component_name="CASCheckFunc")
 
@@ -201,7 +190,7 @@ class TestRoboKudoExceptions:
         color_image = np.zeros((2, 2, 3), dtype=np.uint8)
 
         with pytest.raises(ColorToDepthRatioMissing):
-            get_scaled_color_image_for_depth_image(_FakeCAS(), color_image)
+            get_scaled_color_image_for_depth_image(CAS(), color_image)
 
     def test_get_scale_coordinates_raises_color_to_depth_ratio_missing(self):
         with pytest.raises(ColorToDepthRatioMissing):

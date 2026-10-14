@@ -1,3 +1,6 @@
+# %% Imports
+import logging
+
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -33,6 +36,7 @@ from robokudo.pipeline import Pipeline
 import robokudo.scripts.query_test_client
 
 
+# %% Query execution
 class QueryWorkerThread(threading.Thread):
     def __init__(self, node):
         threading.Thread.__init__(self)
@@ -48,7 +52,6 @@ def query_simple_pipeline(node):
         "file_reader",
         loop=True,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
-        kinect_height_fix_mode=True,
         color2depth_ratio=(0.5, 0.5),
     )
 
@@ -78,12 +81,14 @@ def query_simple_pipeline(node):
     return seq, tree_result
 
 
+# %% Query fixtures
 @pytest.fixture
 def tree_run(node):
-    print("tree_run")
+    logging.debug("tree_run")
     return query_simple_pipeline(node)
 
 
+# %% Query interface tests
 class TestQueryInterface:
     def test_query_annotator_returns_running(self, tree_run):
         seq, tree_result = tree_run
@@ -95,7 +100,7 @@ class TestQueryInterface:
         # seq, tree_result = query_simple_pipeline(node)
         multiprocessing.set_start_method("spawn", force=True)
 
-        print("Starting Client Process")
+        logging.debug("Starting Client Process")
         client_timeout_seconds = 20.0
         client_results = multiprocessing.Queue()
         client_readiness = multiprocessing.Event()
@@ -110,16 +115,16 @@ class TestQueryInterface:
         client_process.start()
         assert client_readiness.wait(timeout=client_timeout_seconds)
 
-        print("Starting QueryWorker Thread")
+        logging.debug("Starting QueryWorker Thread")
         # Start the ActionServer/Query Interface PPT after its client is ready.
         worker_thread = QueryWorkerThread(node)
         worker_thread.start()
 
         worker_thread.join()
-        print("Thread joined")
+        logging.debug("Thread joined")
         seq, tree_result = worker_thread.result
         client_process.join()
-        print("Process joined")
+        logging.debug("Process joined")
 
         # PPT with action server completed successfully
         assert tree_result is py_trees.common.Status.SUCCESS

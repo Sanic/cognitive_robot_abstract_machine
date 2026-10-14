@@ -38,13 +38,14 @@ from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     Finger,
     Neck,
     Torso,
     MobileBase,
     EndEffector,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import (
@@ -410,11 +411,7 @@ class UnitreeG1RightArm(Arm[UnitreeG1RightHand]):
 
 
 @dataclass(eq=False)
-class D435(Camera):
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
+class D435(RobotCamera):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -422,7 +419,10 @@ class D435(Camera):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "d435_link"),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            forward_facing_axis=Vector3.Z(),
+            camera_model=FieldOfViewCameraModel(
+                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+            ),
             minimal_height=1.27,
             maximal_height=1.60,
             default_camera=True,

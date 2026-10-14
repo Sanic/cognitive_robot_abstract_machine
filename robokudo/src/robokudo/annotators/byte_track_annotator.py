@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 
 import numpy as np
-import open3d as o3d
 import supervision as sv
 from py_trees.common import Status
 from supervision.config import CLASS_NAME_DATA_FIELD
@@ -20,7 +19,8 @@ if TYPE_CHECKING:
 
 
 class ByteTrackAnnotator(BaseAnnotator):
-    """A ByteTrack annotator that tracks detected objects across pipeline ticks.
+    """
+    A ByteTrack annotator that tracks detected objects across pipeline ticks.
 
     The annotator is capable of utilizing:
 
@@ -33,25 +33,34 @@ class ByteTrackAnnotator(BaseAnnotator):
         super().__init__(name)
 
         self.tracker: ByteTrackTracker = ByteTrackTracker()
-        """Main ByteTrack instance for object instance tracking."""
+        """
+        Main ByteTrack instance for object instance tracking.
+        """
 
         self.last_ts: float = 0.0
-        """Timestamp of the last data received, used for tracker reset detection."""
+        """
+        Timestamp of the last data received, used for tracker reset detection.
+        """
 
         self.label_annotator = sv.RichLabelAnnotator(color_lookup=sv.ColorLookup.TRACK)
-        """A special label annotator, that cannot simply be used like the annotators in `self.vis_annotators`."""
+        """
+        A special label annotator, that cannot simply be used like the annotators in `self.vis_annotators`.
+        """
 
         self.vis_annotators = [
             sv.BoxAnnotator(color_lookup=sv.ColorLookup.TRACK),
             sv.MaskAnnotator(color_lookup=sv.ColorLookup.INDEX),
             sv.TraceAnnotator(color_lookup=sv.ColorLookup.TRACK),
         ]
-        """A list of simple supervision annotators to use for visualization. They will be applied in order."""
+        """
+        A list of simple supervision annotators to use for visualization. They will be applied in order.
+        """
 
     def update(self) -> Status:
         cas = self.get_cas()
+        observation = cas.require_camera_observation()
 
-        data_ts = cas.get(CASViews.DATA_TIMESTAMP)
+        data_ts = observation.timestamp_nanoseconds
         if data_ts < self.last_ts:
             # This is expected when looping data
             self.rk_logger.debug("Time moved backward, resetting tracker.")
@@ -76,15 +85,15 @@ class ByteTrackAnnotator(BaseAnnotator):
         masks = [oh.roi.mask for oh in ohs]
         masks = list(filter(lambda m: m is not None, masks))
         if len(masks) == len(rois_xyxy):
-            camera_intrinsic: o3d.cuda.pybind.camera.PinholeCameraIntrinsic = cas.get(
-                CASViews.CAMERA_INTRINSIC
-            )
-
             # Masks must be restored to full color image size
             restored_masks = []
             for roi, mask in zip(rois_xyxy, masks):
                 restored_mask = np.zeros(
-                    (camera_intrinsic.height, camera_intrinsic.width), dtype=np.uint8
+                    (
+                        observation.resolution.height,
+                        observation.resolution.width,
+                    ),
+                    dtype=np.uint8,
                 )
                 restored_mask[roi[1] : roi[3], roi[0] : roi[2]] = mask
                 restored_masks.append(restored_mask)
@@ -122,7 +131,8 @@ class ByteTrackAnnotator(BaseAnnotator):
         return Status.SUCCESS
 
     def visualize(self, tracked_detections: sv.Detections) -> None:
-        """Visualize the tracked detections and set the resulting image in the annotator output struct.
+        """
+        Visualize the tracked detections and set the resulting image in the annotator output struct.
 
         :param tracked_detections: The tracked detections to visualize.
         """
