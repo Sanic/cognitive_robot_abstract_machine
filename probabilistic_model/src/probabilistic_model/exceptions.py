@@ -1,12 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, List, TYPE_CHECKING
+from typing import Any, Callable, List, Type, TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
 from random_events.variable import Variable
 
 if TYPE_CHECKING:
-    from random_events.product_algebra import Event
+    from random_events.product_algebra import Event, SimpleEvent
 
     from probabilistic_model.probabilistic_model import ProbabilisticModel
 
@@ -163,3 +163,165 @@ class NonContinuousVariableError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Fit them with a model that supports discrete variables."
+
+
+@dataclass
+class NoClosedFormError(DataclassException, NotImplementedError):
+    """
+    Exception raised when a query has no answer that the model or layer that was asked
+    can represent in closed form.
+    """
+
+    asked_type: Type
+    """
+    The type of the model or layer that was asked.
+    """
+
+    query: Callable
+    """
+    The method that was queried.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.asked_type.__name__}.{self.query.__name__} has no closed form."
+
+    def suggest_correction(self) -> str:
+        return "Ask the query before truncating, or approximate it by sampling."
+
+
+@dataclass
+class InvalidMomentOrderError(DataclassException, ValueError):
+    """
+    Exception raised when a moment is asked for an order that is not a whole number or
+    is negative.
+    """
+
+    order: Any
+    """
+    The order that was asked for.
+    """
+
+    def error_message(self) -> str:
+        return f"There is no moment of order {self.order}."
+
+    def suggest_correction(self) -> str:
+        return "Ask for an order that is a whole number and not negative."
+
+
+@dataclass
+class EventMixesPointsAndIntervalsError(DataclassException, ValueError):
+    """
+    Exception raised when an event is to be measured uniformly while one of its
+    continuous variables takes points and intervals at once.
+
+    A point has no width, so there is no weight that puts it in proportion to an
+    interval.
+    """
+
+    event: SimpleEvent
+    """
+    The event whose variable mixes them.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A continuous variable of {self.event} takes points and intervals at "
+            f"once."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Make every continuous variable either points only or intervals only."
+
+
+@dataclass
+class MixtureOverDifferentVariablesError(DataclassException, ValueError):
+    """
+    Exception raised when a mixture is built of components that are not over the same
+    variables.
+
+    A mixture is only smooth if every component models the same variables, so a query
+    over a mixture of differing components has no well-defined answer.
+    """
+
+    variables_per_component: List[List[Variable]]
+    """
+    The variables of every component, in the order the components were given.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "A mixture needs components over the same variables, received "
+            f"{[[str(variable) for variable in variables] for variables in self.variables_per_component]}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Marginalize every component to the variables the mixture is over."
+
+
+@dataclass
+class ProductOverSharedVariablesError(DataclassException, ValueError):
+    """
+    Exception raised when a product is built of factors that share a variable.
+
+    A product is only decomposable if its factors are over disjoint variables, so a
+    shared variable would be counted twice.
+    """
+
+    shared_variables: List[Variable]
+    """
+    The variables that more than one factor is over.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "A product needs factors over disjoint variables, but "
+            f"{[str(variable) for variable in self.shared_variables]} "
+            "appear in more than one factor."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Marginalize the factors to disjoint sets of variables."
+
+
+@dataclass
+class EmptyCompositionError(DataclassException, ValueError):
+    """
+    Exception raised when a mixture or a product is built of no components at all.
+    """
+
+    composition: Callable
+    """
+    The method that was called.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.composition.__name__} needs at least one component."
+
+    def suggest_correction(self) -> str:
+        return "Leave the composition out instead of building it of nothing."
+
+
+@dataclass
+class NumberOfWeightsMismatchError(DataclassException, ValueError):
+    """
+    Exception raised when a mixture does not get exactly one weight per component.
+    """
+
+    number_of_weights: int
+    """
+    The number of weights given.
+    """
+
+    number_of_components: int
+    """
+    The number of components to mix.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Got {self.number_of_weights} weights for "
+            f"{self.number_of_components} components."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Pass exactly one weight per component."

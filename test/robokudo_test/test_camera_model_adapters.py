@@ -1,5 +1,14 @@
+# %% Imports
+import pytest
+
 import numpy as np
 from sensor_msgs.msg import CameraInfo
+
+from robokudo.io.exceptions import (
+    CameraDistortionModelMissing,
+    UnsupportedCameraDistortionModel,
+)
+from robokudo.exceptions import InvalidCameraObservation
 
 from robokudo.io.camera_model_adapters import (
     Open3DCameraModelAdapter,
@@ -14,6 +23,7 @@ from semantic_digital_twin.datastructures.camera_model import (
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
 
+# %% Camera model conversion
 def test_ros_camera_model_adapter_reads_camera_info():
     camera_info = CameraInfo()
     camera_info.width = 640
@@ -83,3 +93,30 @@ def test_open3d_camera_model_adapter_creates_intrinsic():
     assert camera_intrinsic.width == model.resolution.width
     assert camera_intrinsic.height == model.resolution.height
     assert np.array_equal(camera_intrinsic.intrinsic_matrix, model.intrinsic_matrix)
+
+
+# %% Invalid distortion metadata
+
+
+def test_camera_info_requires_model_for_nonzero_distortion() -> None:
+    """
+    Nonzero coefficients without a model raise the specific missing-model error.
+    """
+    camera_info = CameraInfo()
+    camera_info.d = [0.1, 0.0, 0.0, 0.0, 0.0]
+    with pytest.raises(CameraDistortionModelMissing) as error:
+        RosCameraModelAdapter.from_camera_info(camera_info)
+    assert error.value.coefficients == tuple(camera_info.d)
+    assert isinstance(error.value, InvalidCameraObservation)
+
+
+def test_camera_info_rejects_unsupported_distortion_model() -> None:
+    """
+    An unknown distortion model raises the specific unsupported-model error.
+    """
+    camera_info = CameraInfo()
+    camera_info.distortion_model = "unsupported"
+    with pytest.raises(UnsupportedCameraDistortionModel) as error:
+        RosCameraModelAdapter.from_camera_info(camera_info)
+    assert error.value.distortion_model == camera_info.distortion_model
+    assert isinstance(error.value, InvalidCameraObservation)

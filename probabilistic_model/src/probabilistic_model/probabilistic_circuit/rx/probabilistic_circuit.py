@@ -36,7 +36,20 @@ from probabilistic_model.distributions.distributions import (
 )
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
+from probabilistic_model.probabilistic_circuit.groundable_circuit import (
+    GroundableCircuit,
+    ProductsOfCopies,
+)
+from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
+    MixtureOverVariable,
+    ProbabilisticCircuitRepresentation,
+    UnnormalizedMixture,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    DenseEdgeValues,
+)
 from probabilistic_model.probabilistic_model import (
+    PartialPointType,
     ProbabilisticModel,
     OrderType,
     CenterType,
@@ -142,6 +155,28 @@ class Unit(SubclassJSONSerializer, ABC):
     @abstractmethod
     def variables(self) -> SortedSet:
         raise NotImplementedError
+
+    def is_product_over(self, variables: SortedSet[Variable]) -> bool:
+        """
+        :param variables: Variables.
+        :return: Whether this unit is a product unit that models all of the variables.
+        """
+        return False
+
+    def mixture_components(self) -> List[Unit]:
+        """
+        :return: Nothing, since a unit that does not mix has no components. A unit that
+            mixes answers the subcircuits it mixes.
+        """
+        return []
+
+    @property
+    def log_normalization_constant(self) -> float:
+        """
+        :return: ``0.0``, since a unit that mixes nothing has no weights to normalize.
+            A unit that mixes answers what its weights sum to.
+        """
+        return 0.0
 
     @property
     def leaves(self) -> List[LeafUnit]:
@@ -486,6 +521,20 @@ class SumUnit(InnerUnit):
     @property
     def representation(self) -> str:
         return "+"
+
+    def mixture_components(self) -> List[Unit]:
+        return self.subcircuits
+
+    @property
+    def log_normalization_constant(self) -> float:
+        """
+        :return: ``log(sum(exp(w)))`` over the weights of the components this unit
+            mixes, which is ``0.0`` while it mixes nothing.
+        """
+        log_weights = self.log_weights
+        if len(log_weights) == 0:
+            return 0.0
+        return float(logsumexp(log_weights))
 
     @property
     def log_weighted_subcircuits(self) -> List[Tuple[float, Unit]]:
@@ -854,6 +903,9 @@ class ProductUnit(InnerUnit):
             result = result.union(subcircuit.variables)
         return result
 
+    def is_product_over(self, variables: SortedSet[Variable]) -> bool:
+        return variables.issubset(self.variables)
+
     def support(self):
         support: Event = self.subcircuits[0].result_of_current_query
         support.fill_missing_variables(self.variables)
@@ -960,7 +1012,7 @@ class ProductUnit(InnerUnit):
 
 
 @dataclass
-class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
+class ProbabilisticCircuit(GroundableCircuit[Unit], SubclassJSONSerializer):
     """
     Probabilistic Circuits as a directed, rooted, acyclic graph.
 
@@ -1476,10 +1528,12 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         root = self._condition_leaves_in_place(point)
         if root is None:
             return None, -np.inf
+        # read before marginalizing, which may simplify the root away
+        log_probability = root.result_of_current_query
 
         if preserve_structure:
             self.normalize()
-            return self, root.result_of_current_query
+            return self, log_probability
 
         # simplify dirac parts
         remaining_variables = [v for v in self.variables if v not in point]
@@ -1498,18 +1552,186 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         for variable, value in point.items():
             new_root.add_subcircuit(leaf(make_dirac(variable, value), self))
 
-        new_root.result_of_current_query = root.result_of_current_query
+        new_root.result_of_current_query = log_probability
 
         self.simplify()
         self.normalize()
 
-        return self, root.result_of_current_query
+        return self, log_probability
 
     def log_conditional(
         self, point: Dict[Variable, Any]
     ) -> Tuple[Optional[Self], float]:
         result = self.__deepcopy__()
         return result.log_conditional_in_place(point)
+
+    # %% operations on nodes
+
+    def condition_on_point_in_place(self, point: PartialPointType) -> bool:
+        point = {
+            variable: value
+            for variable, value in point.items()
+            if variable in self.variables
+        }
+        if not point:
+            return True
+        conditioned, _ = self.marginal(point).log_conditional_in_place(point)
+        if conditioned is None:
+            return False
+        self.log_conditional_in_place(point, preserve_structure=True)
+        return True
+
+    def lowest_product_nodes_over(
+        self, variables: SortedSet[Variable]
+    ) -> List[ProductUnit]:
+        found_nodes: List[ProductUnit] = []
+        ancestor_indices: set[int] = set()
+        for layer in reversed(self.layers):
+            for node in layer:
+                if node.index in ancestor_indices:
+                    continue
+                if not node.is_product_over(variables):
+                    continue
+                found_nodes.append(node)
+                ancestor_indices.add(node.index)
+                ancestor_indices.update(rx.ancestors(self.graph, node.index))
+        return found_nodes
+
+    def subcircuit_at(self, node: Unit) -> Self:
+        result = self.__class__()
+        result.mount(node)
+        return result
+
+    def remove_variables_in_place(
+        self, variables: SortedSet[Variable], nodes: List[ProductUnit]
+    ) -> List[ProductUnit]:
+        self.restrict_to_variables_in_place(SortedSet(self.variables) - variables)
+        return nodes
+
+    def root_mixture_components(self) -> List[Self]:
+        return [
+            self.subcircuit_at(subcircuit)
+            for subcircuit in self.root.mixture_components()
+        ]
+
+    def multiply_nodes_by_mixtures(
+        self,
+        nodes: List[ProductUnit],
+        products: ProductsOfCopies,
+        log_weights: Optional[DenseEdgeValues],
+    ):
+        roots = [
+            self._mounted_product(products, index)
+            for index in range(len(products.points))
+        ]
+        if log_weights is None:
+            for node in nodes:
+                node.add_subcircuit(roots[0])
+            return
+        for node, node_log_weights in zip(nodes, log_weights):
+            sum_unit = SumUnit(probabilistic_circuit=self)
+            node.add_subcircuit(sum_unit)
+            for root, log_weight in zip(roots, node_log_weights):
+                if log_weight > -np.inf:
+                    sum_unit.add_subcircuit(root, float(log_weight))
+            sum_unit.normalize()
+
+    def _mounted_product(self, products: ProductsOfCopies, index: int) -> ProductUnit:
+        """
+        :param products: The products.
+        :param index: The index of a product.
+        :return: The root of the product, mounted into this circuit.
+        """
+        root = ProductUnit(probabilistic_circuit=self)
+        for copies in products.conditioned_copies:
+            copy = copies.circuit.__deepcopy__()
+            copy.condition_on_point_in_place(products.points[index])
+            copy.restrict_to_variables_in_place(copies.variables)
+            copy.update_variables(copies.renaming)
+            root.add_subcircuit(self.mount(copy.root)[copy.root.index])
+        for variable, values in products.point_masses.items():
+            root.add_subcircuit(leaf(make_dirac(variable, values[index]), self))
+        if products.components:
+            component = products.components[index]
+            root.add_subcircuit(self.mount(component.root)[component.root.index])
+        return root
+
+    # %% reading the mixtures
+
+    def unnormalized_mixtures(
+        self, tolerance: float = 1e-6
+    ) -> List[UnnormalizedMixture[Unit]]:
+        return [
+            UnnormalizedMixture(node, node.log_normalization_constant)
+            for node in self.nodes()
+            if abs(node.log_normalization_constant) >= tolerance
+        ]
+
+    def mixtures_over(
+        self, variables: SortedSet[Variable]
+    ) -> List[MixtureOverVariable[Unit]]:
+        _ = self.support
+        return [
+            report
+            for layer in self.layers
+            for node in layer
+            for report in self._mixtures_of_unit_over(node, variables)
+        ]
+
+    def _mixtures_of_unit_over(
+        self, unit: Unit, variables: SortedSet[Variable]
+    ) -> List[MixtureOverVariable[Unit]]:
+        """
+        :param unit: The unit to read.
+        :param variables: The variables to read it through.
+        :return: One report per variable the unit models, or nothing if it mixes fewer
+            than two components.
+        """
+        components = unit.mixture_components()
+        if len(components) < 2:
+            return []
+        return [
+            MixtureOverVariable(
+                unit,
+                variable,
+                [
+                    component.result_of_current_query.marginal([variable])
+                    for component in components
+                ],
+            )
+            for variable in variables
+            if variable in unit.variables
+        ]
+
+    # %% composition
+
+    @classmethod
+    def mixture_of(cls, components: List[Self], log_weights: Iterable[float]) -> Self:
+        log_weights = list(log_weights)
+        ProbabilisticCircuitRepresentation.validate_mixture(components, log_weights)
+        result = cls()
+        root = SumUnit(probabilistic_circuit=result)
+        for component, log_weight in zip(components, log_weights):
+            root.add_subcircuit(result._mounted_copy_of(component), log_weight)
+        root.normalize()
+        return result
+
+    @classmethod
+    def product_of(cls, factors: List[Self]) -> Self:
+        ProbabilisticCircuitRepresentation.validate_product(factors)
+        result = cls()
+        root = ProductUnit(probabilistic_circuit=result)
+        for factor in factors:
+            root.add_subcircuit(result._mounted_copy_of(factor))
+        return result
+
+    def _mounted_copy_of(self, other: Self) -> Unit:
+        """
+        :param other: A circuit to copy into this one.
+        :return: The root of the copy, a unit of this circuit.
+        """
+        copy = other.__deepcopy__()
+        return self.mount(copy.root)[copy.root.index]
 
     def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
         result = self.restrict_to_variables(variables)
@@ -1700,7 +1922,8 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
         Rename each variable in this circuit to include ``prefix`` as a namespace.
 
         Produces names of the form ``"{prefix}.{variable.name}"``. Variables in
-        ``excluded_variables`` are left unchanged.
+        ``excluded_variables``, and variables already inside that namespace, are left
+        unchanged.
 
         :param prefix: String prefix to prepend to every variable name.
         :param excluded_variables: Variables that should keep their current names.
@@ -1711,6 +1934,7 @@ class ProbabilisticCircuit(ProbabilisticModel, SubclassJSONSerializer):
             )
             for variable in self.variables
             if variable not in excluded_variables
+            and not variable.name.startswith(f"{prefix}.")
         }
         self.update_variables(variable_renames)
 
@@ -2280,6 +2504,20 @@ class MultivariateLeaf(LeafUnit):
         self.distribution, self.result_of_current_query = (
             self.distribution.log_conditional(own_point)
         )
+
+    def moment(self, order, center, variable_to_index_map):
+        result = np.zeros(len(variable_to_index_map))
+        requested = [
+            variable for variable in self.distribution.variables if variable in order
+        ]
+        if requested:
+            moment = self.distribution.moment(
+                {variable: order[variable] for variable in requested},
+                {variable: center[variable] for variable in requested},
+            )
+            for variable in requested:
+                result[variable_to_index_map[variable]] = moment[variable]
+        self.result_of_current_query = result
 
     def replace_by_dirac_product(self, point: Dict[Variable, Any]) -> ProductUnit:
         """

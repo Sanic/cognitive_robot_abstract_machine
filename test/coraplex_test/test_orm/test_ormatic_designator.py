@@ -1,17 +1,21 @@
 import pytest
+import rclpy
 from sqlalchemy import select
 
 # The alternative mapping needs to be imported for the stretch to work properly
 import coraplex.alternative_motion_mappings.stretch_motion_mapping  # type: ignore
 import coraplex.alternative_motion_mappings.tiago_motion_mapping  # type: ignore
 from krrood.ormatic.data_access_objects.helper import to_dao
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.execution_environment import simulated_robot
+from krrood.ormatic.exceptions import QueryCannotBePersisted
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.plans.factories import sequential, execute_single
 from coraplex.plans.plan import Plan
-from coraplex.robot_plans.actions.composite.transporting import TransportAction
+from coraplex.robot_plans.actions.composite.transporting import (
+    MoveAndPickUpAction,
+    MoveAndPlaceAction,
+    TransportAction,
+)
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from semantic_digital_twin.datastructures.definitions import TorsoState
@@ -20,8 +24,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
 @pytest.fixture()
-def simple_plan(immutable_model_world):
-    world, robot_view, context = immutable_model_world
+def simple_plan(pr2_apartment_context):
+    world, robot_view, context = pr2_apartment_context
 
     plan = sequential(
         [
@@ -29,20 +33,20 @@ def simple_plan(immutable_model_world):
                 Pose.from_xyz_quaternion(
                     1.6, 1.9, 0, 0, 0, 0, 1, reference_frame=world.root
                 ),
-                True,
             ),
             MoveTorsoAction(TorsoState.HIGH),
-            ParkArmsAction(Arms.BOTH),
+            ParkArmsAction(context.robot.all_arms),
         ],
         context=context,
     ).plan
     return plan
 
+
 @pytest.mark.skip("Execution Data is not recorded right now")
 def test_plan_serialization(coraplex_testing_session, simple_plan):
     session = coraplex_testing_session
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         simple_plan.perform()
 
     dao = to_dao(simple_plan)
@@ -66,7 +70,7 @@ def test_plan_serialization(coraplex_testing_session, simple_plan):
 
 def test_replay_simple_plan(coraplex_testing_session, simple_plan):
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         simple_plan.perform()
 
     session = coraplex_testing_session
@@ -84,21 +88,32 @@ def test_replay_simple_plan(coraplex_testing_session, simple_plan):
 
 
 @pytest.fixture
-def complex_plan(mutable_model_world):
-    world, robot_view, context = mutable_model_world
+def complex_plan(pr2_apartment_context):
+    """
+    A plan transporting the milk with steps that are grounded already, standing where
+    the transport described by queries grounds its steps to.
+    """
+    world, robot_view, context = pr2_apartment_context
     context.evaluate_conditions = False
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = execute_single(
         TransportAction(
-            object_designator=world.get_semantic_annotations_by_type(Milk)[0],
-            target_location=Pose.from_xyz_quaternion(
-                2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
+            pick_up=MoveAndPickUpAction.from_standing_position(
+                standing_position=Pose.from_xyz_rpy(
+                    1.63, 1.98, 0.0, reference_frame=world.root
+                ),
+                grasp=milk.grasp_candidates()[0],
+                arm=context.robot.left_arm,
             ),
-            arm=Arms.LEFT,
-            grasp_description=GraspDescription(
-                ApproachDirection.LEFT,
-                VerticalAlignment.NoAlignment,
-                robot_view.left_arm.end_effector,
+            place=MoveAndPlaceAction.from_standing_position(
+                standing_position=Pose.from_xyz_rpy(
+                    1.8, 2.54, 0.0, reference_frame=world.root
+                ),
+                target_location=Pose.from_xyz_quaternion(
+                    2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
+                ),
+                object_designator=milk,
             ),
         ),
         context=context,
@@ -106,10 +121,11 @@ def complex_plan(mutable_model_world):
 
     return plan
 
+
 @pytest.mark.skip("Execution Data is not recorded right now")
 def test_execution_data_of_complex_plan(coraplex_testing_session, complex_plan):
 
-    with simulated_robot:
+    with kinematically_simulated_robot:
         complex_plan.perform()
 
     session = coraplex_testing_session
@@ -131,8 +147,10 @@ def test_execution_data_of_complex_plan(coraplex_testing_session, complex_plan):
 
 
 def test_replay_complex_plan_from_db(coraplex_testing_session, complex_plan):
-
-    with simulated_robot:
+    """
+    A performed plan holding a transport is persisted and recreated from the database.
+    """
+    with kinematically_simulated_robot:
         complex_plan.perform()
 
     complex_plan.initial_world = None
@@ -146,3 +164,25 @@ def test_replay_complex_plan_from_db(coraplex_testing_session, complex_plan):
     fetched_plan = session.scalars(select(PlanMappingDAO)).one()
 
     recreated_plan = fetched_plan.from_dao()
+
+
+def test_a_plan_whose_transport_still_holds_queries_cannot_be_stored(
+    pr2_apartment_context,
+):
+    """
+    A step still described by a query has no value to store until it is grounded, so
+    storing it is refused rather than writing something that cannot be read back.
+    """
+    world, robot_view, context = pr2_apartment_context
+    transport = TransportAction.from_graspable_by_closest_grasps(
+        world.get_semantic_annotations_by_type(Milk)[0],
+        Pose.from_xyz_quaternion(2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root),
+        context.robot.left_arm,
+        context,
+    )
+    plan = execute_single(transport, context=context).plan
+
+    with pytest.raises(QueryCannotBePersisted) as failure:
+        to_dao(plan)
+
+    assert failure.value.query in (transport.pick_up, transport.place)

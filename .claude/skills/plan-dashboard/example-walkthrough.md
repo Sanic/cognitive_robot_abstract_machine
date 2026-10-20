@@ -8,8 +8,8 @@ The only thing this assumes is a fork of this repository with the `.claude/`
 tooling on its default branch. If you haven't set anything up yet, run
 `/setup-personal-notes` once — it checks what's already in place, asks about
 anything it can't decide for you, and finishes in seconds if you're already
-set up. (You don't have to run it first: any skill below offers it if you
-need it.) [`.claude/hooks/README.md`](../../hooks/README.md) documents what it
+set up. (You don't have to run it first: any skill below runs it for you if
+you need it, without asking whether to.) [`.claude/hooks/README.md`](../../hooks/README.md) documents what it
 configures, for when you want the details.
 
 The example data referenced below is committed alongside this file, under
@@ -18,11 +18,16 @@ files, not just prose. You can render them yourself with no GitHub access at
 all:
 
 ```bash
-cd .claude/skills/plan-dashboard
-pip install -r requirements.txt
-python3 build_dashboard.py --plan example/plan.yaml --roadmap example/roadmap.md \
-  --pr-data example/pr_data.json --output /tmp/example-dashboard.html
+source .claude/hooks/resolve-personal-notes-config.sh
+"${BASSTLER_PYTHON}" -m basstler.build_dashboard \
+  --plan .claude/skills/plan-dashboard/example/plan.yaml \
+  --roadmap .claude/skills/plan-dashboard/example/roadmap.md \
+  --pr-data .claude/skills/plan-dashboard/example/pr_data.json \
+  --output /tmp/example-dashboard.html
 ```
+
+`BASSTLER_PYTHON` is the package's own environment, which every session start creates
+with the package and its dependencies installed; see `basstler/README.md`.
 
 ## 1. Start with the idea, in plan mode
 
@@ -92,7 +97,7 @@ items:
     title: Circuit breaker around the retry loop
     branch: retry-circuit-breaker
     track: retry-logic
-    status: in_progress
+    status: in progress
     pull_request_number: 102
     depends_on: [retry-backoff-strategy]
 

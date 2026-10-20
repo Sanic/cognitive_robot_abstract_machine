@@ -1,3 +1,4 @@
+# %% Imports
 import sys
 from dataclasses import replace
 
@@ -46,7 +47,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import (
     Box as SemDTBox,
     Cylinder as SemDTCylinder,
@@ -54,6 +55,8 @@ from semantic_digital_twin.world_description.geometry import (
 )
 from semantic_digital_twin.world_description.world_entity import Body, Region
 from . import _assertions
+
+# %% Camera behavior
 
 
 class TestUtilsAnnotationConversion(object):
@@ -87,7 +90,6 @@ class TestUtilsAnnotationConversion(object):
             camera=Camera(
                 name=PrefixedName(name="camera"),
                 root=camera_body,
-                forward_facing_axis=Vector3.Z(),
                 camera_model=camera_model,
             ),
             effective_camera_model=camera_model,
@@ -260,8 +262,7 @@ class TestUtilsAnnotationConversion(object):
         camera_to_world_quat = (
             cas_with_tf.require_camera_observation()
             .world_T_camera_or_raise()
-            .to_quaternion()
-            .to_list()
+            .quaternion.to_list()
         )
         od = ObjectDesignator()
 
@@ -310,8 +311,7 @@ class TestUtilsAnnotationConversion(object):
         camera_to_world_quat = (
             cas_with_tf.require_camera_observation()
             .world_T_camera_or_raise()
-            .to_quaternion()
-            .to_list()
+            .quaternion.to_list()
         )
 
         od = ObjectDesignator()
@@ -348,8 +348,7 @@ class TestUtilsAnnotationConversion(object):
         camera_to_world_quat = (
             cas_with_tf.require_camera_observation()
             .world_T_camera_or_raise()
-            .to_quaternion()
-            .to_list()
+            .quaternion.to_list()
         )
         od = ObjectDesignator()
 

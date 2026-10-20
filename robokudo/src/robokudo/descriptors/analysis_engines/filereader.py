@@ -22,13 +22,17 @@ The pipeline implements the following functionality:
     before running this pipeline.
 """
 
+from __future__ import annotations
+
+# %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 
-from robokudo.annotators.outputs import ClearAnnotatorOutputs
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
+from robokudo.types.cv import ColorToDepthRatio
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
@@ -89,7 +93,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             loop=True,
             target_ros_package="robokudo_test_data",
             target_dir="data",
-            color2depth_ratio=(0.5, 0.5),
+            color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
         )
 
         # Restrict FOV of pointcloud to robustly get only one object

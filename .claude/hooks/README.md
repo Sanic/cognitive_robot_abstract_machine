@@ -36,7 +36,8 @@ Every run prints a summary of what it found and wrote, so a session never has to
 
 It is safe to re-run: on a clone that's already set up it reports what it found and asks nothing.
 You don't have to run it first either — `/plan-create`, `/plan-dashboard`, `/plan-item-kickoff`,
-`/plan-item-resolve` and `/add-plan-item` each offer it if something is missing.
+`/plan-item-resolve` and `/add-plan-item` each run it for you if something is missing, without
+stopping to ask.
 
 To do the same by hand:
 
@@ -49,6 +50,11 @@ To do the same by hand:
 ```
 
 `check-setup.sh` prints one row per check and exits non-zero if anything still needs doing.
+
+Every session start also gives the `basstler` package its own environment, `basstler/.venv`, with
+the package and the dependencies `basstler/pyproject.toml` declares installed into it wherever any
+of that is missing, for a clone whose personal-notes branch resolves — reported on its
+`dependencies:` line, never fatal, and described in `basstler/README.md`.
 
 Every session start prints its own summary, so none of the three things below has to be
 remembered. Its `setup:` line runs `check-setup.sh` and names any check that still needs setup;
@@ -151,7 +157,8 @@ Override only what you need:
     config from them, and is a no-op if none are set.
 
 For Claude Code on the web, see <https://code.claude.com/docs/en/claude-code-on-the-web> for where
-either of those lives. [`setup_steps.py`](./setup_steps.py) prints the exact variable lines your
+either of those lives. [`basstler/src/basstler/setup_steps.py`](../../basstler/src/basstler/setup_steps.py), run as
+`basstler/.venv/bin/python -m basstler.setup_steps`, prints the exact variable lines your
 clone needs — only the settings you have moved off their defaults — alongside the other two steps
 no script can perform for you.
 
@@ -179,16 +186,18 @@ the narrative that doesn't belong in structured data.
   can't silently go stale the way a hand-maintained roadmap doc could.
 - Start or unblock one item → `/plan-item-kickoff <plan-id> <item-id>`,
   `/plan-item-resolve <plan-id> <item-id>`. Kickoff opens the item's branch and draft PR and
-  marks it `in_progress` as soon as its plan is approved — via
-  [`plan_item_bootstrap.py`](./plan_item_bootstrap.py), which you can also run by hand — so the
-  manifest never says `not_started` while the work is underway.
+  marks it `in progress` as soon as its plan is approved — via
+  [`basstler/src/basstler/plan_item_bootstrap.py`](../../basstler/src/basstler/plan_item_bootstrap.py), which you can also
+  run by hand as `basstler/.venv/bin/python -m basstler.plan_item_bootstrap` — so the
+  manifest never says `not started` while the work is underway.
 - Decide where a new piece of work goes → `/add-plan-item <description>`. It runs the shared scope
   check in [`scope-decision.md`](../skills/add-plan-item/scope-decision.md) — the rule all four plan
   skills defer to for "is this new work, or a change to work already in flight?"
 - Choose whether either skill implements on its own, plans first, or asks → `/plan-item-mode
   <auto|plan|ask> [kickoff|resolve|both]`, or the
-  [`plan_item_mode.py`](./plan_item_mode.py) `resolve|set` it calls. Defaults in
-  [`plan-item-modes.toml`](./plan-item-modes.toml) are `auto` for both; `set` pins a per-user
+  [`basstler/src/basstler/plan_item_mode.py`](../../basstler/src/basstler/plan_item_mode.py) `resolve|set` it calls, which you
+  can also run by hand as `basstler/.venv/bin/python -m basstler.plan_item_mode`. Defaults in
+  [`plan-item-modes.toml`](../../basstler/src/basstler/plan-item-modes.toml) are `auto` for both; `set` pins a per-user
   override at `.claude/personal/plan-item-modes.toml` on the notes branch. What each mode obliges
   the skill to do, and when `auto` still stops to ask →
   [`execution-modes.md`](../skills/plan-dashboard/execution-modes.md).

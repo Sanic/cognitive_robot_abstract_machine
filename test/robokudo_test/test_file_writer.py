@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 from collections.abc import Iterator
 
@@ -6,8 +7,8 @@ import pytest
 from py_trees.common import Status
 
 from krrood.adapters.json_serializer import from_json
-from robokudo import world as robokudo_world
 from robokudo.annotators.file_writer import FileWriter
+from robokudo.types.cv import ColorToDepthRatio
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_filereader_playback import (
     FileReaderCameraConfig,
@@ -18,23 +19,13 @@ from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world import World
 
+from .test_camera_interface_observation import runtime_world
+
 # %% Camera observation recording
-
-
-@pytest.fixture
-def runtime_world() -> Iterator[World]:
-    """
-    Install an isolated semantic world for file playback.
-    """
-    previous_world = robokudo_world.world_instance()
-    world = World()
-    robokudo_world.set_world(world)
-    yield world
-    robokudo_world.set_world(previous_world)
 
 
 def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
@@ -54,7 +45,6 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
     camera = Camera(
         name=PrefixedName(name="camera"),
         root=camera_frame,
-        forward_facing_axis=Vector3.Z(),
         camera_model=camera_model,
     )
     world_frame = Body(name=PrefixedName(name="map"))
@@ -110,7 +100,7 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
         FileReaderCameraConfig(
             target_dir=str(tmp_path),
             loop=False,
-            color2depth_ratio=(1.0, 1.0),
+            color_to_depth_ratio=ColorToDepthRatio(),
         )
     )
     replayed_cas = CAS()

@@ -22,18 +22,23 @@ class RoboKudoError(DataclassException, ABC):
 @dataclass
 class ColorToDepthRatioMissing(RoboKudoError, RuntimeError):
     """
-    Raised when COLOR2DEPTH_RATIO is required but missing.
+    Raised when an operation needs the color-to-depth ratio, but the CAS holds none.
     """
 
     operation: str = "continue"
+    """
+    The operation that needs the color-to-depth ratio.
+    """
 
     def error_message(self) -> str:
-        return f"COLOR2DEPTH_RATIO is missing from the CAS. Can't {self.operation}."
+        return (
+            f"The color-to-depth ratio is missing from the CAS. Can't {self.operation}."
+        )
 
     def suggest_correction(self) -> str:
         return (
-            "make sure the camera driver or reader stores COLOR2DEPTH_RATIO in the CAS "
-            "before this operation."
+            "make sure the camera driver or reader stores the color-to-depth ratio in "
+            "the CAS before this operation."
         )
 
 
@@ -53,134 +58,28 @@ class UnknownMode(RoboKudoError, ValueError):
         return "use one of the modes supported by this component."
 
 
-# %% Semantic robot selection
+# %% ROS frame identifiers
 
 
 @dataclass
-class RobotAnnotationMissing(RoboKudoError):
+class InvalidROSFrameId(RoboKudoError, ValueError):
     """
-    Raised when no semantic robot matches the runtime-world selection.
-    """
-
-    robot_name: str | None = None
-    """
-    Requested robot name, or ``None`` when no name was configured.
+    Raised when a ROS frame identifier is empty after normalization.
     """
 
-    def error_message(self) -> str:
-        """
-        Describe the missing robot selection.
-        """
-        if self.robot_name is None:
-            return (
-                "The runtime Semantic Digital Twin world contains no robot annotation."
-            )
-        return f"No robot annotation named '{self.robot_name}' exists in the runtime world."
-
-    def suggest_correction(self) -> str:
-        """
-        Describe how to make a runtime robot selectable.
-        """
-        return "synchronize a robot into the runtime world or select an existing robot."
-
-
-@dataclass
-class RobotAnnotationAmbiguous(RoboKudoError):
+    frame_id: str
     """
-    Raised when runtime-world robot selection has multiple valid results.
-    """
-
-    robot_names: tuple[str, ...]
-    """
-    Names of robot annotations that satisfy the selection.
+    Supplied ROS frame identifier.
     """
 
     def error_message(self) -> str:
-        """
-        Describe the ambiguous robot selection.
-        """
-        return f"Robot selection is ambiguous between {self.robot_names}."
+        return f"Invalid ROS frame identifier: {self.frame_id!r}."
 
     def suggest_correction(self) -> str:
-        """
-        Describe how to select one runtime robot.
-        """
-        return "configure the name of the robot whose default camera should be used."
+        return "provide a nonempty ROS frame identifier containing more than leading slashes."
 
 
-# %% Semantic camera selection
-
-
-@dataclass
-class CameraAnnotationMissing(RoboKudoError):
-    """
-    Raised when no semantic camera matches the configured selection.
-    """
-
-    camera_name: str | None = None
-    """
-    Requested camera name, or ``None`` when no name was configured.
-    """
-
-    def error_message(self) -> str:
-        if self.camera_name is None:
-            return "The Semantic Digital Twin world contains no camera annotation."
-        return f"No camera annotation named '{self.camera_name}' exists in the world."
-
-    def suggest_correction(self) -> str:
-        return "add a Camera annotation to the world or select an existing camera."
-
-
-@dataclass
-class CameraAnnotationAmbiguous(RoboKudoError):
-    """
-    Raised when camera selection has more than one valid result.
-    """
-
-    camera_names: tuple[str, ...]
-    """
-    Names of camera annotations that satisfy the selection.
-    """
-
-    def error_message(self) -> str:
-        return f"Camera selection is ambiguous between {self.camera_names}."
-
-    def suggest_correction(self) -> str:
-        return "configure the name of the camera that should provide perception data."
-
-
-@dataclass
-class CameraPoseOverrideUnavailable(RoboKudoError):
-    """
-    Raised when the selected camera attachment cannot accept a pose override.
-    """
-
-    camera_name: str
-    """
-    Name of the semantic camera whose pose cannot be changed.
-    """
-
-    connection_type: str | None
-    """
-    Camera-root connection type, or ``None`` when the camera is the world root.
-    """
-
-    def error_message(self) -> str:
-        """
-        Describe why the configured pose cannot be applied.
-        """
-        if self.connection_type is None:
-            return f"Camera '{self.camera_name}' has no parent connection."
-        return (
-            f"Camera '{self.camera_name}' is attached through immutable connection "
-            f"type '{self.connection_type}'."
-        )
-
-    def suggest_correction(self) -> str:
-        """
-        Describe the attachment required for configurable camera placement.
-        """
-        return "attach the camera root through a Connection6DoF or omit camera_pose."
+# %% Camera observations
 
 
 @dataclass
@@ -541,6 +440,19 @@ class PlaneModelMissing(AnalysisPreconditionError):
 
 
 @dataclass
+class PointCloudCameraModelMissing(AnalysisPreconditionError):
+    """
+    Raised when the CAS lacks the projection model for its point cloud.
+    """
+
+    def error_message(self) -> str:
+        return "The CAS contains no point cloud camera model."
+
+    def suggest_correction(self) -> str:
+        return "provide the camera model used to create the point cloud."
+
+
+@dataclass
 class PointCloudTooSmallForClustering(AnalysisPreconditionError):
     """
     Raised when too few points are available for point-cloud clustering.
@@ -637,3 +549,103 @@ class WorldDescriptorBootstrapError(WorldDescriptorError, RuntimeError):
             "inspect the original chained exception for the underlying world model "
             "operation that failed."
         )
+
+
+# %% Analysis data contracts
+
+
+@dataclass
+class ObjectGeometryMissing(WorldDescriptorError, ValueError):
+    """
+    A world object declares no supported geometry.
+    """
+
+    object_name: str
+    """
+    Name of the object without geometry.
+    """
+
+    def error_message(self) -> str:
+        return f"Object {self.object_name!r} requires mesh, box or cylinder dimensions."
+
+    def suggest_correction(self) -> str:
+        return "Configure a mesh path, box dimensions or cylinder dimensions."
+
+
+@dataclass
+class RegionParentMissing(WorldDescriptorError, ValueError):
+    """
+    A world region references a missing parent body.
+    """
+
+    region_name: str
+    """
+    Name of the region being attached.
+    """
+
+    parent_name: str
+    """
+    Requested parent body name.
+    """
+
+    def error_message(self) -> str:
+        return f"Region {self.region_name!r} references missing parent {self.parent_name!r}."
+
+    def suggest_correction(self) -> str:
+        return "Add the parent body or select an existing parent name."
+
+
+# %% Bounding box projection
+@dataclass
+class BoundingBoxDepthMissing(RoboKudoError, ValueError):
+    """
+    A bounding box has a corner on the camera plane.
+    """
+
+    def error_message(self) -> str:
+        return "A bounding box corner has zero optical depth and cannot be projected."
+
+    def suggest_correction(self) -> str:
+        return "Provide a bounding box whose corners have nonzero optical depth."
+
+
+@dataclass
+class DetectionModelNotConfigured(RoboKudoError, ValueError):
+    """
+    Raised when an annotator is given no model to load.
+    """
+
+    annotator_name: str
+    """
+    Name of the annotator that has no model configured.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.annotator_name} has neither a pretrained model nor weights inside "
+            f"a ROS package configured."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "set 'pretrained_model', or set both 'ros_package_name' and "
+            "'weights_path' in the annotator's parameters."
+        )
+
+
+@dataclass
+class ParentPipelineMissing(RoboKudoError, RuntimeError):
+    """
+    Raised when a behaviour that operates on its pipeline is not part of one.
+    """
+
+    behaviour_name: str
+    """
+    Name of the behaviour without a parent pipeline.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.behaviour_name} is not part of a Pipeline."
+
+    def suggest_correction(self) -> str:
+        return "add the behaviour as a descendant of a Pipeline."

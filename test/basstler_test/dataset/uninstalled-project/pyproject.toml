@@ -1,0 +1,5 @@
+# A project no environment can have installed, declaring nothing else, so the only
+# requirement it can be missing is itself.
+[project]
+name = "basstler-no-such-project"
+dependencies = []

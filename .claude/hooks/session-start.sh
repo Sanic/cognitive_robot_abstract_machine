@@ -119,6 +119,14 @@ set -euo pipefail
 # keeps it, and global config is never touched. See ./save-git-identity.sh to
 # record one, and ./README.md for the two cases a hook cannot reach.
 #
+# Dependencies: the package gets its own environment, with itself and its
+# dependencies installed in it, on every start that finds any of that missing,
+# for anyone whose notes branch resolved - the same audience everything else
+# here serves. The usual run costs an import check and nothing more, and a
+# failure is reported rather than allowed to end the run. See
+# create_basstler_environment in ./resolve-personal-notes-config.sh, and
+# basstler/README.md, which tells a reader this happens.
+#
 # Setup: the summary also carries ./check-setup.sh's verdict, naming any
 # check that still needs setup. It is reported rather than left to be run on
 # purpose because remembering to run it is the step that gets skipped - after
@@ -190,10 +198,10 @@ WROTE_ANYTHING=0
 # session to describe secondhand, in its own prose, what the hook did.
 SUMMARY_NOTES="not found"
 SUMMARY_PROGRESS="not applicable (no current PR on this branch)"
-# SUMMARY_PLAN, SUMMARY_GIT_IDENTITY and SUMMARY_SETUP get no default on
-# purpose: every path below
-# assigns one, so `set -u` turns a path that forgets into a loud failure rather
-# than the silently uninformative report this hook used to print.
+# SUMMARY_PLAN, SUMMARY_GIT_IDENTITY, SUMMARY_DEPENDENCIES and SUMMARY_SETUP
+# get no default on purpose: every path below assigns one, so `set -u` turns a
+# path that forgets into a loud failure rather than the silently uninformative
+# report this hook used to print.
 
 if git cat-file -e "FETCH_HEAD:${NOTES_PATH}" 2>/dev/null; then
   cat <<HEADER >> "${OUTPUT_FILE}"
@@ -403,6 +411,77 @@ if git cat-file -e "FETCH_HEAD:${PERSONAL_SETTINGS_PATH}" 2>/dev/null; then
   fi
 fi
 
+# Dependencies: give the package its own environment, with the package and its
+# dependencies installed in it, wherever any of that is missing - so nothing
+# downstream has to run without them. Reached only after the notes branch
+# resolved above, which is the signal that this is somebody who has run the
+# setup - a clone that never did installs nothing.
+#
+# Run before the setup check below, so check-setup.sh's dashboard_dependencies
+# row reports on what this run has just installed rather than on the absence it
+# was about to fix - the same ordering, for the same reason, as CLAUDE.local.md
+# and the git identity.
+#
+# Only when something is actually missing: the common case then costs one
+# import check and no installer at all, which is what makes doing this on
+# every session start affordable.
+#
+# Never fatal. An installer that is absent, offline or refused reports here and
+# the run carries on: a hook that dies at this point takes the notes, the plan
+# and the setup verdict with it, and says nothing about why.
+#
+# ensure_basstler_environment: sets SUMMARY_DEPENDENCIES to what it did.
+ensure_basstler_environment() {
+  if [ ! -x "${BASSTLER_ENVIRONMENT_INTERPRETER}" ]; then
+    create_and_install_basstler_environment
+    return
+  fi
+  local missing
+  if ! missing="$(missing_dependencies)"; then
+    SUMMARY_DEPENDENCIES="$(dependencies_line_not_checked)"
+    return
+  fi
+  if [ -z "${missing}" ]; then
+    SUMMARY_DEPENDENCIES="$(dependencies_line_already_installed \
+      "${BASSTLER_ENVIRONMENT_DIRECTORY}")"
+    return
+  fi
+  if ! install_basstler_into_environment; then
+    SUMMARY_DEPENDENCIES="$(dependencies_line_install_failed "${missing}" \
+      "${BASSTLER_ENVIRONMENT_DIRECTORY}" \
+      "$(printf '%s' "${BASSTLER_INSTALL_OUTPUT}" | tail -1)" \
+      "${BASSTLER_INSTALL_COMMAND[*]}")"
+    return
+  fi
+  SUMMARY_DEPENDENCIES="$(dependencies_line_installed "${missing}" \
+    "${BASSTLER_ENVIRONMENT_DIRECTORY}")"
+}
+
+# create_and_install_basstler_environment: the first start on a clone, or one
+# whose environment was deleted - create it, install the package into it, and
+# point BASSTLER_PYTHON at it for everything after this in the run.
+create_and_install_basstler_environment() {
+  if ! create_basstler_environment; then
+    SUMMARY_DEPENDENCIES="$(dependencies_line_environment_not_created \
+      "${BASSTLER_ENVIRONMENT_DIRECTORY}" \
+      "$(printf '%s' "${BASSTLER_ENVIRONMENT_OUTPUT}" | tail -1)" \
+      "${BASSTLER_PYTHON_REQUIREMENT}")"
+    return
+  fi
+  resolve_basstler_python
+  if ! install_basstler_into_environment; then
+    SUMMARY_DEPENDENCIES="$(dependencies_line_install_failed \
+      "./${BASSTLER_SOURCE_TREE}" "${BASSTLER_ENVIRONMENT_DIRECTORY}" \
+      "$(printf '%s' "${BASSTLER_INSTALL_OUTPUT}" | tail -1)" \
+      "${BASSTLER_INSTALL_COMMAND[*]}")"
+    return
+  fi
+  SUMMARY_DEPENDENCIES="$(dependencies_line_environment_created \
+    "${BASSTLER_ENVIRONMENT_DIRECTORY}" "./${BASSTLER_SOURCE_TREE}")"
+}
+
+ensure_basstler_environment
+
 # Setup verdict, from ./check-setup.sh - the single read-only source of truth
 # for whether this clone is set up. Reported here because remembering to run it
 # is exactly what does not happen: a session that skips it discovers the same
@@ -444,6 +523,7 @@ session-start.sh summary:
   PR progress:     ${SUMMARY_PROGRESS}
   plan:            ${SUMMARY_PLAN}
   git identity:    ${SUMMARY_GIT_IDENTITY}
+  dependencies:    ${SUMMARY_DEPENDENCIES}
   setup:           ${SUMMARY_SETUP}
   plan state SHA:  $(git rev-parse FETCH_HEAD) (run plan-updates-since.sh <plan-id> to recheck from here later)
 SUMMARY

@@ -5,6 +5,9 @@ This pipeline renders the synchronized robot world and returns detected objects 
 their poses and colors.
 """
 
+from __future__ import annotations
+
+# %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -12,7 +15,8 @@ from robokudo.behaviours.ensure_world_synchronized import EnsureWorldSynchronize
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
 from robokudo.annotators.semdt_segmented_objects import SegmentedObjectAnnotator
-from robokudo.descriptors.camera_configs.config_semdt_raytracer import (
+from robokudo.descriptors.camera_configs.config_ray_tracing import (
+    RayTracingCameraConfiguration,
     RuntimeRobotWorldSource,
 )
 from robokudo.descriptors.factories.cr_descriptor_factory import (
@@ -38,7 +42,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         Render and report every visible object with its pose and colors.
         """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "semdt_raytracer",
+            RayTracingCameraConfiguration.registry_name,
             source=RuntimeRobotWorldSource(),
         )
         seq = Pipeline("SemDTRayTracerPipeline")

@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import simulated_robot
+from coraplex.execution_environment import kinematically_simulated_robot
 from coraplex.orm.ormatic_interface import Base, PlanMappingDAO  # type: ignore
 from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -103,9 +103,8 @@ def _random_navigate_action(world: World):
             yaw=...,
             reference_frame=world.root,
         ),
-        keep_joint_states=True,
     )
-    action.expression.limit(10)
+    action.limit(10)
     return action
 
 
@@ -135,7 +134,7 @@ class ORMaticReliabilityExperimentResult(ExperimentResult):
 
     plan_execution_duration: float
     """
-    Seconds to execute the plan under simulated_robot.
+    Seconds to execute the plan under kinematically_simulated_robot.
     """
 
     to_data_access_object_duration: float
@@ -177,7 +176,7 @@ class ORMaticReliabilityAggregateResult(ExperimentResult):
 
     plan_execution_duration: MeanAndStandardDeviation
     """
-    Mean and standard deviation of plan execution time under simulated_robot (seconds).
+    Mean and standard deviation of plan execution time under kinematically_simulated_robot (seconds).
     """
 
     to_data_access_object_duration: MeanAndStandardDeviation
@@ -221,7 +220,7 @@ def reliability_experiment(
     plan = create_plan(world, context, plan_size)
 
     t0 = time.perf_counter()
-    with simulated_robot:
+    with kinematically_simulated_robot:
         plan.perform()
     plan_execution_duration = time.perf_counter() - t0
 

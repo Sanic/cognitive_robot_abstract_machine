@@ -20,9 +20,10 @@ The module is used for:
 
 from __future__ import annotations
 
+# %% Imports
 import time
 
-from typing_extensions import Optional, TYPE_CHECKING, Any
+from typing_extensions import TYPE_CHECKING, Any
 
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.cas import CASViews
@@ -106,7 +107,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         Only works on video/image files.
         """
-        self._backup_color: Optional[npt.NDArray] = None
+        self._backup_color: npt.NDArray | None = None
         """
         Backup of image for single-image file mode.
         """
@@ -200,7 +201,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         # update additional (fake) data
         depth = self.camera_config.depth
         camera_info = self.camera_config.camera_info
-        color2depth_ratio = self.camera_config.color2depth_ratio
+        color_to_depth_ratio = self.camera_config.color_to_depth_ratio
         if camera_info is None:
             raise CameraDataMissing(
                 data_name="Camera calibration",
@@ -220,7 +221,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, color)
         cas.set(CASViews.DEPTH_IMAGE, depth)
-        cas.set(CASViews.COLOR2DEPTH_RATIO, color2depth_ratio)
+        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, color_to_depth_ratio)
         camera_frame = camera_info.header.frame_id or self.camera_config.camera_frame
         modalities = (
             (CameraModality.COLOR, CameraModality.DEPTH)

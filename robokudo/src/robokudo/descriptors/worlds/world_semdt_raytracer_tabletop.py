@@ -1,9 +1,18 @@
+# %% Imports
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraModality,
+    CameraRange,
+    PinholeCameraModel,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.robots.robot_parts import Camera
 from importlib.util import find_spec
 from pathlib import Path
 
-from robokudo.descriptors.worlds.pinhole_rgbd_camera import PinholeRGBDCameraSpec
 from robokudo.world_descriptor import (
     BaseWorldDescriptor,
+    CameraPlacement,
     ObjectSpec,
     PredefinedObject,
     RegionSpec,
@@ -153,10 +162,26 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
 
         self.build_regions(root, region_specs)
+        camera_name = PrefixedName(name="semdt_camera_optical_frame")
         self.build_camera(
             root,
-            PinholeRGBDCameraSpec(
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            CameraPlacement(
+                camera=Camera(
+                    name=camera_name,
+                    root=Body(name=camera_name),
+                    camera_model=PinholeCameraModel.from_field_of_view(
+                        resolution=CameraResolution(), field_of_view=FieldOfView()
+                    ),
+                    camera_range=CameraRange(
+                        minimum_distance=0.05, maximum_distance=8.0
+                    ),
+                    modalities=(
+                        CameraModality.COLOR,
+                        CameraModality.DEPTH,
+                        CameraModality.SEGMENTATION,
+                    ),
+                ),
+                parent_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.20,
                     y=0.40,
                     z=1.05,

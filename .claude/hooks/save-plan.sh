@@ -48,11 +48,11 @@ set -euo pipefail
 # live Claude session can), so it does not regenerate the dashboard itself -
 # it prints a reminder to run /plan-dashboard <plan-id> afterward.
 #
-# Requires python3 with PyYAML to parse/validate manifests and regenerate
-# the reverse index (unlike session-start.sh's read path, which is
-# grep/awk-only so it stays dependency-free on every session start - this
-# script only runs when a session is actively editing a plan, where python3
-# is a safe assumption in this repo).
+# Requires the package's interpreter with its dependencies to parse/validate
+# manifests and regenerate the reverse index (unlike session-start.sh's read
+# path, which is grep/awk-only so it stays dependency-free on every session
+# start - this script only runs when a session is actively editing a plan,
+# after a session start has set that interpreter up).
 #
 # Resolves the remote/branch exactly like the other hook scripts (git
 # config > environment variable > the zero-config default, plus the
@@ -70,12 +70,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
 
-if ! command -v python3 > /dev/null 2>&1; then
-  echo "python3 is required to parse/validate plan manifests and regenerate the branch index." >&2
+if ! command -v "${BASSTLER_PYTHON}" > /dev/null 2>&1; then
+  echo "${BASSTLER_PYTHON} is required to parse/validate plan manifests and regenerate the branch index." >&2
   exit 1
 fi
-if ! python3 -c "import yaml" > /dev/null 2>&1; then
-  echo "python3's PyYAML module is required (pip install pyyaml)." >&2
+# Asked through the package's own declaration rather than by importing one
+# name here, so this script carries no Python of its own and no second opinion
+# about what the tooling needs. A session start installs these; a checkout
+# where that never ran reaches this message instead of a traceback.
+if ! MISSING_DEPENDENCIES="$(missing_dependencies)"; then
+  echo "Could not read what the basstler package requires from ${BASSTLER_PYPROJECT_FILE}." >&2
+  exit 1
+fi
+if [ -n "${MISSING_DEPENDENCIES}" ]; then
+  echo "The basstler package's requirements are not installed for ${BASSTLER_PYTHON}: ${MISSING_DEPENDENCIES}" >&2
+  echo "Start a new session, or run: pip --python ${BASSTLER_PYTHON} install --editable ./${BASSTLER_SOURCE_TREE}" >&2
   exit 1
 fi
 
@@ -192,7 +201,7 @@ if [ ! -s "${MANIFEST_FILE}" ]; then
   exit 1
 fi
 
-MANIFEST_PLAN_ID="$(python3 "${SCRIPT_DIR}/plan_manifest_tools.py" read-id "${MANIFEST_FILE}")"
+MANIFEST_PLAN_ID="$("${BASSTLER_PYTHON}" -m "${PLAN_MANIFEST_TOOLS_MODULE}" read-id "${MANIFEST_FILE}")"
 if [ "${MANIFEST_PLAN_ID}" != "${PLAN_ID}" ]; then
   echo "The plan manifest's 'id: ${MANIFEST_PLAN_ID}' does not match the plan" >&2
   echo "being saved ('${PLAN_ID}') - refusing to save under a mismatched key." >&2
@@ -210,7 +219,7 @@ cp "${MANIFEST_FILE}" "${SCRATCH_DIR}/${MANIFEST_PATH}"
 cp "${ROADMAP_FILE}" "${SCRATCH_DIR}/${ROADMAP_PATH}"
 
 mkdir -p "$(dirname "${SCRATCH_DIR}/${PLAN_BRANCH_INDEX_PATH}")"
-python3 "${SCRIPT_DIR}/plan_manifest_tools.py" regenerate-branch-index \
+"${BASSTLER_PYTHON}" -m "${PLAN_MANIFEST_TOOLS_MODULE}" regenerate-branch-index \
   --scratch-dir "${SCRATCH_DIR}" \
   --plans-dir "${PLANS_DIR}" \
   --manifest-filename "${PLAN_MANIFEST_FILENAME}" \

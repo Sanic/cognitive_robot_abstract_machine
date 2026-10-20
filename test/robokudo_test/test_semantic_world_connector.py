@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# %% Imports
 import numpy as np
 import py_trees
 import pytest
@@ -25,7 +26,8 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import Vector3
+
+# %% Camera behavior
 
 
 def _make_hypothesis(
@@ -127,7 +129,6 @@ def semdt_cas() -> CAS:
         camera=Camera(
             name=PrefixedName(name="camera"),
             root=camera_body,
-            forward_facing_axis=Vector3.Z(),
             camera_model=camera_model,
         ),
         effective_camera_model=camera_model,

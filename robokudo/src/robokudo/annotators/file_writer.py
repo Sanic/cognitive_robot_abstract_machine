@@ -1,4 +1,5 @@
-"""Sensor data storage to filesystem.
+"""
+Sensor data storage to filesystem.
 
 This module provides an annotator for:
 
@@ -20,6 +21,7 @@ The module uses:
 
 from __future__ import annotations
 
+# %% Imports
 import json
 from pathlib import Path
 from timeit import default_timer
@@ -33,7 +35,8 @@ from robokudo.cas import CASViews
 
 
 class FileWriter(BaseAnnotator):
-    """Sensor data storage to filesystem.
+    """
+    Sensor data storage to filesystem.
 
     This module provides methods to store sensor data into the local filesystem.
     This way you can work on recorded data without having to use bag files.
@@ -44,10 +47,13 @@ class FileWriter(BaseAnnotator):
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for file writer."""
+        """
+        Configuration descriptor for file writer.
+        """
 
         class Parameters:
-            """Parameters for configuring file storage.
+            """
+            Parameters for configuring file storage.
 
             .. note::
                filename_prefix should match FileReader configuration.
@@ -55,10 +61,14 @@ class FileWriter(BaseAnnotator):
 
             def __init__(self) -> None:
                 self.target_dir: str = "/tmp/"
-                """Directory to store files in"""
+                """
+                Directory to store files in
+                """
 
                 self.filename_prefix: str = "rk_"
-                """Prefix for generated filenames, make sure that this matches the FileReader filename_prefix"""
+                """
+                Prefix for generated filenames, make sure that this matches the FileReader filename_prefix
+                """
 
         # Overwrite the parameters explicitly to enable auto-completion
         parameters = Parameters()
@@ -68,7 +78,8 @@ class FileWriter(BaseAnnotator):
         name: str = "FileWriter",
         descriptor: FileWriter.Descriptor | None = None,
     ) -> None:
-        """Initialize the file writer.
+        """
+        Initialize the file writer.
 
         :param name: Name of this annotator instance
         :param descriptor: Configuration descriptor
@@ -89,8 +100,9 @@ class FileWriter(BaseAnnotator):
                 f"{self.descriptor.parameters.target_dir} is not existing or not a directory"
             )
 
-    def generate_full_file_path_(self, data_type: str, file_extension: str) -> str:
-        """Generate the full filename and path where data should be stored.
+    def generate_full_file_path_(self, data_type: CASViews, file_extension: str) -> str:
+        """
+        Generate the full filename and path where data should be stored.
 
         Creates a filepath using:
 
@@ -112,7 +124,8 @@ class FileWriter(BaseAnnotator):
         )
 
     def update(self) -> Status:
-        """Process and store sensor data.
+        """
+        Process and store sensor data.
 
         The method:
 
@@ -127,7 +140,7 @@ class FileWriter(BaseAnnotator):
         start_timer = default_timer()
 
         if not self.initialized:
-            print(
+            self.rk_logger(
                 "FileWriter has not been properly instantiated. Check error log for __init__ errors."
             )
             return Status.FAILURE

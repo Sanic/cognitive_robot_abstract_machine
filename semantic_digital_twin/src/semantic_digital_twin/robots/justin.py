@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+# %% Imports
 from abc import ABC
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Self, Union, List
+from typing_extensions import Self
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
@@ -34,10 +35,12 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+# %% Robot parts
 
 
 class JustinJoint(StrEnum):
@@ -101,10 +104,10 @@ class JustinJoint(StrEnum):
 @dataclass(eq=False)
 class JustinLeftThumb(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -124,10 +127,10 @@ class JustinLeftThumb(Finger):
 @dataclass(eq=False)
 class JustinLeftIndexFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -145,10 +148,10 @@ class JustinLeftIndexFinger(Finger):
 @dataclass(eq=False)
 class JustinLeftMiddleFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -168,10 +171,10 @@ class JustinLeftMiddleFinger(Finger):
 @dataclass(eq=False)
 class JustinLeftRingFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -189,10 +192,10 @@ class JustinLeftRingFinger(Finger):
 @dataclass(eq=False)
 class JustinRightThumb(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -212,10 +215,10 @@ class JustinRightThumb(Finger):
 @dataclass(eq=False)
 class JustinRightIndexFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -233,10 +236,10 @@ class JustinRightIndexFinger(Finger):
 @dataclass(eq=False)
 class JustinRightMiddleFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -256,10 +259,10 @@ class JustinRightMiddleFinger(Finger):
 @dataclass(eq=False)
 class JustinRightRingFinger(Finger):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -287,10 +290,10 @@ class JustinLeftHand(
     ],
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
@@ -307,6 +310,14 @@ class JustinLeftHand(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.NEGATIVE_X(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -316,7 +327,6 @@ class JustinLeftHand(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "l_gripper_tool_frame"
             ),
-            front_facing_orientation=Quaternion(0.707, -0.707, 0.707, -0.707),
         )
 
 
@@ -331,10 +341,10 @@ class JustinRightHand(
     ],
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
@@ -351,6 +361,14 @@ class JustinRightHand(
 
         return [gripper_open, gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.Z(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -360,17 +378,16 @@ class JustinRightHand(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "r_gripper_tool_frame"
             ),
-            front_facing_orientation=Quaternion(0.707, 0.707, 0.707, 0.707),
         )
 
 
 @dataclass(eq=False)
 class JustinLeftArm(Arm[JustinLeftHand]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
             name=PrefixedName("left_arm_park", prefix=self.name.name),
             mapping=dict(
@@ -393,10 +410,10 @@ class JustinLeftArm(Arm[JustinLeftHand]):
 @dataclass(eq=False)
 class JustinRightArm(Arm[JustinRightHand]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
             name=PrefixedName("right_arm_park", prefix=self.name.name),
             mapping=dict(
@@ -424,30 +441,34 @@ class JustinCamera(RobotCamera):
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "head2"),
-            forward_facing_axis=Vector3.Z(),
+            root=cls.create_optical_root(
+                robot_root._world.get_body_in_branch_by_name(robot_root, "head2"),
+                HomogeneousTransformationMatrix(),
+            ),
             camera_model=FieldOfViewCameraModel(
-                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+                angular_extent=FieldOfView(
+                    horizontal_angle=0.99483, vertical_angle=0.75049
+                )
             ),
             minimal_height=0.75049,
             maximal_height=0.99483,
             default_camera=True,
         )
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
 
 @dataclass(eq=False)
 class JustinNeck(Neck[JustinCamera]):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -465,10 +486,10 @@ class JustinTorso(
     Torso, HasLeftRightArm[JustinLeftArm, JustinRightArm], HasNeck[JustinNeck]
 ):
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -496,10 +517,10 @@ class JustinMobileBase(MobileBase[OmniDrive], HasTorso[JustinTorso]):
             root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
         )
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
 

@@ -4,13 +4,15 @@ from dataclasses import dataclass
 
 import numpy as np
 from random_events.interval import Bound, Interval
+from random_events.product_algebra import SimpleEvent
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import List, Self, Type
+from typing_extensions import List, Optional, Self, Type
 
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    NodeIndices,
     NodeMask,
     NodeValues,
     SampleColumn,
@@ -20,6 +22,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base import (
     AbstractContinuousLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
+    QueryCache,
+    memoized,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
     LayerWithLogProbabilities,
@@ -94,6 +100,11 @@ class DiracDeltaLayer(AbstractContinuousLayer):
             layers[0].tolerance,
         )
 
+    def has_equal_parameters(self, other: Self) -> bool:
+        return np.array_equal(self.location, other.location) and np.array_equal(
+            self.density_cap, other.density_cap
+        )
+
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
@@ -117,15 +128,36 @@ class DiracDeltaLayer(AbstractContinuousLayer):
             return self.location - center
         return np.zeros(self.number_of_nodes)
 
-    def sample_of_node(
-        self, node: int, amount: int, variables: SortedSet
-    ) -> SampleColumn:
-        return np.full(amount, self.location[node])
+    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+        return self.location[nodes].astype(float)
 
     def type_of_truncated_layer(
         self, assignment: Interval, singleton_allowed: bool
     ) -> Type[Layer]:
         return self.__class__
+
+    def contains(self, assignment: Interval) -> NodeMask:
+        """
+        :param assignment: The assignment of the variable of this layer.
+        :return: Whether the assignment reaches the mass of every node, up to
+            :attr:`tolerance`.
+        """
+        lower_of_window = self.location - self.tolerance
+        upper_of_window = self.location + self.tolerance
+        inside = np.zeros(self.number_of_nodes, dtype=bool)
+        for simple_interval in assignment.simple_sets:
+            left = (
+                simple_interval.lower <= upper_of_window
+                if simple_interval.left == Bound.CLOSED
+                else simple_interval.lower < upper_of_window
+            )
+            right = (
+                lower_of_window <= simple_interval.upper
+                if simple_interval.right == Bound.CLOSED
+                else lower_of_window < simple_interval.upper
+            )
+            inside |= left & right
+        return inside
 
     def log_truncated_of_assignment(
         self, assignment: Interval, singleton_allowed: bool
@@ -133,24 +165,22 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         """
         Truncating a Dirac delta either keeps it unchanged or makes it impossible, so
         the whole layer is truncated by testing which locations the assignment contains.
-        """
-        inside = np.zeros(self.number_of_nodes, dtype=bool)
-        for interval in assignment.simple_sets:
-            left = (
-                interval.lower <= self.location
-                if interval.left == Bound.CLOSED
-                else interval.lower < self.location
-            )
-            right = (
-                self.location <= interval.upper
-                if interval.right == Bound.CLOSED
-                else self.location < interval.upper
-            )
-            inside |= left & right
 
+        See :meth:`~probabilistic_model.probabilistic_circuit.tensorized.input_layer.base.UnivariateInputLayer.log_truncated_of_assignment`
+        for the parameters and the result.
+        """
         return LayerWithLogProbabilities(
-            self.__deepcopy__(), np.where(inside, 0.0, -np.inf)
+            self.__deepcopy__(), np.where(self.contains(assignment), 0.0, -np.inf)
         )
+
+    @memoized
+    def probability_of_simple_event_of_nodes(
+        self,
+        event: SimpleEvent,
+        variables: SortedSet,
+        cache: Optional[QueryCache] = None,
+    ) -> NodeValues:
+        return self.contains(event[variables[self.variable]]).astype(float)
 
     def log_conditional_of_value(self, value: float) -> LayerWithLogProbabilities:
         log_likelihood = self.log_likelihood_of_nodes_from_column(np.array([value]))[0]

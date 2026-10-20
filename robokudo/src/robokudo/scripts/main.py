@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+# %% Imports
 from robokudo.world import world_instance
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (

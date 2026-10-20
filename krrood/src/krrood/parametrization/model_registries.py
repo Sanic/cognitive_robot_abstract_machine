@@ -14,7 +14,7 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
 from probabilistic_model.probabilistic_circuit.relational.causal import (
     RelationalCausalCircuit,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     GroundingMode,
     RelationalProbabilisticCircuit,
 )
@@ -101,7 +101,7 @@ class RelationalCircuitRegistry(ModelRegistry):
     How undetermined aggregation latents are represented during grounding.
 
     See
-    :class:`~probabilistic_model.probabilistic_circuit.relational.rspn.GroundingMode`.
+    :class:`~probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit.GroundingMode`.
     """
 
     def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:

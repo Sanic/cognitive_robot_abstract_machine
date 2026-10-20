@@ -180,10 +180,10 @@ CLAUDE.local.md
 .claude/.plan-state-sync-sha
 
 # The stacked-PR board snapshot, re-exported from GitHub by
-# `.claude/stack/maintenance.py board --write` at the start of every maintenance pass.
+# `python3 -m basstler.maintenance board --write` at the start of every maintenance pass.
 # Scratch state, never committed: a stale copy read as current is a pass acting on a
 # stack that has since moved.
-.claude/stack/board.json
+basstler/src/basstler/board.json
 
 # ORMatic generates every package's ormatic_interface.py from its dataclasses, so the
 # repository builds them (scripts/regenerate_all_orm.py) instead of tracking them.
@@ -194,3 +194,13 @@ CLAUDE.local.md
 # Local data produced by the Python coverage checks.
 /.coverage
 /.coverage.*
+
+# Some robokudo annotators have default models downloaded
+robokudo/src/robokudo/models/
+
+# basstler's own virtual environment, created by every session start that finds it
+# missing (see create_basstler_environment in .claude/hooks/resolve-personal-notes-config.sh).
+basstler/.venv/
+# The uv such a start installs for itself, where it finds neither uv nor a supported
+# interpreter (see install_uv in the same file).
+basstler/.uv/

@@ -28,14 +28,11 @@ from experiments.simulated_tabletop_demo.demo import (
 import robokudo.world as rk_world
 from robokudo.annotators.semdt_segmented_objects import SegmentedObjectAnnotator
 from robokudo.cas import CAS
-from robokudo.descriptors.camera_configs.config_semdt_raytracer import (
+from robokudo.descriptors.camera_configs.config_ray_tracing import (
     RuntimeRobotWorldSource,
-    SemDTRayTracerCameraConfig,
-    SemDTRGBMode,
+    RayTracingCameraConfiguration,
 )
-from robokudo.io.semdt_camera_context import RayTracingContext
-from robokudo.io.semdt_raytracer_camera_interface import SemDTRayTracerCameraInterface
-from robokudo.io.semdt_raytracer_renderer import SemDTRayTracerRenderer
+from robokudo.io.ray_tracing_camera_interface import RayTracingCameraInterface
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
@@ -89,15 +86,10 @@ def test_robot_camera_renders_both_tabletop_objects():
     robot = world.get_semantic_annotations_by_type(Tiago)[0]
     camera = robot.get_default_camera()
     camera.camera_model = FieldOfViewCameraModel(
-        view=camera.field_of_view,
+        angular_extent=camera.field_of_view,
         image_resolution=CameraResolution(width=128, height=128),
     )
-    renderer = SemDTRayTracerRenderer(
-        rgb_mode=SemDTRGBMode.SEMANTIC,
-        logger=logging.getLogger(__name__),
-    )
-
-    frame = renderer.render(RayTracingContext(world=world, camera=camera))
+    frame = world.ray_tracer.render(camera)
     visible = set(np.unique(frame.segmentation))
 
     assert world.get_body_by_name(CUP_NAME).index in visible
@@ -113,7 +105,7 @@ def test_rendered_segments_produce_separate_object_poses(monkeypatch):
     demonstration.populate_scene(world)
     camera = world.get_semantic_annotations_by_type(Tiago)[0].get_default_camera()
     camera.camera_model = FieldOfViewCameraModel(
-        view=camera.field_of_view,
+        angular_extent=camera.field_of_view,
         image_resolution=CameraResolution(width=128, height=128),
     )
     monkeypatch.setattr(rk_world, "world_instance", lambda: world)
@@ -121,8 +113,8 @@ def test_rendered_segments_produce_separate_object_poses(monkeypatch):
         rk_world, "init_world_entity_tracker_from_world", lambda world: None
     )
     cas = CAS()
-    SemDTRayTracerCameraInterface(
-        SemDTRayTracerCameraConfig(source=RuntimeRobotWorldSource())
+    RayTracingCameraInterface(
+        RayTracingCameraConfiguration(source=RuntimeRobotWorldSource())
     ).set_data(cas)
     annotator = SegmentedObjectAnnotator()
     monkeypatch.setattr(annotator, "get_cas", lambda: cas)
@@ -219,7 +211,9 @@ def test_plan_applies_updated_detection_from_separate_ray_tracing_process(monkey
             try:
                 demonstration.populate_scene(world)
                 context = demonstration.build_context(world)
-                with ExecutionEnvironment(execution_type=ExecutionType.SIMULATED):
+                with ExecutionEnvironment(
+                    execution_type=ExecutionType.KINEMATICALLY_SIMULATED
+                ):
                     demonstration.build_plan(context).perform()
 
                     milk = world.get_body_by_name(MILK_NAME)
@@ -239,12 +233,12 @@ def test_plan_applies_updated_detection_from_separate_ray_tracing_process(monkey
 
     assert len(applied) == 2
     assert all(detection.semantic_annotation is Milk for detection in applied)
-    first_position = (
-        world.transform(applied[0].pose, world.root).to_homogeneous_matrix().to_np()
-    )
-    second_position = (
-        world.transform(applied[1].pose, world.root).to_homogeneous_matrix().to_np()
-    )
+    first_position = world.transform(
+        applied[0].pose, world.root
+    ).homogeneous_matrix.to_np()
+    second_position = world.transform(
+        applied[1].pose, world.root
+    ).homogeneous_matrix.to_np()
     assert second_position[1, 3] > first_position[1, 3] + 0.08
 
 
@@ -306,7 +300,9 @@ def test_tabletop_query_returns_both_untyped_colored_objects_and_plan_uses_red(
                 ).global_transform.to_np()[:3, 3]
                 context = demonstration.build_context(world)
                 with caplog.at_level(logging.INFO, logger="coraplex.perception"):
-                    with ExecutionEnvironment(execution_type=ExecutionType.SIMULATED):
+                    with ExecutionEnvironment(
+                        execution_type=ExecutionType.KINEMATICALLY_SIMULATED
+                    ):
                         demonstration.build_plan(context).perform()
             finally:
                 demonstration.tear_down()
@@ -316,9 +312,7 @@ def test_tabletop_query_returns_both_untyped_colored_objects_and_plan_uses_red(
     assert applied[0].semantic_annotation is Milk
     assert "unclassified color=red" in caplog.text
     assert "unclassified color=blue" in caplog.text
-    applied_position = (
-        world.transform(applied[0].pose, world.root)
-        .to_homogeneous_matrix()
-        .to_np()[:3, 3]
-    )
+    applied_position = world.transform(
+        applied[0].pose, world.root
+    ).homogeneous_matrix.to_np()[:3, 3]
     assert np.linalg.norm(applied_position - expected_milk_position) < 0.2

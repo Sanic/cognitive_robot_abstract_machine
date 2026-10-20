@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+# %% Imports
 import os
 from pathlib import Path
 import json
@@ -8,14 +11,13 @@ import numpy as np
 import py_trees
 from rclpy.node import Node
 
+from robokudo.types.cv import ColorToDepthRatio
 import robokudo.defs
 from robokudo import world as rk_world
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
 import robokudo.utils.data_downloader
-from robokudo.pipeline import Pipeline
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
-from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.annotators.storage import StorageWriter
 from robokudo.cas import CASViews
 from robokudo.descriptors.factories.cr_descriptor_factory import (
@@ -24,6 +26,10 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 from robokudo.io.storage import Storage, StorageDocumentField
 import robokudo.utils.tree_execution
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
+from robokudo.pipeline import Pipeline
+from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -36,7 +42,7 @@ def _build_writer_pipeline(db_name: str) -> Pipeline:
         "file_reader",
         loop=False,
         target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
-        color2depth_ratio=(0.5, 0.5),
+        color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
     )
     camera_config = file_reader_descriptor.parameters.camera_config
     camera_config.static_camera_transform_enabled = True
@@ -82,7 +88,7 @@ def _build_reader_pipeline(db_name: str) -> Pipeline:
 
 
 class TestStorageRoundtripPipeline:
-    def test_store_and_replay_sensor_data_roundtrip(self):
+    def test_store_and_replay_sensor_data_roundtrip(self) -> None:
         rk_world.init_world_with_entity_tracker()
         db_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
         storage = Storage(db_name)
@@ -189,8 +195,8 @@ class TestStorageRoundtripPipeline:
                 is reader_pose.reference_frame
             )
 
-            assert writer_pipeline.cas.get(CASViews.COLOR2DEPTH_RATIO) == (
-                reader_pipeline.cas.get(CASViews.COLOR2DEPTH_RATIO)
+            assert writer_pipeline.cas.get(CASViews.COLOR_TO_DEPTH_RATIO) == (
+                reader_pipeline.cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
             )
         finally:
             writer_node.destroy_node()

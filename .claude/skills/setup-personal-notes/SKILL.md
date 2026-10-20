@@ -141,11 +141,15 @@ That helper is idempotent — it pushes nothing if the content already matches.
 
 ## 6. `dashboard_dependencies` — what the dashboards need
 
-Mechanical, not a preference. Say what's missing and install it:
+Mechanical, not a preference. Say what's missing and install it, into the
+package's own environment where it exists:
 
 ```bash
-pip install -r "${PLAN_DASHBOARD_REQUIREMENTS_FILE}"
+pip --python "${BASSTLER_PYTHON}" install --editable "./${BASSTLER_SOURCE_TREE}"
 ```
+
+Where the environment does not exist yet, step 7's session start creates it
+and installs into it; its `dependencies:` line reports the outcome.
 
 If the install fails (no network, a managed environment, a read-only
 interpreter), don't retry blindly — report the failure and the command, and

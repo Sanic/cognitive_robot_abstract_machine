@@ -12,7 +12,8 @@ from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.query import GenerateQueryResult, QueryAnnotator
-from robokudo.descriptors.camera_configs.config_semdt_raytracer import (
+from robokudo.descriptors.camera_configs.config_ray_tracing import (
+    RayTracingCameraConfiguration,
     RuntimeRobotWorldSource,
 )
 from robokudo.descriptors.factories.cr_descriptor_factory import (
@@ -38,7 +39,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         Return every posed tabletop cluster with its observed colors.
         """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "semdt_raytracer",
+            RayTracingCameraConfiguration.registry_name,
             source=RuntimeRobotWorldSource(),
         )
         plane_desc = PlaneAnnotator.Descriptor()

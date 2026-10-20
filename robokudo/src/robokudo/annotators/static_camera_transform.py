@@ -1,7 +1,10 @@
-"""Annotator for writing a configured static camera transform into the CAS.
+"""
+Annotator for writing a configured static camera transform into the CAS.
 Use this in scenarios where you do not have a world to camera transform published
-or when you develop the perception system in isolation."""
+or when you develop the perception system in isolation.
+"""
 
+# %% Imports
 from __future__ import annotations
 
 from timeit import default_timer
@@ -13,19 +16,26 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.camera_interface import CameraInterface
 
 
+# %% Static camera pose
 class StaticCameraTransformAnnotator(BaseAnnotator):
-    """Write a fixed camera-to-world transform to the current CAS."""
+    """
+    Write a fixed camera-to-world transform to the current CAS.
+    """
 
     class Descriptor(BaseAnnotator.Descriptor):
         class Parameters:
             def __init__(self) -> None:
                 self.world_frame: str = "map"
-                """Reference frame used for the camera-to-world transform."""
+                """
+                Reference frame used for the camera-to-world transform.
+                """
 
                 self.world_T_camera: HomogeneousTransformationMatrix = (
                     HomogeneousTransformationMatrix()
                 )
-                """Camera pose relative to the configured world frame."""
+                """
+                Image-frame pose relative to the configured world frame.
+                """
 
         parameters = Parameters()
 
@@ -37,16 +47,19 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
         super().__init__(name=name, descriptor=descriptor)
 
     def update(self) -> Status:
+        """
+        Bind the configured world pose directly to the optical camera root.
+        """
         start_timer = default_timer()
 
         cas = self.get_cas()
-        params = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         observation = cas.require_camera_observation()
 
         world_T_camera = CameraInterface.bind_world_T_camera(
-            world_frame=params.world_frame,
-            camera_frame=observation.camera.root.name.name,
-            world_T_camera=params.world_T_camera,
+            world_frame=parameters.world_frame,
+            camera_frame=str(observation.camera.root.name),
+            world_T_camera=parameters.world_T_camera,
         )
         cas.camera_observation = observation.with_world_T_camera(world_T_camera)
 

@@ -21,12 +21,20 @@ from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.justin import Justin
-from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
-from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.robots.robot_part_mixins import (
+    HasMobileBase,
+    HasTwoFingers,
+)
+from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.spatial_types import Point3, Vector3
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
-from coraplex.exceptions import MissingToolFrame, MissingWaypoints
+from coraplex.exceptions import (
+    FingerWidthNeedsPhysics,
+    MissingToolFrame,
+    MissingWaypoints,
+)
+from coraplex.plans.executables import GiskardExecutable
 from coraplex.robot_plans.mixins import (
     CartesianVelocityLimitParameters,
     GripperStallToleranceParameters,
@@ -34,89 +42,9 @@ from coraplex.robot_plans.mixins import (
 )
 from coraplex.robot_plans.motions.base import BaseMotion
 from coraplex.datastructures.enums import (
-    Arms,
     MovementType,
     WaypointsMovementType,
 )
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.view_manager import ViewManager
-from coraplex.utils import translate_pose_along_local_axis
-
-
-@dataclass
-class ReachMotion(BaseMotion, HasTcpGoalThresholds):
-    """
-    Moves the tool center point through the grasp description's pre-grasp and grasp
-    poses for an object.
-    """
-
-    object_designator: Body
-    """
-    Object designator_description describing the object that should be picked up
-    """
-    arm: Arms
-    """
-    The arm that should be used for pick up.
-    """
-
-    grasp_description: GraspDescription
-    """
-    The grasp description that should be used for picking up the object
-    """
-    movement_type: MovementType = MovementType.CARTESIAN
-    """
-    The type of movement that should be performed.
-    """
-
-    reverse_pose_sequence: bool = False
-    """
-    Reverses the sequence of poses, i.e., moves away from the object instead of towards
-    it.
-
-    Used for placing objects.
-    """
-
-    def _calculate_pose_sequence(self) -> List[Pose]:
-        end_effector = ViewManager.get_end_effector_view(self.arm, self.robot_view)
-
-        target_pose = GraspDescription.get_grasp_pose(
-            self.grasp_description, end_effector, self.object_designator
-        )
-        target_pose.rotate_by_quaternion(
-            GraspDescription.calculate_grasp_orientation(
-                self.grasp_description,
-                end_effector.front_facing_orientation.to_np(),
-            )
-        )
-        target_pre_pose = translate_pose_along_local_axis(
-            target_pose,
-            end_effector.front_facing_axis.to_np()[:3],
-            -0.05,  # TODO: Maybe put these values in the semantic annotates
-        )
-
-        pose = self.world.transform(target_pre_pose, self.world.root)
-
-        sequence = [target_pre_pose, pose]
-        return sequence.reverse() if self.reverse_pose_sequence else sequence
-
-    def perform(self):
-        pass
-
-    @property
-    def _motion_chart(self):
-        tip = ViewManager().get_end_effector_view(self.arm, self.robot_view).tool_frame
-        nodes = [
-            CartesianPose(
-                root_link=self.robot_view.root,
-                tip_link=tip,
-                goal_pose=pose,
-                translation_threshold=self.resolved_position_threshold(),
-                orientation_threshold=self.resolved_orientation_threshold(),
-                name="Reach",
-            )
-            for pose in self._calculate_pose_sequence()
-        ]
-        return Sequence(nodes=nodes)
 
 
 @dataclass
@@ -130,9 +58,9 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
     Motion that should be performed, either 'open' or 'close'.
     """
 
-    gripper: Arms
+    gripper: EndEffector
     """
-    Name of the gripper that should be moved.
+    The gripper that should be moved.
     """
 
     allow_gripper_collision: Optional[bool] = None
@@ -145,10 +73,8 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
 
     @property
     def _motion_chart(self):
-        arm = ViewManager().get_end_effector_view(self.gripper, self.robot)
-
         name = "OpenGripper" if self.motion == GripperState.OPEN else "CloseGripper"
-        goal_state = arm.get_joint_state_by_type(self.motion)
+        goal_state = self.gripper.get_joint_state_by_type(self.motion)
         joint_task = JointPositionList(goal_state=goal_state, name=name)
 
         done_node = joint_task
@@ -186,6 +112,67 @@ class MoveGripperMotion(BaseMotion, GripperStallToleranceParameters):
 
 
 @dataclass
+class MoveFingersToWidthMotion(BaseMotion):
+    """
+    Closes a two-finger gripper until its fingertips stand a given distance apart,
+    rather than driving it to a gripper state of its own.
+
+    Closing a gripper all the way onto an object that is not centred between the
+    fingers wedges it sideways instead of holding it, so an object held by contact alone
+    is better met at its own width. Giskard is given the distance between the fingertips
+    as the goal and finds the joint positions that realise it, which is what keeps this
+    independent of how a gripper's fingers are driven.
+
+    ..note:: This only means anything where something pushes back. Where the world is
+        moved kinematically a held object hangs off the tool frame however the fingers
+        stand, and :class:`MoveGripperMotion` says what is meant more directly.
+    """
+
+    gripper: HasTwoFingers
+    """
+    The gripper whose fingers close.
+    """
+
+    width: float
+    """
+    How far apart the fingertips' facing surfaces are to stand, in metres.
+    """
+
+    squeeze: float = 0.0
+    """
+    How far past that width each fingertip is sent, in metres, so the fingers press into
+    an object rather than merely touching it.
+
+    Keep it small, since it is commanded penetration into a body that does not yield.
+    """
+
+    threshold: float = 0.0005
+    """
+    How close, in metres, the fingertips have to come to the goal for the motion to
+    count as done: well under a squeeze, so the squeeze is not lost to the tolerance.
+    """
+
+    def perform(self):
+        return
+
+    @property
+    def _motion_chart(self) -> Task:
+        execution_type = GiskardExecutable.execution_type
+        if execution_type is None or not execution_type.objects_push_back:
+            raise FingerWidthNeedsPhysics(execution_type)
+        fingertips = self.gripper.fingertips
+        return CartesianPosition(
+            root_link=fingertips.finger,
+            tip_link=fingertips.thumb,
+            goal_point=fingertips.finger_P_thumb(
+                max(0.0, self.width - 2 * self.squeeze)
+            ),
+            name="MoveFingersToWidth",
+            threshold=self.threshold,
+        )
+
+
+@dataclass
 class MoveToolCenterPointMotion(
     BaseMotion, CartesianVelocityLimitParameters, HasTcpGoalThresholds
 ):
@@ -198,7 +185,7 @@ class MoveToolCenterPointMotion(
     Target pose to which the TCP should be moved.
     """
 
-    arm: Arms
+    arm: Arm
     """
     Arm with the TCP that should be moved to the target.
     """
@@ -246,7 +233,7 @@ class MoveToolCenterPointMotion(
 
     @property
     def _motion_chart(self):
-        tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
+        tip = self.arm.end_effector.tool_frame
         root = (
             self.world.root
             if isinstance(self.robot, HasMobileBase)
@@ -257,7 +244,7 @@ class MoveToolCenterPointMotion(
             task = CartesianPosition(
                 root_link=root,
                 tip_link=tip,
-                goal_point=self.target.to_position(),
+                goal_point=self.target.position,
                 name="MoveTCP",
                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                 threshold=self.resolved_position_threshold(),
@@ -275,9 +262,10 @@ class MoveToolCenterPointMotion(
         accompanying_nodes: List[MotionStatechartNode] = list(
             self._velocity_limit_nodes(root, tip)
         )
+        accompanying_nodes.extend(self.keep_base_still())
         if self.allow_gripper_collision:
             accompanying_nodes.extend(
-                self._only_allow_gripper_collision_rules(self.arm)
+                self._only_allow_gripper_collision_rules(self.arm.end_effector)
             )
         if not accompanying_nodes:
             return task
@@ -295,7 +283,7 @@ class MoveTCPWaypointsMotion(BaseMotion, HasTcpGoalThresholds):
     Waypoints the TCP should move along.
     """
 
-    arm: Arms
+    arm: Arm
     """
     Arm with the TCP that should be moved to the target.
     """
@@ -317,7 +305,7 @@ class MoveTCPWaypointsMotion(BaseMotion, HasTcpGoalThresholds):
 
     @property
     def _motion_chart(self):
-        tip = ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
+        tip = self.arm.end_effector.tool_frame
         root = (
             self.world.root
             if isinstance(self.robot, HasMobileBase)
@@ -336,7 +324,11 @@ class MoveTCPWaypointsMotion(BaseMotion, HasTcpGoalThresholds):
             )
             for pose in self.waypoints
         ]
-        return Sequence(nodes=nodes)
+        waypoints = Sequence(nodes=nodes)
+        hold_base = self.keep_base_still()
+        if not hold_base:
+            return waypoints
+        return Parallel([waypoints, *hold_base])
 
 
 @dataclass
@@ -351,7 +343,7 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion, HasTcpGoalThresholds):
     Waypoints the TCP should move along.
     """
 
-    arm: Arms
+    arm: Arm
     """
     Arm with the TCP that should be moved along the waypoints.
     """
@@ -384,9 +376,7 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion, HasTcpGoalThresholds):
         """
         if self.tip is not None:
             return self.tip
-        tool_frame = (
-            ViewManager().get_end_effector_view(self.arm, self.robot).tool_frame
-        )
+        tool_frame = self.arm.end_effector.tool_frame
         if tool_frame is None:
             raise MissingToolFrame(self.arm, self.robot)
         return tool_frame
@@ -440,10 +430,11 @@ class MoveTCPWaypointsAlignedMotion(BaseMotion, HasTcpGoalThresholds):
         if isinstance(self.robot, Justin):
             tasks.append(self._upright_torso_task(tip_link, root_link))
         motion_statechart_nodes = (
-            self._only_allow_gripper_collision_rules(self.arm)
+            self._only_allow_gripper_collision_rules(self.arm.end_effector)
             if self.allow_gripper_collision
             else []
         )
+        motion_statechart_nodes.extend(self.keep_base_still())
         motion_statechart_nodes.append(Parallel(tasks))
         return Parallel(motion_statechart_nodes)
 
@@ -487,4 +478,7 @@ class MoveManipulatorMotion(BaseMotion, HasTcpGoalThresholds):
             binding_policy=GoalBindingPolicy.Bind_on_start,
             name=self.__class__.__name__,
         )
-        return task
+        hold_base = self.keep_base_still()
+        if not hold_base:
+            return task
+        return Parallel([task, *hold_base])

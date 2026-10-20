@@ -13,7 +13,7 @@ from robokudo.annotators.semdt_segmented_objects import SegmentedObjectAnnotator
 from robokudo.descriptors.analysis_engines.semdt_raytracer_tabletop_query_demo import (
     AnalysisEngine,
 )
-from robokudo.descriptors.camera_configs.config_semdt_raytracer import (
+from robokudo.descriptors.camera_configs.config_ray_tracing import (
     RuntimeRobotWorldSource,
 )
 

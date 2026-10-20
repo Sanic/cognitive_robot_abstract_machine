@@ -14,6 +14,7 @@ The module provides:
 * Timestamp management
 """
 
+# %% Imports
 from __future__ import annotations
 
 import copy
@@ -23,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 
 import numpy as np
-import open3d as o3d
+import open3d
 from typing_extensions import (
     TYPE_CHECKING,
     Any,
@@ -35,7 +36,11 @@ from typing_extensions import (
     TypeVar,
 )
 
-from robokudo.exceptions import CameraObservationMissing
+from robokudo.exceptions import (
+    CameraObservationMissing,
+    ColorToDepthRatioMissing,
+    PointCloudCameraModelMissing,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
@@ -44,9 +49,13 @@ if TYPE_CHECKING:
     from robokudo.types.core import Annotation
     from robokudo.types.camera import CameraObservation
 
+    from robokudo.types.cv import ColorToDepthRatio
 
+
+# %% View definitions
 class CASViews(StrEnum):
-    """Standard view definitions for the Common Analysis Structure.
+    """
+    Standard view definitions for the Common Analysis Structure.
 
     This class defines the standard keys used to store and access different types
     of data in the CAS. These keys ensure consistent access to common data types
@@ -54,43 +63,61 @@ class CASViews(StrEnum):
     """
 
     COLOR_IMAGE = "color_image"
-    """RGB image data"""
+    """
+    RGB image data
+    """
 
     DEPTH_IMAGE = "depth_image"
-    """Depth image data"""
+    """
+    Depth image data
+    """
 
-    COLOR2DEPTH_RATIO = "color2depth_ratio"
-    """Scale factor to scale the `COLOR_IMAGE` to the resolution of the `DEPTH_IMAGE` in x, y format.
-    
-    Example: 1280x960 RGB, 640x480 DEPTH -> 0.5 along X and Y
+    COLOR_TO_DEPTH_RATIO = "color_to_depth_ratio"
+    """
+    Size of the :attr:`DEPTH_IMAGE` relative to the :attr:`COLOR_IMAGE`, as a
+    :class:`~robokudo.types.cv.ColorToDepthRatio`.
     """
 
     CAMERA_OBSERVATION = "camera_observation"
-    """Semantic camera and effective projection metadata for the current frame."""
+    """
+    Semantic camera and effective projection metadata for the current frame.
+    """
 
     POINTCLOUD_CAMERA_MODEL = "pointcloud_camera_model"
-    """Effective pinhole model used to generate the current point cloud."""
+    """
+    Effective pinhole model used to generate the current point cloud.
+    """
 
     CLOUD = "cloud"
-    """Point cloud data"""
+    """
+    Point cloud data
+    """
 
     QUERY = "query"
-    """Query information"""
+    """
+    Query information
+    """
 
     CAS_ID = "cas_id"
-    """Monotonic ID of the CAS instance within a single pipeline run.
+    """
+    Monotonic ID of the CAS instance within a single pipeline run.
     type: Int
     """
 
     OBJECT_IMAGE = "object_image"
-    """Object image data. This view is used in imagistic reasoning pipelines where a 
-    rendered scene can be fully segmented per object."""
+    """
+    Object image data. This view is used in imagistic reasoning pipelines where a
+    rendered scene can be fully segmented per object.
+    """
 
     OBJECT_COLOR_MAP = "object_color_map"
-    """Object color mapping data which assigns objects visible in OBJECT_IMAGE to entity names."""
+    """
+    Object color mapping data which assigns objects visible in OBJECT_IMAGE to entity names.
+    """
 
     GROUND_TRUTH_WORLD_REFERENCE = "ground_truth_world_ref"
-    """Read-only reference to the SemDT ground-truth world used for this CAS frame.
+    """
+    Read-only reference to the SemDT ground-truth world used for this CAS frame.
 
     This view is intended for in-process consumers only and should be written
     by producers via `CAS.set_ref(...)` to avoid deep-copying the world object.
@@ -98,9 +125,11 @@ class CASViews(StrEnum):
     """
 
 
+# %% Common analysis structure
 @dataclass
 class CAS:
-    """The main data representation in RoboKudo.
+    """
+    The main data representation in RoboKudo.
 
     This class provides the central data structure used by annotators to store and
     retrieve information. Each pipeline has its own CAS instance that maintains
@@ -112,14 +141,19 @@ class CAS:
     """
 
     timestamp: float = field(default_factory=time.time_ns)
-    """Unix timestamp when this CAS was created. In Nanoseconds since Epoch."""
+    """
+    Unix timestamp when this CAS was created. In Nanoseconds since Epoch.
+    """
 
     timestamp_readable: str = field(init=False)
-    """Human readable timestamp string."""
+    """
+    Human readable timestamp string.
+    """
 
     views: Dict[str, Any] = field(default_factory=dict)
-    """Dictionary storing view data, each view stores data that is typically singular for a single CAS.
-    
+    """
+    Dictionary storing view data, each view stores data that is typically singular for a single CAS.
+
     Example: Sensor data, a camera observation, and a point cloud.
     """
 
@@ -152,25 +186,38 @@ class CAS:
         self.views[CASViews.DEPTH_IMAGE] = value
 
     @property
-    def color2depth_ratio(self) -> Optional[Tuple[float, float]]:
-        return self.views.get(CASViews.COLOR2DEPTH_RATIO)
+    def color_to_depth_ratio(self) -> ColorToDepthRatio:
+        """
+        Return required color-to-depth scaling.
 
-    @color2depth_ratio.setter
-    def color2depth_ratio(self, value: Tuple[float, float]) -> None:
-        self.views[CASViews.COLOR2DEPTH_RATIO] = value
+        :raises ColorToDepthRatioMissing: If scaling is absent or unset.
+        """
+        ratio = self.views.get(CASViews.COLOR_TO_DEPTH_RATIO)
+        if ratio is None:
+            raise ColorToDepthRatioMissing()
+        return ratio
+
+    @color_to_depth_ratio.setter
+    def color_to_depth_ratio(self, value: ColorToDepthRatio | None) -> None:
+        self.views[CASViews.COLOR_TO_DEPTH_RATIO] = value
 
     @property
     def camera_observation(self) -> Optional[CameraObservation]:
-        """Return the semantic camera metadata for the current frame."""
+        """
+        Return the semantic camera metadata for the current frame.
+        """
         return self.views.get(CASViews.CAMERA_OBSERVATION)
 
     @camera_observation.setter
     def camera_observation(self, value: CameraObservation) -> None:
-        """Store camera metadata by reference to preserve semantic identity."""
+        """
+        Store camera metadata by reference to preserve semantic identity.
+        """
         self.views[CASViews.CAMERA_OBSERVATION] = value
 
     def require_camera_observation(self) -> CameraObservation:
-        """Return camera metadata required by frame-dependent processing.
+        """
+        Return camera metadata required by frame-dependent processing.
 
         :return: Camera observation for the current frame.
         :raises CameraObservationMissing: If no camera interface supplied metadata.
@@ -181,21 +228,30 @@ class CAS:
         return observation
 
     @property
-    def pointcloud_camera_model(self) -> Optional[PinholeCameraModel]:
-        """Return the calibration used to generate the current point cloud."""
-        return self.views.get(CASViews.POINTCLOUD_CAMERA_MODEL)
+    def pointcloud_camera_model(self) -> PinholeCameraModel:
+        """
+        Return the calibration required for the current point cloud.
+
+        :raises PointCloudCameraModelMissing: If point cloud calibration is absent.
+        """
+        camera_model = self.views.get(CASViews.POINTCLOUD_CAMERA_MODEL)
+        if camera_model is None:
+            raise PointCloudCameraModelMissing()
+        return camera_model
 
     @pointcloud_camera_model.setter
     def pointcloud_camera_model(self, value: PinholeCameraModel) -> None:
-        """Store the calibration used to generate the current point cloud."""
+        """
+        Store the calibration used to generate the current point cloud.
+        """
         self.views[CASViews.POINTCLOUD_CAMERA_MODEL] = value
 
     @property
-    def cloud(self) -> Optional[o3d.geometry.PointCloud]:
+    def cloud(self) -> Optional[open3d.geometry.PointCloud]:
         return self.views.get(CASViews.CLOUD)
 
     @cloud.setter
-    def cloud(self, value: o3d.geometry.PointCloud) -> None:
+    def cloud(self, value: open3d.geometry.PointCloud) -> None:
         self.views[CASViews.CLOUD] = value
 
     @property
@@ -223,7 +279,8 @@ class CAS:
         self.views[CASViews.GROUND_TRUTH_WORLD_REFERENCE] = value
 
     def get(self, view_name: str) -> Any:
-        """Get a view by name.
+        """
+        Get a view by name.
 
         :param view_name: Name of the view to retrieve
         :return: The view data
@@ -232,7 +289,8 @@ class CAS:
         return self.views[view_name]
 
     def contains(self, view_name: str) -> bool:
-        """Check if a view exists.
+        """
+        Check if a view exists.
 
         :param view_name: Name of the view to check
         :return: True if the view exists
@@ -240,7 +298,8 @@ class CAS:
         return view_name in self.views
 
     def get_copy(self, view_name: str) -> Any:
-        """Get a deep copy of a view.
+        """
+        Get a deep copy of a view.
 
         :param view_name: Name of the view to copy
         :return: Deep copy of the view data
@@ -249,7 +308,8 @@ class CAS:
         return copy.deepcopy(self.views[view_name])
 
     def set(self, view_name: str, value: Any) -> None:
-        """Put data in the CAS index by a given view name. This method will make a deepcopy of value.
+        """
+        Put data in the CAS index by a given view name. This method will make a deepcopy of value.
 
         :param view_name: The name of the view which should be selected from constants in the CASView class.
         :param value: The value that will be placed in the CAS under view_name by making a deepcopy of it.
@@ -257,7 +317,8 @@ class CAS:
         self.views[view_name] = copy.deepcopy(value)
 
     def set_ref(self, view_name: str, value: Any) -> None:
-        """Put data in the CAS index by a given view name. In contrast to set(), this will not make a copy but just
+        """
+        Put data in the CAS index by a given view name. In contrast to set(), this will not make a copy but just
         does an assignment.
 
         :param view_name: The name of the view which should be selected from constants in the CASView class.
@@ -269,7 +330,8 @@ class CAS:
 
     @staticmethod
     def filter_by_type(type_to_include: Type[T], input_list: List[Any]) -> List[T]:
-        """Filter a list to include only objects of a specific type.
+        """
+        Filter a list to include only objects of a specific type.
 
         :param type_to_include: Type to filter for
         :param input_list: List to filter
@@ -330,7 +392,8 @@ class CAS:
         input_list: List[Any],
         criteria: Dict[str, Tuple[str, Any]],
     ) -> List[Any]:
-        """Filters a list of objects based on specified criteria. Objects must be of type 'type_to_include'
+        """
+        Filters a list of objects based on specified criteria. Objects must be of type 'type_to_include'
 
         :param type_to_include: All the returned objects must be of this type.
         :param input_list: List of objects to be filtered.

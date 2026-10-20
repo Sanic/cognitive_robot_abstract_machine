@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+# %% Imports
 from timeit import default_timer
 
 import numpy as np
-from builtin_interfaces.msg import Time
+from rclpy.time import Time
 from py_trees.common import Status
 from scipy.optimize import linear_sum_assignment
 
@@ -146,9 +147,8 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
             if world_T_camera.reference_frame is not None:
                 stamped_pose.frame = str(world_T_camera.reference_frame.name)
             stamped_pose.timestamp = Time(
-                sec=int(observation.timestamp_nanoseconds // 1_000_000_000),
-                nanosec=int(observation.timestamp_nanoseconds % 1_000_000_000),
-            )
+                nanoseconds=observation.timestamp_nanoseconds
+            ).to_msg()
 
             object_hypothesis.annotations.append(stamped_pose)
 
@@ -265,16 +265,20 @@ class SemanticDigitalTwinConnector(ThreadedAnnotator):
             return
 
         visualization_img = cas.get_copy(CASViews.COLOR_IMAGE)
-        object_hypotheses = [oh for oh, _ in associated_hypotheses]
+        object_hypotheses = [
+            object_hypothesis for object_hypothesis, _ in associated_hypotheses
+        ]
         labels_by_hypothesis_id = {
-            id(oh): self.get_object_belief_label(object_belief)
-            for oh, object_belief in associated_hypotheses
+            id(object_hypothesis): self.get_object_belief_label(object_belief)
+            for object_hypothesis, object_belief in associated_hypotheses
         }
 
         draw_bounding_boxes_from_object_hypotheses(
             visualization_img,
             object_hypotheses,
-            lambda oh: labels_by_hypothesis_id.get(id(oh), "unassociated"),
+            lambda object_hypothesis: labels_by_hypothesis_id.get(
+                id(object_hypothesis), "unassociated"
+            ),
         )
         self.get_annotator_output_struct().set_image(visualization_img)
 

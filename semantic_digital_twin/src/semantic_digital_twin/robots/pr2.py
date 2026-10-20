@@ -1,12 +1,19 @@
+from __future__ import annotations
+
+# %% Imports
 import os
+from abc import ABC
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
-from typing import Self, List
+from typing_extensions import Self
+
+from typing_extensions import Dict, Generic
 
 from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -24,12 +31,17 @@ from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraM
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasNeck,
+    HasLidar,
     HasLeftRightArm,
     HasTorso,
     HasMobileBase,
     HasTwoFingers,
+    TGenericEndEffector,
+    TGenericLeftFinger,
+    TGenericRightFinger,
 )
 from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
@@ -41,14 +53,35 @@ from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     EndEffector,
 )
-from semantic_digital_twin.spatial_types import Quaternion, Vector3
+from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.world_description.connection_properties import (
+    DriveServos,
+    JointServo,
+    ServoGains,
+    VelocityServoGains,
+)
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
+    ActiveConnection1DOF,
     OmniDrive,
 )
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+# %% Robot parts
+
+
+class PR2Topic(StrEnum):
+    """
+    Topics the PR2 publishes the state of its parts on, where it does not follow the
+    conventional name.
+    """
+
+    ODOMETRY = "odom"
+    """
+    The topic the mobile base reports its odometry on.
+    """
 
 
 class PR2Joint(StrEnum):
@@ -87,30 +120,113 @@ class PR2Joint(StrEnum):
     RIGHT_GRIPPER_RIGHT_FINGER = "r_gripper_r_finger_joint"
 
 
+# %% what drives the PR2 in a physical simulation
+
+
+@dataclass(frozen=True)
+class PR2JointDrive:
+    """
+    What drives one joint of the PR2 in a physical simulation.
+
+    The values are not taken from the real robot; they are tuned for the simulated joint
+    to follow its commanded position.
+    """
+
+    torque_limit: float
+    """
+    The largest torque, or force, the servo may exert.
+    """
+
+    stiffness: float
+    """
+    How hard the servo pulls towards its commanded position.
+    """
+
+    damping: float
+    """
+    How hard the servo resists the joint's velocity.
+    """
+
+    armature: float
+    """
+    The rotor inertia reflected through the gearbox.
+    """
+
+    def servo_for(self, connection: ActiveConnection1DOF) -> JointServo:
+        """
+        :param connection: The joint to drive.
+        :return: The servo driving the joint, which keeps the passive dynamics the
+            description gives the joint.
+        """
+        return JointServo(
+            gains=ServoGains(
+                stiffness=self.stiffness,
+                damping=self.damping,
+                torque_limit=self.torque_limit,
+            ),
+            dynamics=replace(connection.dynamics, armature=self.armature),
+        )
+
+
 @dataclass(eq=False)
 class PR2KinectV1(RobotCamera):
+    """
+    Kinect V1 camera attached to its RGB optical frame.
+    """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
+        """
+        Attach the camera to the Kinect RGB optical frame below the robot root.
+
+        :param robot_root: Root of the robot branch containing the optical frame.
+        :return: Camera configured for the model's optical frame.
+        """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "wide_stereo_optical_frame"
+                robot_root, "head_mount_kinect_rgb_optical_frame"
             ),
-            forward_facing_axis=Vector3.Z(),
             camera_model=FieldOfViewCameraModel(
-                view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049)
+                angular_extent=FieldOfView(
+                    horizontal_angle=0.99483, vertical_angle=0.75049
+                )
             ),
             minimal_height=1.27,
             maximal_height=1.60,
             default_camera=True,
+        )
+
+
+@dataclass(eq=False)
+class PR2BaseLidar(Lidar):
+    """
+    The Hokuyo scanner sweeping the floor in front of the PR2's base.
+    """
+
+    @classmethod
+    def with_source(
+        cls, robot_root: KinematicStructureEntity, source: LidarSource
+    ) -> Self:
+        return cls(
+            root=robot_root._world.get_body_in_branch_by_name(
+                robot_root, "base_laser_link"
+            ),
+            scan_pattern=ScanPattern(
+                minimum_angle=-2.2689,
+                maximum_angle=2.2689,
+                angle_increment=0.0043633,
+                minimum_range=0.023,
+                maximum_range=60.0,
+            ),
+            source=source,
         )
 
 
@@ -120,7 +236,7 @@ class PR2RightGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -143,7 +259,7 @@ class PR2RightGripperRightFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -166,7 +282,7 @@ class PR2LeftGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -189,7 +305,7 @@ class PR2LeftGripperRightFinger(Finger):
     def setup_hardware_interfaces(self):
         return
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -207,11 +323,41 @@ class PR2LeftGripperRightFinger(Finger):
 
 
 @dataclass(eq=False)
+class PR2Gripper(
+    EndEffector,
+    HasTwoFingers[TGenericLeftFinger, TGenericRightFinger],
+    Generic[TGenericLeftFinger, TGenericRightFinger],
+    ABC,
+):
+    """
+    A gripper of the PR2: two fingers coupled by a mimic linkage, driven through the
+    joint of the thumb.
+    """
+
+    @property
+    def finger_drive(self) -> PR2JointDrive:
+        """
+        What drives the joint of the thumb, and with it every finger joint that follows
+        it.
+        """
+        return PR2JointDrive(
+            torque_limit=5.0, stiffness=50.0, damping=5.0, armature=0.05
+        )
+
+    def _setup_servos(self) -> None:
+        thumb_degree_of_freedom = self.thumb.root.parent_connection.raw_dof
+        for connection in self.active_connections:
+            if connection.raw_dof is not thumb_degree_of_freedom:
+                continue
+            self._declare_servo(connection, self.finger_drive.servo_for(connection))
+
+
+@dataclass(eq=False)
 class PR2RightGripper(
-    EndEffector, HasTwoFingers[PR2RightGripperLeftFinger, PR2RightGripperRightFinger]
+    PR2Gripper[PR2RightGripperLeftFinger, PR2RightGripperRightFinger]
 ):
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         right_gripper_joints = self.active_connections
 
         right_gripper_open = JointState.from_mapping(
@@ -231,6 +377,14 @@ class PR2RightGripper(
     def setup_hardware_interfaces(self):
         return
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -242,16 +396,13 @@ class PR2RightGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "r_gripper_tool_frame"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
 
 @dataclass(eq=False)
-class PR2LeftGripper(
-    EndEffector, HasTwoFingers[PR2LeftGripperLeftFinger, PR2LeftGripperRightFinger]
-):
+class PR2LeftGripper(PR2Gripper[PR2LeftGripperLeftFinger, PR2LeftGripperRightFinger]):
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         left_gripper_joints = self.active_connections
         left_gripper_open = JointState.from_mapping(
             name=PrefixedName("left_gripper_open", prefix=self.name.name),
@@ -267,6 +418,14 @@ class PR2LeftGripper(
 
         return [left_gripper_open, left_gripper_close]
 
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -278,7 +437,6 @@ class PR2LeftGripper(
             tool_frame=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "l_gripper_tool_frame"
             ),
-            front_facing_orientation=Quaternion(0, 0, 0, 1),
         )
 
     def setup_hardware_interfaces(self):
@@ -300,8 +458,27 @@ class PR2Neck(Neck[PR2KinectV1]):
             )
             connection.has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
+
+    @property
+    def drives_by_joint(self) -> Dict[PR2Joint, PR2JointDrive]:
+        """
+        What drives each joint of the neck.
+        """
+        return {
+            PR2Joint.HEAD_PAN: PR2JointDrive(
+                torque_limit=20.0, stiffness=200.0, damping=60.0, armature=0.5
+            ),
+            PR2Joint.HEAD_TILT: PR2JointDrive(
+                torque_limit=40.0, stiffness=400.0, damping=40.0, armature=0.5
+            ),
+        }
+
+    def _setup_servos(self) -> None:
+        for joint_name, drive in self.drives_by_joint.items():
+            connection = self._world.get_connection_by_name(joint_name)
+            self._declare_servo(connection, drive.servo_for(connection))
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -318,7 +495,46 @@ class PR2Neck(Neck[PR2KinectV1]):
 
 
 @dataclass(eq=False)
-class PR2LeftArm(Arm[PR2LeftGripper]):
+class PR2Arm(Arm[TGenericEndEffector], Generic[TGenericEndEffector], ABC):
+    """
+    An arm of the PR2.
+    """
+
+    @property
+    def drives_by_joint(self) -> Dict[str, PR2JointDrive]:
+        """
+        What drives each joint, keyed by the joint's name without the arm's
+        ``l_``/``r_`` prefix.
+
+        The shoulder, upper arm, elbow and forearm joints may exert more torque than the
+        two wrist joints, which carry only the gripper.
+        """
+        upper = PR2JointDrive(
+            torque_limit=100.0, stiffness=2000.0, damping=200.0, armature=0.5
+        )
+        wrist = PR2JointDrive(
+            torque_limit=30.0, stiffness=500.0, damping=30.0, armature=0.1
+        )
+        return {
+            "shoulder_pan_joint": upper,
+            "shoulder_lift_joint": upper,
+            "upper_arm_roll_joint": upper,
+            "elbow_flex_joint": upper,
+            "forearm_roll_joint": upper,
+            "wrist_flex_joint": wrist,
+            "wrist_roll_joint": wrist,
+        }
+
+    def _setup_servos(self) -> None:
+        for connection in self.active_connections:
+            unprefixed = connection.name.name.removeprefix("l_").removeprefix("r_")
+            self._declare_servo(
+                connection, self.drives_by_joint[unprefixed].servo_for(connection)
+            )
+
+
+@dataclass(eq=False)
+class PR2LeftArm(PR2Arm[PR2LeftGripper]):
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
@@ -336,7 +552,7 @@ class PR2LeftArm(Arm[PR2LeftGripper]):
             )
             connection.has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         left_arm_park = JointState.from_mapping(
             name=PrefixedName("left_park", prefix=self.name.name),
             mapping=dict(
@@ -367,13 +583,13 @@ class PR2LeftArm(Arm[PR2LeftGripper]):
                 robot_root, "torso_lift_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_wrist_roll_link"
+                robot_root, "l_force_torque_link"
             ),
         )
 
 
 @dataclass(eq=False)
-class PR2RightArm(Arm[PR2RightGripper]):
+class PR2RightArm(PR2Arm[PR2RightGripper]):
 
     def setup_hardware_interfaces(self):
         controlled_joints = [
@@ -391,7 +607,7 @@ class PR2RightArm(Arm[PR2RightGripper]):
             )
             connection.has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         right_arm_park = JointState.from_mapping(
             name=PrefixedName("right_park", prefix=self.name.name),
             mapping=dict(
@@ -443,7 +659,7 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
             )
             connection.has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections
         torso_low = JointState.from_mapping(
             name=PrefixedName("torso_low", prefix=self.name.name),
@@ -465,9 +681,29 @@ class PR2Torso(Torso, HasLeftRightArm[PR2LeftArm, PR2RightArm], HasNeck[PR2Neck]
 
         return [torso_low, torso_mid, torso_high]
 
+    @property
+    def lift_drive(self) -> PR2JointDrive:
+        """
+        What drives the torso lift joint, which carries the whole upper body.
+        """
+        return PR2JointDrive(
+            torque_limit=10000.0, stiffness=100000.0, damping=8000.0, armature=1.0
+        )
+
+    def _setup_servos(self) -> None:
+        connection = self._world.get_connection_by_name(PR2Joint.TORSO_LIFT)
+        self._declare_servo(connection, self.lift_drive.servo_for(connection))
+
 
 @dataclass(eq=False)
-class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
+class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseLidar]):
+
+    @classproperty
+    def topic_name(cls) -> str:
+        """
+        The topic the PR2 publishes the pose of its base on.
+        """
+        return PR2Topic.ODOMETRY
 
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -476,8 +712,27 @@ class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso]):
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
+
+    @property
+    def drive_servos(self) -> DriveServos:
+        """
+        Servos tuned for the base, which carries the whole robot, to follow its
+        commanded velocity; they are not taken from the real robot.
+        """
+        return DriveServos(
+            translation_gains=VelocityServoGains(damping=20000.0, torque_limit=10000.0),
+            rotation_gains=VelocityServoGains(damping=5000.0, torque_limit=5000.0),
+        )
+
+    def _setup_servos(self) -> None:
+        """
+        Declare the drive's servos, see :meth:`MobileBase._setup_servos`, and let a
+        physical simulation carry the weight of every body standing on the base.
+        """
+        super()._setup_servos()
+        self._compensate_gravity()
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(

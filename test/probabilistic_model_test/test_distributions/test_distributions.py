@@ -175,8 +175,9 @@ class SymbolicDistributionTestCase(unittest.TestCase):
         self.assertEqual(prob, 1)
 
     def test_likelihood_survives_a_category_whose_hash_exceeds_the_modulus(self):
-        """A category still scores its true probability when its Python `hash()`
-        falls outside `sys.hash_info.modulus`.
+        """
+        A category still scores its true probability when its Python `hash()` falls
+        outside `sys.hash_info.modulus`.
 
         `probabilities` is keyed by `hash(category)`; `log_likelihood` used to hash
         that already-hashed key a second time. `int.__hash__` reduces any value
@@ -247,6 +248,31 @@ class DiracDeltaDistributionTestCase(unittest.TestCase):
         conditional, probability = self.model.truncated(event)
         self.assertIsNone(conditional)
         self.assertEqual(0, probability)
+
+    def test_truncating_to_its_own_support_keeps_the_distribution(self):
+        """
+        An interval holds its bounds with less precision than a location, so the support
+        of a Dirac delta does not hold its own location exactly.
+
+        Truncating to that support still has to keep the distribution, the way
+        ``probability`` already counts it.
+        """
+        distribution = DiracDeltaDistribution(
+            variable=self.x, location=3.427709925174713
+        )
+        support = distribution.univariate_support
+        self.assertNotEqual(support.simple_sets[0].lower, distribution.location)
+        self.assertEqual(
+            distribution.probability(
+                SimpleEvent.from_data({self.x: support}).as_composite_set()
+            ),
+            1.0,
+        )
+        truncated, probability = distribution.truncated(
+            SimpleEvent.from_data({self.x: support}).as_composite_set()
+        )
+        self.assertEqual(truncated, distribution)
+        self.assertEqual(probability, 1.0)
 
     def test_mode(self):
         mode, log_likelihood = self.model.univariate_log_mode()

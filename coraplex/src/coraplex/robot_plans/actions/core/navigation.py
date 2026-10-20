@@ -4,14 +4,13 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Optional, Any, Dict
 
-from coraplex.config.action_conf import ActionConfig
 from coraplex.datastructures.dataclasses import Context
 from coraplex.exceptions import NoFloorBelowRobot, NotOnASingleLevelException
 from coraplex.plans.attachment_nodes import ReAttachNode
 from coraplex.plans.factories import execute_single, pause_until, sequential
 from coraplex.plans.plan_node import PlanNode
 from coraplex.robot_plans.actions.base import ActionDescription
-from coraplex.robot_plans.motions.navigation import MoveMotion
+from coraplex.robot_plans.motions.navigation import MoveMotion, TurnMotion
 from coraplex.robot_plans.motions.robot_body import LookingMotion
 from giskardpy.motion_statechart.goals.templates import Parallel
 from giskardpy.motion_statechart.monitors.joint_monitors import (
@@ -19,6 +18,7 @@ from giskardpy.motion_statechart.monitors.joint_monitors import (
 )
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import variable_from, and_, ConditionType
+from semantic_digital_twin.exceptions import MissingMovableJointError
 from semantic_digital_twin.reasoning.predicates import allclose, InsideOf
 from semantic_digital_twin.reasoning.robot_predicates import is_pose_free_for_robot
 from semantic_digital_twin.robots.robot_parts import Camera
@@ -50,18 +50,10 @@ class NavigateAction(ActionDescription):
     x-axis.
     """
 
-    keep_joint_states: bool = ActionConfig.navigate_keep_joint_states
-    """
-    Keep the joint states of the robot the same during the navigation.
-    """
-
     @property
     def _action_plan(self) -> PlanNode:
         return execute_single(
-            MoveMotion(
-                self.robot.mobile_base.pose_facing(self.target_location),
-                self.keep_joint_states,
-            )
+            MoveMotion(self.robot.mobile_base.pose_facing(self.target_location))
         )
 
     @staticmethod
@@ -115,6 +107,22 @@ class LookAtAction(ActionDescription):
 
 
 @dataclass
+class FaceAtAction(ActionDescription):
+    """
+    Turns the robot's base on the spot until its front faces a target.
+    """
+
+    target: Pose
+    """
+    What to face; only its horizontal position matters.
+    """
+
+    @property
+    def _action_plan(self) -> PlanNode:
+        return execute_single(TurnMotion(self.target))
+
+
+@dataclass
 class PathPlanningNavigateAction(ActionDescription):
     """
     Navigates the robot to a pose along a path through the environment's free space.
@@ -122,8 +130,8 @@ class PathPlanningNavigateAction(ActionDescription):
     The free space is decomposed into a graph of convex sets, so the robot drives around
     the furniture and walls between it and the target instead of straight at them.
 
-
-    This works for obstacles which are known in the environment beforehand not such that are added during navigation.
+    This works for obstacles which are known in the environment beforehand, not for
+    those added during navigation.
     """
 
     target: Pose
@@ -213,7 +221,7 @@ class PathPlanningNavigateAction(ActionDescription):
                     reference_frame=waypoint.reference_frame,
                 ),
                 reference_frame=waypoint.reference_frame,
-            ).to_pose()
+            ).pose
             for waypoint, next_waypoint in zip(waypoints[1:], waypoints[2:])
         ]
         return poses + [self.target]
@@ -338,18 +346,21 @@ class ElevatorNavigation(ActionDescription):
         """
         nodes = []
         for door in self.elevator.doors:
-            connection = door.mechanical_joint.root.parent_connection
+            if door.movable_joint is None:
+                raise MissingMovableJointError(door)
             nodes.append(
                 JointPositionReached(
-                    connection=connection,
-                    position=connection.dof.limits.upper.position,
+                    connection=door.movable_joint,
+                    position=door.movable_joint.dof.limits.upper.position,
                     threshold=self.arrival_threshold,
                     name=f"{door.name}Open",
                 )
             )
+        if self.elevator.movable_joint is None:
+            raise MissingMovableJointError(self.elevator)
         nodes.append(
             JointPositionReached(
-                connection=self.elevator.mechanical_joint.root.parent_connection,
+                connection=self.elevator.movable_joint,
                 position=self.elevator.drive_position_for_floor(target_floor),
                 threshold=self.arrival_threshold,
                 name="ElevatorAtTargetFloor",

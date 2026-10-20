@@ -1,0 +1,5 @@
+# A project declaring one dependency the suite's own environment has installed, then one
+# no environment can have, so a check reports the second and not the first.
+[project]
+name = "basstler"
+dependencies = ["pytest>=1", "no-such-distribution-exists>=2"]

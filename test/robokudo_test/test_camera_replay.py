@@ -2,9 +2,11 @@
 Verify camera replay from a full recorded semantic world.
 """
 
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass, replace
-from typing import Any
+from typing_extensions import Any
 from unittest.mock import Mock
 
 import numpy as np
@@ -13,10 +15,11 @@ import pytest
 from robokudo import world as rk_world
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_mongodb_playback import MongoReplayMode
-from robokudo.exceptions import InvalidCameraObservation
+from robokudo.exceptions import InvalidCameraObservation, CameraObservationMissing
 from robokudo.io.cas_view_codecs import CameraObservationCodec, ViewPayload
 from robokudo.io.sensor_world import SensorWorldProjector
 from robokudo.io.storage import Storage, StorageDocumentField
+from robokudo.io.exceptions import RecordedViewMissing
 from robokudo.io.storage_reader_interface import StorageReaderInterface
 from robokudo.types.camera import CameraObservation
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
@@ -33,7 +36,7 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -48,7 +51,9 @@ class RecordedScene:
     """
 
     world: World
-    """Recorded semantic world."""
+    """
+    Recorded semantic world.
+    """
 
     observation: CameraObservation
     """
@@ -56,7 +61,9 @@ class RecordedScene:
     """
 
     source_root: Body
-    """Recorded world root outside the direct camera pose."""
+    """
+    Recorded world root outside the direct camera pose.
+    """
 
     inferred_body: Body
     """
@@ -92,9 +99,9 @@ def _recorded_scene(
     camera = Camera(
         name=PrefixedName(name="recorded_camera"),
         root=camera_root,
-        forward_facing_axis=Vector3.Z(),
         camera_model=FieldOfViewCameraModel(
-            view=FieldOfView(), image_resolution=effective_model.resolution
+            angular_extent=FieldOfView(),
+            image_resolution=effective_model.resolution,
         ),
         camera_range=CameraRange(minimum_distance=0.2, maximum_distance=12.0),
         modalities=(CameraModality.COLOR, CameraModality.DEPTH),
@@ -154,7 +161,7 @@ def _snapshot(world: World) -> dict[str, Any]:
 # %% Sensor projection
 
 
-def test_sensor_world_projection_excludes_inferred_entities():
+def test_sensor_world_projection_excludes_inferred_entities() -> None:
     """
     Keep camera IDs and a direct pose while omitting unrelated world branches.
     """
@@ -173,7 +180,7 @@ def test_sensor_world_projection_excludes_inferred_entities():
     assert sensor_world.get_bodies_by_name(scene.inferred_body.name) == []
 
 
-def test_full_snapshot_replays_only_camera_context():
+def test_full_snapshot_replays_only_camera_context() -> None:
     """
     Restore a full snapshot temporarily and keep only its sensor context.
     """
@@ -203,8 +210,8 @@ def test_full_snapshot_replays_only_camera_context():
     assert replayed.camera.camera_range == scene.observation.camera.camera_range
     assert tuple(replayed.camera.modalities) == scene.observation.camera.modalities
     np.testing.assert_array_equal(
-        replayed.camera.forward_facing_axis.to_np(),
-        scene.observation.camera.forward_facing_axis.to_np(),
+        replayed.camera.viewing_direction.to_np(),
+        scene.observation.camera.viewing_direction.to_np(),
     )
     assert replayed.effective_camera_model == scene.observation.effective_camera_model
     assert replayed.world_T_camera.child_frame is replayed.camera.root
@@ -216,7 +223,7 @@ def test_full_snapshot_replays_only_camera_context():
     assert reasoning_world.get_bodies_by_name(scene.source_root.name) == []
 
 
-def test_replay_resolves_leading_slash_pose_frame_alias():
+def test_replay_resolves_leading_slash_pose_frame_alias() -> None:
     """
     Replay a TF pose whose frame omits the camera root's leading slash.
     """
@@ -253,7 +260,7 @@ def test_replay_resolves_leading_slash_pose_frame_alias():
 
 
 @pytest.mark.parametrize("pose_frame_alias", [False, True])
-def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool):
+def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool) -> None:
     """
     Apply a new sampled pose without replacing the projected camera.
     """
@@ -295,7 +302,7 @@ def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool):
     )
 
 
-def test_missing_pose_merges_camera_into_existing_world():
+def test_missing_pose_merges_camera_into_existing_world() -> None:
     """
     Attach an unposed recorded camera without restoring recorded objects.
     """
@@ -317,7 +324,7 @@ def test_missing_pose_merges_camera_into_existing_world():
     assert reasoning_world.get_bodies_by_name(scene.inferred_body.name) == []
 
 
-def test_camera_pose_child_must_match_camera_root():
+def test_camera_pose_child_must_match_camera_root() -> None:
     """
     Reject a sampled pose for a different sensor frame.
     """
@@ -334,7 +341,7 @@ def test_camera_pose_child_must_match_camera_root():
         ).project()
 
 
-def test_camera_pose_requires_a_reference_frame():
+def test_camera_pose_requires_a_reference_frame() -> None:
     """
     Reject a pose whose target frame cannot be represented in the sensor world.
     """
@@ -348,7 +355,7 @@ def test_camera_pose_requires_a_reference_frame():
 # %% Reader behavior
 
 
-def test_storage_reader_keeps_camera_identity_in_cas():
+def test_storage_reader_keeps_camera_identity_in_cas() -> None:
     """
     Keep the world camera instance when transferring decoded views into a CAS.
     """
@@ -377,7 +384,7 @@ def test_storage_reader_keeps_camera_identity_in_cas():
     assert cas.require_camera_observation().camera is scene.observation.camera
 
 
-def test_sensor_replay_skips_recorded_nonsensor_views():
+def test_sensor_replay_skips_recorded_nonsensor_views() -> None:
     """
     Fetch only selected sensor views from a recorded frame.
     """
@@ -404,7 +411,7 @@ def test_sensor_replay_skips_recorded_nonsensor_views():
     collection.find_one.assert_called_once_with({"_id": 1})
 
 
-def test_explicit_full_world_replay_restores_recorded_objects():
+def test_explicit_full_world_replay_restores_recorded_objects() -> None:
     """
     Restore inferred entities only when full-world playback is selected.
     """
@@ -451,3 +458,95 @@ def test_explicit_full_world_replay_restores_recorded_objects():
         )
     )
     assert cas.contains(CASViews.QUERY)
+
+
+# %% Projection isolation
+
+
+@pytest.mark.parametrize("pose_frame_alias", [False, True])
+def test_sensor_projection_copies_camera_data_and_sampled_pose(
+    pose_frame_alias: bool,
+) -> None:
+    """
+    Projection preserves the sampled optical pose without sharing camera calibration.
+    """
+    scene = _recorded_scene(pose_frame_alias=pose_frame_alias)
+    projected_world = SensorWorldProjector(scene.observation).project()
+    projected_camera = projected_world.get_semantic_annotation_by_id(
+        scene.observation.camera.id
+    )
+    assert projected_camera is not scene.observation.camera
+    assert projected_camera.root is not scene.observation.camera.root
+    assert projected_camera.camera_model == scene.observation.camera.camera_model
+    assert projected_camera.camera_model is not scene.observation.camera.camera_model
+    np.testing.assert_allclose(
+        projected_camera.root.global_transform.to_np(),
+        scene.observation.world_T_camera.to_np(),
+        atol=1e-12,
+    )
+
+
+# %% Sensor replay input validation
+
+
+def test_sensor_replay_requires_recorded_camera_observation() -> None:
+    """
+    Sensor replay rejects a frame without a camera observation before reading storage.
+    """
+    reader = StorageReaderInterface.__new__(StorageReaderInterface)
+    reader.storage = Mock()
+    with pytest.raises(CameraObservationMissing):
+        reader._restore_sensor_world({StorageDocumentField.VIEW_IDS: {}})
+    reader.storage.load_view_document.assert_not_called()
+
+
+@pytest.mark.parametrize("conflicting_identity", [False, True])
+def test_sensor_replay_rejects_conflicting_camera_root_without_changing_world(
+    conflicting_identity: bool,
+) -> None:
+    """
+    A recorded camera cannot overwrite a runtime body sharing its identity or name.
+    """
+    scene = _recorded_scene()
+    root = scene.observation.camera.root
+    conflict = (
+        Body(name=PrefixedName(name="runtime_camera"), id=root.id)
+        if conflicting_identity
+        else Body(name=root.name)
+    )
+    rk_world.init_world_with_entity_tracker()
+    reasoning_world = rk_world.world_instance()
+    with reasoning_world.modify_world():
+        reasoning_world.add_body(conflict)
+    document = Storage.encode_view_document(
+        CASViews.CAMERA_OBSERVATION, scene.observation
+    )
+    reader = StorageReaderInterface.__new__(StorageReaderInterface)
+    reader.storage = Mock(load_view_document=Mock(return_value=document))
+    reader.rk_logger = Mock()
+    frame = {
+        StorageDocumentField.WORLD: json.dumps(_snapshot(scene.world)),
+        StorageDocumentField.VIEW_IDS: {CASViews.CAMERA_OBSERVATION: 1},
+    }
+    with pytest.raises(InvalidCameraObservation):
+        reader._restore_sensor_world(frame)
+    assert reasoning_world.bodies == [conflict]
+    assert reasoning_world.get_semantic_annotations_by_type(Camera) == []
+
+
+# %% Missing stored views
+
+
+def test_storage_reports_missing_view_document() -> None:
+    """
+    A broken recorded view reference raises a structured storage error.
+    """
+    storage = Storage.__new__(Storage)
+    collection = Mock()
+    collection.find_one.return_value = None
+    storage.db = {Storage.VIEW_COLLECTION_NAME: collection}
+    with pytest.raises(RecordedViewMissing):
+        storage.load_view_document(
+            {StorageDocumentField.VIEW_IDS: {CASViews.COLOR_IMAGE: 42}},
+            CASViews.COLOR_IMAGE,
+        )

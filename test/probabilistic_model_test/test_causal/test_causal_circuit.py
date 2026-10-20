@@ -347,7 +347,7 @@ def _build_unnormalized_circuit() -> tuple:
 def _build_shared_cause_subcircuit_circuit() -> tuple:
     """
     A DAG, not a tree: the SumUnit over the cause x is mounted as a shared child of two
-    different ProductUnits, matching the mounting pattern RSPN grounding uses when one
+    different ProductUnits, matching the mounting pattern relational grounding uses when one
     exchangeable instance is attached under several class-level product nodes.
 
         SumUnit(root)
@@ -753,7 +753,7 @@ class VerifySupportDeterminismSharedSubcircuitTestCase(unittest.TestCase):
     """
     A shared child (a node with more than one parent) must be visited once by
     _check_support_disjointness's traversal and its disjointness result attributed
-    correctly to every parent -- the pattern RSPN's exact-partition and Monte-Carlo
+    correctly to every parent -- the pattern the relational circuit's exact-partition and Monte-Carlo
     grounding both rely on when one grounded instance is mounted under several class-
     level product nodes.
     """
@@ -1715,15 +1715,14 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def _build_circuit_with_an_untruncatable_cause_region() -> tuple:
+def _build_circuit_with_a_rounded_cause_region() -> tuple:
     """
     Two equal-weight strata whose cause ``x`` is a Dirac point each, one of them at a
     value single precision cannot represent exactly.
 
-    A support region is read off the circuit in single precision, so truncating the
-    circuit back to the region misses the Dirac at ``0.2`` and yields nothing, while the
-    region at ``1.0`` truncates fine. Adjusting for ``z`` has to skip the former region
-    without leaving anything behind.
+    A support region is read off the circuit in single precision, so the region of the
+    Dirac at ``0.2`` does not hold that location exactly. Adjusting for ``z`` has to
+    intervene on it all the same, within the tolerance of the Dirac.
     """
     x, y, z = Continuous("x"), Continuous("y"), Continuous("z")
     circuit = ProbabilisticCircuit()
@@ -1751,17 +1750,15 @@ def _build_circuit_with_an_untruncatable_cause_region() -> tuple:
     return circuit, x, y, z
 
 
-class BackdoorAdjustmentSkippedRegionTestCase(unittest.TestCase):
+class BackdoorAdjustmentRoundedRegionTestCase(unittest.TestCase):
     """
-    A cause region that cannot be truncated to must be skipped without leaving a
-    dangling unit in the interventional circuit, which would give it several roots.
+    A cause region whose value an interval rounds must still be intervened on, and the
+    interventional circuit must have one root with one branch per cause region.
     """
 
     @classmethod
     def setUpClass(cls):
-        cls.circuit, cls.x, cls.y, cls.z = (
-            _build_circuit_with_an_untruncatable_cause_region()
-        )
+        cls.circuit, cls.x, cls.y, cls.z = _build_circuit_with_a_rounded_cause_region()
         cls.cc = CausalCircuit.from_probabilistic_circuit(
             cls.circuit,
             MarginalDeterminismTreeNode.from_causal_graph([cls.x], [cls.y]),
@@ -1769,7 +1766,10 @@ class BackdoorAdjustmentSkippedRegionTestCase(unittest.TestCase):
             [cls.y],
         )
 
-    def test_adjusted_circuit_has_one_root(self):
+    def test_adjusted_circuit_has_one_root_with_a_branch_per_region(self):
         adjusted = self.cc.backdoor_adjustment(self.x, self.y, [self.z])
         self.assertTrue(isinstance(adjusted.root, SumUnit))
-        self.assertEqual(len(adjusted.root.subcircuits), 1)
+        self.assertEqual(
+            len(adjusted.root.subcircuits),
+            len(self.cc._extract_disjoint_regions_for_variable(self.x)),
+        )

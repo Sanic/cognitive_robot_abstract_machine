@@ -14,15 +14,16 @@ The module supports bidirectional conversion between:
 
 from __future__ import annotations
 
+# %% Imports
 import numpy as np
-import open3d as o3d
+import open3d
 from geometry_msgs.msg import Pose, PoseStamped
 from sensor_msgs.msg import Image
 from std_msgs.msg import Header
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
-from robokudo.utils.o3d_helper import get_obb_from_size_and_transform
+from robokudo.utils.o3d_helper import create_oriented_bounding_box
 from robokudo.utils.transform import get_transform_matrix, get_rotation_matrix_from_q
 
 if TYPE_CHECKING:
@@ -159,7 +160,7 @@ def get_transform_matrix_from_pose_annotation(
 
 def get_o3d_obb_from_bounding_box_annotation(
     bounding_box_annotation: BoundingBox3DAnnotation,
-) -> o3d.geometry.OrientedBoundingBox:
+) -> open3d.geometry.OrientedBoundingBox:
     """
     Convert a bounding box annotation to an open3d oriented bounding box.
 
@@ -176,7 +177,7 @@ def get_o3d_obb_from_bounding_box_annotation(
     transform_matrix = get_transform_matrix_from_pose_annotation(
         bounding_box_annotation.pose
     )
-    return get_obb_from_size_and_transform(bb_size, transform_matrix)
+    return create_oriented_bounding_box(bb_size, transform_matrix)
 
 
 def convert_ros_to_cv_image(ros_image: Image) -> npt.NDArray:

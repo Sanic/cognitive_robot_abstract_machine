@@ -23,12 +23,12 @@ from coraplex.plans.factories import code
 from coraplex.plans.plan_node import PlanNode
 from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.connections import Connection6DoFSpecification
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    Connection6DoFSpecification,
-    RobotSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.tiago import Tiago, TiagoJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup, Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix

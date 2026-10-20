@@ -5,17 +5,16 @@ This module provides classes for describing a world with predefined objects and 
 It builds semantic_digital_twin entities into a shared World instance.
 """
 
+from __future__ import annotations
+
+from robokudo.exceptions import ObjectGeometryMissing, RegionParentMissing
+
+# %% Imports
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from semantic_digital_twin.datastructures.camera_model import (
-    CameraModality,
-    CameraModel,
-    CameraRange,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -32,7 +31,9 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
     SemanticAnnotation,
 )
-from typing_extensions import Any, Dict, List, Optional
+from typing_extensions import Any
+
+# %% Camera definitions
 
 
 @dataclass
@@ -46,10 +47,10 @@ class ObjectSpec:
 
     name: str
     pose: HomogeneousTransformationMatrix
-    mesh_path: Optional[Path] = None
-    box_scale: Optional[Scale] = None
-    cylinder_width: Optional[float] = None
-    cylinder_height: Optional[float] = None
+    mesh_path: Path | None = None
+    box_scale: Scale | None = None
+    cylinder_width: float | None = None
+    cylinder_height: float | None = None
     center_mesh: bool = True
     color: Color = field(default_factory=lambda: Color(0.1, 0.2, 0.8, 1.0))
 
@@ -66,31 +67,25 @@ class RegionSpec:
     name: str
     pose: HomogeneousTransformationMatrix
     box_scale: Scale
-    parent_name: Optional[str] = None
+    parent_name: str | None = None
     color: Color = field(default_factory=Color)
 
 
 @dataclass
-class CameraSpec:
-    """Describe a semantic camera and its attachment to a world."""
+class CameraPlacement:
+    """
+    Place a detached semantic camera relative to a parent body.
+    """
 
-    name: str
-    """Name shared by the camera annotation and its root body."""
+    camera: Camera
+    """
+    Camera annotation whose optical root will be attached to the parent.
+    """
 
-    pose: HomogeneousTransformationMatrix
-    """Camera-root pose relative to the parent body."""
-
-    forward_facing_axis: Vector3
-    """Viewing direction expressed in the camera root frame."""
-
-    camera_model: CameraModel
-    """Native projection model of the camera."""
-
-    camera_range: CameraRange = field(default_factory=CameraRange)
-    """Usable distance interval of the camera."""
-
-    modalities: tuple[CameraModality, ...] = field(default_factory=tuple)
-    """Kinds of image data the camera can produce."""
+    parent_T_camera: HomogeneousTransformationMatrix
+    """
+    Optical-frame pose relative to the selected parent body.
+    """
 
 
 @dataclass(eq=False)
@@ -105,9 +100,9 @@ class BaseWorldDescriptor:
 
     def __init__(
         self,
-        world: Optional[World] = None,
+        world: World | None = None,
         root_name: str = "descriptor_world_root",
-        root_prefix: Optional[str] = "world",
+        root_prefix: str | None = "world",
     ) -> None:
         """
         Initialize a world descriptor.
@@ -137,15 +132,15 @@ class BaseWorldDescriptor:
             -center_x, -center_y, -center_z, 0, 0, 0
         )
 
-    def build_objects(self, root: Body, specs: List[Any]) -> Dict[str, Connection6DoF]:
+    def build_objects(self, root: Body, specs: list[Any]) -> dict[str, Connection6DoF]:
         """
         Create bodies, connections, annotations, and poses from object specs.
         """
-        connections: Dict[str, Connection6DoF] = {}
+        connections: dict[str, Connection6DoF] = {}
 
         with self.world.modify_world():
             for spec in specs:
-                shapes: List[Any] = []
+                shapes: list[Any] = []
                 collision: ShapeCollection
 
                 if spec.mesh_path is not None:
@@ -175,12 +170,7 @@ class BaseWorldDescriptor:
                         shapes = [cylinder]
                         collision = ShapeCollection([cylinder])
                     else:
-                        raise ValueError(
-                            (
-                                f"ObjectSpec {spec.name} requires mesh_path, box_scale, "
-                                "or cylinder_width+cylinder_height."
-                            )
-                        )
+                        raise ObjectGeometryMissing(object_name=spec.name)
 
                 body = Body(
                     name=PrefixedName(name=spec.name),
@@ -202,12 +192,12 @@ class BaseWorldDescriptor:
         return connections
 
     def build_regions(
-        self, root: Body, specs: List[RegionSpec]
-    ) -> Dict[str, Connection6DoF]:
+        self, root: Body, specs: list[RegionSpec]
+    ) -> dict[str, Connection6DoF]:
         """
         Create regions and connections from region specs.
         """
-        connections: Dict[str, Connection6DoF] = {}
+        connections: dict[str, Connection6DoF] = {}
 
         with self.world.modify_world():
             for spec in specs:
@@ -222,8 +212,8 @@ class BaseWorldDescriptor:
                 if spec.parent_name is not None:
                     parent_candidates = self.world.get_bodies_by_name(spec.parent_name)
                     if len(parent_candidates) == 0:
-                        raise ValueError(
-                            f"RegionSpec {spec.name} references unknown parent_name '{spec.parent_name}'."
+                        raise RegionParentMissing(
+                            region_name=spec.name, parent_name=spec.parent_name
                         )
                     parent = parent_candidates[0]
 
@@ -240,37 +230,33 @@ class BaseWorldDescriptor:
 
         return connections
 
-    def build_camera(self, parent: Body, spec: CameraSpec) -> Camera:
-        """Create and attach one semantic camera.
-
-        :param parent: Body to which the camera root is attached.
-        :param spec: Semantic camera description and relative pose.
-        :return: Camera annotation added to this descriptor's world.
+    def build_camera(self, parent: Body, placement: CameraPlacement) -> Camera:
         """
+        Attach and register the supplied camera at its parent-relative optical pose.
+
+        :param parent: Body to which the detached optical root is attached.
+        :param placement: Camera annotation and its optical pose relative to the parent.
+        :return: The supplied camera annotation registered in this descriptor's world.
+        """
+        camera = placement.camera
         with self.world.modify_world():
-            camera_body = Body(name=PrefixedName(name=spec.name))
             connection = Connection6DoF.create_with_dofs(
                 parent=parent,
-                child=camera_body,
+                child=camera.root,
                 world=self.world,
             )
             self.world.add_connection(connection)
-            camera = Camera(
-                name=PrefixedName(name=spec.name),
-                root=camera_body,
-                forward_facing_axis=spec.forward_facing_axis,
-                camera_model=spec.camera_model,
-                camera_range=spec.camera_range,
-                modalities=spec.modalities,
-            )
             self.world.add_semantic_annotation(camera)
 
         with self.world.modify_world():
-            connection.origin = spec.pose
-
+            connection.origin = HomogeneousTransformationMatrix(
+                data=placement.parent_T_camera,
+                reference_frame=parent,
+                child_frame=camera.root,
+            )
         return camera
 
-    def get_predefined_object_bodies(self) -> List[Body]:
+    def get_predefined_object_bodies(self) -> list[Body]:
         """
         Get list of pre-defined objects.
         """

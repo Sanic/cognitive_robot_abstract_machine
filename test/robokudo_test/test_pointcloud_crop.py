@@ -9,8 +9,9 @@ made every step after the transform unreachable, so the mode never actually crop
 anything even when the camera-to-world transform was available.
 """
 
+# %% Imports
 import numpy as np
-import open3d as o3d
+import open3d
 import pytest
 from dataclasses import replace
 from py_trees.blackboard import Blackboard
@@ -18,7 +19,8 @@ from py_trees.common import Status
 
 # robokudo.pipeline must be imported before robokudo.annotators.outputs: importing
 # outputs first trips a circular import between it and robokudo.annotators.core.
-import robokudo.pipeline  # noqa: F401
+from robokudo.types.cv import ColorToDepthRatio
+import robokudo.pipeline
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap, AnnotatorOutputs
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.cas import CAS, CASViews
@@ -28,8 +30,10 @@ from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
+
+# %% Camera behavior
 
 
 @pytest.fixture()
@@ -66,11 +70,16 @@ def cas_with_cloud_at_world_origin(
         quat_w=1.0,
     )
     camera_body = Body(name=PrefixedName(name="camera"))
+    world_frame = Body(name=PrefixedName(name="world"))
+    world_T_camera = HomogeneousTransformationMatrix(
+        data=world_T_camera,
+        reference_frame=world_frame,
+        child_frame=camera_body,
+    )
     cas.camera_observation = CameraObservation(
         camera=Camera(
             name=PrefixedName(name="camera"),
             root=camera_body,
-            forward_facing_axis=Vector3.Z(),
             camera_model=camera_model,
         ),
         effective_camera_model=camera_model,
@@ -80,15 +89,15 @@ def cas_with_cloud_at_world_origin(
 
     points_inside_the_crop = np.array([[0.0, 0.0, 1.0], [0.05, 0.05, 1.0]])
     points_outside_the_crop = np.array([[5.0, 5.0, 1.0], [-5.0, -5.0, 1.0]])
-    cloud = o3d.geometry.PointCloud()
-    cloud.points = o3d.utility.Vector3dVector(
+    cloud = open3d.geometry.PointCloud()
+    cloud.points = open3d.utility.Vector3dVector(
         np.vstack([points_inside_the_crop, points_outside_the_crop])
     )
 
     cas.set_ref(CASViews.CLOUD, cloud)
     cas.set(CASViews.COLOR_IMAGE, np.zeros((200, 200, 3), dtype=np.uint8))
     cas.pointcloud_camera_model = camera_model
-    cas.set(CASViews.COLOR2DEPTH_RATIO, (1.0, 1.0))
+    cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
     return cas
 
 

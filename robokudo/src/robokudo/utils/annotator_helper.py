@@ -13,15 +13,17 @@ It supports:
 
 from __future__ import annotations
 
+# %% Imports
 from copy import deepcopy
 
 import cv2
 import numpy as np
-import open3d as o3d
-from typing_extensions import Callable, List, TYPE_CHECKING
+import open3d
+from typing_extensions import Callable, TYPE_CHECKING
 
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
@@ -94,8 +96,8 @@ def transform_pose_from_world_to_camera(
 
 
 def transform_cloud_from_camera_to_world(
-    cas: CAS, cloud: o3d.geometry.PointCloud, transform_inplace: bool = False
-) -> o3d.geometry.PointCloud:
+    cas: CAS, cloud: open3d.geometry.PointCloud, transform_inplace: bool = False
+) -> open3d.geometry.PointCloud:
     """
     Transform point cloud from camera to world coordinates.
 
@@ -115,8 +117,8 @@ def transform_cloud_from_camera_to_world(
 
 
 def transform_cloud_from_world_to_camera(
-    cas: CAS, cloud: o3d.geometry.PointCloud, transform_inplace: bool = False
-) -> o3d.geometry.PointCloud:
+    cas: CAS, cloud: open3d.geometry.PointCloud, transform_inplace: bool = False
+) -> open3d.geometry.PointCloud:
     """
     Transform point cloud from world to camera coordinates.
 
@@ -164,7 +166,7 @@ def get_world_to_camera_transform_matrix(cas: CAS) -> npt.NDArray:
 
 def draw_bounding_boxes_from_object_hypotheses(
     img: npt.NDArray,
-    object_hypotheses: List[ObjectHypothesis],
+    object_hypotheses: list[ObjectHypothesis],
     text_function: Callable[[ObjectHypothesis], str],
 ) -> None:
     """
@@ -195,6 +197,26 @@ def draw_bounding_boxes_from_object_hypotheses(
             (0, 0, 255),
             2,
         )
+
+
+def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
+    """
+    Scale the camera intrinsics of an annotator to the depth image resolution.
+
+    If the depth image has a different resolution than the color image, the color image
+    is usually scaled to the depth image resolution, which requires the camera
+    intrinsics to be scaled as well.
+
+    :param annotator: Annotator whose ``camera_intrinsics`` attribute is replaced by the
+        scaled intrinsics.
+    """
+    cas = annotator.get_cas()
+    color_to_depth_ratio = cas.color_to_depth_ratio
+    camera_model = cas.require_camera_observation().effective_camera_model.scaled(
+        scale_x=color_to_depth_ratio.horizontal,
+        scale_y=color_to_depth_ratio.vertical,
+    )
+    annotator.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(camera_model)
 
 
 def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
@@ -241,31 +263,26 @@ def resize_mask(annotator: BaseAnnotator, mask: npt.NDArray) -> npt.NDArray:
 
     :param annotator: Annotator containing resolution info
     :param mask: A binary image.
-    :return: The scaled version of mask, according to the COLOR2DEPTH_RATIO.
+    :return: The mask scaled back by the color-to-depth ratio.
     """
     if not annotator.descriptor.parameters.global_with_depth:
         # nothing to do
         return mask
 
-    color2depth_ratio = annotator.get_cas().get(CASViews.COLOR2DEPTH_RATIO)
+    color_to_depth_ratio = annotator.get_cas().color_to_depth_ratio
 
-    if not color2depth_ratio:
+    if color_to_depth_ratio is None:
         raise ColorToDepthRatioMissing(operation="resize mask")
 
-    if color2depth_ratio == (1, 1):
+    if color_to_depth_ratio.is_identity:
         return mask
-    else:
-        c2d_ratio_x = color2depth_ratio[0]
-        c2d_ratio_y = color2depth_ratio[1]
-        resized_mask = cv2.resize(
-            mask,
-            None,
-            fx=1 / c2d_ratio_x,
-            fy=1 / c2d_ratio_y,
-            interpolation=cv2.INTER_NEAREST,
-        )
-
-    return resized_mask
+    return cv2.resize(
+        mask,
+        None,
+        fx=1 / color_to_depth_ratio.horizontal,
+        fy=1 / color_to_depth_ratio.vertical,
+        interpolation=cv2.INTER_NEAREST,
+    )
 
 
 def generate_source_name(annotator: BaseAnnotator) -> str:

@@ -1,9 +1,13 @@
+# %% Imports
 import numpy as np
 import pytest
 from std_msgs.msg import String
 
 from robokudo.types.camera import CameraObservation
+
+from robokudo.cas import CASViews
 from robokudo.io.cas_view_codecs import CASViewCodecRegistry
+from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.tf import StampedTransform
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -16,9 +20,10 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
+
+# %% Camera behavior
 
 
 def test_bytes_codec_roundtrip():
@@ -92,7 +97,6 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     camera = Camera(
         name=PrefixedName(name="camera"),
         root=root,
-        forward_facing_axis=Vector3.X(),
         camera_model=camera_model,
     )
     with world.modify_world():
@@ -126,6 +130,15 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     assert (
         decoded_observation.timestamp_nanoseconds == observation.timestamp_nanoseconds
     )
+
+
+def test_color_to_depth_ratio_roundtrip():
+    registry = CASViewCodecRegistry()
+    ratio = ColorToDepthRatio(horizontal=0.5, vertical=0.25)
+
+    encoded = registry.encode_view(CASViews.COLOR_TO_DEPTH_RATIO, ratio)
+
+    assert registry.decode_view(encoded) == (CASViews.COLOR_TO_DEPTH_RATIO, ratio)
 
 
 def test_decode_view_unknown_serializer_raises():

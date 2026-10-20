@@ -19,13 +19,13 @@ There are exactly four outcomes, and step 5 picks one:
 4. **No item at all** — work small enough that tracking it costs more than it
    returns.
 
-## 0. Check the setup is in place, and offer it if not
+## 0. Check the setup is in place, and run it if not
 
 Every plan's manifest lives on the personal-notes branch, which the user may not
 have set up yet. Follow
 `.claude/skills/setup-personal-notes/prerequisite-check.md` before step 1: run
-the check, and if it reports anything missing, offer `/setup-personal-notes`
-rather than failing on a branch that isn't there.
+the check, and if it reports anything missing, run `/setup-personal-notes`
+without asking first, rather than failing on a branch that isn't there.
 
 ## 1. Pin down what the work actually touches
 
@@ -64,7 +64,7 @@ The rule is in `${SCOPE_DECISION_DOCUMENT}` — read it rather than re-deriving
 it here. Gather its evidence in one call:
 
 ```bash
-python3 "${CHECK_SCOPE_OVERLAP_SCRIPT}" \
+"${BASSTLER_PYTHON}" -m "${CHECK_SCOPE_OVERLAP_MODULE}" \
     --base <base-branch> \
     --path <path> [--path <path> ...] \
     --candidate '<item-id-or-title>=<branch>' [--candidate ... ]
@@ -121,8 +121,8 @@ changes" section governs. Either way the proposal ends with `${SAVE_PLAN_SCRIPT}
 and republishing the dashboard via `/plan-dashboard <plan-id>` in the same turn,
 so no published dashboard is older than the manifest behind it.
 
-**If the outcome is a new item**, `${PLAN_ITEM_BOOTSTRAP_SCRIPT}`'s `record`
-operation writes its `plan.yaml` entry and `roadmap.md` section and runs the save
+**If the outcome is a new item**, the `record` operation of
+`"${BASSTLER_PYTHON}" -m "${PLAN_ITEM_BOOTSTRAP_MODULE}"` writes its `plan.yaml` entry and `roadmap.md` section and runs the save
 for you — `record` only, never `open`, which creates the branch and pull request
 this skill does not.
 

@@ -6,7 +6,11 @@ from probabilistic_model.distributions.distributions import (
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.utils import MissingDict
+from probabilistic_model.exceptions import EventMixesPointsAndIntervalsError
+from probabilistic_model.utils import (
+    MissingDict,
+    event_compatible_for_truncation_with_singletons,
+)
 
 
 def uniform_measure_of_event(event: Event) -> ProbabilisticCircuit:
@@ -15,6 +19,8 @@ def uniform_measure_of_event(event: Event) -> ProbabilisticCircuit:
 
     :param event: The event
     :return: The circuit describing the uniform measure
+    :raises EventMixesPointsAndIntervalsError: If a continuous variable takes points and
+        intervals in the box bounding the event.
     """
     # calculate the bounding box of the event
     bounding_box = event.bounding_box()
@@ -33,7 +39,14 @@ def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> ProbabilisticC
 
     :param simple_event: The simple event
     :return: The circuit describing the uniform measure over the simple event
+    :raises EventMixesPointsAndIntervalsError: If a continuous variable takes points and
+        intervals.
     """
+    if not event_compatible_for_truncation_with_singletons(
+        simple_event.as_composite_set()
+    ):
+        raise EventMixesPointsAndIntervalsError(simple_event)
+
     # initialize the root of the circuit
     result = ProbabilisticCircuit()
     uniform_model = ProductUnit(probabilistic_circuit=result)
@@ -42,14 +55,25 @@ def uniform_measure_of_simple_event(simple_event: SimpleEvent) -> ProbabilisticC
         # handle different variables
         if isinstance(variable, Continuous):
 
-            # create a uniform distribution for every interval in a continuous variables description
             distribution = SumUnit(probabilistic_circuit=result)
-            for assignment_ in assignment:
-                uniform = UniformDistribution(variable=variable, interval=assignment_)
-                distribution.add_subcircuit(
-                    UnivariateContinuousLeaf(uniform, probabilistic_circuit=result),
-                    1 / uniform.probability_density_function_value(),
-                )
+            if all(assignment_.is_singleton() for assignment_ in assignment):
+                for assignment_ in assignment:
+                    dirac = DiracDeltaDistribution(
+                        variable=variable, location=assignment_.lower, density_cap=1.0
+                    )
+                    distribution.add_subcircuit(
+                        UnivariateContinuousLeaf(dirac, probabilistic_circuit=result),
+                        0.0,
+                    )
+            else:
+                for assignment_ in assignment:
+                    uniform = UniformDistribution(
+                        variable=variable, interval=assignment_
+                    )
+                    distribution.add_subcircuit(
+                        UnivariateContinuousLeaf(uniform, probabilistic_circuit=result),
+                        -uniform.log_probability_density_function_value(),
+                    )
             distribution.normalize()
 
         # create uniform distribution for symbolic variables

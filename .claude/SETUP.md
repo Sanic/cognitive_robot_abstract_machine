@@ -20,8 +20,10 @@ are genuinely yours. Re-running it on a set-up clone changes nothing.
 ## 2. Do the steps no script can do
 
 ```bash
-python3 .claude/hooks/setup_steps.py
+basstler/.venv/bin/python -m basstler.setup_steps
 ```
+
+The setup in step 1 created that environment; see [`basstler/README.md`](../basstler/README.md).
 
 It prints these three, already filled in for your fork:
 
