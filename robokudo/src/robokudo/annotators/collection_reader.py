@@ -185,7 +185,9 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 pipeline.cas.query = query
 
             for collection_reader in self.collection_readers:
-                collection_reader.parameters.camera_interface.set_data(self.get_cas())
+                camera_interface = collection_reader.parameters.camera_interface
+                if camera_interface.set_data(self.get_cas()) is False:
+                    return Status.RUNNING
 
             self.feedback_message = (
                 f"Got sensor data... Waited for {time_difference} seconds"

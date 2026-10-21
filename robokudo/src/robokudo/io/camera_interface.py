@@ -22,6 +22,8 @@ The module handles:
 
 from __future__ import annotations
 
+# %% imports
+
 import logging
 import struct
 import warnings
@@ -59,6 +61,9 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from robokudo.types.cv import ColorToDepthRatio
+
+
+# %% camera acquisition
 
 
 class CameraInterface(object):
@@ -162,16 +167,17 @@ class CameraInterface(object):
         )
         return True
 
-    def set_data(self, cas: CAS) -> None:
-        """
-        This method is supposed to read in, convert (if needed) and put the data into
-        the CAS. If you are running a CameraInterface which is getting data via callback
-        methods, please make sure to keep callbacks light and do the main conversion
-        work here! Callbacks should be short.
+    def set_data(self, cas: CAS) -> bool | None:
+        """Populate the CAS with the next available camera acquisition.
 
-        :param cas: The CAS where the data should be placed in
+        :param cas: Destination for camera data.
+        :return: False if delivery was discarded and the reader must keep waiting.
+            True or None indicates successful delivery.
         """
         raise NotImplementedError
+
+
+# %% ROS transforms
 
 
 class ROSCameraInterface(CameraInterface):
@@ -348,6 +354,9 @@ class ROSCameraInterface(CameraInterface):
         self.camera_intrinsic.set_intrinsics(width, height, fx, fy, cx, cy)
 
 
+# %% compressed depth
+
+
 def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
     """
     Convert compressed depth image to proper depth format.
@@ -404,6 +413,9 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
         return depth_img_mm
     else:
         raise Exception("Decoding of '" + depth_fmt + "' is not implemented!")
+
+
+# %% RGB-D subscriptions
 
 
 class KinectCameraInterface(ROSCameraInterface):
