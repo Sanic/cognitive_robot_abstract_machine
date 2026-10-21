@@ -1,0 +1,30 @@
+# %% stereo depth
+fast_foundation_stereo:
+  ros__parameters:
+    left_image_topic: /left/image_rect_color
+    right_image_topic: /right/image_rect_color
+    left_camera_info_topic: /left/camera_info
+    right_camera_info_topic: /right/camera_info
+    depth_topic: /ffs/depth
+    input_reliability: reliable
+    baseline_override: 0.0
+    max_depth: 10.0
+    input_scale: 1.0
+    valid_iters: 8
+    max_disp: 192
+    sync_queue_size: 5
+    sync_slop: 0.03
+    max_frame_age: 0.5
+
+# %% optional point cloud
+foundation_stereo_pointcloud:
+  ros__parameters:
+    rgb_topic: /left/image_rect_color
+    depth_topic: /ffs/depth
+    camera_info_topic: /left/camera_info
+    points_topic: /ffs_points2
+    input_reliability: reliable
+    max_depth: 10.0
+    sync_queue_size: 30
+    sync_slop: 0.03
+    max_frame_age: 1.0
