@@ -65,7 +65,12 @@ class FoundationStereoCameraConfig(
     Rectified optical frame shared by all input messages.
     """
 
-    lookup_viewpoint: bool = False
+    tf_to: str = "map"
+    """
+    Global frame to transform the rectified optical frame to.
+    """
+
+    lookup_viewpoint: bool = True
     """
     Whether to require acquisition-time TF before consuming a frame.
     """
