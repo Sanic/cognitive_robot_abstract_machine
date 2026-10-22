@@ -60,7 +60,7 @@ class FoundationStereoCameraConfig(
     Per-frame left calibration topic.
     """
 
-    tf_from: str = "olive_left_optical_frame"
+    tf_from: str = "olive_camera_left_optical_frame"
     """
     Rectified optical frame shared by all input messages.
     """
