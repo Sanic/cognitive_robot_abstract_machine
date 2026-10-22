@@ -12,10 +12,20 @@ from PIL import Image
 from typing_extensions import TYPE_CHECKING
 
 from krrood.patterns.path_enumeration import PathEnumeration
+from robokudo.types.annotation import PoseAnnotation
+from robokudo.types.scene import ObjectHypothesis
+from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypotheses
+from robokudo.utils.o3d_helper import (
+    draw_wireframe_of_obb_into_image,
+    get_obb_from_size_and_transform,
+)
+from robokudo.utils.transform import get_transform_matrix
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from robokudo.cas import CAS
+    from robokudo.experiments.camera_handoff.tabletop import SegmentedTarget
     from robokudo.experiments.camera_handoff.experiment import ComparisonResult
     from robokudo.experiments.camera_handoff.perception import (
         CameraObservation,
@@ -33,6 +43,8 @@ class ApproachFiles(PathEnumeration):
     """
 
     HEAD_IMAGE = "head.png"
+    HEAD_SEGMENTATION = "head_segmentation.png"
+    HEAD_ESTIMATE = "head_estimate.txt"
     HEAD_ONLY = "head_only"
     FEEDBACK = "feedback"
     MEASUREMENTS = "measurements.csv"
@@ -172,4 +184,36 @@ class ImageRecorder:
             f"Head-only completed: {result.head_only.completed}\n"
             f"Feedback completed: {result.feedback.completed}\n"
             "Overlay: cyan = projected search region; green = observed target; white = desired alignment.\n"
+        )
+
+    def write_initial_estimate(
+        self, cas: CAS, observation: CameraObservation, selected: SegmentedTarget
+    ) -> None:
+        """
+        Save detected cluster regions and the selected bounding-box pose.
+        """
+        self.output_directory.mkdir(parents=True, exist_ok=True)
+        overlay = observation.color.copy()
+        draw_bounding_boxes_from_object_hypotheses(
+            overlay,
+            cas.filter_annotations_by_type(ObjectHypothesis),
+            lambda hypothesis: hypothesis.id,
+        )
+        estimate = selected.estimate
+        world_T_target = get_transform_matrix(
+            estimate.world_R_target, estimate.world_center
+        )
+        camera_T_target = np.linalg.inv(observation.world_T_camera) @ world_T_target
+        bounding_box = get_obb_from_size_and_transform(
+            estimate.dimensions, camera_T_target
+        )
+        draw_wireframe_of_obb_into_image(cas, overlay, bounding_box)
+        Image.fromarray(overlay[:, :, ::-1]).save(
+            self.output_directory / ApproachFiles.HEAD_SEGMENTATION
+        )
+        pose = cas.filter_by_type(PoseAnnotation, selected.hypothesis.annotations)[0]
+        (self.output_directory / ApproachFiles.HEAD_ESTIMATE).write_text(
+            f"Pose source: {pose.source}\nSelected cluster: {selected.hypothesis.id}\n"
+            f"World-frame bounding-box pose:\n{world_T_target}\n"
+            f"Measured box dimensions (m): {estimate.dimensions}\n"
         )

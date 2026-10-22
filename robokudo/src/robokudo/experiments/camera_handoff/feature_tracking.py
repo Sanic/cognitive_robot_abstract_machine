@@ -7,6 +7,7 @@ from enum import IntEnum
 
 import cv2
 import numpy as np
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.experiments.camera_handoff.exceptions import TargetNotAcquired
 from robokudo.experiments.camera_handoff.perception import (
@@ -16,6 +17,9 @@ from robokudo.experiments.camera_handoff.perception import (
     TargetEstimate,
     TargetMeasurement,
 )
+
+if TYPE_CHECKING:
+    from robokudo.experiments.camera_handoff.tabletop import SegmentedTarget
 
 # %% hand observations
 
@@ -85,10 +89,12 @@ class FeatureTargetTracker(ImageTargetTracker):
     """
     Dominant object hue for initial hand-image foreground separation.
     """
+
     hue_tolerance: int = 12
     """
     Allowed circular hue deviation in OpenCV HSV units.
     """
+
     minimum_saturation: int = 60
     """
     Minimum saturation of foreground-colored pixels.
@@ -123,10 +129,12 @@ class FeatureTargetTracker(ImageTargetTracker):
     """
     Minimum relative corner quality for hand-image landmarks.
     """
+
     minimum_feature_distance: float = 3.0
     """
     Minimum separation of tracking corners in pixels.
     """
+
     minimum_matches: int = 6
     """
     Minimum consistent hand-image landmarks for a temporal update.
@@ -168,13 +176,23 @@ class FeatureTargetTracker(ImageTargetTracker):
         depth: np.ndarray,
         dimensions: np.ndarray,
         bias: np.ndarray,
+        segmented_target: SegmentedTarget | None = None,
     ) -> TargetEstimate:
         """
-        Initialize model bounds and coarse color from the head's selected object.
+        Initialize target geometry and coarse color from a selected head object.
 
-        The table plane and upright model orientation must be known. No head-image
-        tracking landmarks are retained.
+        A segmented target supplies measured pose and extents. Without one, the upright
+        model dimensions and table plane must be known.
         """
+        if segmented_target is not None:
+            self.learn_color(observation.color, segmented_target.mask)
+            measured = segmented_target.estimate
+            return TargetEstimate(
+                measured.world_center + bias,
+                measured.edge_length,
+                measured.dimensions.copy(),
+                measured.world_R_target.copy(),
+            )
         rows, columns = np.nonzero(depth > 0)
         world_points = observation.unproject(
             np.column_stack((columns, rows)), depth[rows, columns]
@@ -206,7 +224,14 @@ class FeatureTargetTracker(ImageTargetTracker):
         center = (lower + upper) / 2
         center[1] = lower[1] + dimensions[1] / 2
         center[2] = upper[2] - dimensions[2] / 2
-        hsv = cv2.cvtColor(observation.color, cv2.COLOR_BGR2HSV)
+        self.learn_color(observation.color, mask)
+        return TargetEstimate(center + bias, float(max(dimensions)), dimensions)
+
+    def learn_color(self, color: np.ndarray, mask: np.ndarray) -> None:
+        """
+        Initialize hand foreground appearance from the selected object pixels.
+        """
+        hsv = cv2.cvtColor(color, cv2.COLOR_BGR2HSV)
         colored = (
             mask
             & (hsv[:, :, 1] >= self.minimum_saturation)
@@ -218,7 +243,6 @@ class FeatureTargetTracker(ImageTargetTracker):
             np.argmax(np.bincount(hsv[:, :, 0][colored], minlength=HueEncoding.PERIOD))
         )
         self.previous = None
-        return TargetEstimate(center + bias, float(max(dimensions)), dimensions)
 
     def track(
         self, color: np.ndarray, region: ImageRegion | None

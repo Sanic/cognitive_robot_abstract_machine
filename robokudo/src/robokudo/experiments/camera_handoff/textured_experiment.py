@@ -24,6 +24,7 @@ from robokudo.experiments.camera_handoff.simulation import (
     SharedSceneCamera,
 )
 from robokudo.experiments.camera_handoff.textured_models import TexturedModel
+from robokudo.experiments.camera_handoff.tabletop import TabletopInitializer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 
@@ -120,6 +121,11 @@ class TexturedHandoffExperiment(CameraHandoffExperiment):
     Hand-image outline and temporal feature tracking.
     """
 
+    head_initializer: TabletopInitializer = field(default_factory=TabletopInitializer)
+    """
+    Tabletop segmentation and cluster bounding-box pose initialization.
+    """
+
     head_distance: float = 0.65
     """
     Head-camera distance from the table center along negative world y.
@@ -161,6 +167,7 @@ class TexturedHandoffExperiment(CameraHandoffExperiment):
             self.head_elevation - center_height, self.head_distance
         )
         cameras.hand.camera.camera_config.camera_z = center_height
+        self.head_initializer.configure(cameras.head)
         return cameras
 
     def run(self, output_directory: Path) -> ComparisonResult:
@@ -173,15 +180,17 @@ class TexturedHandoffExperiment(CameraHandoffExperiment):
         Image.fromarray(head.color[:, :, ::-1]).save(
             output_directory / self.model.asset.preview_filename
         )
-        shape = self.model.load()
-        bounds = self.model.measure_bounds(shape)
+        selected = self.head_initializer.estimate(cameras.head.pipeline.cas, head)
         target = self.feature_tracker.acquire(
             head,
             cameras.head.pipeline.cas.get(CASViews.DEPTH_IMAGE).astype(float) / 1000,
-            bounds[1] - bounds[0],
+            selected.estimate.dimensions,
             self.position_bias,
+            segmented_target=selected,
         )
         recorder = ImageRecorder(output_directory)
+        recorder.write_initial_estimate(cameras.head.pipeline.cas, head, selected)
+        bounds = self.model.measure_bounds(self.model.load())
         world = cameras.hand.camera.world
         truth_center = (
             world.compute_forward_kinematics_np(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from time import monotonic, sleep
 
 import numpy as np
 from py_trees.blackboard import Blackboard
@@ -104,9 +105,19 @@ class CameraPipeline:
             blackboard.set(BlackboardKey.OUTPUT_BUFFER, AnnotatorOutputPerPipelineMap())
         self.pipeline.setup()
 
-    def capture(self) -> CameraObservation:
-        """Capture a fresh image and copy calibration out of the pipeline CAS."""
+    def capture(
+        self, timeout_seconds: float = 30.0, poll_interval: float = 0.001
+    ) -> CameraObservation:
+        """Capture a completed pipeline frame within the specified time limit."""
+        deadline = monotonic() + timeout_seconds
         self.pipeline.tick_once()
+        while self.pipeline.status is Status.RUNNING:
+            if monotonic() >= deadline:
+                raise InvalidExperiment(
+                    "Camera processing exceeded the capture timeout."
+                )
+            sleep(poll_interval)
+            self.pipeline.tick_once()
         if self.pipeline.status is not Status.SUCCESS:
             raise InvalidExperiment("A camera pipeline failed to capture an image.")
         cas = self.pipeline.cas

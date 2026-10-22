@@ -69,7 +69,7 @@ class CameraObservation:
 
 @dataclass
 class TargetEstimate:
-    """An axis-aligned object estimate in the scene frame."""
+    """An oriented object bounding-box estimate in the scene frame."""
 
     world_center: np.ndarray
     """Estimated object center, independent of the scene ground truth."""
@@ -77,6 +77,8 @@ class TargetEstimate:
     """Known cube edge length when individual dimensions are absent."""
     dimensions: np.ndarray | None = None
     """Individual bounding-box dimensions for a non-cubic target."""
+    world_R_target: np.ndarray = field(default_factory=lambda: np.eye(3))
+    """Rotation of the bounding-box axes relative to the world frame."""
 
     def front_depth(self, observation: CameraObservation) -> float:
         """Return the optical depth of the nearest bounding-box plane."""
@@ -85,7 +87,8 @@ class TargetEstimate:
         )
         camera_T_world = np.linalg.inv(observation.world_T_camera)
         camera_center = camera_T_world @ np.append(self.world_center, 1)
-        return float(camera_center[2] - np.abs(camera_T_world[2, :3]) @ dimensions / 2)
+        camera_R_target = camera_T_world[:3, :3] @ self.world_R_target
+        return float(camera_center[2] - np.abs(camera_R_target[2]) @ dimensions / 2)
 
     def project_region(
         self,
@@ -97,9 +100,10 @@ class TargetEstimate:
         dimensions = (
             np.full(3, self.edge_length) if self.dimensions is None else self.dimensions
         )
-        corners = self.world_center + np.array(list(product((-0.5, 0.5), repeat=3))) * (
+        target_corners = np.array(list(product((-0.5, 0.5), repeat=3))) * (
             dimensions + 2 * uncertainty_meters
         )
+        corners = self.world_center + target_corners @ self.world_R_target.T
         camera_T_world = np.linalg.inv(observation.world_T_camera)
         camera_corners = corners @ camera_T_world[:3, :3].T + camera_T_world[:3, 3]
         if np.any(camera_corners[:, 2] <= 0):

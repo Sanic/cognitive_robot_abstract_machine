@@ -37,11 +37,19 @@ The textured camera samples the meshes' UV-mapped materials at SemDT scene ray
 intersections. It needs no OpenGL display and does not silently replace textures
 with flat colors. Lighting, shadows, and sensor noise are not simulated.
 
-For textured runs the head view is oblique. Initialization selects the raised
-object containing an image seed, which defaults to the head principal point.
-This seed stands in for a head-camera detector selecting the desired instance;
-the prototype does not perform semantic object recognition. A known table plane
-and known axis-aligned model dimensions locate the initial model center.
+For textured runs the head view is oblique. The head pipeline follows RoboKudo's
+demo: image preprocessing, point-cloud cropping, plane detection, and tabletop
+clustering, followed by `ClusterPoseBBAnnotator`. Initialization selects the
+cluster containing an image seed, which defaults to the head principal point.
+This seed selects the desired instance; the prototype does not perform semantic
+object recognition. The annotated pose and box dimensions initialize tracking
+without a known table height or model dimensions. Box orientation is preserved
+when projecting into the hand image.
+
+`ClusterPoseBB` estimates a world-up oriented box around the visible cluster.
+Its center and extents can differ from the complete object's geometry, and its
+yaw is not a canonical model orientation. This is a geometric pose estimate,
+not CAD-model registration.
 
 The head supplies the initial object bounds, center, and a coarse dominant hue.
 Only the estimated model bounds and uncertainty are projected into the hand image.
@@ -66,6 +74,8 @@ initialization.
 ## Recorded results
 
 - `head.png`: fixed 512 × 512 head RGB image.
+- `head_segmentation.png`: textured-run cluster rectangles and selected 3D box.
+- `head_estimate.txt`: selected cluster, measured world pose, and box dimensions.
 - `head_only/`: 240 × 240 hand frames during the biased approach without correction.
 - `feedback/`: hand frames during the same approach with lateral feedback.
 - `*_raw.png`: unchanged BGR sensor images saved as ordinary RGB PNGs.
@@ -115,5 +125,5 @@ With sufficient free memory, cap the test process and run only the relevant file
 ```bash
 free -m
 ulimit -v 12582912
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 /home/pmania/venvs/cram-env/bin/python -m pytest test/robokudo_test/test_camera_handoff.py test/robokudo_test/test_textured_camera_handoff.py --orm-build never --capture=fd
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 /home/pmania/venvs/cram-env/bin/python -m pytest test/robokudo_test/test_camera_handoff.py test/robokudo_test/test_textured_camera_handoff.py test/robokudo_test/test_tabletop_handoff.py --orm-build never --capture=fd
 ```
