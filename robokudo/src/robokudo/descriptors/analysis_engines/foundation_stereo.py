@@ -10,6 +10,7 @@ from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnn
 from robokudo.annotators.cluster_position import ClusterPositionAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
+from robokudo.annotators.open_vocabulary_object_detection_annotator import OpenVocabularyObjectDetectionAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
@@ -61,18 +62,21 @@ class AnalysisEngine(AnalysisEngineInterface):
         plane_annotator = PlaneAnnotator()
 
         point_cloud_cluster_extractor = PointCloudClusterExtractor()
-
+        open_vocab_descriptor = OpenVocabularyObjectDetectionAnnotator.Descriptor()
+        open_vocab_descriptor.parameters.classes = ["bottle", "apple"]
+        open_vocab_descriptor.parameters.precision_mode = True
         return Pipeline(
             self.name(),
             children=[
                 pipeline_init(),
                 CollectionReaderAnnotator(reader),
                 preprocessor,
-                point_cloud_crop_annotator,
-                plane_annotator,
-                point_cloud_cluster_extractor,
-                ClusterColorAnnotator(),
-                ClusterColorHistogramAnnotator(),
+                # point_cloud_crop_annotator,
+                # plane_annotator,
+                # point_cloud_cluster_extractor,
+                # ClusterColorAnnotator(),
+                # ClusterColorHistogramAnnotator(),
+                OpenVocabularyObjectDetectionAnnotator(descriptor=open_vocab_descriptor),
                 ClusterPositionAnnotator(),
             ],
         )
