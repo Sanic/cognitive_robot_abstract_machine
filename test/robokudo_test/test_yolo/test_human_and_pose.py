@@ -525,6 +525,40 @@ def test_keypoint_clouds_are_built_around_the_two_dimensional_keypoints(
     ] == keypoints.keypoints
 
 
+def test_keypoint_radius_retains_depth_pixel_units_at_smaller_depth_resolution(
+    model_loader: MockModelLoader, scene: PersonScene
+) -> None:
+    """
+    Preserve the configured depth-pixel circle radius when RGB has more pixels.
+    """
+    descriptor = scene.depth_descriptor()
+    descriptor.parameters.generate_clouds_for_keypoints = True
+    annotator = scene.annotator_in_pipeline(descriptor, color_to_depth_ratio=0.5)
+    annotator.compute()
+
+    hypothesis = _only_hypothesis(annotator)
+    clouds = _keypoints_of_kind(hypothesis, KeypointKind.POINT_CLOUD)
+    nose = _keypoints_of_kind(hypothesis, KeypointKind.IMAGE_POSITION).keypoints[
+        PoseKeypoint.NOSE
+    ]
+    depth = annotator.get_cas().get(CASViews.DEPTH_IMAGE)
+    center = (
+        annotator.get_cas()
+        .get(CASViews.COLOR_TO_DEPTH_RATIO)
+        .depth_pixel(nose.x, nose.y)
+    )
+    mask = cv2.circle(
+        np.zeros_like(depth, dtype=np.uint8),
+        (center.x, center.y),
+        descriptor.parameters.keypoint_masking_radius,
+        1,
+        thickness=cv2.FILLED,
+    )
+    assert len(clouds.keypoints[PoseKeypoint.NOSE].points.points) == np.count_nonzero(
+        mask
+    )
+
+
 # %% visualization
 
 

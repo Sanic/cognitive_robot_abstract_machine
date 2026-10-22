@@ -25,6 +25,7 @@ import robokudo.utils.cv_helper
 from robokudo.cas import CASViews
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
+from robokudo.utils.image_region_projection_3d import ImageRegionProjection3D
 from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:
@@ -195,18 +196,46 @@ class OpenVocabularyObjectDetectionAnnotator(
     @catch_and_raise_to_blackboard
     def compute(self) -> py_trees.common.Status:
         """
-        Main method: Detect objects based on configured classes and update the visualization.
+        Publish classified hypotheses with available depth points and visualization.
 
         :return: ``py_trees.common.Status.SUCCESS`` after processing the color image.
         """
         start_timer = default_timer()
         image = self.get_cas().get(CASViews.COLOR_IMAGE)
         object_hypotheses = self.detect_objects(image)
+        self.add_point_clouds(object_hypotheses)
         visualization = self.visualize_objects(image, object_hypotheses)
         self.get_cas().annotations.extend(object_hypotheses)
         self.get_annotator_output_struct().set_image(visualization)
         self.feedback_message = f"Processing took {default_timer() - start_timer:.4f}s"
         return py_trees.common.Status.SUCCESS
+
+    def add_point_clouds(
+        self,
+        object_hypotheses: list[ObjectHypothesis],
+    ) -> None:
+        """
+        Assign colored depth points within each hypothesis's mask or bounding box.
+
+        Hypotheses remain unchanged when depth is disabled or unavailable.
+
+        :param object_hypotheses: Hypotheses with regions in color-image coordinates.
+        """
+        cas = self.get_cas()
+        if not self.descriptor.parameters.global_with_depth or not object_hypotheses:
+            return
+        if not cas.contains(CASViews.DEPTH_IMAGE):
+            return
+        depth_image = cas.get(CASViews.DEPTH_IMAGE)
+        if depth_image is None:
+            return
+        projection = ImageRegionProjection3D.from_cas(cas)
+        for hypothesis in object_hypotheses:
+            hypothesis.points = (
+                projection.project_mask(hypothesis.roi.mask, region=hypothesis.roi.roi)
+                if self.descriptor.parameters.precision_mode
+                else projection.project_box(hypothesis.roi.roi)
+            )
 
     def detect_objects(
         self, image: numpy_typing.NDArray[numpy.uint8]

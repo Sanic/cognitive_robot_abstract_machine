@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import cv2
 import numpy
+import open3d
 import pytest
 import torch
 from py_trees.common import Status
@@ -24,6 +25,7 @@ from robokudo.pipeline import Pipeline
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import crop_image_roi
+from robokudo.utils.o3d_helper import get_cloud_from_rgb_depth_and_mask
 
 # %% NumPy image inputs
 
@@ -316,6 +318,66 @@ def test_visualize_objects_draws_roi_mask_without_mutating_source(
         numpy.broadcast_to(color.to_rgb()[::-1], image_region[foreground].shape),
     )
     numpy.testing.assert_array_equal(image, original_image)
+
+
+# %% Detection point clouds
+
+
+@pytest.mark.parametrize("precision_mode", [False, True])
+@pytest.mark.parametrize("depth_scale", [1.0, 0.5])
+def test_detection_populates_masked_point_cloud(
+    precision_mask_annotator: OpenVocabularyObjectDetectionAnnotator,
+    precision_mode: bool,
+    depth_scale: float,
+) -> None:
+    """
+    Project the detection region into depth while preserving color-image regions.
+    """
+    annotator = precision_mask_annotator
+    annotator.descriptor.parameters.precision_mode = precision_mode
+    annotator.descriptor.parameters.global_with_depth = True
+    image = annotator.get_cas().get(CASViews.COLOR_IMAGE)
+    height, width = image.shape[:2]
+    depth_width, depth_height = int(width * depth_scale), int(height * depth_scale)
+    depth = numpy.full((depth_height, depth_width), 1000, dtype=numpy.uint16)
+    intrinsics = open3d.camera.PinholeCameraIntrinsic(width, height, 2, 2, 0, 0)
+    annotator.get_cas().set(CASViews.DEPTH_IMAGE, depth)
+    annotator.get_cas().set(CASViews.CAMERA_INTRINSIC, intrinsics)
+    annotator.get_cas().set(
+        CASViews.COLOR_TO_DEPTH_RATIO,
+        ColorToDepthRatio(horizontal=depth_scale, vertical=depth_scale),
+    )
+    if precision_mode:
+        mask = annotator.predict_mask(image, [1, 1, width - 1, height - 1])
+        # SAM foreground outside the box must not enter the hypothesis cloud.
+        expected_mask = numpy.zeros_like(mask)
+        expected_mask[1 : height - 1, 1 : width - 1] = mask[
+            1 : height - 1, 1 : width - 1
+        ]
+    else:
+        expected_mask = numpy.zeros((height, width), dtype=numpy.uint8)
+        expected_mask[1 : height - 1, 1 : width - 1] = numpy.iinfo(numpy.uint8).max
+    expected_cloud = get_cloud_from_rgb_depth_and_mask(
+        cv2.cvtColor(
+            cv2.resize(
+                image, (depth_width, depth_height), interpolation=cv2.INTER_NEAREST
+            ),
+            cv2.COLOR_BGR2RGB,
+        ),
+        depth,
+        cv2.resize(
+            expected_mask, (depth_width, depth_height), interpolation=cv2.INTER_NEAREST
+        ),
+        open3d.camera.PinholeCameraIntrinsic(
+            depth_width, depth_height, 2 * depth_scale, 2 * depth_scale, 0, 0
+        ),
+    )
+
+    assert annotator.compute() == Status.SUCCESS
+
+    hypothesis = annotator.get_cas().filter_annotations_by_type(ObjectHypothesis)[0]
+    numpy.testing.assert_array_equal(hypothesis.points.points, expected_cloud.points)
+    numpy.testing.assert_array_equal(hypothesis.points.colors, expected_cloud.colors)
 
 
 # %% Dataclass initialization

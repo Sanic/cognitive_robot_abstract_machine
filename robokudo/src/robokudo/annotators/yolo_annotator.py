@@ -21,7 +21,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import open3d as o3d
 import torch
 from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
@@ -39,14 +38,16 @@ from robokudo.types.scene import HumanHypothesis, ObjectHypothesis
 from robokudo.utils.annotator_helper import (
     draw_bounding_boxes_from_object_hypotheses,
     resize_mask,
-    scale_camera_intrinsics,
 )
 from robokudo.utils.comparators import RoiComparator
-from robokudo.utils.cv_helper import crop_image, get_scaled_color_image_for_depth_image
+from robokudo.utils.cv_helper import crop_image
 from robokudo.utils.decorators import timer_decorator
 from robokudo.utils.file_loader import FileLoader
 from robokudo.utils.module_loader import ModuleLoader
-from robokudo.utils.o3d_helper import get_cloud_from_rgb_depth_and_mask
+from robokudo.utils.image_region_projection_3d import (
+    ImageCoordinates,
+    ImageRegionProjection3D,
+)
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -225,30 +226,33 @@ class YoloAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "YoloAnnotator",
-        descriptor: Optional[YoloAnnotator.Descriptor] = None,
+        descriptor: YoloAnnotator.Descriptor | None = None,
     ) -> None:
+        """
+        Initialize detection models, region projection and hypothesis comparison.
+        """
         super().__init__(name, descriptor)
 
         self.model_location: str = self.descriptor.parameters.model_location(self.name)
         """
         Where the YOLO model is loaded from.
         """
-        self.model: Optional[YOLO] = None
+        self.model: YOLO | None = None
         """
         The YOLO detection model, loaded during setup.
         """
-        self.class_names: Dict[int, str] = {}
+        self.class_names: dict[int, str] = {}
         """
         Name of each class the model detects, by class id, loaded during setup.
         """
-        self.segmentation_model: Optional[SAM] = None
+        self.segmentation_model: SAM | None = None
         """
         The SAM model refining the hypothesis masks in precision mode, loaded during
         setup.
         """
-        self.camera_intrinsics: Optional[o3d.camera.PinholeCameraIntrinsic] = None
+        self.region_projection: ImageRegionProjection3D | None = None
         """
-        Intrinsics of the camera at the resolution of the depth image.
+        Projection of image regions into the current camera's depth points.
         """
         self.roi_comparator = RoiComparator(weight=1.0)
         """
@@ -287,10 +291,15 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
         if parameters.global_with_depth:
-            self.camera_intrinsics = self.get_cas().get_copy(CASViews.CAMERA_INTRINSIC)
-            scale_camera_intrinsics(self)
+            self.region_projection = ImageRegionProjection3D.from_cas(
+                self.get_cas(), depth_truncate=parameters.depth_truncate
+            )
 
-        detection_image = self._detection_image()
+        detection_image = (
+            cv2.cvtColor(self.region_projection.rgb_image, cv2.COLOR_RGB2BGR)
+            if parameters.global_with_depth
+            else self.get_cas().get_copy(CASViews.COLOR_IMAGE)
+        )
         existing_hypotheses = (
             self.get_cas().filter_annotations_by_type(ObjectHypothesis)
             if parameters.classify_existing_hypotheses
@@ -312,16 +321,6 @@ class YoloAnnotator(ThreadedAnnotator):
         if parameters.global_with_visualization:
             self._visualize(annotated_detections)
         return Status.SUCCESS
-
-    def _detection_image(self) -> npt.NDArray[np.uint8]:
-        """
-        :return: The color image, scaled to the depth image resolution when depth is
-            used.
-        """
-        color_image = self.get_cas().get_copy(CASViews.COLOR_IMAGE)
-        if not self.descriptor.parameters.global_with_depth:
-            return color_image
-        return get_scaled_color_image_for_depth_image(self.get_cas(), color_image)
 
     def _detect(self, detection_image: npt.NDArray[np.uint8]) -> List[YoloDetection]:
         """
@@ -445,7 +444,9 @@ class YoloAnnotator(ThreadedAnnotator):
 
         detection_mask = self._detection_mask(detection, detection_image)
         if self.descriptor.parameters.global_with_depth:
-            hypothesis.points = self._point_cloud(detection_mask, detection_image)
+            hypothesis.points = self.region_projection.project_mask(
+                detection_mask, coordinates=ImageCoordinates.DEPTH
+            )
         hypothesis.roi.mask = crop_image(
             resize_mask(self, detection_mask),
             (region.pos.x, region.pos.y),
@@ -480,23 +481,6 @@ class YoloAnnotator(ThreadedAnnotator):
         kernel_size = parameters.precision_mode_erosion_kernel_size
         kernel = np.ones((kernel_size, kernel_size), np.uint8)
         return cv2.erode(mask, kernel, iterations=1)
-
-    def _point_cloud(
-        self,
-        detection_mask: npt.NDArray[np.uint8],
-        detection_image: npt.NDArray[np.uint8],
-    ) -> o3d.geometry.PointCloud:
-        """
-        :return: The point cloud of the depth measurements inside the detection mask.
-        """
-        return get_cloud_from_rgb_depth_and_mask(
-            rgb_image=cv2.cvtColor(detection_image, cv2.COLOR_BGR2RGB),
-            depth_image=self.get_cas().get(CASViews.DEPTH_IMAGE),
-            mask=detection_mask,
-            camera_intrinsics=self.camera_intrinsics,
-            depth_truncate=self.descriptor.parameters.depth_truncate,
-            mask_true_value=self.mask_foreground,
-        )
 
     def _visualize(self, annotated_detections: List[AnnotatedDetection]) -> None:
         """

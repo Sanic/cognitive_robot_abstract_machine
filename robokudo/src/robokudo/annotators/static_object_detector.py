@@ -11,6 +11,8 @@ The detector can create object hypotheses with poses, masks, and class labels.
 
 from __future__ import annotations
 
+# %% imports
+
 import copy
 from enum import Enum
 from timeit import default_timer
@@ -43,9 +45,12 @@ from robokudo.utils.cv_helper import (
     rect_outside_image,
 )
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
+from robokudo.utils.image_region_projection_3d import (
+    ImageCoordinates,
+    ImageRegionProjection3D,
+)
 from robokudo.utils.o3d_helper import (
     get_2d_bounding_rect_from_3d_bb,
-    get_cloud_from_rgb_depth_and_mask,
     get_obb_from_size_and_transform,
 )
 from robokudo.utils.transform import (
@@ -62,9 +67,15 @@ if TYPE_CHECKING:
     import open3d as o3d
 
 
+# %% detection modes
+
+
 class StaticObjectMode(Enum):
     BOUNDING_BOX = "bounding_box"
     WORLD_DESCRIPTOR = "world_descriptor"
+
+
+# %% static detection
 
 
 class StaticObjectDetectorAnnotator(BaseAnnotator):
@@ -514,7 +525,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         return rotation_list
 
     def get_cloud_from_2d_bb_roi(
-        self, color_rgb: npt.NDArray
+        self, color_rgb: npt.NDArray[np.uint8]
     ) -> o3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside the configured bounding
@@ -530,14 +541,15 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             width=parameters.bounding_box_width,
             height=parameters.bounding_box_height,
         )
-        left, top, right, bottom = (
-            self.get_cas()
-            .get(CASViews.COLOR_TO_DEPTH_RATIO)
-            .depth_region(box)
-            .get_corner_points()
+        ratio = self.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
+        depth_region = ratio.depth_region(box)
+        projection = ImageRegionProjection3D(
+            rgb_image=color_rgb,
+            depth_image=self.depth,
+            camera_intrinsics=self.camera_intrinsics,
+            color_region=Rect(
+                width=int(color_rgb.shape[1] / ratio.horizontal),
+                height=int(color_rgb.shape[0] / ratio.vertical),
+            ),
         )
-        mask = np.zeros_like(self.depth, dtype=np.uint8)
-        mask[top:bottom, left:right] = 255
-        return get_cloud_from_rgb_depth_and_mask(
-            color_rgb, self.depth, mask, self.camera_intrinsics, mask_true_value=255
-        )
+        return projection.project_box(depth_region, coordinates=ImageCoordinates.DEPTH)
