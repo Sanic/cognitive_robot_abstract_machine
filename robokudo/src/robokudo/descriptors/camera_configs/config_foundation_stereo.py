@@ -105,7 +105,7 @@ class FoundationStereoCameraConfig(
     Maximum calibration timestamp difference in seconds.
     """
 
-    max_frame_age: float = 1.0
+    max_frame_age: float = 10.0
     """
     Maximum acquisition age in seconds at receipt and consumption.
     """
