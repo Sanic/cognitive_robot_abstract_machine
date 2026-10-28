@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass, field
+
 import numpy as np
 from enum import Enum
 
@@ -48,6 +53,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 
+# %% Articulation limits
 class MaximumSpeed(float, Enum):
     """
     The speed limits of the kitchen's movable parts.
@@ -70,10 +76,38 @@ class MaximumSpeed(float, Enum):
     """
 
 
+# %% Measured kitchen geometry
+@dataclass
+class KitchenMeasurements:
+    """Kitchen dimensions and placements in the registered model root frame."""
+
+    wall_interior_y: float = -2.480
+    """Observed interior plane behind the kitchen run in metres."""
+    refrigerator_depth: float = 0.581
+    """Refrigerator corpus depth under the flush-back constraint in metres."""
+    counter_cabinet_depth: float = 0.586
+    """Counter corpus depth under the flush-back constraint in metres."""
+    counter_worktop_depth: float = 0.590
+    """Worktop depth between the wall and observed front edge in metres."""
+    oven_tower_depth: float = 0.599
+    """Oven tower depth under the flush-back constraint in metres."""
+    island_center_x: float = 3.52835439
+    """Measured island corpus centre along root X in metres."""
+    island_center_y: float = 0.46312429
+    """Measured island corpus centre along root Y in metres."""
+    island_yaw: float = np.pi / 2 + np.radians(0.3315143615)
+    """Measured island orientation about the root vertical axis in radians."""
+
+
+# %% Environment construction
+@dataclass
 class KitchenEnvironment:
     """
     Manages the Kitchen Environment world with walls, furniture, and room layouts.
     """
+
+    measurements: KitchenMeasurements = field(default_factory=KitchenMeasurements)
+    """Observed kitchen geometry with the existing flush-back construction constraint."""
 
     def get_world(self) -> World:
         """
@@ -131,7 +165,7 @@ class KitchenEnvironment:
             ),
         )
 
-    def _build_environment_walls(self, world: World):
+    def _build_environment_walls(self, world: World) -> World:
         """
         Builds and configures the environment walls for a given world.
         """
@@ -219,7 +253,7 @@ class KitchenEnvironment:
                 world=world,
                 name="east_wall",
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=2.462, y=-2.535, yaw=np.pi / 2
+                    x=2.462, y=self.measurements.wall_interior_y - 0.025, yaw=np.pi / 2
                 ),
                 scale=Scale(0.05, 4.924, 3.00),
             )
@@ -254,7 +288,7 @@ class KitchenEnvironment:
             world.add_connection(root_C_north_west_wall)
             return world
 
-    def _build_environment_furniture(self, world: World):
+    def _build_environment_furniture(self, world: World) -> World:
         """
         Adds furniture items and room layouts to the scene graph.
         """
@@ -262,7 +296,7 @@ class KitchenEnvironment:
         standard_handle_width = 0.015
 
         with world.modify_world():
-            # --- TRASH CAN ---
+            # %% Trash can
             trash_can = TrashCan.get_annotation_specification(
                 "trash_can",
                 TrashCan.get_default_root_kinematic_structure_entity_specification(
@@ -277,8 +311,8 @@ class KitchenEnvironment:
             for shape in trash_can.root.visual.shapes:
                 shape.color = Color.GRAY()
 
-            # --- REFRIGERATOR ---
-            fridge_length, fridge_width = 0.60, 0.60
+            # %% Refrigerator
+            fridge_length, fridge_width = self.measurements.refrigerator_depth, 0.60
             fridge_front_width = 0.595
             fridge_drawer_floor_gap = 0.145
             fridge_drawer_height = 0.354
@@ -305,7 +339,7 @@ class KitchenEnvironment:
             fridge_center_x = fridge_counter_boundary_x - fridge_width / 2
             fridge_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=fridge_center_x,
-                y=-2.181,
+                y=self.measurements.wall_interior_y + fridge_length / 2,
                 z=fridge_height / 2,
                 yaw=-np.pi / 2,
             )
@@ -492,8 +526,10 @@ class KitchenEnvironment:
                 shape.color = Color.GRAY()
             fridge_drawer.add(fridge_drawer_handle)
 
-            # --- KITCHEN COUNTER ---
-            counter_top_length, counter_top_depth = 2.044, 0.658
+            # %% Kitchen counter
+            counter_top_length = 2.044
+            counter_top_depth = self.measurements.counter_worktop_depth
+            counter_cabinet_depth = self.measurements.counter_cabinet_depth
             counter_top_surface_height = 0.85
             counter_top_thickness = 0.026
             counter_base_facing_height = 0.099
@@ -506,13 +542,13 @@ class KitchenEnvironment:
             counter_top_center_x = fridge_counter_boundary_x + counter_top_length / 2
             root_T_counter_cabinets = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=counter_top_center_x,
-                y=-2.181,
+                y=self.measurements.wall_interior_y + counter_cabinet_depth / 2,
                 z=counter_base_facing_height + counter_cabinet_height / 2,
                 yaw=-np.pi / 2,
             )
             root_T_counter_top = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=counter_top_center_x,
-                y=-2.181,
+                y=self.measurements.wall_interior_y + counter_top_depth / 2,
                 z=counter_top_surface_height - counter_top_thickness / 2,
                 yaw=-np.pi / 2,
             )
@@ -535,7 +571,7 @@ class KitchenEnvironment:
                 name="counter_base_facing",
                 world_root_T_self=root_T_counter_cabinets
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-counter_top_depth / 2 + counter_base_facing_setback,
+                    x=-counter_cabinet_depth / 2 + counter_base_facing_setback,
                     z=-counter_cabinet_height / 2 - counter_base_facing_height / 2,
                 ),
                 scale=Scale(
@@ -598,7 +634,7 @@ class KitchenEnvironment:
                 "module_1_cabinet",
                 Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
-                        x=counter_top_depth,
+                        x=counter_cabinet_depth,
                         y=module_1_width,
                         z=counter_cabinet_height,
                     ),
@@ -613,7 +649,7 @@ class KitchenEnvironment:
                 name="module_1_face_plate",
                 world_root_T_self=module_1_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-counter_top_depth / 2 + module_1_door_thickness / 2,
+                    x=-counter_cabinet_depth / 2 + module_1_door_thickness / 2,
                     z=(counter_cabinet_height - module_1_face_plate_height) / 2,
                 ),
                 scale=Scale(
@@ -628,7 +664,7 @@ class KitchenEnvironment:
             module_1_hinge_world_pose = (
                 module_1_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-counter_top_depth / 2 + module_1_door_thickness / 2,
+                    x=-counter_cabinet_depth / 2 + module_1_door_thickness / 2,
                     y=-module_1_front_width / 2,
                     z=module_1_door_center_height,
                 )
@@ -693,7 +729,7 @@ class KitchenEnvironment:
                 "dishwasher",
                 Dishwasher.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
-                        x=counter_top_depth,
+                        x=counter_cabinet_depth,
                         y=module_2_width,
                         z=counter_cabinet_height,
                     ),
@@ -706,7 +742,7 @@ class KitchenEnvironment:
             module_2_hinge_world_pose = (
                 module_2_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-counter_top_depth / 2 + module_2_door_thickness / 2,
+                    x=-counter_cabinet_depth / 2 + module_2_door_thickness / 2,
                     z=-counter_cabinet_height / 2,
                 )
             )
@@ -764,7 +800,7 @@ class KitchenEnvironment:
                 "module_3_cabinet",
                 Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
-                        x=counter_top_depth,
+                        x=counter_cabinet_depth,
                         y=module_3_width,
                         z=counter_cabinet_height,
                     ),
@@ -790,7 +826,7 @@ class KitchenEnvironment:
                 drawer_pose = (
                     module_3_pose
                     @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                        x=-counter_top_depth / 2 + module_3_drawer_depth / 2,
+                        x=-counter_cabinet_depth / 2 + module_3_drawer_depth / 2,
                         z=drawer_center_height,
                     )
                 )
@@ -836,8 +872,8 @@ class KitchenEnvironment:
                 drawer.add(handle)
                 drawer_bottom_height += height
 
-            # --- OVEN TOWER ---
-            oven_width, oven_depth = 1.20, 0.658
+            # %% Oven tower
+            oven_width, oven_depth = 1.20, self.measurements.oven_tower_depth
             oven_base_facing_height = 0.145
             oven_side_drawer_height = 1.324
             oven_side_drawer_top_gap = 0.008
@@ -857,7 +893,10 @@ class KitchenEnvironment:
                 + oven_width / 2
             )
             tower_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=tower_center_x, y=-2.181, z=oven_height / 2, yaw=-np.pi / 2
+                x=tower_center_x,
+                y=self.measurements.wall_interior_y + oven_depth / 2,
+                z=oven_height / 2,
+                yaw=-np.pi / 2,
             )
             tower = Cupboard.get_annotation_specification(
                 "oven_tower",
@@ -1187,7 +1226,7 @@ class KitchenEnvironment:
                 shape.color = Color.GRAY()
             oven_door.add(oven_handle)
 
-            # --- SIDEBOARD / KITCHEN ISLAND ---
+            # %% Sideboard / kitchen island
             sideboard_length, sideboard_width, sideboard_height = 2.250, 0.597, 0.825
             sideboard_top_length, sideboard_top_width = 2.447, 0.796
             sideboard_top_thickness = 0.026
@@ -1260,10 +1299,10 @@ class KitchenEnvironment:
                 + sideboard_outer_column_width / 2,
             ]
             sideboard_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=3.545,
-                y=0.203 + sideboard_width / 2,
+                x=self.measurements.island_center_x,
+                y=self.measurements.island_center_y,
                 z=sideboard_height / 2,
-                yaw=np.pi / 2,
+                yaw=self.measurements.island_yaw,
             )
 
             kitchen_island = KitchenIsland.create_with_new_body_in_world(
@@ -1430,7 +1469,7 @@ class KitchenEnvironment:
                         shape.color = Color.GRAY()
                     drawer.add(handle)
 
-            # --- SOFA ---
+            # %% Sofa
             sofa = Sofa.create_with_new_body_in_world(
                 world=world,
                 name="sofa",
@@ -1442,10 +1481,10 @@ class KitchenEnvironment:
             for color in sofa.bodies[0].visual.shapes:
                 color.color = Color.BEIGE()
 
-            # --- COFFEE TABLE ---
+            # %% Coffee table
             self._build_coffee_table(world)
 
-            # --- CUPBOARD ---
+            # %% Cupboard
             cupboard_scale = Scale(0.43, 0.80, 2.02)
             cupboard_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=4.55, y=4.72, z=1.01
@@ -1524,7 +1563,7 @@ class KitchenEnvironment:
                     shape.color = Color.GRAY()
                 door.add(handle)
 
-            # --- DESK ---
+            # %% Desk
             desk_length, desk_width, desk_height = 0.60, 1.20, 0.75
             desk_color = Color.WHITE()
             desk_plate_thickness = 0.03
@@ -1560,7 +1599,7 @@ class KitchenEnvironment:
                     shape.color = desk_color
                 desk.add(leg)
 
-            # --- MODULAR COOKING TABLE ---
+            # %% Modular cooking table
             (
                 cooking_table_length,
                 cooking_table_depth,
@@ -1668,7 +1707,7 @@ class KitchenEnvironment:
                     shape.color = Color.GRAY()
                 drawer.add(handle)
 
-            # --- DINING TABLE ---
+            # %% Dining table
             (
                 dining_table_length,
                 dining_table_width,
