@@ -1,0 +1,348 @@
+"""
+The ground truth of one Articulate3D scene, as the protocol makes it.
+
+Every object comes from Articulate3D's own annotation: its parts, the faces each covers
+and the part hierarchy. What a part *is* comes from the protocol, which a person wrote
+before any run was judged, and which field holds a part comes from the ontology the run
+was given. Nothing comes from inference rules, and nothing from what a run produced.
+
+Run ``python -m experiments.warsaw.articulate3d.ground_truth --help`` for its options.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+from dataclasses import dataclass, field
+from enum import StrEnum
+from pathlib import Path
+
+from semantic_digital_twin.adapters.articulate3d_dataset.schema import (
+    Articulate3DAnnotationFile,
+    Articulate3DPart,
+)
+from semantic_digital_twin.semantic_annotations.part_whole import fields_accepting
+from semantic_digital_twin.semantic_annotations.taxonomy_export import (
+    annotation_classes,
+    load_annotation_modules,
+)
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
+
+from experiments.warsaw.articulate3d.exceptions import AmbiguousPartFieldError
+from experiments.warsaw.articulate3d.protocol import EvaluationProtocol
+from experiments.warsaw.bases import JsonRecord
+
+# %% what the ontology makes of a relation
+
+
+class Expressibility(StrEnum):
+    """
+    Whether the ontology can hold one relation of the part hierarchy.
+    """
+
+    EXPRESSIBLE = "expressible"
+    """
+    The whole's class has a field that holds the part's class.
+    """
+
+    INEXPRESSIBLE = "inexpressible"
+    """
+    No field of the whole's class holds the part's class, so no run can mount it.
+    """
+
+    UNDETERMINED = "undetermined"
+    """
+    The class of an end is not judged, so whether a field could hold it is not known.
+    """
+
+
+# %% the ground truth of one scene
+
+
+@dataclass(frozen=True)
+class GroundTruthPart(JsonRecord):
+    """
+    One annotated part the evaluation covers.
+    """
+
+    part_id: int
+    """
+    The part, as Articulate3D numbers the parts of a scene.
+    """
+
+    part_name: str
+    """
+    The name its annotator gave it.
+    """
+
+    semantic_class: str | None
+    """
+    The class it is judged against, or nothing where its class is not judged.
+    """
+
+    faces: list[int]
+    """
+    The faces of the scan it covers.
+    """
+
+
+@dataclass(frozen=True)
+class GroundTruthRelation(JsonRecord):
+    """
+    One relation of the part hierarchy: a part and the whole it belongs to.
+    """
+
+    whole: int
+    """
+    The part holding the other.
+    """
+
+    part: int
+    """
+    The part held.
+    """
+
+    expressibility: Expressibility
+    """
+    Whether the ontology can hold the relation.
+    """
+
+    field_name: str | None = None
+    """
+    The field the whole holds the part through, where the ontology can hold it.
+    """
+
+
+@dataclass(frozen=True)
+class SceneGroundTruth(JsonRecord):
+    """
+    Everything one scene is judged against.
+    """
+
+    scene_id: str
+    """
+    The ScanNet++ scene, as both datasets name it.
+    """
+
+    parts: list[GroundTruthPart] = field(default_factory=list)
+    """
+    Every part the evaluation covers.
+    """
+
+    relations: list[GroundTruthRelation] = field(default_factory=list)
+    """
+    Every relation of the part hierarchy between two of those parts.
+    """
+
+    @classmethod
+    def read(cls, path: Path) -> SceneGroundTruth:
+        """
+        :param path: A ground truth file.
+        :return: What it holds.
+        """
+        return cls.from_json(json.loads(Path(path).read_text()))
+
+    def write(self, path: Path) -> None:
+        """
+        :param path: Where to write the ground truth.
+        """
+        Path(path).write_text(json.dumps(self.to_json()))
+
+
+# %% building it
+
+
+@dataclass(frozen=True)
+class GroundTruthBuilder:
+    """
+    Turns Articulate3D's annotation of a scene into ground truth, by a frozen protocol.
+    """
+
+    protocol: EvaluationProtocol
+    """
+    What a person decided about the dataset's annotations.
+    """
+
+    ontology: dict[str, type]
+    """
+    The ontology's classes by name, which the protocol's classes must belong to.
+    """
+
+    def __post_init__(self) -> None:
+        self.protocol.check_classes(set(self.ontology))
+
+    def build(
+        self, scene_id: str, annotated: list[Articulate3DPart]
+    ) -> SceneGroundTruth:
+        """
+        Make the ground truth of one scene.
+
+        A part without faces is left out, since no run can find it in a mesh, and so is
+        a part whose name the protocol ignores. A relation is kept only where both of its
+        ends are.
+
+        :param scene_id: The scene.
+        :param annotated: Its annotated parts.
+        :return: The scene's ground truth.
+        """
+        covered = [
+            part
+            for part in annotated
+            if len(part.face_indices) and self.protocol.covers(part.part_name)
+        ]
+        parts = [
+            GroundTruthPart(
+                part_id=part.part_id,
+                part_name=part.part_name,
+                semantic_class=self.protocol.class_of(
+                    scene_id, part.part_id, part.part_name
+                ),
+                faces=[int(face) for face in part.face_indices],
+            )
+            for part in covered
+        ]
+        class_of = {part.part_id: part.semantic_class for part in parts}
+        at_position = {}
+        for part in covered:
+            if part.hierarchy_path is not None:
+                at_position.setdefault(part.hierarchy_path, part)
+        relations = [
+            self._relation(
+                at_position[part.parent_hierarchy_path].part_id, part.part_id, class_of
+            )
+            for part in covered
+            if part.parent_hierarchy_path in at_position
+        ]
+        return SceneGroundTruth(scene_id=scene_id, parts=parts, relations=relations)
+
+    def _relation(
+        self, whole: int, part: int, class_of: dict[int, str | None]
+    ) -> GroundTruthRelation:
+        """
+        :param whole: The part holding the other.
+        :param part: The part held.
+        :param class_of: The class each part is judged against.
+        :return: The relation, with the field the ontology holds it through.
+        :raises AmbiguousPartFieldError: If several fields could hold it and the
+            protocol does not choose.
+        """
+        whole_class, part_class = class_of[whole], class_of[part]
+        if whole_class is None or part_class is None:
+            return GroundTruthRelation(
+                whole=whole, part=part, expressibility=Expressibility.UNDETERMINED
+            )
+        chosen = self.protocol.field_choice(whole_class, part_class)
+        if chosen is not None:
+            return GroundTruthRelation(
+                whole=whole,
+                part=part,
+                expressibility=Expressibility.EXPRESSIBLE,
+                field_name=chosen,
+            )
+        fields = fields_accepting(self.ontology[whole_class], self.ontology[part_class])
+        if not fields:
+            return GroundTruthRelation(
+                whole=whole, part=part, expressibility=Expressibility.INEXPRESSIBLE
+            )
+        if len(fields) > 1:
+            raise AmbiguousPartFieldError(
+                whole_class=whole_class,
+                part_class=part_class,
+                fields=[one.field_name for one in fields],
+            )
+        return GroundTruthRelation(
+            whole=whole,
+            part=part,
+            expressibility=Expressibility.EXPRESSIBLE,
+            field_name=fields[0].field_name,
+        )
+
+
+# %% command-line entry point
+
+
+class GroundTruthFile(StrEnum):
+    """
+    How a scene's ground truth file is named.
+    """
+
+    SUFFIX = "_ground_truth.json"
+    """
+    What follows the scene id.
+    """
+
+    def path(self, directory: Path, scene_id: str) -> Path:
+        """
+        :param directory: The directory holding ground truth files.
+        :param scene_id: The scene.
+        :return: Where the scene's ground truth is written.
+        """
+        return Path(directory) / f"{scene_id}{self.value}"
+
+
+def argument_parser() -> argparse.ArgumentParser:
+    """
+    Build the command-line interface for building ground truth.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--dataset",
+        type=Path,
+        required=True,
+        help="The directory holding Articulate3D's annotation files",
+    )
+    parser.add_argument(
+        "--protocol", type=Path, required=True, help="The frozen protocol"
+    )
+    parser.add_argument(
+        "--output", type=Path, required=True, help="Where to write the ground truth"
+    )
+    parser.add_argument(
+        "--scenes",
+        type=Path,
+        help="A file of scene ids, one per line; every annotated scene by default",
+    )
+    return parser
+
+
+def main(arguments: list[str] | None = None) -> int:
+    """
+    Build and write the ground truth of a set of scenes.
+
+    :param arguments: Command-line arguments without the program name.
+    :return: Zero once every scene's ground truth is written.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logger = logging.getLogger(__name__)
+    parsed = argument_parser().parse_args(arguments)
+    load_annotation_modules()
+    builder = GroundTruthBuilder(
+        protocol=EvaluationProtocol.read(parsed.protocol),
+        ontology=annotation_classes(SemanticAnnotation),
+    )
+    scene_ids = (
+        parsed.scenes.read_text().split()
+        if parsed.scenes
+        else Articulate3DAnnotationFile.PARTS.scene_ids(parsed.dataset)
+    )
+    parsed.output.mkdir(parents=True, exist_ok=True)
+    for scene_id in scene_ids:
+        built = builder.build(
+            scene_id,
+            Articulate3DPart.all_in_file(
+                Articulate3DAnnotationFile.PARTS.path(parsed.dataset, scene_id)
+            ),
+        )
+        built.write(GroundTruthFile.SUFFIX.path(parsed.output, scene_id))
+        logger.info(
+            "%s: %s parts, %s relations",
+            scene_id,
+            len(built.parts),
+            len(built.relations),
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
