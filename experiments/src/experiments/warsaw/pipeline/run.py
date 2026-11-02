@@ -248,6 +248,14 @@ class Run:
         made.mkdir(parents=True, exist_ok=True)
         return made
 
+    @property
+    def scene_directory(self) -> Path:
+        """
+        :return: The directory this run read its scene from, as its provenance records
+            it.
+        """
+        return Path(self.read_json(RunFile.PROVENANCE)["settings"]["scene_directory"])
+
     def holds(self, run_file: RunFile) -> bool:
         """
         :param run_file: The file to look for.

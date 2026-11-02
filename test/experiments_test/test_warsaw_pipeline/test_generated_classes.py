@@ -173,6 +173,21 @@ def test_a_missing_class_is_written_into_the_run_that_proposed_it(step, known):
     assert "KitchenIsland" in written.path.read_text()
 
 
+def test_the_bases_each_generated_class_declares_are_read_back(step, known):
+    """
+    Read from the file, so a finished run says what its classes derive from without
+    being imported.
+    """
+    wanted = {"KitchenIsland": ["Table", "HasDrawers"], "Ceiling": ["Furniture"]}
+    step.generate_missing(wanted, known)
+
+    assert GeneratedClasses(directory=step.run.directory).declared_bases == wanted
+
+
+def test_a_run_that_generated_nothing_declares_no_bases(step):
+    assert GeneratedClasses(directory=step.run.directory).declared_bases == {}
+
+
 def test_bases_are_ordered_as_a_class_must_declare_them(step, known):
     """
     A proposal naming HasRootBody beside IsStorageSpace -- which derives from it --

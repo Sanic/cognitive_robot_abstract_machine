@@ -15,8 +15,6 @@ scan was scaled. The modelled world's objects are already there.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import trimesh
 from numpy.typing import NDArray
@@ -104,8 +102,7 @@ def bodies_of_a_run(run: Run) -> Iterator[Tuple[str, trimesh.Trimesh]]:
     :param run: The finished run to read.
     :return: Each body in turn, by the name the run gave it.
     """
-    scene_path = Path(run.read_json(RunFile.PROVENANCE)["settings"]["scene_directory"])
-    [scene_mesh] = sorted(scene_path.glob("*.ply"))
+    [scene_mesh] = sorted(run.scene_directory.glob("*.ply"))
     scene = trimesh.load(scene_mesh, process=False)
     faces_of = np.load(run.path(RunFile.SPLIT_FACES))
     for name in faces_of.files:

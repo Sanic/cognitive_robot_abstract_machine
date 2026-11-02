@@ -18,13 +18,12 @@ call at the top of a step rather than something a step can opt into later.
 
 from __future__ import annotations
 
-import re
+import ast
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
-from typing_extensions import List, Optional
 
 from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     declared_annotation_classes,
@@ -91,16 +90,31 @@ class GeneratedClasses:
         return self.path.exists()
 
     @property
-    def class_names(self) -> List[str]:
+    def class_names(self) -> list[str]:
         """
         :return: The names of the classes this run generated, read out of the file rather
             than by importing it, so asking costs nothing and changes nothing.
         """
-        if not self.were_generated:
-            return []
-        return re.findall(r"^class (\w+)", self.path.read_text(), re.MULTILINE)
+        return list(self.declared_bases)
 
-    def taken_over_by_the_ontology(self) -> List[str]:
+    @property
+    def declared_bases(self) -> dict[str, list[str]]:
+        """
+        :return: The names of the classes each class this run generated derives from, in
+            declaration order, by class name. Read out of the file rather than by
+            importing it, so asking costs nothing and changes nothing.
+        """
+        if not self.were_generated:
+            return {}
+        return {
+            statement.name: [
+                base.id for base in statement.bases if isinstance(base, ast.Name)
+            ]
+            for statement in ast.parse(self.path.read_text()).body
+            if isinstance(statement, ast.ClassDef)
+        }
+
+    def taken_over_by_the_ontology(self) -> list[str]:
         """
         Say which of this run's own classes the ontology has since gained.
 
@@ -128,7 +142,7 @@ class GeneratedClasses:
                 directory=str(self.directory), class_names=taken_over
             )
 
-    def use(self) -> Optional[ModuleType]:
+    def use(self) -> ModuleType | None:
         """
         Make this run's generated classes the ones this interpreter means.
 
