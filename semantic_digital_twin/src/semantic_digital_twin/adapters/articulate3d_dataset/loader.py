@@ -59,14 +59,10 @@ class Articulate3DDatasetLoader:
                 scene_id=scene_id, directory=self.directory
             )
 
-        parts = json.loads(parts_path.read_text())
         articulations = json.loads(articulations_path.read_text())
         return Articulate3DScene(
             scannetpp_scene=self.scannetpp_dataset_loader.load(scene_id),
-            parts=[
-                Articulate3DPart.from_json(annotation)
-                for annotation in parts["data"]["annotations"]
-            ],
+            parts=Articulate3DPart.all_in_file(parts_path),
             articulations=[
                 Articulate3DArticulation.from_json(articulation)
                 for articulation in articulations["data"]["articulations"]

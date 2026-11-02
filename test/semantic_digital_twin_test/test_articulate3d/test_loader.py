@@ -15,6 +15,7 @@ from semantic_digital_twin.adapters.articulate3d_dataset.loader import (
 from semantic_digital_twin.adapters.articulate3d_dataset.schema import (
     Articulate3DAnnotationFile,
     Articulate3DArticulation,
+    Articulate3DPart,
     Articulate3DScene,
 )
 from semantic_digital_twin.adapters.scannetpp_dataset.loader import (
@@ -310,6 +311,29 @@ def test_load_ignores_the_face_count_the_annotations_record(
     scene = loader.load("table_and_cup")
 
     for part, expected in zip(scene.parts, cabinet.parts, strict=True):
+        np.testing.assert_array_equal(part.face_indices, expected.face_indices)
+
+
+def test_scene_ids_lists_every_scene_a_directory_annotates(tmp_path, resources):
+    for scene_id in ["b_scene", "a_scene"]:
+        shutil.copy(
+            Articulate3DAnnotationFile.PARTS.path(resources, "table_and_cup"),
+            Articulate3DAnnotationFile.PARTS.path(tmp_path, scene_id),
+        )
+
+    assert Articulate3DAnnotationFile.PARTS.scene_ids(tmp_path) == [
+        "a_scene",
+        "b_scene",
+    ]
+
+
+def test_parts_are_read_from_their_file_alone(resources, cabinet):
+    parts = Articulate3DPart.all_in_file(
+        Articulate3DAnnotationFile.PARTS.path(resources, "table_and_cup")
+    )
+
+    assert [part.label for part in parts] == [part.label for part in cabinet.parts]
+    for part, expected in zip(parts, cabinet.parts, strict=True):
         np.testing.assert_array_equal(part.face_indices, expected.face_indices)
 
 

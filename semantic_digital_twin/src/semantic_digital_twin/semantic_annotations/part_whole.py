@@ -113,15 +113,28 @@ def field_holding(whole: Type, part: Type) -> Optional[PartWholeField]:
     :return: That field, or ``None`` where no field accepts the part or more than one
         does -- the case ``add`` refuses as ambiguous rather than choosing.
     """
-    matching = [
+    matching = fields_accepting(whole, part)
+    if len(matching) != 1:
+        return None
+    return matching[0]
+
+
+def fields_accepting(whole: Type, part: Type) -> List[PartWholeField]:
+    """
+    Report every field through which a whole could hold a part.
+
+    :param whole: The annotation class holding the part.
+    :param part: The annotation class being held.
+    :return: The fields whose element type the part is, none where the whole cannot
+        hold it and several where :meth:`PartWholeRelationship.add` would raise
+        ``AmbiguousPart``.
+    """
+    return [
         part_whole_relationship_field
         for part_whole_relationship_field in part_whole_fields(whole)
         if isinstance(part_whole_relationship_field.part, type)
         and issubclass(part, part_whole_relationship_field.part)
     ]
-    if len(matching) != 1:
-        return None
-    return matching[0]
 
 
 def admissible_relations(one_class: Type, other_class: Type) -> List[PartWholeField]:

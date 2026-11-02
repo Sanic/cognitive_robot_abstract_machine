@@ -16,7 +16,10 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     IsStorageSpace,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.part_whole import field_holding
+from semantic_digital_twin.semantic_annotations.part_whole import (
+    field_holding,
+    fields_accepting,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cabinet,
     CounterTop,
@@ -216,6 +219,16 @@ def test_a_part_the_whole_cannot_hold_has_no_field():
     Nothing to report is not the same as reporting the wrong field.
     """
     assert field_holding(Handle, Cabinet) is None
+
+
+def test_every_field_that_accepts_a_part_is_reported():
+    assert [field.field_name for field in fields_accepting(Cabinet, Drawer)] == [
+        "drawers"
+    ]
+
+
+def test_no_field_is_reported_for_a_part_the_whole_cannot_hold():
+    assert fields_accepting(Handle, Cabinet) == []
 
 
 def test_the_field_reported_is_the_one_a_mount_actually_routes_to():

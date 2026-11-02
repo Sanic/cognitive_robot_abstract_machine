@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
@@ -58,6 +59,16 @@ class Articulate3DAnnotationFile(StrEnum):
         :return: The path of this file for the scene.
         """
         return directory / f"{scene_id}_{self.value}"
+
+    def scene_ids(self, directory: Path) -> list[str]:
+        """
+        :param directory: The Articulate3D dataset directory.
+        :return: The scenes the directory holds this file for, in name order.
+        """
+        suffix = f"_{self.value}"
+        return sorted(
+            path.name.removesuffix(suffix) for path in directory.glob(f"*{suffix}")
+        )
 
 
 # %% parts
@@ -124,6 +135,17 @@ class Articulate3DPart:
             label=data["label"],
             face_indices=np.asarray(data["triIndices"], dtype=int),
         )
+
+    @classmethod
+    def all_in_file(cls, path: Path) -> list[Articulate3DPart]:
+        """
+        :param path: A scene's ``parts.json``.
+        :return: Every part the file annotates, in the file's order.
+        """
+        parts = json.loads(Path(path).read_text())
+        return [
+            cls.from_json(annotation) for annotation in parts["data"]["annotations"]
+        ]
 
 
 # %% articulations
