@@ -311,6 +311,9 @@ class MountAnnotations(HasLogger):
             split=split,
             classifications=classifications,
             annotated_names=set(annotations),
+            parents=EvaluationGraph.parents_in(
+                world, {body.name for body in split.bodies}
+            ),
         ).with_fields_resolved(annotation_classes(SemanticAnnotation))
         self.run.write_record(RunFile.EVALUATION_GRAPH, graph)
 

@@ -5,11 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from semantic_digital_twin.semantic_annotations.part_whole import field_holding
-
+from typing_extensions import TYPE_CHECKING
 
 from experiments.warsaw.bases import JsonRecord
 from experiments.warsaw.evaluation.size import ObjectSize
 from experiments.warsaw.pipeline.records import Classifications, SplitRecord
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 # %% graph nodes and edges
 
@@ -35,6 +38,12 @@ class EvaluationNode(JsonRecord):
 
     annotation_applied: bool
     """Whether the selected class was instantiated in the final SDT."""
+
+    parent: str | None
+    """
+    The nearest body of the split this body hangs below in the final world, or nothing
+    where it hangs below none.
+    """
 
     size: ObjectSize | None = None
     """How big the body is, where a run's geometry has been measured."""
@@ -137,12 +146,15 @@ class EvaluationGraph(JsonRecord):
         split: SplitRecord,
         classifications: Classifications,
         annotated_names: set[str],
+        parents: dict[str, str | None],
     ) -> EvaluationGraph:
         """Build a graph from files and outcomes already produced by the pipeline.
 
         :param split: Bodies, proposed pairings, and refused mounts.
         :param classifications: The class selected for every body the model answered.
         :param annotated_names: Bodies whose annotations were instantiated successfully.
+        :param parents: The body each body of the split hangs below in the final world,
+            as :meth:`parents_in` finds it.
         :return: A portable graph that does not depend on the run's database schema.
         """
         answers = {
@@ -168,6 +180,7 @@ class EvaluationGraph(JsonRecord):
                 faces=body.faces,
                 body_id=body.body_id,
                 annotation_applied=body.name in annotated_names,
+                parent=parents[body.name],
             )
             for body in split.bodies
         ]
@@ -191,3 +204,22 @@ class EvaluationGraph(JsonRecord):
             source_world_id=split.world_id,
             annotated_world_id=split.annotated_world_id,
         )
+
+    @staticmethod
+    def parents_in(world: World, names: set[str]) -> dict[str, str | None]:
+        """
+        :param world: The world a run built.
+        :param names: The bodies of its split.
+        :return: For each of those bodies, the nearest of them it hangs below, or nothing
+            where it hangs below none.
+        """
+        parents = {}
+        for body in world.bodies:
+            name = str(body.name.name)
+            if name not in names:
+                continue
+            above = body.parent_kinematic_structure_entity
+            while above is not None and str(above.name.name) not in names:
+                above = above.parent_kinematic_structure_entity
+            parents[name] = None if above is None else str(above.name.name)
+        return parents

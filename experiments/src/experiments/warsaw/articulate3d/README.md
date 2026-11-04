@@ -21,15 +21,17 @@ Freeze all of it with one git tag before running the evaluated scenes.
 
 ## Workflow
 
-1. **List the part names** the annotators used and start a protocol from them. Every
-   name is added as `undecided`:
+1. **List the part names** the annotators used and add them to the protocol, which is
+   kept with this package as `protocol.json`. Every new name is added as `undecided`:
 
    ```bash
    python -m experiments.warsaw.articulate3d.labels --dataset <articulate3d> \
-       --protocol protocol.json
+       --scannetpp <scannet++ data> \
+       --protocol experiments/src/experiments/warsaw/articulate3d/protocol.json
    ```
 
-2. **Rule on every name** in `protocol.json`:
+2. **Rule on every name** in `protocol.json`. The commands below read that file unless
+   `--protocol` names another:
    - `class`: the name means one class of the ontology (`semantic_class`);
    - `ambiguous`: the name covers different kinds of things, so these parts are judged as
      objects and as ends of relations, but not on their class;
@@ -45,7 +47,7 @@ Freeze all of it with one git tag before running the evaluated scenes.
 
    ```bash
    python -m experiments.warsaw.articulate3d.ground_truth --dataset <articulate3d> \
-       --protocol protocol.json --output ground_truth/
+       --scannetpp <scannet++ data> --output ground_truth/
    ```
 
 4. **Convert each scene** into the pipeline's input. The part hierarchy is stripped from
@@ -89,19 +91,24 @@ so a misclassified body is still found and counted as a misclassification.
 | classes recognised | the same, out of every part whose class is judged, found or not |
 | hierarchical precision / recall | partial credit for an answer on the right branch of the class hierarchy |
 | answers standing for no class | generated classes with no single class of the ontology as their base |
-| relation precision | the run's part-whole mounts that are relations of the part hierarchy |
-| relation recall | relations of the part hierarchy the run made |
-| expressible | relations the ontology can hold at all: the most any run can make |
-| through the same field | correct mounts made through the field the ontology holds them in |
+| link precision | parts the run hung from another part that hang from their annotated whole |
+| link recall | relations of the part hierarchy the run made |
+| links reachable | relations a field of either class can make: the most any run can make |
+| reachable recall | of those, the ones the run made |
+| ancestor precision / recall | partial credit for a part hung on the right branch, such as a handle hung from its door rather than from the plate on it |
+| triplet precision / recall | links made with both ends given exactly their class, out of the links whose ends' classes are judged |
 
-A class the run generated is judged as the one class of the ontology it derives from,
-with mixins left out. A share with nothing to divide by is reported as `n/a`, never as a
-perfect score.
+Links are read from the tree the run built. A part counts as hung from the nearest
+annotated part above it, past any body between that matches no part. A part the
+annotation hangs from nothing counts against precision when the run hangs it from a
+part. A class the run generated is judged as the one class of the ontology it derives
+from, with mixins left out. A share with nothing to divide by is reported as `n/a`,
+never as a perfect score.
 
 ## Not covered yet
 
-- **Joints.** The pipeline mounts every part with a fixed connection, so the annotated
-  axes, origins and ranges are not scored.
+- **Joints.** The pipeline mounts every part with a fixed connection, and the
+  annotated joints are not evaluated.
 - **Held-out ontology classes.** Testing class generation by hiding classes from the
   taxonomy the pipeline sees needs a change to the taxonomy export.
 - **Confidence intervals.** Spread over scenes and over repeated runs is not computed yet.

@@ -46,7 +46,7 @@ from experiments.warsaw.articulate3d.exceptions import (
     SceneExcludedError,
     SceneNotConvertedError,
 )
-from experiments.warsaw.articulate3d.protocol import EvaluationProtocol
+from experiments.warsaw.articulate3d.protocol import EvaluationProtocol, ProtocolFile
 from experiments.warsaw.articulate3d.rules import AnnotatedScene
 from experiments.warsaw.bases import JsonRecord
 from experiments.warsaw.habitat.convert import label_property
@@ -377,8 +377,9 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--protocol",
         type=Path,
-        required=True,
-        help="The frozen protocol, whose annotation rules the scene is written by",
+        default=ProtocolFile.ARTICULATE3D,
+        help="The frozen protocol, whose annotation rules the scene is written by; the "
+        "one kept with this package by default",
     )
     parser.add_argument("--scene", required=True, help="The scene to convert")
     parser.add_argument("--output", type=Path, required=True, help="Where to write it")

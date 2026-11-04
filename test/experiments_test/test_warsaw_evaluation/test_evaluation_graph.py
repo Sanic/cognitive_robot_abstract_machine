@@ -14,7 +14,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     annotation_classes,
 )
-from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    SemanticAnnotation,
+)
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 from experiments.warsaw.evaluation.graph import (
     EvaluationEdge,
@@ -73,6 +79,7 @@ def test_graph_snapshot_keeps_accepted_and_refused_relations() -> None:
         split=split,
         classifications=classifications,
         annotated_names={"cabinet_1", "drawer_1"},
+        parents={"cabinet_1": None, "drawer_1": "cabinet_1", "handle_1": None},
     )
 
     assert graph.source_world_id == 7
@@ -85,6 +92,7 @@ def test_graph_snapshot_keeps_accepted_and_refused_relations() -> None:
     assert graph.nodes[0].predicted_class == "Cabinet"
     assert graph.nodes[0].annotation_applied is True
     assert graph.nodes[2].annotation_applied is False
+    assert [node.parent for node in graph.nodes] == [None, "cabinet_1", None]
     assert graph.edges[0].accepted is True
     assert graph.edges[1].accepted is False
     assert graph.edges[1].refusal_reason == "class does not admit part"
@@ -104,6 +112,7 @@ def test_unclassified_body_remains_visible_in_snapshot() -> None:
         split=split,
         classifications=Classifications(scene="apartment.glb", model="scripted/model"),
         annotated_names=set(),
+        parents={"unknown_1": None},
     )
 
     assert graph.nodes[0].predicted_class is None
@@ -126,6 +135,7 @@ def graph_with_an_unnamed_mount() -> EvaluationGraph:
                 faces=100,
                 body_id=None,
                 annotation_applied=True,
+                parent=None,
             ),
             EvaluationNode(
                 name="drawer_2",
@@ -134,6 +144,7 @@ def graph_with_an_unnamed_mount() -> EvaluationGraph:
                 faces=50,
                 body_id=None,
                 annotation_applied=True,
+                parent="cabinet_5",
             ),
         ],
         edges=[
@@ -189,3 +200,28 @@ def test_a_relation_whose_classes_cannot_say_keeps_having_no_field():
     resolved = graph.with_fields_resolved(annotation_classes(SemanticAnnotation))
 
     assert resolved.edges[0].field_name == ""
+
+
+# %% where each body hangs
+
+
+def test_a_body_hangs_from_the_nearest_body_of_the_split_above_it():
+    """
+    What a mount puts between a part and its whole, such as a region, is not a body the
+    run judged, so it is passed over.
+    """
+    world = World.create_with_root_body("root")
+    cabinet, between, drawer = (
+        Body(name=PrefixedName(name)) for name in ("cabinet_1", "region", "drawer_1")
+    )
+    with world.modify_world():
+        for parent, child in (
+            (world.root, cabinet),
+            (cabinet, between),
+            (between, drawer),
+        ):
+            world.add_connection(FixedConnection(parent=parent, child=child))
+
+    parents = EvaluationGraph.parents_in(world, {"cabinet_1", "drawer_1"})
+
+    assert parents == {"cabinet_1": None, "drawer_1": "cabinet_1"}

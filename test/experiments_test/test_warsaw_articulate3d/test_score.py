@@ -2,8 +2,8 @@
 Judging a run of an Articulate3D scene against the scene's ground truth.
 
 The runs here are written by hand: which faces each body has, what each was classified
-as, and what was mounted into what. The perfect run cuts out exactly the annotated
-parts, classifies each as the ground truth does and mounts each part into its whole.
+as, and which body each hangs below. The perfect run cuts out exactly the annotated
+parts, classifies each as the ground truth does and hangs each part from its whole.
 """
 
 from __future__ import annotations
@@ -13,24 +13,18 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from semantic_digital_twin.semantic_annotations.part_whole import field_holding
 
 from experiments.warsaw.articulate3d.convert import SceneConversion
-from experiments.warsaw.articulate3d.ground_truth import GroundTruthFile
+from experiments.warsaw.articulate3d.ground_truth import Expressibility, GroundTruthFile
 from experiments.warsaw.articulate3d.score import (
     ClassLineage,
-    MountVerdict,
     SceneScore,
     ScoreFile,
     ScoreOverRuns,
     Share,
     main,
 )
-from experiments.warsaw.evaluation.graph import (
-    EvaluationEdge,
-    EvaluationGraph,
-    EvaluationNode,
-)
+from experiments.warsaw.evaluation.graph import EvaluationGraph, EvaluationNode
 from experiments.warsaw.pipeline.run import Run, RunFile
 
 from .scenes import kitchen_corner
@@ -38,9 +32,9 @@ from .scenes import kitchen_corner
 # %% a run, written by hand
 
 
-def node(name, predicted_class):
+def node(name, predicted_class, parent=None):
     """
-    :return: A body the run classified.
+    :return: A body the run classified, hanging below *parent*.
     """
     return EvaluationNode(
         name=name,
@@ -49,18 +43,7 @@ def node(name, predicted_class):
         faces=0,
         body_id=None,
         annotation_applied=predicted_class is not None,
-    )
-
-
-def mount(whole, part, field_name="", accepted=True):
-    """
-    :return: A mount the run made.
-    """
-    return EvaluationEdge(
-        whole=whole,
-        part=part,
-        field_name=field_name,
-        accepted=accepted,
+        parent=parent,
     )
 
 
@@ -89,31 +72,20 @@ def bodies():
 
 
 @pytest.fixture
-def graph(ontology):
+def graph():
     """
-    :return: The perfect run's classes and mounts.
+    :return: The perfect run's classes, and where each body hangs.
     """
-
-    def field_of(whole, part):
-        return field_holding(ontology[whole], ontology[part]).field_name
-
     return EvaluationGraph(
         nodes=[
             node("cabinet_1", "Cabinet"),
-            node("door_1", "Door"),
-            node("handle_1", "Handle"),
-            node("drawer_1", "Drawer"),
-            node("handle_2", "Handle"),
+            node("door_1", "Door", "cabinet_1"),
+            node("handle_1", "Handle", "door_1"),
+            node("drawer_1", "Drawer", "cabinet_1"),
+            node("handle_2", "Handle", "drawer_1"),
             node("switch_base_1", "ElectricalDevice"),
-            node("control_1", None),
-        ],
-        edges=[
-            mount("cabinet_1", "door_1", field_of("Cabinet", "Door")),
-            mount("door_1", "handle_1", field_of("Door", "Handle")),
-            mount("cabinet_1", "drawer_1", field_of("Cabinet", "Drawer")),
-            mount("drawer_1", "handle_2", field_of("Drawer", "Handle")),
-            mount("switch_base_1", "control_1"),
-        ],
+            node("control_1", None, "switch_base_1"),
+        ]
     )
 
 
@@ -137,10 +109,31 @@ def with_class(graph, body, predicted_class):
     return replace(
         graph,
         nodes=[
-            node(one.name, predicted_class) if one.name == body else one
+            replace(one, predicted_class=predicted_class) if one.name == body else one
             for one in graph.nodes
         ],
     )
+
+
+def with_parents(graph, parents):
+    """
+    :return: The same run, with the bodies *parents* names hung otherwise.
+    """
+    return replace(
+        graph,
+        nodes=[
+            replace(one, parent=parents[one.name]) if one.name in parents else one
+            for one in graph.nodes
+        ],
+    )
+
+
+def attachment_of(links, part_id):
+    """
+    :return: Where the run hung one annotated part.
+    """
+    [attachment] = [one for one in links.attachments if one.part_id == part_id]
+    return attachment
 
 
 # %% which body is which part
@@ -297,76 +290,141 @@ def test_ancestry_holds_neither_mixins_nor_the_root(lineage, taxonomy):
     assert ancestry.isdisjoint(mixins | {taxonomy["root_name"]})
 
 
-# %% relations
+# %% links
 
 
-def test_the_perfect_run_makes_every_relation_and_nothing_else(
+def test_the_perfect_run_makes_every_link_and_nothing_else(
     ground_truth, bodies, graph, lineage
 ):
-    relations = judged(ground_truth, bodies, graph, lineage).relations
+    links = judged(ground_truth, bodies, graph, lineage).links
 
-    assert relations.precision == Share(len(graph.edges), len(graph.edges))
-    assert relations.recall == Share(
+    assert links.precision == Share(
         len(ground_truth.relations), len(ground_truth.relations)
     )
+    assert links.recall == links.precision
 
 
 def test_hanging_every_part_off_the_outermost_whole_is_mostly_wrong(
     ground_truth, bodies, graph, lineage
 ):
-    flat = replace(
-        graph,
-        edges=[mount("cabinet_1", name) for name in bodies if name != "cabinet_1"],
+    flat = with_parents(
+        graph, {name: "cabinet_1" for name in bodies if name != "cabinet_1"}
     )
 
-    relations = judged(ground_truth, bodies, flat, lineage).relations
+    links = judged(ground_truth, bodies, flat, lineage).links
 
-    assert relations.precision == Share(2, len(flat.edges))
-    assert relations.recall == Share(2, len(ground_truth.relations))
+    assert links.precision == Share(2, len(bodies) - 1)
+    assert links.recall == Share(2, len(ground_truth.relations))
 
 
-def test_a_run_mounting_nothing_has_no_precision_rather_than_a_perfect_one(
+def test_a_run_hanging_nothing_has_no_precision_rather_than_a_perfect_one(
     ground_truth, bodies, graph, lineage
 ):
-    relations = judged(
-        ground_truth, bodies, replace(graph, edges=[]), lineage
-    ).relations
+    loose = with_parents(graph, {name: None for name in bodies})
 
-    assert relations.precision.value is None
-    assert relations.recall == Share(0, len(ground_truth.relations))
+    links = judged(ground_truth, bodies, loose, lineage).links
+
+    assert links.precision.value is None
+    assert links.recall == Share(0, len(ground_truth.relations))
 
 
-def test_a_mount_reaching_outside_the_annotation_is_not_judged(
+def test_a_part_hung_below_a_body_that_is_no_part_hangs_from_the_part_above_that(
     ground_truth, bodies, graph, lineage
 ):
-    bodies = {**bodies, "shelf_1": np.array([14, 15])}
-    graph = replace(graph, edges=graph.edges + [mount("cabinet_1", "shelf_1")])
-
-    relations = judged(ground_truth, bodies, graph, lineage).relations
-
-    assert relations.mounts[-1].verdict is MountVerdict.OUTSIDE
-    assert relations.precision.total == len(graph.edges) - 1
-
-
-def test_refused_mounts_are_not_judged(ground_truth, bodies, graph, lineage):
     """
-    A refused mount is not in the world the run built, so it is not judged.
+    A body the run cut that matches no part says nothing about the part hierarchy, so
+    what lies past it is judged.
     """
-    graph = replace(
-        graph, edges=graph.edges + [mount("cabinet_1", "control_1", accepted=False)]
+    bodies = {**bodies, "cabinet_1": np.array([0, 1, 2]), "panel_1": np.array([3])}
+    graph = replace(graph, nodes=graph.nodes + [node("panel_1", None, "cabinet_1")])
+    graph = with_parents(graph, {"door_1": "panel_1"})
+
+    links = judged(ground_truth, bodies, graph, lineage).links
+
+    assert attachment_of(links, 2).correct
+
+
+def test_a_part_the_annotation_hangs_from_nothing_is_wrong_when_hung_from_a_part(
+    ground_truth, bodies, graph, lineage
+):
+    graph = with_parents(graph, {"switch_base_1": "cabinet_1"})
+
+    links = judged(ground_truth, bodies, graph, lineage).links
+
+    assert links.precision == Share(
+        len(ground_truth.relations), len(ground_truth.relations) + 1
     )
 
-    relations = judged(ground_truth, bodies, graph, lineage).relations
 
-    assert len(relations.mounts) == len(graph.edges) - 1
+def test_a_part_hung_from_its_whole_s_whole_is_wrong_but_on_the_right_branch(
+    ground_truth, bodies, graph, lineage
+):
+    """
+    Annotators hang a handle from its door or from a plate on it, and the ontology
+    allows both, so a run choosing the other still placed the handle on the right
+    object.
+    """
+    graph = with_parents(graph, {"handle_1": "cabinet_1"})
+
+    handle = attachment_of(judged(ground_truth, bodies, graph, lineage).links, 3)
+
+    assert not handle.correct
+    assert (handle.predicted_ancestors, handle.true_ancestors) == ([1], [2, 1])
+    assert handle.shared_ancestors == 1
+
+
+def test_a_link_with_a_misclassified_end_is_right_but_not_as_a_triplet(
+    ground_truth, bodies, graph, lineage
+):
+    links = judged(
+        ground_truth, bodies, with_class(graph, "drawer_1", "Door"), lineage
+    ).links
+    with_both_classes_judged = [
+        one
+        for one in ground_truth.relations
+        if one.expressibility is not Expressibility.UNDETERMINED
+    ]
+    through_the_drawer = [
+        one for one in with_both_classes_judged if 4 in (one.whole, one.part)
+    ]
+
+    assert links.recall == Share(
+        len(ground_truth.relations), len(ground_truth.relations)
+    )
+    assert links.triplet_recall == Share(
+        len(with_both_classes_judged) - len(through_the_drawer),
+        len(with_both_classes_judged),
+    )
+    assert links.triplet_precision == links.triplet_recall
 
 
 def test_the_ontology_bounds_what_a_run_can_make(ground_truth, bodies, graph, lineage):
-    relations = judged(ground_truth, bodies, graph, lineage).relations
-    expressible = [one for one in ground_truth.relations if one.field_name is not None]
+    links = judged(ground_truth, bodies, graph, lineage).links
+    reachable = [one for one in ground_truth.relations if one.field_name is not None]
 
-    assert relations.expressible == Share(len(expressible), len(ground_truth.relations))
-    assert relations.same_field == Share(len(expressible), len(graph.edges))
+    assert links.reachable == Share(len(reachable), len(ground_truth.relations))
+    assert links.reachable_recall == Share(len(reachable), len(reachable))
+
+
+def test_a_relation_held_the_other_way_round_by_a_carrying_part_is_reachable(
+    ground_truth, bodies, graph, lineage
+):
+    """
+    Mounted through a field whose part carries its whole, the whole hangs from the part,
+    which is the link the annotation makes.
+    """
+    [first, *others] = ground_truth.relations
+    ground_truth = replace(
+        ground_truth,
+        relations=[replace(first, expressibility=Expressibility.CARRIED), *others],
+    )
+
+    links = judged(ground_truth, bodies, graph, lineage).links
+    held_by_a_field = [
+        one for one in ground_truth.relations if one.field_name is not None
+    ]
+
+    assert links.reachable == Share(len(held_by_a_field), len(ground_truth.relations))
 
 
 # %% many runs together
@@ -378,8 +436,8 @@ def test_a_summary_adds_every_count_up(ground_truth, bodies, graph, lineage):
     summary = ScoreOverRuns.over([score, replace(score, run="other")])
 
     assert summary.parts == 2 * len(ground_truth.parts)
-    assert summary.relations.recall == Share(
-        2 * score.relations.recall.count, 2 * score.relations.recall.total
+    assert summary.links.recall == Share(
+        2 * score.links.recall.count, 2 * score.links.recall.total
     )
 
 

@@ -29,7 +29,11 @@ from experiments.warsaw.articulate3d.ground_truth import (
     GroundTruthBuilder,
     SceneGroundTruth,
 )
-from experiments.warsaw.articulate3d.protocol import EvaluationProtocol, PartNameRuling
+from experiments.warsaw.articulate3d.protocol import (
+    EvaluationProtocol,
+    PartNameRuling,
+    ProtocolFile,
+)
 from experiments.warsaw.articulate3d.rules import (
     AnnotationRule,
     PartNameCorrection,
@@ -388,7 +392,10 @@ def argument_parser() -> argparse.ArgumentParser:
         help="ScanNet++'s data directory, holding the meshes the annotations were made on",
     )
     parser.add_argument(
-        "--protocol", type=Path, required=True, help="The protocol to report"
+        "--protocol",
+        type=Path,
+        default=ProtocolFile.ARTICULATE3D,
+        help="The protocol to report; the one kept with this package by default",
     )
     parser.add_argument(
         "--splits",
