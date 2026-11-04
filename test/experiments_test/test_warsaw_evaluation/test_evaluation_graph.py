@@ -29,7 +29,6 @@ from experiments.warsaw.pipeline.records import (
     SplitRecord,
 )
 from experiments.warsaw.scene_split import Pairing
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
 # %% preserving nodes and relation outcomes
 
@@ -42,13 +41,11 @@ def test_graph_snapshot_keeps_accepted_and_refused_relations() -> None:
         whole="cabinet_1",
         part="drawer_1",
         field_name="drawers",
-        kind=MountKind.PART,
     )
     refused = Pairing(
         whole="drawer_1",
         part="handle_1",
         field_name="handles",
-        kind=MountKind.PART,
     )
     split = SplitRecord(
         scene="apartment.glb",
@@ -89,7 +86,6 @@ def test_graph_snapshot_keeps_accepted_and_refused_relations() -> None:
     assert graph.nodes[0].annotation_applied is True
     assert graph.nodes[2].annotation_applied is False
     assert graph.edges[0].accepted is True
-    assert graph.edges[0].relation == "part"
     assert graph.edges[1].accepted is False
     assert graph.edges[1].refusal_reason == "class does not admit part"
     assert EvaluationGraph.from_json(graph.to_json()) == graph
@@ -144,7 +140,6 @@ def graph_with_an_unnamed_mount() -> EvaluationGraph:
             EvaluationEdge(
                 whole="cabinet_5",
                 part="drawer_2",
-                relation="part",
                 field_name="",
                 accepted=True,
             )

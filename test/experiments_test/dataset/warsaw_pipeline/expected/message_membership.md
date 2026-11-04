@@ -7,17 +7,14 @@ cabinet_20 was read as Cabinet
 cabinet_4 was read as Cabinet
 
 Door(HasHandle, HasMechanicalJoint)
-  part mechanical_joint -> MechanicalJoint, mounted with add()
-  part handle -> Handle, mounted with add()
-  part entry_way -> EntryWay, mounted with add()
+  part mechanical_joint -> MechanicalJoint
+  part handle -> Handle
+  part entry_way -> EntryWay
 Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers)
-  part drawers -> Drawer (many), mounted with add()
-  part doors -> Door (many), mounted with add()
-  contains objects -> HasRootBody (many), mounted with add_object()
-  supports supporting_surface -> Region, mounted with add_supporting_surface()
+  part drawers -> Drawer (many)
+  part doors -> Door (many)
 
-Cabinet.doors may hold a Door (part, mounted with add())
-Cabinet.objects may hold a HasRootBody (contains, mounted with add_object())
+Cabinet.doors may hold a Door (part)
 
 ## What was measured
 door_10: 3800 faces, 1.982 m2, middle 1.72 m up, 1 piece(s)

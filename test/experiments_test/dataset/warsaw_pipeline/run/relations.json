@@ -581,34 +581,7 @@
           },
           "mounts": {
             "__collection_type__": "builtins.list",
-            "__items__": [
-              {
-                "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "CONTAINS"
-                },
-                "whole": "Floor",
-                "field_name": "objects",
-                "target": "HasRootBody",
-                "holds_many": true,
-                "mounted_by": "add_object",
-                "removes_geometry": false
-              },
-              {
-                "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "CONTAINS"
-                },
-                "whole": "KitchenIsland",
-                "field_name": "objects",
-                "target": "HasRootBody",
-                "holds_many": true,
-                "mounted_by": "add_object",
-                "removes_geometry": false
-              }
-            ]
+            "__items__": []
           }
         },
         "prompt_block": "floor_1: 44607 faces, 50.017 m2, middle 0.50 m up, 1 piece(s), 100% of it claimed by nothing else.\nkitchen_island_1: 27501 faces, 30.695 m2, middle 1.69 m up, 1 piece(s), 33% of it claimed by nothing else.\nBetween them: they share no faces and touch nowhere; their surfaces are 0.030 m apart."
@@ -645,34 +618,7 @@
           },
           "mounts": {
             "__collection_type__": "builtins.list",
-            "__items__": [
-              {
-                "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "CONTAINS"
-                },
-                "whole": "Floor",
-                "field_name": "objects",
-                "target": "HasRootBody",
-                "holds_many": true,
-                "mounted_by": "add_object",
-                "removes_geometry": false
-              },
-              {
-                "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "CONTAINS"
-                },
-                "whole": "Cabinet",
-                "field_name": "objects",
-                "target": "HasRootBody",
-                "holds_many": true,
-                "mounted_by": "add_object",
-                "removes_geometry": false
-              }
-            ]
+            "__items__": []
           }
         },
         "prompt_block": "floor_1: 44607 faces, 50.017 m2, middle 0.50 m up, 1 piece(s), 100% of it claimed by nothing else.\ncabinet_20: 1775 faces, 2.000 m2, middle 1.57 m up, 1 piece(s), 0% of it claimed by nothing else.\nBetween them: they share no faces and touch nowhere; their surfaces are 0.035 m apart."
@@ -709,21 +655,7 @@
           },
           "mounts": {
             "__collection_type__": "builtins.list",
-            "__items__": [
-              {
-                "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "CONTAINS"
-                },
-                "whole": "KitchenIsland",
-                "field_name": "objects",
-                "target": "HasRootBody",
-                "holds_many": true,
-                "mounted_by": "add_object",
-                "removes_geometry": false
-              }
-            ]
+            "__items__": []
           }
         },
         "prompt_block": "door_10: 3800 faces, 1.982 m2, middle 1.72 m up, 1 piece(s), 0% of it claimed by nothing else.\nkitchen_island_1: 27501 faces, 30.695 m2, middle 1.69 m up, 1 piece(s), 33% of it claimed by nothing else.\nBetween them: they share 3345 faces, 88% of door_10 and 12% of kitchen_island_1."
@@ -763,28 +695,10 @@
             "__items__": [
               {
                 "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "PART"
-                },
                 "whole": "Cabinet",
                 "field_name": "doors",
                 "target": "Door",
                 "holds_many": true,
-                "mounted_by": "add",
-                "removes_geometry": false
-              },
-              {
-                "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "CONTAINS"
-                },
-                "whole": "Cabinet",
-                "field_name": "objects",
-                "target": "HasRootBody",
-                "holds_many": true,
-                "mounted_by": "add_object",
                 "removes_geometry": false
               }
             ]
@@ -827,28 +741,10 @@
             "__items__": [
               {
                 "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "PART"
-                },
                 "whole": "Cabinet",
                 "field_name": "doors",
                 "target": "Door",
                 "holds_many": true,
-                "mounted_by": "add",
-                "removes_geometry": false
-              },
-              {
-                "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "CONTAINS"
-                },
-                "whole": "Cabinet",
-                "field_name": "objects",
-                "target": "HasRootBody",
-                "holds_many": true,
-                "mounted_by": "add_object",
                 "removes_geometry": false
               }
             ]
@@ -891,28 +787,10 @@
             "__items__": [
               {
                 "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "PART"
-                },
                 "whole": "Cabinet",
                 "field_name": "doors",
                 "target": "Door",
                 "holds_many": true,
-                "mounted_by": "add",
-                "removes_geometry": false
-              },
-              {
-                "__json_type__": "experiments.warsaw.pipeline.records.AdmissibleMount",
-                "kind": {
-                  "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-                  "name": "CONTAINS"
-                },
-                "whole": "Cabinet",
-                "field_name": "objects",
-                "target": "HasRootBody",
-                "holds_many": true,
-                "mounted_by": "add_object",
                 "removes_geometry": false
               }
             ]

@@ -22,7 +22,6 @@ adjudication; if any of those is wrong, this writes it faithfully into the world
 from __future__ import annotations
 
 import dataclasses
-import inspect
 import logging
 import sys
 from collections import Counter, defaultdict
@@ -35,7 +34,6 @@ from semantic_digital_twin.semantic_annotations.in_memory_builder import (
     SemanticAnnotationClassBuilder,
 )
 from semantic_digital_twin.semantic_annotations.taxonomy_export import (
-    MountKind,
     annotation_classes,
     in_base_order,
     names_a_category,
@@ -400,7 +398,7 @@ class MountAnnotations(HasLogger):
         pairings: List[Pairing],
     ) -> Mounted:
         """
-        Carry out every pairing, through the channel the ontology says mounts it.
+        Mount every pairing's part into its whole, in the field the pairing names.
 
         :param world: The world the annotations are in.
         :param annotations: The annotation made for each body, by name.
@@ -422,7 +420,7 @@ class MountAnnotations(HasLogger):
                     )
                     continue
                 try:
-                    self.mount_one(whole, part, pairing)
+                    whole.add(part, field_name=pairing.field_name)
                 except UsageError as refusal:
                     # The world refusing a mount is an answer about this pairing, not a
                     # state the run should not have reached: the class a body was given
@@ -437,25 +435,6 @@ class MountAnnotations(HasLogger):
                 else:
                     mounted.carried_out += 1
         return mounted
-
-    @staticmethod
-    def mount_one(
-        whole: SemanticAnnotation, part: SemanticAnnotation, pairing: Pairing
-    ) -> None:
-        """
-        Mount one part into one whole, through the channel its kind names.
-
-        :param whole: The annotation that holds.
-        :param part: The annotation it holds.
-        :param pairing: The mount to carry out.
-        :raises UsageError: If the world will not hold the part that way.
-        """
-        if pairing.kind is MountKind.CONTAINS:
-            whole.add_object(part)
-        elif pairing.kind is MountKind.SUPPORTS:
-            whole.add_supporting_surface(part)
-        else:
-            whole.add(part, field_name=pairing.field_name)
 
 
 # %% generating the classes the scene needs

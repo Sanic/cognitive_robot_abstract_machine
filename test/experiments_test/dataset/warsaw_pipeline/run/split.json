@@ -163,71 +163,43 @@
         "__json_type__": "experiments.warsaw.scene_split.Pairing",
         "whole": "cabinet_5",
         "part": "door_11",
-        "field_name": "doors",
-        "kind": {
-          "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-          "name": "PART"
-        }
+        "field_name": "doors"
       },
       {
         "__json_type__": "experiments.warsaw.scene_split.Pairing",
         "whole": "drawer_7",
         "part": "handle_13",
-        "field_name": "handle",
-        "kind": {
-          "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-          "name": "PART"
-        }
+        "field_name": "handle"
       },
       {
         "__json_type__": "experiments.warsaw.scene_split.Pairing",
         "whole": "drawer_5",
         "part": "handle_14",
-        "field_name": "handle",
-        "kind": {
-          "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-          "name": "PART"
-        }
+        "field_name": "handle"
       },
       {
         "__json_type__": "experiments.warsaw.scene_split.Pairing",
         "whole": "cabinet_4",
         "part": "door_10",
-        "field_name": "",
-        "kind": {
-          "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-          "name": "PART"
-        }
+        "field_name": ""
       },
       {
         "__json_type__": "experiments.warsaw.scene_split.Pairing",
         "whole": "kitchen_island_1",
         "part": "drawer_4",
-        "field_name": "",
-        "kind": {
-          "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-          "name": "PART"
-        }
+        "field_name": ""
       },
       {
         "__json_type__": "experiments.warsaw.scene_split.Pairing",
         "whole": "kitchen_island_1",
         "part": "drawer_6",
-        "field_name": "",
-        "kind": {
-          "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-          "name": "PART"
-        }
+        "field_name": ""
       },
       {
         "__json_type__": "experiments.warsaw.scene_split.Pairing",
         "whole": "kitchen_island_1",
         "part": "drawer_7",
-        "field_name": "",
-        "kind": {
-          "__json_type__": "semantic_digital_twin.semantic_annotations.taxonomy_export.MountKind",
-          "name": "PART"
-        }
+        "field_name": ""
       }
     ]
   },

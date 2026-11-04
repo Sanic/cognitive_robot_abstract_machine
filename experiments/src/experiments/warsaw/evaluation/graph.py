@@ -6,7 +6,6 @@ from dataclasses import dataclass, field, replace
 
 from semantic_digital_twin.semantic_annotations.part_whole import field_holding
 
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
 from experiments.warsaw.bases import JsonRecord
 from experiments.warsaw.evaluation.size import ObjectSize
@@ -60,9 +59,6 @@ class EvaluationEdge(JsonRecord):
 
     part: str
     """The body at the contained end of the relation."""
-
-    relation: MountKind
-    """The channel the mount was attempted through."""
 
     field_name: str
     """The ontology field through which the mount was attempted."""
@@ -159,7 +155,6 @@ class EvaluationGraph(JsonRecord):
                 refusal.pairing.whole,
                 refusal.pairing.part,
                 refusal.pairing.field_name,
-                refusal.pairing.kind.value,
             ): refusal.reason
             for refusal in split.refused
         }
@@ -178,18 +173,13 @@ class EvaluationGraph(JsonRecord):
         ]
         edges = []
         for pairing in split.pairings:
-            key = (
-                pairing.whole,
-                pairing.part,
-                pairing.field_name,
-                pairing.kind.value,
+            refusal_reason = refusal_by_pairing.get(
+                (pairing.whole, pairing.part, pairing.field_name)
             )
-            refusal_reason = refusal_by_pairing.get(key)
             edges.append(
                 EvaluationEdge(
                     whole=pairing.whole,
                     part=pairing.part,
-                    relation=pairing.kind,
                     field_name=pairing.field_name,
                     accepted=refusal_reason is None,
                     refusal_reason=refusal_reason,

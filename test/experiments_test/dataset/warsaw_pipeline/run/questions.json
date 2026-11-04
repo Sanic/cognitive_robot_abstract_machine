@@ -32,19 +32,16 @@
           "classes": {
             "__collection_type__": "builtins.list",
             "__items__": [
-              "Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers)\n  part drawers -> Drawer (many), mounted with add()\n  part doors -> Door (many), mounted with add()\n  contains objects -> HasRootBody (many), mounted with add_object()\n  supports supporting_surface -> Region, mounted with add_supporting_surface()",
-              "Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint)\n  part mechanical_joint -> MechanicalJoint, mounted with add()\n  part handle -> Handle, mounted with add()\n  contains objects -> HasRootBody (many), mounted with add_object()\n  supports supporting_surface -> Region, mounted with add_supporting_surface()",
-              "KitchenIsland(Table, HasDrawers, HasSupportingSurface)\n  part drawers -> Drawer (many), mounted with add()\n  contains objects -> HasRootBody (many), mounted with add_object()\n  supports supporting_surface -> Region, mounted with add_supporting_surface()"
+              "Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers)\n  part drawers -> Drawer (many)\n  part doors -> Door (many)",
+              "Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint)\n  part mechanical_joint -> MechanicalJoint\n  part handle -> Handle",
+              "KitchenIsland(Table, HasDrawers, HasSupportingSurface)\n  part drawers -> Drawer (many)"
             ]
           },
           "admits": {
             "__collection_type__": "builtins.list",
             "__items__": [
-              "Cabinet.drawers may hold a Drawer (part, mounted with add())",
-              "Cabinet.objects may hold a HasRootBody (contains, mounted with add_object())",
-              "Drawer.objects may hold a HasRootBody (contains, mounted with add_object())",
-              "KitchenIsland.objects may hold a HasRootBody (contains, mounted with add_object())",
-              "KitchenIsland.drawers may hold a Drawer (part, mounted with add())"
+              "Cabinet.drawers may hold a Drawer (part)",
+              "KitchenIsland.drawers may hold a Drawer (part)"
             ]
           }
         },
@@ -214,15 +211,14 @@
           "classes": {
             "__collection_type__": "builtins.list",
             "__items__": [
-              "Door(HasHandle, HasMechanicalJoint)\n  part mechanical_joint -> MechanicalJoint, mounted with add()\n  part handle -> Handle, mounted with add()\n  part entry_way -> EntryWay, mounted with add()",
-              "Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers)\n  part drawers -> Drawer (many), mounted with add()\n  part doors -> Door (many), mounted with add()\n  contains objects -> HasRootBody (many), mounted with add_object()\n  supports supporting_surface -> Region, mounted with add_supporting_surface()"
+              "Door(HasHandle, HasMechanicalJoint)\n  part mechanical_joint -> MechanicalJoint\n  part handle -> Handle\n  part entry_way -> EntryWay",
+              "Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers)\n  part drawers -> Drawer (many)\n  part doors -> Door (many)"
             ]
           },
           "admits": {
             "__collection_type__": "builtins.list",
             "__items__": [
-              "Cabinet.doors may hold a Door (part, mounted with add())",
-              "Cabinet.objects may hold a HasRootBody (contains, mounted with add_object())"
+              "Cabinet.doors may hold a Door (part)"
             ]
           }
         },

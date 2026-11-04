@@ -7,25 +7,16 @@ drawer_5 was read as Drawer
 kitchen_island_1 was read as KitchenIsland
 
 Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers)
-  part drawers -> Drawer (many), mounted with add()
-  part doors -> Door (many), mounted with add()
-  contains objects -> HasRootBody (many), mounted with add_object()
-  supports supporting_surface -> Region, mounted with add_supporting_surface()
+  part drawers -> Drawer (many)
+  part doors -> Door (many)
 Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint)
-  part mechanical_joint -> MechanicalJoint, mounted with add()
-  part handle -> Handle, mounted with add()
-  contains objects -> HasRootBody (many), mounted with add_object()
-  supports supporting_surface -> Region, mounted with add_supporting_surface()
+  part mechanical_joint -> MechanicalJoint
+  part handle -> Handle
 KitchenIsland(Table, HasDrawers, HasSupportingSurface)
-  part drawers -> Drawer (many), mounted with add()
-  contains objects -> HasRootBody (many), mounted with add_object()
-  supports supporting_surface -> Region, mounted with add_supporting_surface()
+  part drawers -> Drawer (many)
 
-Cabinet.drawers may hold a Drawer (part, mounted with add())
-Cabinet.objects may hold a HasRootBody (contains, mounted with add_object())
-Drawer.objects may hold a HasRootBody (contains, mounted with add_object())
-KitchenIsland.objects may hold a HasRootBody (contains, mounted with add_object())
-KitchenIsland.drawers may hold a Drawer (part, mounted with add())
+Cabinet.drawers may hold a Drawer (part)
+KitchenIsland.drawers may hold a Drawer (part)
 
 ## The picture
 cabinet_8 (labelled "cabinet") is tomato

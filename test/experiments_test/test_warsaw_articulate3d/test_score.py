@@ -14,7 +14,6 @@ from dataclasses import replace
 import numpy as np
 import pytest
 from semantic_digital_twin.semantic_annotations.part_whole import field_holding
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
 from experiments.warsaw.articulate3d.convert import SceneConversion
 from experiments.warsaw.articulate3d.ground_truth import GroundTruthFile
@@ -53,14 +52,13 @@ def node(name, predicted_class):
     )
 
 
-def mount(whole, part, field_name="", relation=MountKind.PART, accepted=True):
+def mount(whole, part, field_name="", accepted=True):
     """
     :return: A mount the run made.
     """
     return EvaluationEdge(
         whole=whole,
         part=part,
-        relation=relation,
         field_name=field_name,
         accepted=accepted,
     )
@@ -350,21 +348,17 @@ def test_a_mount_reaching_outside_the_annotation_is_not_judged(
     assert relations.precision.total == len(graph.edges) - 1
 
 
-def test_refused_mounts_and_mounts_of_other_kinds_are_not_part_whole_mounts(
-    ground_truth, bodies, graph, lineage
-):
+def test_refused_mounts_are_not_judged(ground_truth, bodies, graph, lineage):
+    """
+    A refused mount is not in the world the run built, so it is not judged.
+    """
     graph = replace(
-        graph,
-        edges=graph.edges
-        + [
-            mount("cabinet_1", "control_1", accepted=False),
-            mount("cabinet_1", "control_1", relation=MountKind.CONTAINS),
-        ],
+        graph, edges=graph.edges + [mount("cabinet_1", "control_1", accepted=False)]
     )
 
     relations = judged(ground_truth, bodies, graph, lineage).relations
 
-    assert len(relations.mounts) == len(graph.edges) - 2
+    assert len(relations.mounts) == len(graph.edges) - 1
 
 
 def test_the_ontology_bounds_what_a_run_can_make(ground_truth, bodies, graph, lineage):

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import pytest
 
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
 from experiments.warsaw.pipeline.records import Relations, RelationStatus
 from experiments.warsaw.pipeline.run import Run
@@ -49,8 +48,8 @@ def test_a_cabinet_can_hold_a_drawer_and_only_one_way(step, known):
     """
     view = step.ontology_view(known["Cabinet"], known["Drawer"])
     assert view.status is RelationStatus.RELATION_KNOWN
-    assert view.admissible[0].field_name == "drawers"
-    assert view.admissible[0].whole == "Cabinet"
+    assert view.mounts[0].field_name == "drawers"
+    assert view.mounts[0].whole == "Cabinet"
 
 
 def test_two_classes_that_cannot_hold_one_another_leave_an_overlap_unexplained(
@@ -75,17 +74,13 @@ def test_an_unmapped_label_leaves_the_ontology_with_nothing_to_say(step, known):
     )
 
 
-def test_containment_is_reported_beside_the_parts_rather_than_as_one(step, known):
+def test_storing_one_in_the_other_is_not_admitted(step, known):
     """
-    ``contains`` is admissible between almost any two annotations, so letting it decide
-    the status would report a relation for every pair in the room -- but a mug on a
-    counter does stand in one, and an adjudication told only about parts would force
-    "part" onto it.
+    A drawer could be stored in a cabinet as well as be part of it, and only the part is
+    a relation the pipeline mounts.
     """
     view = step.ontology_view(known["Cabinet"], known["Drawer"])
-    assert view.status is RelationStatus.RELATION_KNOWN
-    assert [one.field_name for one in view.admissible] == ["drawers"]
-    assert {one.kind for one in view.mounts} == {MountKind.PART, MountKind.CONTAINS}
+    assert [one.field_name for one in view.mounts] == ["drawers"]
 
 
 # %% which object stands for a label

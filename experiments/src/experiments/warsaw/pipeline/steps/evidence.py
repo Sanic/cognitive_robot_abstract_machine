@@ -283,14 +283,7 @@ class MeasureScene(PipelineStep):
         self, one_class: Optional[Type], other_class: Optional[Type]
     ) -> OntologyView:
         """
-        Ask the ontology what two classes may be to one another.
-
-        The status is decided by the part-whole channel alone, because that is the one that
-        discriminates: ``contains`` is admissible between almost any two annotations, since
-        ``IsStorageSpace.objects`` accepts anything with a root body, so letting it decide
-        would report a relation for every pair in the room. The other channels are reported
-        beside it instead, since a mug on a counter and a jar in a box do stand in one, and
-        an adjudication told only about parts would force "part" onto them.
+        Ask the ontology which of two classes may hold the other as a part.
 
         :param one_class: The class of one segment, or None when its label maps to none.
         :param other_class: The class of the other segment.
@@ -303,20 +296,18 @@ class MeasureScene(PipelineStep):
             status=RelationStatus.NO_LEGAL_RELATION,
             mounts=[
                 AdmissibleMount(
-                    kind=relation.kind,
                     whole=whole.__name__,
                     field_name=relation.field_name,
                     target=relation.target,
                     holds_many=relation.holds_many,
-                    mounted_by=relation.mounted_by,
                     removes_geometry=relation.removes_geometry,
                 )
                 for whole, relation in admissible_mounts(one_class, other_class)
             ],
         )
-        if len(view.admissible) == 1:
+        if len(view.mounts) == 1:
             return replace(view, status=RelationStatus.RELATION_KNOWN)
-        if view.admissible:
+        if view.mounts:
             return replace(view, status=RelationStatus.RELATION_AMBIGUOUS)
         return view
 
@@ -647,8 +638,7 @@ class MeasureScene(PipelineStep):
             for whole, relation in admissible_mounts(read_as[one], read_as[other]):
                 admits.append(
                     f"{whole.__name__}.{relation.field_name} may hold a "
-                    f"{relation.target} ({relation.kind}, mounted with "
-                    f"{relation.mounted_by}())"
+                    f"{relation.target} as a part"
                 )
         return OntologySlice(
             read_as={
@@ -804,7 +794,7 @@ class MeasureScene(PipelineStep):
                 continue
             if not pair.evidence.shared_faces and not pair.evidence.touching_edges:
                 continue
-            admitted = pair.view.admissible[0]
+            admitted = pair.view.mounts[0]
             whole, part = pair.evidence.one, pair.evidence.other
             if pair.classes.get(labels[whole]) != admitted.whole:
                 whole, part = part, whole

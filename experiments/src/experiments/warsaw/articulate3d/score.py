@@ -35,7 +35,6 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.sparse import csr_matrix
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 from typing_extensions import Any, Sequence
 
 from experiments.warsaw.articulate3d.convert import ConvertedScene
@@ -739,7 +738,7 @@ class RelationAgreement(JsonRecord):
         truth = {(relation.whole, relation.part): relation for relation in relations}
         mounts = []
         for edge in edges:
-            if not edge.accepted or edge.relation != MountKind.PART:
+            if not edge.accepted:
                 continue
             ends = (edge.whole, edge.part)
             if outside & set(ends):

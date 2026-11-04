@@ -19,7 +19,6 @@ from enum import StrEnum
 
 from typing_extensions import Any, ClassVar, Dict, List, Optional, Self, Set, Tuple
 
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
 from experiments.warsaw.bases import JsonRecord
 from experiments.warsaw.scene_split import Pairing
@@ -185,16 +184,7 @@ class ClassAnswer(ModelAnswer):
 @dataclass
 class AdmissibleMount(JsonRecord):
     """
-    One way the ontology allows two classes to be mounted into one another.
-
-    A structural part is one of these rather than a kind apart: the channel says which it
-    is, and every channel names the same things -- which class holds, through which field,
-    what that field accepts, and by which method.
-    """
-
-    kind: MountKind
-    """
-    The channel that mounts it.
+    One way the ontology allows one of two classes to hold the other as a part.
     """
 
     whole: str
@@ -215,11 +205,6 @@ class AdmissibleMount(JsonRecord):
     holds_many: bool
     """
     Whether that field holds several of them rather than one.
-    """
-
-    mounted_by: str
-    """
-    The method that carries the mount out.
     """
 
     removes_geometry: bool
@@ -245,19 +230,8 @@ class OntologyView(JsonRecord):
 
     mounts: List[AdmissibleMount] = field(default_factory=list)
     """
-    Every mount allowed between them, of any channel.
+    Every mount allowed between them.
     """
-
-    @property
-    def admissible(self) -> List[AdmissibleMount]:
-        """
-        The part-whole ones alone, which are what the status is decided by: ``contains``
-        is admissible between almost any two annotations, so counting it would report a
-        relation for every pair in the room.
-
-        :return: The structural parts allowed between them.
-        """
-        return [one for one in self.mounts if one.kind is MountKind.PART]
 
 
 @dataclass

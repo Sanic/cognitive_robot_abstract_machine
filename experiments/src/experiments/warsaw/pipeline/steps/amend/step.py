@@ -118,9 +118,7 @@ class MixinProposal(QuestionAboutTheOntology[AmendmentRecord]):
             if mixin["name"] == self.record.mixin
         )
         granted = ", ".join(
-            f"{relation['field']} -> {relation['target']}"
-            for relation in introduces
-            if relation["kind"] == "part"
+            f"{relation['field']} -> {relation['target']}" for relation in introduces
         )
         # What the class holds is not enough to judge by, since what *those* hold is a
         # relation further away and often decides it -- a cabinet holds doors and a door

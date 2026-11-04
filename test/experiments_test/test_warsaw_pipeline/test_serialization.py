@@ -12,14 +12,12 @@ from __future__ import annotations
 import json
 
 import numpy as np
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
 from experiments.warsaw.pipeline.records import (
     BodyAnswer,
     CountedClaimants,
     LabelAnswer,
 )
-from experiments.warsaw.scene_split import Pairing
 from experiments.warsaw.segment_relations import ClaimedFaces
 
 # %% what a model says, which nothing has stamped
@@ -94,18 +92,6 @@ def test_a_tuple_does_not_come_back_a_list():
     assert read == counted
     assert isinstance(read.claimants, tuple)
     assert {read.claimants} == {("cabinet_8", "drawer_5")}
-
-
-def test_a_channel_comes_back_as_the_channel_and_not_as_its_name():
-    """
-    ``MountKind`` is a string enumeration, so a file holds the string it stands for; the
-    mount is chosen by asking which member it is.
-    """
-    pairing = Pairing(
-        whole="cabinet_5", part="door_11", field_name="doors", kind=MountKind.CONTAINS
-    )
-    read = Pairing.from_json(json.loads(json.dumps(pairing.to_json())))
-    assert read.kind is MountKind.CONTAINS
 
 
 # %% the claimants, counted
