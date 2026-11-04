@@ -111,6 +111,14 @@ physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
 experiments           = { workspace = true }
 krrood_spatial_math   = { workspace = true }
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+
+[[tool.uv.index]]
+name = "pytorch"
+# CI overrides this named index with the CPU wheel repository.
+url = "https://pypi.org/simple"
+explicit = true
 
 [tool.poetry]
 package-mode = false

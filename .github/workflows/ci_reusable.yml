@@ -18,6 +18,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # Keep PyPI first for general dependencies; torch and torchvision use the named index.
+      UV_INDEX: https://pypi.org/simple pytorch=https://download.pytorch.org/whl/cpu
     container:
       image: ${{ inputs.repo_lowercase }}
     steps:
@@ -59,9 +62,8 @@ jobs:
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
-          # --no-sources keeps the editable workspace packages from being reinstalled from their paths;
-          # the CPU-only torch index avoids downloading the CUDA libraries onto the runner disk.
-          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources --extra-index-url https://download.pytorch.org/whl/cpu
+          # --no-sources keeps the editable workspace packages from being reinstalled from their paths.
+          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources --torch-backend cpu
 
       - name: Restore cache
         uses: actions/cache/restore@v4

@@ -18,6 +18,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # Keep PyPI first for general dependencies; torch and torchvision use the named index.
+      UV_INDEX: https://pypi.org/simple pytorch=https://download.pytorch.org/whl/cpu
     container:
       image: ${{ inputs.repo_lowercase }}
     steps:
