@@ -13,13 +13,18 @@ imports nothing itself, which is what lets the steps run in one process.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from functools import cached_property
 from types import ModuleType
 
+from krrood.ormatic.utils import create_engine
 from typing_extensions import TYPE_CHECKING
 
-from experiments.warsaw.exceptions import WorldNotInDatabaseError
+from experiments.warsaw.exceptions import (
+    DatabaseNotConfiguredError,
+    WorldNotInDatabaseError,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
@@ -31,6 +36,12 @@ if TYPE_CHECKING:
 class WorldStore:
     """
     The database a run's worlds are kept in.
+    """
+
+    variable: str = "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
+    """
+    The environment variable the database is read from, the one a run points at its own
+    schema.
     """
 
     def mappings(self) -> ModuleType:
@@ -50,14 +61,16 @@ class WorldStore:
     @cached_property
     def engine(self) -> Engine:
         """
-        Built once per store: an engine holds a pool of connections, and one made per
-        call leaves a pool behind for every world read or written.
+        Built once per store, from the database the environment names when it is first
+        asked for, whichever database other code in the process has opened before.
 
-        :return: A connection to the database the environment points at.
+        :return: A connection to that database.
+        :raises DatabaseNotConfiguredError: If the environment names none.
         """
-        from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
-
-        return semantic_digital_twin_sessionmaker().kw["bind"]
+        uri = os.environ.get(self.variable)
+        if uri is None:
+            raise DatabaseNotConfiguredError(variable=self.variable)
+        return create_engine(uri)
 
     def create_tables(self) -> int:
         """

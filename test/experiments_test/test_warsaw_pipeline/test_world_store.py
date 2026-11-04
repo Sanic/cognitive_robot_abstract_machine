@@ -9,9 +9,11 @@ rather than answered with nothing.
 from __future__ import annotations
 
 import pytest
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import InvalidRequestError
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
 )
@@ -19,7 +21,10 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
-from experiments.warsaw.exceptions import WorldNotInDatabaseError
+from experiments.warsaw.exceptions import (
+    DatabaseNotConfiguredError,
+    WorldNotInDatabaseError,
+)
 from experiments.warsaw.pipeline.database.world_store import WorldStore
 
 # %% a database of this test's own
@@ -94,3 +99,42 @@ def test_an_id_nothing_was_written_under_is_reported(store):
     """
     with pytest.raises(WorldNotInDatabaseError):
         store.read(4242)
+
+
+# %% the database a store reaches
+
+
+@pytest.fixture
+def session_opened_on_another_database(monkeypatch, tmp_path):
+    """
+    Open the semantic digital twin's process-wide session on a database of its own, and
+    forget it again afterwards so no later test reaches that database.
+    """
+    monkeypatch.setenv(WorldStore().variable, f"sqlite:///{tmp_path / 'earlier.db'}")
+    semantic_digital_twin_sessionmaker()
+    yield
+    semantic_digital_twin_sessionmaker.cache_clear()
+
+
+def test_a_store_reaches_the_database_the_environment_names_when_it_is_made(
+    session_opened_on_another_database, monkeypatch, tmp_path
+):
+    """
+    A step is pointed at its run's schema through the environment, and an earlier step
+    in the same process may already have opened a session on another one.
+    """
+    later = f"sqlite:///{tmp_path / 'later.db'}"
+    monkeypatch.setenv(WorldStore().variable, later)
+
+    assert WorldStore().engine.url == make_url(later)
+
+
+def test_a_store_without_a_database_to_reach_is_refused(monkeypatch):
+    """
+    Without a database named, a world would have nowhere to go between steps.
+    """
+    store = WorldStore()
+    monkeypatch.delenv(store.variable, raising=False)
+
+    with pytest.raises(DatabaseNotConfiguredError):
+        store.engine
