@@ -1,9 +1,10 @@
 """
 List the part names Articulate3D's annotators used, so the protocol can rule on each.
 
-Each name is counted by how often it occurs and in how many scenes. Given a protocol,
-every name it does not list yet is added to it as undecided, and every ruling it already
-holds is kept.
+Each name is counted by how often it occurs and in how many scenes, over the scenes the
+protocol's annotation rules keep, as they correct them. Given a protocol, every name it
+does not list yet is added to it as undecided, and every ruling it already holds is
+kept.
 
 Run ``python -m experiments.warsaw.articulate3d.labels --help`` for its options.
 """
@@ -18,10 +19,10 @@ from pathlib import Path
 
 from semantic_digital_twin.adapters.articulate3d_dataset.schema import (
     Articulate3DAnnotationFile,
-    Articulate3DPart,
 )
 
 from experiments.warsaw.articulate3d.protocol import EvaluationProtocol
+from experiments.warsaw.articulate3d.rules import AnnotatedScene
 
 # %% how often each name is used
 
@@ -60,26 +61,20 @@ class PartNameCensus:
     """
 
     @classmethod
-    def of(cls, directory: Path, scene_ids: list[str]) -> PartNameCensus:
+    def of(cls, scenes: list[AnnotatedScene]) -> PartNameCensus:
         """
-        :param directory: The directory holding Articulate3D's annotation files.
-        :param scene_ids: The scenes to count over.
+        :param scenes: The scenes to count over.
         :return: How often each part name is used in them.
         """
         parts: Counter = Counter()
-        scenes: Counter = Counter()
-        for scene_id in scene_ids:
-            names = [
-                part.part_name
-                for part in Articulate3DPart.all_in_file(
-                    Articulate3DAnnotationFile.PARTS.path(directory, scene_id)
-                )
-            ]
+        scenes_using: Counter = Counter()
+        for scene in scenes:
+            names = [part.part_name for part in scene.parts]
             parts.update(names)
-            scenes.update(set(names))
+            scenes_using.update(set(names))
         return cls(
             uses=[
-                PartNameUse(part_name=name, parts=count, scenes=scenes[name])
+                PartNameUse(part_name=name, parts=count, scenes=scenes_using[name])
                 for name, count in sorted(
                     parts.items(), key=lambda one: (-one[1], one[0])
                 )
@@ -100,6 +95,12 @@ def argument_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="The directory holding Articulate3D's annotation files",
+    )
+    parser.add_argument(
+        "--scannetpp",
+        type=Path,
+        required=True,
+        help="ScanNet++'s data directory, holding the meshes the annotations were made on",
     )
     parser.add_argument(
         "--scenes",
@@ -129,17 +130,24 @@ def main(arguments: list[str] | None = None) -> int:
         if parsed.scenes
         else Articulate3DAnnotationFile.PARTS.scene_ids(parsed.dataset)
     )
-    census = PartNameCensus.of(parsed.dataset, scene_ids)
-    logger.info("%s part names over %s scenes", len(census.uses), len(scene_ids))
+    protocol = (
+        EvaluationProtocol.read(parsed.protocol)
+        if parsed.protocol is not None and parsed.protocol.is_file()
+        else EvaluationProtocol()
+    )
+    ruled_scenes = protocol.annotation_rules.apply_to_scenes(
+        scene_ids, parsed.dataset, parsed.scannetpp
+    )
+    for ruled in ruled_scenes:
+        for finding in ruled.exclusions:
+            logger.info("left out %s: %s", finding.scene_id, finding.finding)
+    kept = [ruled.scene for ruled in ruled_scenes if not ruled.excluded]
+    census = PartNameCensus.of(kept)
+    logger.info("%s part names over %s scenes", len(census.uses), len(kept))
     for use in census.uses:
         logger.info("  %6s parts  %4s scenes  %s", use.parts, use.scenes, use.part_name)
     if parsed.protocol is None:
         return 0
-    protocol = (
-        EvaluationProtocol.read(parsed.protocol)
-        if parsed.protocol.is_file()
-        else EvaluationProtocol()
-    )
     protocol.listing(use.part_name for use in census.uses).write(parsed.protocol)
     logger.info("listed in %s", parsed.protocol)
     return 0

@@ -107,6 +107,41 @@ class AmbiguousPartFieldError(DataclassException, LookupError):
         return "Add a field choice for this pair of classes to the protocol."
 
 
+@dataclass
+class AmbiguousWholeError(DataclassException, ValueError):
+    """
+    Raised when a part lies below a place in the part hierarchy that several parts
+    share, so which of them it belongs to is not annotated.
+    """
+
+    scene_id: str
+    """
+    The scene the part is annotated in.
+    """
+
+    part_label: str
+    """
+    The part's label.
+    """
+
+    whole_labels: list[str]
+    """
+    The labels of the parts sharing the place above it.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.part_label}' in scene {self.scene_id} could belong to any of "
+            f"{self.whole_labels}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Leave the scene out with the protocol's AmbiguousWhole rule, or ignore all "
+            "but one of the parts sharing the place."
+        )
+
+
 # %% a run that cannot be scored
 
 
@@ -159,3 +194,29 @@ class ConvertedLabelsCollideError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Convert the scene with neutral labels, which never collide."
+
+
+# %% a scene the rules leave out
+
+
+@dataclass
+class SceneExcludedError(DataclassException, ValueError):
+    """
+    Raised when a scene the protocol's rules leave out is to be evaluated.
+    """
+
+    scene_id: str
+    """
+    The scene.
+    """
+
+    findings: list[str]
+    """
+    What makes each rule leave it out.
+    """
+
+    def error_message(self) -> str:
+        return f"The protocol leaves scene {self.scene_id} out: {self.findings}"
+
+    def suggest_correction(self) -> str:
+        return "Evaluate only scenes the protocol keeps."

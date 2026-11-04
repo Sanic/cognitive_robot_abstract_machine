@@ -57,7 +57,6 @@ from semantic_digital_twin.world_description.world_modification import (
 
 
 class ConnectionModificationTestCase(unittest.TestCase):
-
     def test_single_modification(self):
         w = World()
 
@@ -174,7 +173,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
         with w.modify_world():
             w.add_kinematic_structure_entity(b1 := Body(name=PrefixedName("b1")))
         v1 = Handle(root=b1)
-        v2 = Door(root=b1, handle=v1)
+        v2 = Door(root=b1, handles=[v1])
 
         add_v1 = AddSemanticAnnotationModification.from_domain_object(v1)
         add_v2 = AddSemanticAnnotationModification.from_domain_object(v2)

@@ -15,12 +15,29 @@ from experiments.warsaw.articulate3d.convert import (
     LabelDisclosure,
     LabelOverlap,
     SceneConversion,
+    main,
 )
-from experiments.warsaw.articulate3d.exceptions import ConvertedLabelsCollideError
+from experiments.warsaw.articulate3d.exceptions import (
+    ConvertedLabelsCollideError,
+    SceneExcludedError,
+)
+from experiments.warsaw.articulate3d.protocol import EvaluationProtocol
+from experiments.warsaw.articulate3d.rules import (
+    AnnotationRules,
+    MeshChanged,
+    MeshSize,
+    PartNameCorrection,
+)
 from experiments.warsaw.habitat.convert import label_property
 from experiments.warsaw.world_loader.scene import SceneFrame, SourceFrame, WarsawScene
 
-from .scenes import kitchen_corner, part
+from .scenes import (
+    SceneName,
+    kitchen_corner,
+    kitchen_corner_parts,
+    part,
+    row_of_squares,
+)
 
 # %% what the pipeline reads back
 
@@ -146,3 +163,65 @@ def test_the_same_seed_writes_the_same_scene(scene, tmp_path):
     second = SceneConversion(seed=5).write(scene, tmp_path / "second")
 
     assert first.parts == second.parts
+
+
+# %% converting by the protocol's rules
+
+
+def convert_kitchen_corner(dataset, tmp_path, rules):
+    """
+    :param rules: The annotation rules of the protocol the scene is converted by.
+    :return: The directory the scene is converted into.
+    """
+    protocol_path = tmp_path / "protocol.json"
+    EvaluationProtocol(annotation_rules=rules).write(protocol_path)
+    output = tmp_path / "converted"
+    main(
+        [
+            "--dataset",
+            str(dataset.articulate3d_directory),
+            "--scannetpp",
+            str(dataset.scannetpp_directory),
+            "--protocol",
+            str(protocol_path),
+            "--scene",
+            SceneName.KITCHEN_CORNER,
+            "--output",
+            str(output),
+        ]
+    )
+    return output
+
+
+def test_a_scene_is_converted_as_the_rules_correct_it(dataset, tmp_path):
+    dataset.write_scene(
+        SceneName.KITCHEN_CORNER, kitchen_corner_parts(), row_of_squares(8)
+    )
+    correction = PartNameCorrection(
+        written="unknown", meant="handle", mistake="a spelling mistake"
+    )
+
+    output = convert_kitchen_corner(
+        dataset, tmp_path, AnnotationRules(corrections=[correction])
+    )
+
+    assert [
+        one.label for one in ConvertedScene.beside(output).parts if one.part_id == 9
+    ] == ["handle.3.1"]
+
+
+def test_a_scene_the_rules_leave_out_is_not_converted(dataset, tmp_path):
+    mesh = row_of_squares(8)
+    dataset.write_scene(
+        SceneName.KITCHEN_CORNER,
+        kitchen_corner_parts(),
+        mesh,
+        recorded_mesh_size=MeshSize(
+            vertices=len(mesh.vertices) + 1, faces=len(mesh.faces)
+        ),
+    )
+
+    with pytest.raises(SceneExcludedError):
+        convert_kitchen_corner(
+            dataset, tmp_path, AnnotationRules(exclusions=[MeshChanged()])
+        )

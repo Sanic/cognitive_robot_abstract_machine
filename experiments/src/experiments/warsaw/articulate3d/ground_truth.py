@@ -29,8 +29,12 @@ from semantic_digital_twin.semantic_annotations.taxonomy_export import (
 )
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
-from experiments.warsaw.articulate3d.exceptions import AmbiguousPartFieldError
+from experiments.warsaw.articulate3d.exceptions import (
+    AmbiguousPartFieldError,
+    AmbiguousWholeError,
+)
 from experiments.warsaw.articulate3d.protocol import EvaluationProtocol
+from experiments.warsaw.articulate3d.rules import RuleFindings
 from experiments.warsaw.bases import JsonRecord
 
 # %% what the ontology makes of a relation
@@ -46,9 +50,16 @@ class Expressibility(StrEnum):
     The whole's class has a field that holds the part's class.
     """
 
+    CARRIED = "carried"
+    """
+    No field of the whole's class holds the part's class, but the part's class holds the
+    whole's class through a field whose parts carry their whole: mounted that way round,
+    the whole hangs from the part as annotated.
+    """
+
     INEXPRESSIBLE = "inexpressible"
     """
-    No field of the whole's class holds the part's class, so no run can mount it.
+    No field of either class holds the other, so no run can mount the relation.
     """
 
     UNDETERMINED = "undetermined"
@@ -185,6 +196,8 @@ class GroundTruthBuilder:
         :param scene_id: The scene.
         :param annotated: Its annotated parts.
         :return: The scene's ground truth.
+        :raises AmbiguousWholeError: If a part lies below a place in the part hierarchy
+            several covered parts share.
         """
         covered = [
             part
@@ -203,17 +216,23 @@ class GroundTruthBuilder:
             for part in covered
         ]
         class_of = {part.part_id: part.semantic_class for part in parts}
-        at_position = {}
+        at_position: dict[str, list[Articulate3DPart]] = {}
         for part in covered:
             if part.hierarchy_path is not None:
-                at_position.setdefault(part.hierarchy_path, part)
-        relations = [
-            self._relation(
-                at_position[part.parent_hierarchy_path].part_id, part.part_id, class_of
-            )
-            for part in covered
-            if part.parent_hierarchy_path in at_position
-        ]
+                at_position.setdefault(part.hierarchy_path, []).append(part)
+        relations = []
+        for part in covered:
+            wholes = at_position.get(part.parent_hierarchy_path, [])
+            if len(wholes) > 1:
+                raise AmbiguousWholeError(
+                    scene_id=scene_id,
+                    part_label=part.label,
+                    whole_labels=[whole.label for whole in wholes],
+                )
+            if wholes:
+                relations.append(
+                    self._relation(wholes[0].part_id, part.part_id, class_of)
+                )
         return SceneGroundTruth(scene_id=scene_id, parts=parts, relations=relations)
 
     def _relation(
@@ -223,7 +242,8 @@ class GroundTruthBuilder:
         :param whole: The part holding the other.
         :param part: The part held.
         :param class_of: The class each part is judged against.
-        :return: The relation, with the field the ontology holds it through.
+        :return: The relation, with the field the ontology holds it through; for a
+            relation it holds the other way round, the field of the part's class.
         :raises AmbiguousPartFieldError: If several fields could hold it and the
             protocol does not choose.
         """
@@ -240,7 +260,17 @@ class GroundTruthBuilder:
                 expressibility=Expressibility.EXPRESSIBLE,
                 field_name=chosen,
             )
+        expressibility = Expressibility.EXPRESSIBLE
         fields = fields_accepting(self.ontology[whole_class], self.ontology[part_class])
+        if not fields:
+            expressibility = Expressibility.CARRIED
+            fields = [
+                one
+                for one in fields_accepting(
+                    self.ontology[part_class], self.ontology[whole_class]
+                )
+                if one.part_carries_whole
+            ]
         if not fields:
             return GroundTruthRelation(
                 whole=whole, part=part, expressibility=Expressibility.INEXPRESSIBLE
@@ -254,7 +284,7 @@ class GroundTruthBuilder:
         return GroundTruthRelation(
             whole=whole,
             part=part,
-            expressibility=Expressibility.EXPRESSIBLE,
+            expressibility=expressibility,
             field_name=fields[0].field_name,
         )
 
@@ -270,6 +300,12 @@ class GroundTruthFile(StrEnum):
     SUFFIX = "_ground_truth.json"
     """
     What follows the scene id.
+    """
+
+    RULE_FINDINGS = "rule_findings.json"
+    """
+    The file beside the scenes' ground truth that lists every annotation rule that
+    applied to them.
     """
 
     def path(self, directory: Path, scene_id: str) -> Path:
@@ -291,6 +327,12 @@ def argument_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="The directory holding Articulate3D's annotation files",
+    )
+    parser.add_argument(
+        "--scannetpp",
+        type=Path,
+        required=True,
+        help="ScanNet++'s data directory, holding the meshes the annotations were made on",
     )
     parser.add_argument(
         "--protocol", type=Path, required=True, help="The frozen protocol"
@@ -317,9 +359,9 @@ def main(arguments: list[str] | None = None) -> int:
     logger = logging.getLogger(__name__)
     parsed = argument_parser().parse_args(arguments)
     load_annotation_modules()
+    protocol = EvaluationProtocol.read(parsed.protocol)
     builder = GroundTruthBuilder(
-        protocol=EvaluationProtocol.read(parsed.protocol),
-        ontology=annotation_classes(SemanticAnnotation),
+        protocol=protocol, ontology=annotation_classes(SemanticAnnotation)
     )
     scene_ids = (
         parsed.scenes.read_text().split()
@@ -327,20 +369,23 @@ def main(arguments: list[str] | None = None) -> int:
         else Articulate3DAnnotationFile.PARTS.scene_ids(parsed.dataset)
     )
     parsed.output.mkdir(parents=True, exist_ok=True)
-    for scene_id in scene_ids:
-        built = builder.build(
-            scene_id,
-            Articulate3DPart.all_in_file(
-                Articulate3DAnnotationFile.PARTS.path(parsed.dataset, scene_id)
-            ),
-        )
-        built.write(GroundTruthFile.SUFFIX.path(parsed.output, scene_id))
+    ruled_scenes = protocol.annotation_rules.apply_to_scenes(
+        scene_ids, parsed.dataset, parsed.scannetpp
+    )
+    for ruled in ruled_scenes:
+        if ruled.excluded:
+            logger.info("%s: left out", ruled.scene.scene_id)
+            continue
+        built = builder.build(ruled.scene.scene_id, ruled.scene.parts)
+        built.write(GroundTruthFile.SUFFIX.path(parsed.output, ruled.scene.scene_id))
         logger.info(
-            "%s: %s parts, %s relations",
-            scene_id,
+            "%s: %s parts, %s relations, %s corrections",
+            ruled.scene.scene_id,
             len(built.parts),
             len(built.relations),
+            len(ruled.corrections),
         )
+    RuleFindings.of(ruled_scenes).write(parsed.output / GroundTruthFile.RULE_FINDINGS)
     return 0
 
 

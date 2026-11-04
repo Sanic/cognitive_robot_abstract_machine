@@ -128,7 +128,7 @@ def annotated_cabinet_world() -> World:
             world.add_connection(FixedConnection(parent=parent, child=child))
         handle = Handle(name=PrefixedName("drawer_handle"), root=handle_body)
         drawer = Drawer(
-            name=PrefixedName("top_drawer"), root=drawer_body, handle=handle
+            name=PrefixedName("top_drawer"), root=drawer_body, handles=[handle]
         )
         cabinet = Cabinet(
             name=PrefixedName("tall_cabinet"), root=cabinet_body, drawers=[drawer]
@@ -170,7 +170,7 @@ def test_a_field_holding_one_part_is_reported_like_a_field_holding_many():
     [relation] = mounted_relations_of(drawer)
 
     assert relation.kind is MountKind.PART
-    assert relation.field_name == "handle"
+    assert relation.field_name == "handles"
     assert relation.target is handle
 
 
@@ -211,7 +211,7 @@ def test_the_field_a_whole_holds_a_part_in_is_reported():
     A mount carried out without naming a field can be told afterwards which it used.
     """
     assert field_holding(Cabinet, Drawer).field_name == "drawers"
-    assert field_holding(Drawer, Handle).field_name == "handle"
+    assert field_holding(Drawer, Handle).field_name == "handles"
 
 
 def test_a_part_the_whole_cannot_hold_has_no_field():

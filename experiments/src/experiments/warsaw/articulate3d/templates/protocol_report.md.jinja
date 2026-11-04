@@ -1,0 +1,123 @@
+{%- macro rule_section(use) %}
+
+### {{ use.title }}
+
+**Rule.** {{ use.rule.statement }}
+
+**Reason.** {{ use.rule.reason }}
+
+{% if use.instances %}
+| Split | Scene | Finding |
+|---|---|---|
+{% for instance in use.instances %}
+| {{ instance.split }} | `{{ instance.scene_id }}` | {{ instance.finding }} |
+{% endfor %}
+{% else %}
+It applies to no scene.
+{% endif %}
+{% endmacro -%}
+# How Articulate3D is read for the evaluation
+
+Every rule below is general: it is written once and applied to every scene of every split,
+never decided per scene. Each rule is stated with the reason it is needed, followed by every
+scene it applied to and what it found there.
+
+## Scenes
+
+| Split | Scenes | Kept | Left out |
+|---|---:|---:|---:|
+{% for split, scenes in ruled_scenes.items() %}
+{% set kept = scenes | rejectattr("excluded") | list | length %}
+| {{ split }} | {{ scenes | length }} | {{ kept }} | {{ scenes | length - kept }} |
+{% endfor %}
+
+## Scenes left out
+
+A scene is left out when any of these rules applies to it; a scene can fall under several.
+{% for use in exclusions %}
+{{ rule_section(use) }}
+{%- endfor %}
+
+## Part names corrected
+
+Corrections change how a part name is read, in the ground truth and in the labels the
+pipeline is given alike. They apply only to the scenes that are kept.
+{% for use in general_corrections %}
+{{ rule_section(use) }}
+{%- endfor %}
+
+### Single names written other than meant
+
+Each of these names is read as the name meant, wherever it occurs.
+
+| Rule | Reason |{% for split in ruled_scenes %} Scenes ({{ split }}) |{% endfor %}
+
+|---|---|{% for split in ruled_scenes %}---:|{% endfor %}
+
+{% for rule, scenes in name_corrections %}
+| {{ rule.statement }} | {{ rule.reason }} |{% for split in ruled_scenes %} {{ scenes[split] }} |{% endfor %}
+
+{% endfor %}
+
+## What each part name means
+
+Every part name is ruled once, for the whole dataset. A name ruled to a class means that
+class wherever it occurs. A name ruled *ambiguous* has no class that fits it, and the
+ontology only grows from the training split; its parts are judged as objects and as ends
+of relations, but not on their class. An *ignored* name is left out of the evaluation with
+its parts. Counts are parts in the kept scenes.
+
+| Class | Name |{% for split in ruled_scenes %} Parts ({{ split }}) |{% endfor %}
+
+|---|---|{% for split in ruled_scenes %}---:|{% endfor %}
+
+{% for use in part_names %}
+| {% if use.ruling is sameas ruling.CLASS %}`{{ use.semantic_class }}`{% else %}*{{ use.ruling.value }}*{% endif %} | `{{ use.part_name }}` |{% for split in ruled_scenes %} {{ use.parts[split] }} |{% endfor %}
+
+{% endfor %}
+
+
+## Relations the ontology can hold
+
+The ontology was extended with a field for every pair of classes the training split relates,
+by these rules:
+
+- the field belongs to the class of the whole and holds a list of parts, named after the
+  part's class in the plural;
+- a whole holding parts of a class and of its subclass holds both through one field, typed by
+  the superclass;
+- a class holding itself gets no field;
+- a relation that is not one of part and whole gets no field: a thing hanging on or resting
+  in the whole (clothing, a towel and a curtain on a door, an accessory hung on a door, a key
+  card in its slot, a shower head in its holder, an intercom handset in its cradle, a
+  thermometer on a heater), and a part annotated under the wrong whole (a flush plate under
+  a toilet lid, a faucet head under a drain pipe); their relations count as ones no field
+  holds;
+- where a part is attached to its whole the other way round from how it belongs to it, the
+  field is declared on the semantic whole and its parts carry that whole: mounting a part
+  hangs the whole from it, as annotated.
+
+| Split | Expressible | Carried | Inexpressible | Class not judged |
+|---|---:|---:|---:|---:|
+{% for split, counts in expressibility.items() %}
+| {{ split }} | {{ counts[kinds.EXPRESSIBLE] }} | {{ counts[kinds.CARRIED] }} | {{ counts[kinds.INEXPRESSIBLE] }} | {{ counts[kinds.UNDETERMINED] }} |
+{% endfor %}
+
+### Fields whose parts carry their whole
+
+| Class | Field | Parts |
+|---|---|---|
+{% for one in carrying_fields %}
+| `{{ one.whole_class }}` | `{{ one.field_name }}` | `{{ one.part_class }}` |
+{% endfor %}
+
+### Pairs no field holds
+
+| Whole | Part |{% for split in ruled_scenes %} Relations ({{ split }}) |{% endfor %}
+
+|---|---|{% for split in ruled_scenes %}---:|{% endfor %}
+
+{% for pair in unheld_pairs %}
+| `{{ pair.whole_class }}` | `{{ pair.part_class }}` |{% for split in ruled_scenes %} {{ pair.relations[split] }} |{% endfor %}
+
+{% endfor %}

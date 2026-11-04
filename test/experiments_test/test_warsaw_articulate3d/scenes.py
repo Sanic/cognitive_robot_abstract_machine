@@ -19,14 +19,20 @@ import numpy as np
 import trimesh
 from semantic_digital_twin.adapters.articulate3d_dataset.schema import (
     Articulate3DAnnotationFile,
+    Articulate3DArticulation,
+    Articulate3DMotionType,
     Articulate3DPart,
     Articulate3DScene,
 )
-from semantic_digital_twin.adapters.scannetpp_dataset.schema import ScanNetPPScene
+from semantic_digital_twin.adapters.scannetpp_dataset.schema import (
+    ScanNetPPScene,
+    ScanNetPPSceneFile,
+)
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
 
+from experiments.warsaw.articulate3d.rules import MeshSize
 from experiments.warsaw.articulate3d.protocol import (
     EvaluationProtocol,
     PartClass,
@@ -116,35 +122,116 @@ def kitchen_corner() -> Articulate3DScene:
     )
 
 
-def write_parts_file(
-    directory: Path, scene_id: str, parts: list[Articulate3DPart]
-) -> Path:
+@dataclass
+class WrittenDataset:
     """
-    Write parts the way Articulate3D writes a scene's ``parts.json``.
+    An Articulate3D directory and a ScanNet++ data directory, written the way the two
+    datasets write a scene.
+    """
 
-    :param directory: The dataset directory.
-    :param scene_id: The scene.
-    :param parts: Its parts.
-    :return: The file written.
+    articulate3d_directory: Path
     """
-    path = Articulate3DAnnotationFile.PARTS.path(directory, scene_id)
-    path.write_text(
-        json.dumps(
-            {
-                "data": {
-                    "annotations": [
-                        {
-                            "partId": one.part_id,
-                            "label": one.label,
-                            "triIndices": one.face_indices.tolist(),
-                        }
-                        for one in parts
-                    ]
+    Where the annotation files are written.
+    """
+
+    scannetpp_directory: Path
+    """
+    Where each scene's mesh is written.
+    """
+
+    def write_scene(
+        self,
+        scene_id: str,
+        parts: list[Articulate3DPart],
+        mesh: trimesh.Trimesh | None,
+        articulations: list[Articulate3DArticulation] | None = None,
+        recorded_mesh_size: MeshSize | None = None,
+    ) -> None:
+        """
+        :param scene_id: The scene.
+        :param parts: Its parts.
+        :param mesh: Its mesh, written with no ScanNet++ objects on it, or nothing to
+            write no mesh.
+        :param articulations: How its parts move; none by default.
+        :param recorded_mesh_size: The mesh size the annotation records; that of the
+            mesh by default.
+        """
+        if recorded_mesh_size is None:
+            recorded_mesh_size = MeshSize(
+                vertices=len(mesh.vertices), faces=len(mesh.faces)
+            )
+        Articulate3DAnnotationFile.PARTS.path(
+            self.articulate3d_directory, scene_id
+        ).write_text(
+            json.dumps(
+                {
+                    "data": {
+                        "stats": {
+                            "totalVertices": recorded_mesh_size.vertices,
+                            "totalFaces": recorded_mesh_size.faces,
+                        },
+                        "annotations": [
+                            {
+                                "partId": one.part_id,
+                                "label": one.label,
+                                "triIndices": one.face_indices.tolist(),
+                            }
+                            for one in parts
+                        ],
+                    }
                 }
-            }
+            )
         )
+        Articulate3DAnnotationFile.ARTICULATIONS.path(
+            self.articulate3d_directory, scene_id
+        ).write_text(
+            json.dumps(
+                {
+                    "data": {
+                        "articulations": [
+                            {
+                                "pid": one.part_id,
+                                "type": one.motion_type.value,
+                                "axis": one.axis.tolist(),
+                                "origin": one.origin.tolist(),
+                                "rangeMin": one.lower_limit,
+                                "rangeMax": one.upper_limit,
+                                "base": one.base_part_ids,
+                            }
+                            for one in articulations or []
+                        ]
+                    }
+                }
+            )
+        )
+        if mesh is None:
+            return
+        scene_directory = self.scannetpp_directory / scene_id
+        (scene_directory / ScanNetPPSceneFile.MESH).parent.mkdir(parents=True)
+        mesh.export(scene_directory / ScanNetPPSceneFile.MESH)
+        (scene_directory / ScanNetPPSceneFile.SEGMENTS).write_text(
+            json.dumps({"segIndices": [0] * len(mesh.vertices)})
+        )
+        (scene_directory / ScanNetPPSceneFile.SEGMENT_ANNOTATIONS).write_text(
+            json.dumps({"segGroups": []})
+        )
+
+
+def articulation(part_id: int, base_part_ids: list[int]) -> Articulate3DArticulation:
+    """
+    :param part_id: The part that moves.
+    :param base_part_ids: The parts it moves relative to.
+    :return: A rotation of the part about the z axis.
+    """
+    return Articulate3DArticulation(
+        part_id=part_id,
+        motion_type=Articulate3DMotionType.ROTATION,
+        axis=np.asarray([0.0, 0.0, 1.0]),
+        origin=np.zeros(3),
+        lower_limit=0.0,
+        upper_limit=1.0,
+        base_part_ids=base_part_ids,
     )
-    return path
 
 
 # %% the protocol

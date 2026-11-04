@@ -45,7 +45,7 @@ class SingleDoorRoom:
 
     door_color: Color = field(default_factory=lambda: Color.RED())
     """
-    Color of the door to to visually distinguish it from the wall
+    Color of the door to to visually distinguish it from the wall.
     """
 
     def spawn(
@@ -68,7 +68,10 @@ class SingleDoorRoom:
         :return: The room's floor annotation.
         """
         floor = Floor.get_annotation_specification(
-            f"{name}_floor", Floor.get_default_root_kinematic_structure_entity_specification(scale=self.scale.xy)
+            f"{name}_floor",
+            Floor.get_default_root_kinematic_structure_entity_specification(
+                scale=self.scale.xy
+            ),
         ).spawn(world, parent=parent, parent_T_self=parent_T_self)
 
         wall = None
@@ -89,7 +92,9 @@ class SingleDoorRoom:
                 ),
             ).spawn(world, parent=floor.root, parent_T_self=wall_pose)
 
-        handle_root_specification = Handle.get_default_root_kinematic_structure_entity_specification()
+        handle_root_specification = (
+            Handle.get_default_root_kinematic_structure_entity_specification()
+        )
         handle_root_specification.parent_T_self = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 y=self.door_scale.y / 2 * 0.9, yaw=np.pi
@@ -104,7 +109,7 @@ class SingleDoorRoom:
                 ),
             ),
             part_specifications={
-                "handle": Handle.get_annotation_specification(
+                "handles": Handle.get_annotation_specification(
                     f"{name}_handle", handle_root_specification
                 )
             },
@@ -152,15 +157,17 @@ class BuildingFloor:
 
         :param world: The world the building floor is added to.
         :param name: Prefix for the names of every entity this building floor creates.
-        :param parent: The entity the floor slab attaches to. If None, ``world.root``
-            is used.
+        :param parent: The entity the floor slab attaches to. If None, ``world.root`` is
+            used.
         :param parent_T_self: Placement of the floor slab in ``parent``'s frame.
             Identity if None.
         :return: The floor slab's annotation.
         """
         floor = Floor.get_annotation_specification(
             f"{name}_floor",
-            Floor.get_default_root_kinematic_structure_entity_specification(scale=self.floor_scale),
+            Floor.get_default_root_kinematic_structure_entity_specification(
+                scale=self.floor_scale
+            ),
         ).spawn(world, parent=parent, parent_T_self=parent_T_self)
 
         room_poses = [

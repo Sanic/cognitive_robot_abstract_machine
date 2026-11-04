@@ -78,9 +78,7 @@ def test_category_from_class_name_converts_upper_camel_case():
 
 def test_mjcf_document_from_element_copy_wraps_element_in_worldbody():
     fixture_body = ET.fromstring(
-        '<body name="hinge_cabinet_main">'
-        '<geom type="box" size="0.3 0.3 0.5"/>'
-        "</body>"
+        '<body name="hinge_cabinet_main"><geom type="box" size="0.3 0.3 0.5"/></body>'
     )
 
     document = _mjcf_document_from_element_copy(fixture_body)
@@ -92,9 +90,7 @@ def test_mjcf_document_from_element_copy_wraps_element_in_worldbody():
 
 def test_mjcf_document_from_element_copy_does_not_mutate_original_element():
     fixture_body = ET.fromstring(
-        '<body name="hinge_cabinet_main">'
-        '<geom type="box" size="0.3 0.3 0.5"/>'
-        "</body>"
+        '<body name="hinge_cabinet_main"><geom type="box" size="0.3 0.3 0.5"/></body>'
     )
 
     _mjcf_document_from_element_copy(fixture_body)
@@ -205,7 +201,7 @@ def test_attach_semantic_annotation_attaches_door_and_handle_sub_parts():
     assert door in cabinet.doors
     assert door.root.name.name == "hinge_cabinet_door"
 
-    assert door.handle == handle
+    assert door.handles == [handle]
     assert handle.root.name.name == "hinge_cabinet_handle"
 
     # the door's real hinge joint (parsed from the fixture's MJCF) must not have been disturbed by

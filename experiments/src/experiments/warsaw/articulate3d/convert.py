@@ -13,7 +13,9 @@ nothing else of the annotation reaches the mesh:
   neutral names that say nothing about what a part is.
 
 Every face of the scan is kept, in the order the annotation numbers them, so a body a run
-cuts out of the scene names the same faces the ground truth does.
+cuts out of the scene names the same faces the ground truth does. The parts are written
+as the protocol's annotation rules correct them, and a scene the rules leave out is not
+written.
 
 Run ``python -m experiments.warsaw.articulate3d.convert --help`` for its options.
 """
@@ -23,7 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 
@@ -41,8 +43,11 @@ from semantic_digital_twin.adapters.scannetpp_dataset.loader import (
 
 from experiments.warsaw.articulate3d.exceptions import (
     ConvertedLabelsCollideError,
+    SceneExcludedError,
     SceneNotConvertedError,
 )
+from experiments.warsaw.articulate3d.protocol import EvaluationProtocol
+from experiments.warsaw.articulate3d.rules import AnnotatedScene
 from experiments.warsaw.bases import JsonRecord
 from experiments.warsaw.habitat.convert import label_property
 from experiments.warsaw.world_loader.scene import SceneFrame, SourceFrame
@@ -369,6 +374,12 @@ def argument_parser() -> argparse.ArgumentParser:
         required=True,
         help="ScanNet++'s data directory, holding the meshes the annotations were made on",
     )
+    parser.add_argument(
+        "--protocol",
+        type=Path,
+        required=True,
+        help="The frozen protocol, whose annotation rules the scene is written by",
+    )
     parser.add_argument("--scene", required=True, help="The scene to convert")
     parser.add_argument("--output", type=Path, required=True, help="Where to write it")
     parser.add_argument(
@@ -397,13 +408,25 @@ def main(arguments: list[str] | None = None) -> int:
 
     :param arguments: Command-line arguments without the program name.
     :return: Zero once the scene is written.
+    :raises SceneExcludedError: If the protocol's annotation rules leave the scene out.
     """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parsed = argument_parser().parse_args(arguments)
-    scene = Articulate3DDatasetLoader(
-        directory=parsed.dataset,
-        scannetpp_dataset_loader=ScanNetPPDatasetLoader(directory=parsed.scannetpp),
-    ).load(parsed.scene)
+    ruled = EvaluationProtocol.read(parsed.protocol).annotation_rules.apply(
+        AnnotatedScene.read(parsed.scene, parsed.dataset, parsed.scannetpp)
+    )
+    if ruled.excluded:
+        raise SceneExcludedError(
+            scene_id=parsed.scene,
+            findings=[finding.finding for finding in ruled.exclusions],
+        )
+    scene = replace(
+        Articulate3DDatasetLoader(
+            directory=parsed.dataset,
+            scannetpp_dataset_loader=ScanNetPPDatasetLoader(directory=parsed.scannetpp),
+        ).load(parsed.scene),
+        parts=ruled.scene.parts,
+    )
     converted = SceneConversion(
         disclosure=parsed.disclosure, overlap=parsed.overlap, seed=parsed.seed
     ).write(scene, parsed.output)

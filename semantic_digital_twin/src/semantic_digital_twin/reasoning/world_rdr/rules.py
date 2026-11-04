@@ -546,6 +546,16 @@ def doors_of(body: Body, annotations: Sequence[SemanticAnnotation]) -> list[Door
     return _parts_held_by(body, annotations, Door)
 
 
+@symbolic_function
+def handles_of(body: Body, world: World) -> list[Handle]:
+    """
+    :param body: The body the handles have to be mounted on.
+    :param world: The world as the rules see it, with the annotations inferred so far.
+    :return: The handles mounted on the body.
+    """
+    return _parts_held_by(body, world.semantic_annotations, Handle)
+
+
 @dataclass(eq=False)
 class HoldsOpenableParts(Predicate):
     """
@@ -620,13 +630,19 @@ def drawers_with_a_handle(world: World) -> list[Drawer]:
     mount = variable(FixedConnection, world.connections)
     handle = variable(Handle, world.semantic_annotations)
     return (
-        entity(inference(Drawer)(root=slider.child, handle=handle))
+        entity(
+            inference(Drawer)(
+                root=slider.child,
+                handles=handles_of(slider.child, world),
+            )
+        )
         .where(
             HasCollisionGeometry(slider.child),
             not_(IsPartOfARobot(slider.child)),
             mount.parent == slider.child,
             mount.child == handle.root,
         )
+        .distinct(slider.child)
         .tolist()
     )
 
@@ -665,13 +681,19 @@ def doors_with_a_handle(world: World) -> list[Door]:
     mount = variable(FixedConnection, world.connections)
     handle = variable(Handle, world.semantic_annotations)
     return (
-        entity(inference(Door)(root=hinge.child, handle=handle))
+        entity(
+            inference(Door)(
+                root=hinge.child,
+                handles=handles_of(hinge.child, world),
+            )
+        )
         .where(
             HasCollisionGeometry(hinge.child),
             not_(IsPartOfARobot(hinge.child)),
             mount.parent == hinge.child,
             mount.child == handle.root,
         )
+        .distinct(hinge.child)
         .tolist()
     )
 

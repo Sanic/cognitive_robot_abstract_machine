@@ -37,6 +37,16 @@ class IsPartWholeRelationship(FieldMetadata):
     cuts the wall it is an aperture of, but not the door whose passage it marks.
     """
 
+    part_carries_whole: bool = False
+    """
+    Whether a part mounted into this field carries the whole: the whole hangs from the
+    part, which takes the whole's place in the kinematic structure, rather than the part
+    from the whole.
+
+    This holds where what a thing is part of differs from what it is attached to, such
+    as a telephone whose handset hangs from its cable.
+    """
+
 
 # %% relation queries
 
@@ -67,6 +77,11 @@ class PartWholeField:
     Whether mounting a part here cuts the part's volume out of the whole's geometry.
     """
 
+    part_carries_whole: bool
+    """
+    Whether a part mounted here carries the whole, rather than hanging from it.
+    """
+
     holds_many: bool
     """
     Whether the field holds several parts rather than a single one.
@@ -94,6 +109,7 @@ def part_whole_fields(annotation_class: Type) -> List[PartWholeField]:
                 field_name=wrapped_field.field.name,
                 part=wrapped_field.type_endpoint,
                 removes_part_geometry_from_whole=relationship.removes_part_geometry_from_whole,
+                part_carries_whole=relationship.part_carries_whole,
                 holds_many=wrapped_field.is_many_to_many_relationship,
             )
         )

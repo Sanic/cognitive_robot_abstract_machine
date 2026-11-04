@@ -37,20 +37,20 @@ class Sage10kOpenDoor(SequentialAction):
         underspecified reach action, which is sequenced with an opening action.
         """
         gcs = PlanarGraphOfBoundingBoxes.navigation_map_at_target(
-            target=self.door.handle.root
+            target=self.door.handles[0].root
         )
 
         arm = self.robot.all_arms[0]
 
-        min_p = self.door.handle.root.collision.min_point
-        max_p = self.door.handle.root.collision.max_point
+        min_p = self.door.handles[0].root.collision.min_point
+        max_p = self.door.handles[0].root.collision.max_point
 
         x = min_p.x - 0.05
         y = (min_p.y + max_p.y) / 2
         z = (min_p.z + max_p.z) / 2
 
         pre_grasp_pose = Pose.from_xyz_rpy(
-            x=x, y=y, z=z, reference_frame=self.door.handle.root
+            x=x, y=y, z=z, reference_frame=self.door.handles[0].root
         )
 
         # Find a node in free space that is near the pre-grasp pose. gcs is planar, so
@@ -88,6 +88,6 @@ class Sage10kOpenDoor(SequentialAction):
         reach_query._where_conditions_.append(free_space_condition)
         reach_action = StatementNode(statement=reach_query)
 
-        open_action = OpenAction.from_handle(self.door.handle, arm)
+        open_action = OpenAction.from_handle(self.door.handles[0], arm)
 
         return [reach_action, open_action]

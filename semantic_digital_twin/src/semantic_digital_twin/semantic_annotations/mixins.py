@@ -48,7 +48,9 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     AmbiguousPart,
     CannotBeAPartOf,
+    MovableJointKindError,
     NoGraspGeometry,
+    WholeWithoutParentError,
     NoSupportingSurfaceError,
     UnknownPartWholeRelationshipField,
 )
@@ -97,12 +99,42 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Drawer,
+        Backplate,
+        Cable,
+        Blinds,
+        Button,
+        Cap,
+        Control,
+        Cooktop,
+        Curtain,
+        DrainPipe,
+        Faucet,
+        FaucetSpout,
+        HeaterValve,
+        Hinge,
+        Hose,
+        Knob,
+        Lid,
+        LidFrame,
+        Lock,
+        PowerSocket,
+        Pump,
+        Shower,
+        ShowerHead,
+        ShowerHose,
+        ShowerValve,
+        Sink,
+        Switch,
+        Thermostat,
+        ToiletFlush,
+        ToiletSeat,
+        Wheel,
+        Window,
         Door,
         Handle,
         Rim,
         Aperture,
         Leg,
-        Sink,
         ShelfLayer,
         Wall,
         CounterTop,
@@ -297,17 +329,28 @@ class HasRootKinematicStructureEntity(
         Realize the relationship between this annotation (as a part) and the
         ``main_has_root_body_annotation`` (the whole) in the kinematic structure. The
         default is to become a kinematic child of the whole, keeping the connection
-        the part hangs from; parts with a different strategy (e.g. apertures that cut
-        the whole) override this.
+        the part hangs from; where the relationship says the part carries the whole,
+        the part takes the whole's place and the whole becomes its kinematic child.
+        Parts with a different strategy (e.g. apertures that cut the whole) override
+        this.
 
         :param main_has_root_body_annotation: The annotation (the whole) this one is
             being added to as a part.
         :param relationship: The metadata of the part-whole relationship field being
             mounted into, describing how the mount affects the whole.
+        :raises WholeWithoutParentError: If the part is to carry a whole that hangs
+            from nothing.
         """
-        main_has_root_body_annotation._world.move_branch(
-            self.root, main_has_root_body_annotation.root, True
-        )
+        world = main_has_root_body_annotation._world
+        whole_root = main_has_root_body_annotation.root
+        if not relationship.part_carries_whole:
+            world.move_branch(self.root, whole_root, True)
+            return
+        whole_parent = whole_root.parent_kinematic_structure_entity
+        if whole_parent is None:
+            raise WholeWithoutParentError(whole=main_has_root_body_annotation)
+        world.move_branch(self.root, whole_parent, True)
+        world.move_branch(whole_root, self.root, True)
 
     @property
     def global_transform(self) -> HomogeneousTransformationMatrix:
@@ -548,7 +591,7 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
         name: str,
         world: World,
         body: Body,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> Self:
         """
         Create this annotation over a region the size and pose of a body.
@@ -743,15 +786,29 @@ class HasApertures(HasRootBody, PartWholeRelationship, Mixin):
     """
 
 
+TMovableConnection = TypeVar("TMovableConnection", bound=ActiveConnection1DOF)
+
+
 @dataclass(eq=False)
-class HasMovableJoint(HasRootBody, Mixin, ABC):
+class HasMovableJoint(HasRootBody, Generic[TMovableConnection], Mixin, ABC):
     """
-    A mixin class for semantic annotations whose root moves relative to its parent, such
-    as a door on its hinge or a drawer on its rails.
+    A mixin class for semantic annotations whose root may move relative to its parent,
+    such as a door on its hinge or a drawer on its rails.
+
+    The type parameter is the kind of joint the annotation moves on;
+    :class:`~semantic_digital_twin.world_description.connections.ActiveConnection1DOF`
+    where it moves on several kinds.
     """
 
     @property
-    def movable_joint(self) -> ActiveConnection1DOF | None:
+    def movable_joint_type(self) -> type[TMovableConnection]:
+        """
+        The kind of joint the annotation moves on.
+        """
+        return self.get_type_of_generic_parameter(TMovableConnection)
+
+    @property
+    def movable_joint(self) -> TMovableConnection | None:
         """
         The connection the root hangs from, which moves the annotation relative to its
         parent.
@@ -762,24 +819,26 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         parent_connection = self.root.parent_connection
         return (
             parent_connection
-            if isinstance(parent_connection, ActiveConnection1DOF)
+            if isinstance(parent_connection, self.movable_joint_type)
             else None
         )
 
-    @abstractmethod
     def calculate_self_T_movable_joint(
         self, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
-        Calculate where the joint that moves this annotation sits, relative to its root.
+        Calculate where the joint that moves this annotation sits, relative to its root:
+        at the root's origin.
 
         :param axis: The axis the joint moves along or about, in the root frame.
         :return: The pose of the joint frame in the root frame.
         """
+        return HomogeneousTransformationMatrix()
 
     def mount_on_movable_joint(
-        self, connection_specification: ActiveConnection1DOFSpecification
-    ) -> ActiveConnection1DOF:
+        self,
+        connection_specification: ActiveConnection1DOFSpecification[TMovableConnection],
+    ) -> TMovableConnection:
         """
         Replace the connection the root hangs from with one built from
         ``connection_specification``, placed where
@@ -789,7 +848,17 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         :param connection_specification: The joint to mount on. Its own
             ``connection_T_child`` is ignored, and the specification is left unchanged.
         :return: The connection the root now hangs from.
+        :raises MovableJointKindError: If the specification builds a joint of another
+            kind than :attr:`movable_joint_type`.
         """
+        if not issubclass(
+            connection_specification.connection_type, self.movable_joint_type
+        ):
+            raise MovableJointKindError(
+                annotation_type=type(self),
+                movable_joint_type=self.movable_joint_type,
+                connection_type=connection_specification.connection_type,
+            )
         placed_specification = dataclasses.replace(
             connection_specification,
             connection_T_child=self.calculate_self_T_movable_joint(
@@ -1037,6 +1106,23 @@ class HasHandles(HasRootBody, PartWholeRelationship, Mixin):
     """
     The handles of the semantic annotation.
     """
+
+
+@dataclass(eq=False)
+class IsGraspedAtHandle(HasGraspCandidates, HasHandles, Mixin):
+    """
+    A mixin class for semantic annotations that have handles and are grasped at the
+    first of them.
+    """
+
+    def grasped_part(self) -> HasGraspCandidates:
+        """
+        :return: The first handle; without a handle, the part the annotation is grasped
+            at otherwise.
+        """
+        if not self.handles:
+            return super().grasped_part()
+        return self.handles[0]
 
 
 THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)
@@ -1683,4 +1769,568 @@ class HasCounterTop(PartWholeRelationship, Mixin):
     )
     """
     The counter top of the semantic annotation.
+    """
+
+
+# %% parts of fixtures, furnishings and appliances
+
+
+@dataclass(eq=False)
+class HasBlinds(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have blinds.
+    """
+
+    blinds: list[Blinds] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The blinds of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasButtons(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have buttons.
+    """
+
+    buttons: list[Button] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The buttons of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasCaps(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have caps.
+    """
+
+    caps: list[Cap] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The caps of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasCarryingHoses(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have hoses and hang from them.
+    """
+
+    hoses: list[Hose] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship(part_carries_whole=True).as_dict(),
+    )
+    """
+    The hoses of the semantic annotation, which carry it.
+    """
+
+
+@dataclass(eq=False)
+class HasCarryingShowerValves(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have shower valves and hang from them.
+    """
+
+    shower_valves: list[ShowerValve] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship(part_carries_whole=True).as_dict(),
+    )
+    """
+    The shower valves of the semantic annotation, which carry it.
+    """
+
+
+@dataclass(eq=False)
+class HasControls(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have controls.
+    """
+
+    controls: list[Control] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The controls of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasCooktops(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have cooktops.
+    """
+
+    cooktops: list[Cooktop] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The cooktops of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasCurtains(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have curtains.
+    """
+
+    curtains: list[Curtain] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The curtains of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasDrainPipes(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have drain pipes.
+    """
+
+    drain_pipes: list[DrainPipe] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The drain pipes of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasFaucetSpouts(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have faucet spouts.
+    """
+
+    faucet_spouts: list[FaucetSpout] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The faucet spouts of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasFaucets(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have faucets.
+    """
+
+    faucets: list[Faucet] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The faucets of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasHeaterValves(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have heater valves.
+    """
+
+    heater_valves: list[HeaterValve] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The heater valves of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasHinges(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have hinges.
+    """
+
+    hinges: list[Hinge] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The hinges of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasHoses(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have hoses.
+    """
+
+    hoses: list[Hose] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The hoses of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasKnobs(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have knobs.
+    """
+
+    knobs: list[Knob] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The knobs of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasLidFrames(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have lid frames.
+    """
+
+    lid_frames: list[LidFrame] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The lid frames of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasLids(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have lids.
+    """
+
+    lids: list[Lid] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The lids of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasLocks(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have locks.
+    """
+
+    locks: list[Lock] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The locks of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasPowerSockets(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have power sockets.
+    """
+
+    power_sockets: list[PowerSocket] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The power sockets of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasPumps(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have pumps.
+    """
+
+    pumps: list[Pump] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The pumps of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasShowerHeads(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have shower heads.
+    """
+
+    shower_heads: list[ShowerHead] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The shower heads of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasShowerHoses(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have shower hoses.
+    """
+
+    shower_hoses: list[ShowerHose] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The shower hoses of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasShowers(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have showers.
+    """
+
+    showers: list[Shower] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The showers of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasSinks(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have sinks.
+    """
+
+    sinks: list[Sink] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The sinks of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasSwitches(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have switches.
+    """
+
+    switches: list[Switch] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The switches of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasThermostats(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have thermostats.
+    """
+
+    thermostats: list[Thermostat] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The thermostats of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasToiletFlushes(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have toilet flushes.
+    """
+
+    toilet_flushes: list[ToiletFlush] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The toilet flushes of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasToiletSeats(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have toilet seats.
+    """
+
+    toilet_seats: list[ToiletSeat] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The toilet seats of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasWheels(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have wheels.
+    """
+
+    wheels: list[Wheel] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The wheels of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasWindows(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have windows.
+    """
+
+    windows: list[Window] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The windows of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasBackplates(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have backplates.
+    """
+
+    backplates: list[Backplate] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The backplates of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasCables(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have cables.
+    """
+
+    cables: list[Cable] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The cables of the semantic annotation.
+    """
+
+
+@dataclass(eq=False)
+class HasCarryingCables(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that have cables and hang from them.
+    """
+
+    cables: list[Cable] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship(part_carries_whole=True).as_dict(),
+    )
+    """
+    The cables of the semantic annotation, which carry it.
     """

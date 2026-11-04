@@ -51,7 +51,7 @@ def cabinet_world(handle_name: str = "handle") -> World:
             Cabinet(
                 root=cabinet_body,
                 drawers=[
-                    Drawer(root=drawer_body, handle=Handle(root=handle_body)),
+                    Drawer(root=drawer_body, handles=[Handle(root=handle_body)]),
                 ],
             )
         )

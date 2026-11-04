@@ -101,7 +101,7 @@ def modelled_kitchen() -> World:
             )
         handle = Handle(name=PrefixedName("drawer_handle"), root=handle_body)
         drawer = Drawer(
-            name=PrefixedName("top_drawer"), root=drawer_body, handle=handle
+            name=PrefixedName("top_drawer"), root=drawer_body, handles=[handle]
         )
         cabinet = Cabinet(
             name=PrefixedName("tall_cabinet"), root=cabinet_body, drawers=[drawer]
@@ -199,7 +199,7 @@ def test_a_mounted_part_becomes_an_edge_between_the_entities_carrying_it():
             whole="cabinet", part="drawer", relation="part", field_name="drawers"
         ),
         GroundTruthEdge(
-            whole="drawer", part="handle", relation="part", field_name="handle"
+            whole="drawer", part="handle", relation="part", field_name="handles"
         ),
     ]
 

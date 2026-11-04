@@ -29,6 +29,39 @@ from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
+    HasBackplates,
+    HasCables,
+    HasCarryingCables,
+    HasBlinds,
+    HasButtons,
+    HasCaps,
+    HasCarryingHoses,
+    HasCarryingShowerValves,
+    HasControls,
+    HasCooktops,
+    HasCurtains,
+    HasDrainPipes,
+    HasFaucetSpouts,
+    HasFaucets,
+    HasHeaterValves,
+    HasHinges,
+    HasHoses,
+    HasKnobs,
+    HasLidFrames,
+    HasLids,
+    HasLocks,
+    HasPowerSockets,
+    HasPumps,
+    HasShowerHeads,
+    HasShowerHoses,
+    HasShowers,
+    HasSinks,
+    HasSwitches,
+    HasThermostats,
+    HasToiletFlushes,
+    HasToiletSeats,
+    HasWheels,
+    HasWindows,
     HasCounterTop,
     HasCabinets,
     HasSupportingSurface,
@@ -37,6 +70,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasDoors,
     HasHandle,
     HasHandles,
+    IsGraspedAtHandle,
     HasCaseAsRootBody,
     HasMovableJoint,
     HasApertures,
@@ -65,7 +99,10 @@ from semantic_digital_twin.spatial_types import (
 )
 from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
     FixedConnection,
+    PrismaticConnection,
+    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -109,7 +146,7 @@ class Furniture(HasRootBody, ABC):
 
 
 @dataclass(eq=False)
-class Handle(HasGraspCandidates):
+class Handle(HasGraspCandidates, HasMovableJoint[RevoluteConnection]):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
@@ -348,7 +385,16 @@ class EntryWay(Aperture):
 
 
 @dataclass(eq=False)
-class Door(HasHandle, HasMovableJoint):
+class Door(
+    IsGraspedAtHandle,
+    HasMovableJoint[ActiveConnection1DOF],
+    HasControls,
+    HasBackplates,
+    HasHinges,
+    HasKnobs,
+    HasLocks,
+    HasWindows,
+):
     """
     A door is a physical entity that has covers an opening, has a movable body and a
     handle.
@@ -454,10 +500,10 @@ class Door(HasHandle, HasMovableJoint):
             frame's axes in either direction.
         :return: The pose of the hinge in the door frame.
         """
-        if self.handle is None:
+        if not self.handles:
             raise MissingSemanticAnnotationError(self.__class__, Handle)
 
-        connection = self.handle.root.parent_connection
+        connection = self.handles[0].root.parent_connection
         door_P_handle = connection.origin_expression.position
         scale = self.root.collision.scale
 
@@ -527,7 +573,13 @@ class DoubleDoor(SemanticAnnotation):
 
 
 @dataclass(eq=False)
-class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
+class Drawer(
+    Furniture,
+    HasCaseAsRootBody,
+    IsGraspedAtHandle,
+    HasMovableJoint[ActiveConnection1DOF],
+    HasKnobs,
+):
     """
     A box that slides out of a piece of furniture, opened by a handle on its front.
     """
@@ -535,18 +587,6 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
     @classproperty
     def _hole_direction_axis(cls) -> Vector3:
         return Vector3.Z()
-
-    def calculate_self_T_movable_joint(
-        self, axis: Vector3
-    ) -> HomogeneousTransformationMatrix:
-        """
-        A drawer slides, which moves it the same wherever its rails sit, so they sit at
-        its origin.
-
-        :param axis: The axis the drawer slides along, in the drawer frame.
-        :return: The identity: the rails' frame is the drawer's frame.
-        """
-        return HomogeneousTransformationMatrix()
 
     @property
     def opening_ratio(self) -> float:
@@ -562,7 +602,7 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
 
 
 @dataclass(eq=False)
-class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
+class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint[PrismaticConnection]):
     """
     An elevator in the world, consists of three walls a floor, double doors for entering and a prismatic drive that moves
     the elevator to other floors.
@@ -571,18 +611,6 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
     @classproperty
     def _hole_direction_axis(cls) -> Vector3:
         return Vector3.NEGATIVE_X()
-
-    def calculate_self_T_movable_joint(
-        self, axis: Vector3
-    ) -> HomogeneousTransformationMatrix:
-        """
-        An elevator's drive slides it, which moves it the same wherever the drive sits,
-        so it sits at the cabin's origin.
-
-        :param axis: The axis the cabin travels along, in the cabin frame.
-        :return: The identity: the drive's frame is the cabin's frame.
-        """
-        return HomogeneousTransformationMatrix()
 
     def open(self):
         """
@@ -644,7 +672,7 @@ class Table(Furniture, HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class CounterTop(Furniture, HasSupportingSurface, HasSink):
+class CounterTop(Furniture, HasSupportingSurface, HasSink, HasCooktops):
     """
     A semantic annotation that represents a counter top.
     """
@@ -664,7 +692,18 @@ class KitchenIsland(
 
 
 @dataclass(eq=False)
-class Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers):
+class Cabinet(
+    Furniture,
+    HasCaseAsRootBody,
+    HasDoors,
+    HasDrawers,
+    HasBackplates,
+    HasHandles,
+    HasHinges,
+    HasLids,
+    HasSinks,
+    HasWheels,
+):
     """
     A piece of furniture with a case that things are stored inside, closed by doors or drawers.
     """
@@ -697,7 +736,7 @@ class Fridge(Cabinet):
 
 
 @dataclass(eq=False)
-class WashingMachine(Cabinet):
+class WashingMachine(Cabinet, HasControls, HasHandles):
     """
     A washing machine is a household appliance that washes laundry in a drum.
 
@@ -715,7 +754,7 @@ class TumbleDryer(Cabinet):
 
 
 @dataclass(eq=False)
-class Oven(HasRootBody, HasDoors):
+class Oven(HasRootBody, HasDoors, HasControls, HasCooktops):
     """
     An appliance with a door that cooks what is put inside it with heat.
     """
@@ -736,7 +775,7 @@ class Cupboard(Cabinet):
 
 
 @dataclass(eq=False)
-class Wardrobe(Cabinet):
+class Wardrobe(Cabinet, HasHinges):
     """
     A tall cabinet for hanging clothes in.
     """
@@ -982,7 +1021,7 @@ class Wall(HasApertures):
 
 
 @dataclass(eq=False)
-class Container(HasGraspCandidates):
+class Container(HasGraspCandidates, HasLids):
     """
     An object that holds contents and has an opening they go in and out through.
     """
@@ -1003,7 +1042,7 @@ class Tableware(HasGraspCandidates):
 
 
 @dataclass(eq=False)
-class Bottle(Container):
+class Bottle(Container, HasCaps, HasHandles):
     """
     Abstract class for bottles.
     """
@@ -1066,7 +1105,7 @@ class CookingContainer(Container, Cookware):
 
 
 @dataclass(eq=False)
-class Lid(Cookware):
+class Lid(Cookware, HasMovableJoint[ActiveConnection1DOF], HasHandles):
     """
     A cover that closes a container.
     """
@@ -1331,7 +1370,7 @@ class DiningTable(Table, HasLegs):
 
 
 @dataclass(eq=False)
-class SideTable(Table):
+class SideTable(Table, HasDoors):
     """
     A side table.
     """
@@ -1340,7 +1379,7 @@ class SideTable(Table):
 
 
 @dataclass(eq=False)
-class Desk(Table, HasLegs):
+class Desk(Table, HasLegs, HasCabinets, HasDoors, HasDrawers):
     """
     A desk.
     """
@@ -1372,7 +1411,7 @@ class Armchair(Chair):
 
 
 @dataclass(eq=False)
-class TrashCan(HasCaseAsRootBody, Furniture):
+class TrashCan(HasCaseAsRootBody, Furniture, HasControls, HasLids, HasLidFrames):
     """
     Abstract class for Trash Can.
     """
@@ -1407,14 +1446,14 @@ class Sofa(Furniture, HasSupportingSurface):
 
 
 @dataclass(eq=False)
-class Sink(HasRootBody):
+class Sink(HasRootBody, HasDrainPipes, HasFaucets):
     """
     A sink.
     """
 
 
 @dataclass(eq=False)
-class Kettle(CookingContainer):
+class Kettle(CookingContainer, HasControls, HasHandles, HasLids):
     """
     A covered container for boiling water.
     """
@@ -1500,7 +1539,7 @@ class Poster(WallDecor):
 
 
 @dataclass(eq=False)
-class WallPanel(HasRootBody):
+class WallPanel(HasRootBody, HasControls, HasDoors, HasLids):
     """
     A wall panel.
     """
@@ -1753,21 +1792,11 @@ class Baseball(HasGraspCandidates):
 
 
 @dataclass(eq=False)
-class BottleCap(HasMovableJoint):
+class Cap(HasMovableJoint[ActiveConnection1DOF], HasPumps):
     """
-    A cap that closes a bottle, typically mounted on a screw joint.
+    A cap that closes an opening, such as a bottle's or a soap dispenser's, typically
+    mounted on a screw joint.
     """
-
-    def calculate_self_T_movable_joint(
-        self, axis: Vector3
-    ) -> HomogeneousTransformationMatrix:
-        """
-        A cap screws about its own centre line, so its thread sits at its origin.
-
-        :param axis: The thread axis, in the cap frame.
-        :return: The identity: the thread's frame is the cap's frame.
-        """
-        return HomogeneousTransformationMatrix()
 
 
 @dataclass(eq=False)
@@ -1924,7 +1953,7 @@ class Leg(HasRootBody):
 
 
 @dataclass(eq=False)
-class Cooktop(HasRootBody):
+class Cooktop(HasRootBody, HasControls):
     """
     A cooktop surface for cooking.
     """
@@ -2101,7 +2130,7 @@ class Sponge(Tool):
 
 
 @dataclass(eq=False)
-class Microwave(IsStorageSpace, HasDoors):
+class Microwave(IsStorageSpace, HasDoors, HasControls):
     """
     A microwave oven, a kitchen appliance with a door that heats food placed inside it
     using microwave radiation.
@@ -2116,16 +2145,494 @@ class Hood(HasRootBody):
 
 
 @dataclass(eq=False)
-class Toaster(HasRootBody):
+class Toaster(HasRootBody, HasControls):
     """
     A countertop appliance for toasting slices of bread.
     """
 
 
 @dataclass(eq=False)
-class CoffeeMachine(HasRootBody):
+class CoffeeMachine(HasRootBody, HasControls):
     """
     A countertop appliance that brews coffee.
     """
 
     _synonyms = {"coffe"}
+
+
+# %% openings and their frames
+
+
+@dataclass(eq=False)
+class Frame(HasRootBody, HasDoors, HasHinges, HasKnobs, HasLocks, HasWindows):
+    """
+    The fixed frame around an opening in a wall that a door or a window hangs in.
+    """
+
+
+@dataclass(eq=False)
+class Window(
+    HasMovableJoint[RevoluteConnection],
+    HasBlinds,
+    HasHandles,
+    HasBackplates,
+    HasHinges,
+    HasKnobs,
+):
+    """
+    A pane of glass in a frame that closes an opening in a wall and opens to let in air.
+    """
+
+
+@dataclass(eq=False)
+class Hinge(HasRootBody):
+    """
+    A joint of two plates that a door, window or lid swings on.
+    """
+
+
+# %% window coverings
+
+
+@dataclass(eq=False)
+class Rail(HasRootBody, HasBlinds, HasControls, HasCurtains):
+    """
+    A rail that blinds or a curtain hang from and slide along.
+    """
+
+
+@dataclass(eq=False)
+class Blinds(HasMovableJoint[PrismaticConnection], HasControls):
+    """
+    Slats over a window that are raised and lowered to let in more or less light.
+    """
+
+
+@dataclass(eq=False)
+class Curtain(HasMovableJoint[PrismaticConnection]):
+    """
+    A length of fabric hanging over a window that is drawn open and closed.
+    """
+
+
+# %% controls
+
+
+@dataclass(eq=False)
+class Control(HasMovableJoint[ActiveConnection1DOF]):
+    """
+    Something operated by hand or foot to control a device, such as a knob, a switch or
+    a button.
+    """
+
+
+@dataclass(eq=False)
+class Switch(Control):
+    """
+    A control that is flipped between on and off, such as a light switch.
+    """
+
+
+@dataclass(eq=False)
+class Button(Control):
+    """
+    A control that is pressed.
+    """
+
+
+@dataclass(eq=False)
+class Pedal(Control):
+    """
+    A control that is pressed with the foot, such as the one that opens a trash can's
+    lid.
+    """
+
+
+@dataclass(eq=False)
+class ControlPanel(HasRootBody, HasControls, HasDoors):
+    """
+    A panel of a device that carries its controls.
+    """
+
+
+# %% bases and plates that other parts are mounted on
+
+
+@dataclass(eq=False)
+class Backplate(
+    HasHandles,
+    HasLocks,
+    HasKnobs,
+    HasControls,
+    HasPowerSockets,
+    HasThermostats,
+    HasToiletFlushes,
+    HasLids,
+):
+    """
+    The plate a fitting is mounted on, such as the rose of a door handle or the plate of a light switch, a power socket or a toilet flush.
+    """
+
+
+@dataclass(eq=False)
+class BaseStation(HasRootBody, HasControls, HasCables):
+    """
+    The unit of a telephone or an intercom that its handset rests on.
+    """
+
+
+@dataclass(eq=False)
+class FaucetBody(HasRootBody, HasControls, HasFaucets):
+    """
+    The body of a faucet that its spout and controls are mounted on.
+    """
+
+
+@dataclass(eq=False)
+class LidFrame(HasRootBody, HasLids):
+    """
+    The top of a container that holds its lid, such as the head of a trash can.
+    """
+
+
+# %% parts that are grasped or lock
+
+
+@dataclass(eq=False)
+class Knob(HasGraspCandidates, HasMovableJoint[RevoluteConnection]):
+    """
+    A small round grip that a door, drawer or device is pulled or turned by.
+    """
+
+
+@dataclass(eq=False)
+class Lock(HasMovableJoint[RevoluteConnection]):
+    """
+    A mechanism that keeps a door or window shut, such as a thumb turn or a cylinder.
+    """
+
+
+@dataclass(eq=False)
+class KeyCard(HasGraspCandidates):
+    """
+    A card that unlocks a door or switches on a room's power.
+    """
+
+
+# %% heating
+
+
+@dataclass(eq=False)
+class Heater(HasRootBody, HasControls, HasHeaterValves):
+    """
+    Something that warms a room, such as a radiator.
+    """
+
+
+@dataclass(eq=False)
+class HeaterValve(HasMovableJoint[RevoluteConnection]):
+    """
+    The valve on a heater that is turned to set how much it warms.
+    """
+
+
+@dataclass(eq=False)
+class Thermostat(ElectricalDevice, HasMovableJoint[ActiveConnection1DOF], HasControls):
+    """
+    A device that is set to the temperature a heater keeps a room at.
+    """
+
+
+@dataclass(eq=False)
+class Thermometer(HasRootBody):
+    """
+    A device that shows the temperature.
+    """
+
+
+# %% electrical devices
+
+
+@dataclass(eq=False)
+class Cable(HasRootBody):
+    """
+    A cable, such as a telephone's cord or a device's power cord.
+    """
+
+
+@dataclass(eq=False)
+class PowerSocket(ElectricalDevice, HasLids):
+    """
+    A socket in a wall that devices are plugged into.
+    """
+
+
+@dataclass(eq=False)
+class PowerStrip(ElectricalDevice, HasSwitches):
+    """
+    A strip of power sockets on a cable.
+    """
+
+
+@dataclass(eq=False)
+class ElectricalPanel(ElectricalDevice, HasLids):
+    """
+    The box holding a building's fuses and circuit breakers.
+    """
+
+
+@dataclass(eq=False)
+class Blender(ElectricalDevice, HasControls):
+    """
+    A kitchen appliance that blends food with spinning blades.
+    """
+
+
+@dataclass(eq=False)
+class Fan(ElectricalDevice, HasSwitches):
+    """
+    A device with spinning blades that moves air.
+    """
+
+
+@dataclass(eq=False)
+class Fryer(ElectricalDevice, HasButtons):
+    """
+    A kitchen appliance that fries food in hot oil or air.
+    """
+
+
+@dataclass(eq=False)
+class Multicooker(ElectricalDevice, HasControls, HasLids):
+    """
+    A kitchen appliance that cooks in a pot in several ways, such as boiling, steaming
+    or baking.
+    """
+
+
+@dataclass(eq=False)
+class Intercom(ElectricalDevice):
+    """
+    A device by the door for talking to whoever rings and letting them in.
+    """
+
+
+@dataclass(eq=False)
+class Telephone(ElectricalDevice, HasCarryingCables):
+    """
+    A telephone with a handset.
+    """
+
+
+@dataclass(eq=False)
+class Printer(ElectricalDevice, HasDrawers):
+    """
+    A device that prints on paper.
+    """
+
+
+@dataclass(eq=False)
+class Projector(ElectricalDevice, HasSwitches):
+    """
+    A device that projects pictures onto a wall or screen.
+    """
+
+
+@dataclass(eq=False)
+class VacuumCleaner(ElectricalDevice, HasButtons, HasSwitches):
+    """
+    A device that cleans floors by suction.
+    """
+
+
+@dataclass(eq=False)
+class WaterHeater(ElectricalDevice, HasControls, HasCables):
+    """
+    A device that heats and stores a building's hot water.
+    """
+
+
+# %% plumbing and sanitary fixtures
+
+
+@dataclass(eq=False)
+class Faucet(
+    HasMovableJoint[RevoluteConnection],
+    HasControls,
+    HasFaucetSpouts,
+    HasHandles,
+    HasCarryingHoses,
+    HasShowerHoses,
+):
+    """
+    A fixture that water runs from, opened and closed by its controls.
+    """
+
+
+@dataclass(eq=False)
+class FaucetSpout(HasMovableJoint[RevoluteConnection]):
+    """
+    The spout of a faucet that the water comes out of.
+    """
+
+
+@dataclass(eq=False)
+class Shower(
+    HasRootBody,
+    HasControls,
+    HasDoors,
+    HasDrainPipes,
+    HasFaucets,
+    HasHoses,
+    HasShowerHoses,
+    HasCarryingShowerValves,
+):
+    """
+    A fixture for washing under a spray of water, or the cabin it is in.
+    """
+
+
+@dataclass(eq=False)
+class ShowerHead(HasRootBody):
+    """
+    The head of a shower that the water sprays from.
+    """
+
+
+@dataclass(eq=False)
+class ShowerHose(HasRootBody, HasShowerHeads):
+    """
+    The flexible hose between a shower's valve and its head.
+    """
+
+
+@dataclass(eq=False)
+class ShowerValve(HasRootBody, HasControls, HasShowerHoses):
+    """
+    The valve that a shower's water flow and temperature are set at.
+    """
+
+
+@dataclass(eq=False)
+class ShowerHeadHolder(HasRootBody):
+    """
+    The bracket a shower head rests in.
+    """
+
+
+@dataclass(eq=False)
+class Hose(HasRootBody):
+    """
+    A flexible tube that carries water.
+    """
+
+
+@dataclass(eq=False)
+class DrainPipe(HasRootBody):
+    """
+    The pipe that drains a sink or another fixture.
+    """
+
+
+@dataclass(eq=False)
+class Toilet(HasRootBody, HasBackplates, HasLids, HasToiletFlushes, HasToiletSeats):
+    """
+    A toilet.
+    """
+
+
+@dataclass(eq=False)
+class ToiletSeat(HasMovableJoint[RevoluteConnection]):
+    """
+    The hinged seat of a toilet.
+    """
+
+
+@dataclass(eq=False)
+class ToiletFlush(HasMovableJoint[ActiveConnection1DOF]):
+    """
+    The button or lever that flushes a toilet.
+    """
+
+
+@dataclass(eq=False)
+class Bathtub(HasRootBody, HasFaucets, HasShowers):
+    """
+    A tub to bathe in.
+    """
+
+
+@dataclass(eq=False)
+class Dispenser(HasRootBody, HasButtons, HasCaps, HasPumps):
+    """
+    A container that gives out its contents, such as soap, through a pump or a button.
+    """
+
+
+@dataclass(eq=False)
+class Pump(HasMovableJoint[ActiveConnection1DOF]):
+    """
+    The head of a dispenser that is pressed to pump out its contents.
+    """
+
+
+# %% containers
+
+
+@dataclass(eq=False)
+class StorageBox(Container, HasLids):
+    """
+    A box things are kept in.
+    """
+
+
+@dataclass(eq=False)
+class Suitcase(Container, HasLids):
+    """
+    A case for carrying clothes and belongings when travelling.
+    """
+
+
+@dataclass(eq=False)
+class Jug(Container, HasLids):
+    """
+    A container with a handle and a spout for pouring liquids.
+    """
+
+
+@dataclass(eq=False)
+class CoffeeCan(Container, HasHandles):
+    """
+    A can that coffee is kept in.
+    """
+
+
+# %% other
+
+
+@dataclass(eq=False)
+class Wheel(HasMovableJoint[RevoluteConnection]):
+    """
+    A wheel that a piece of furniture or a device rolls on.
+    """
+
+
+@dataclass(eq=False)
+class Tabletop(HasRootBody):
+    """
+    The flat top of a table.
+    """
+
+
+@dataclass(eq=False)
+class Clothing(HasGraspCandidates):
+    """
+    Something worn on the body, such as a shirt or a hoodie.
+    """
+
+
+@dataclass(eq=False)
+class DoorAttachment(HasRootBody):
+    """
+    Something attached to a door to hold things, such as a rack or a pocket.
+    """

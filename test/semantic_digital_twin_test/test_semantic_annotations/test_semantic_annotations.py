@@ -333,7 +333,9 @@ def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy
         " the parent of a FixedConnection is the child of the PrismaticConnection,"
         " the child of the FixedConnection is the root of a Handle,"
         " then there's a Drawer whose root is the child of the PrismaticConnection,"
-        " and whose handle is the Handle"
+        " and whose handles are a handles_of, where the body of the handles_of is the"
+        " child of the PrismaticConnection, and the world of the handles_of is a specific"
+        " World with name 'apartment'"
     )
     assert verbalization_hierarchical == (
         "If\n"
@@ -344,7 +346,9 @@ def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy
         "then\n"
         "  there's a Drawer\n"
         "    - whose root is the child of the PrismaticConnection\n"
-        "    - whose handle is the Handle"
+        "    - whose handles are a handles_of, where the body of the handles_of is the"
+        " child of the PrismaticConnection, and the world of the handles_of is a specific"
+        " World with name 'apartment'"
     )
 
 
@@ -353,7 +357,7 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
     door_body = apartment_world_copy.bodies[1]
 
     handle = Handle(root=handle_body)
-    door = Door(root=door_body, handle=handle)
+    door = Door(root=door_body, handles=[handle])
     with apartment_world_copy.modify_world():
         apartment_world_copy.add_semantic_annotation(handle)
         apartment_world_copy.add_semantic_annotation(door)
@@ -368,7 +372,7 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
 
     door_de = Door.from_json(door_se, **kwargs)
 
-    assert type(door.handle) == type(door_de.handle)
+    assert type(door.handles[0]) == type(door_de.handles[0])
     assert type(door.root) == type(door_de.root)
 
 
@@ -507,7 +511,7 @@ class DrawerWithSlidingHandle:
             collision=handle_collision,
         )
         handle = Handle(root=handle_body)
-        drawer = Drawer(root=case, handle=handle)
+        drawer = Drawer(root=case, handles=[handle])
         with world.modify_world():
             world.add_kinematic_structure_entity(root)
             world.add_kinematic_structure_entity(case)
@@ -620,7 +624,7 @@ def test_combined_mesh_skips_bodies_without_collision():
         ShapeCollection([Box(scale=CASE_SCALE)]),
         ShapeCollection([Box(scale=NEGLIGIBLE_SCALE)]),
     )
-    assert not setup.drawer.handle.root.has_collision()
+    assert not setup.drawer.handles[0].root.has_collision()
 
     np.testing.assert_allclose(
         setup.drawer.combined_mesh.bounds, setup.drawer.root.combined_mesh.bounds
@@ -640,7 +644,7 @@ def test_combined_mesh_is_empty_without_collision_geometry():
 # %% every piece of furniture stands as a body
 
 
-def furniture_family() -> List[type]:
+def furniture_family() -> list[type]:
     """
     :return: Every class the ontology derives from :class:`Furniture`, itself included.
     """

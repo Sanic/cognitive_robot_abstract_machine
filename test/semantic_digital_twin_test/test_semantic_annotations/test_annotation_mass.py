@@ -73,7 +73,7 @@ def door() -> Door:
 
 def test_the_mass_of_an_annotation_includes_its_parts(door):
     door.root.inertial = Inertial(mass=0.3)
-    door.handle.root.inertial = Inertial(mass=0.1)
+    door.handles[0].root.inertial = Inertial(mass=0.1)
 
     assert door.mass == pytest.approx(0.4)
-    assert door.handle.mass == pytest.approx(0.1)
+    assert door.handles[0].mass == pytest.approx(0.1)

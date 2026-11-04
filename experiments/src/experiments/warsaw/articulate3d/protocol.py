@@ -9,7 +9,8 @@ where that wording is turned into classes of the ontology, once for the whole da
 
 - every part name gets a ruling, which says what it means wherever it occurs;
 - a part a person classified on sight overrides what its name means;
-- where a whole could hold a part through several fields, the protocol says which.
+- where a whole could hold a part through several fields, the protocol says which;
+- its annotation rules say which scenes are left out and which parts are corrected.
 
 The protocol is written and frozen before any run on the evaluated scenes is looked at.
 Nothing in it may be derived from what a run produced.
@@ -29,6 +30,7 @@ from experiments.warsaw.articulate3d.exceptions import (
     PartNameNotRuledError,
     PartNameUndecidedError,
 )
+from experiments.warsaw.articulate3d.rules import AnnotationRules
 from experiments.warsaw.bases import JsonRecord
 
 # %% what one part name means
@@ -159,6 +161,11 @@ class EvaluationProtocol(JsonRecord):
     field_choices: list[FieldChoice] = field(default_factory=list)
     """
     The field each ambiguous pair of classes is held through.
+    """
+
+    annotation_rules: AnnotationRules = field(default_factory=AnnotationRules)
+    """
+    Which scenes are left out, and how the annotation of the others is corrected.
     """
 
     @classmethod

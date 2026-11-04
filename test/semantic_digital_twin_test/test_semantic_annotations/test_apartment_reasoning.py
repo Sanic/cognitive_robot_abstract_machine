@@ -378,9 +378,9 @@ def test_a_drawer_is_wired_to_the_handle_mounted_on_it(
     }
 
     handled = drawers_by_body[ApartmentDrawer.CABINET5_DRAWER_TOP]
-    assert handled.handle.root.name.name == ApartmentHandle.HANDLE_CAB5_T
+    assert handled.handles[0].root.name.name == ApartmentHandle.HANDLE_CAB5_T
 
-    assert drawers_by_body[ApartmentDrawer.COFFEE_TABLE_DRAWER].handle is None
+    assert drawers_by_body[ApartmentDrawer.COFFEE_TABLE_DRAWER].handles == []
 
 
 def test_a_door_is_wired_to_the_handle_mounted_on_it(
@@ -395,9 +395,11 @@ def test_a_door_is_wired_to_the_handle_mounted_on_it(
     }
 
     handled = doors_by_body[ApartmentDoor.WARDROBE_DOOR_LEFT]
-    assert handled.handle.root.name.name == ApartmentHandle.WARDROBE_DOOR_LEFT_HANDLE
+    assert (
+        handled.handles[0].root.name.name == ApartmentHandle.WARDROBE_DOOR_LEFT_HANDLE
+    )
 
-    assert doors_by_body[ApartmentDoor.CABINET4_DOOR_TOP].handle is None
+    assert doors_by_body[ApartmentDoor.CABINET4_DOOR_TOP].handles == []
 
 
 def test_a_container_holds_the_parts_that_open_out_of_it(

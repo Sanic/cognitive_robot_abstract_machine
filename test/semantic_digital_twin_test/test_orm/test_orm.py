@@ -203,14 +203,14 @@ def test_part_whole_relationship_field_survives_deepcopy():
             door.add(handle)
 
         # The marker is present on the source class before persisting.
-        assert _is_part_whole_relationship(Door, "handle")
+        assert _is_part_whole_relationship(Door, "handles")
         assert _is_part_whole_relationship(Door, "entry_way")
 
         copied_door = copy_function(door)
 
         # The reconstructed object is a real Door, so its fields still carry the marker.
         assert isinstance(copied_door, Door)
-        assert _is_part_whole_relationship(type(copied_door), "handle")
+        assert _is_part_whole_relationship(type(copied_door), "handles")
         assert _is_part_whole_relationship(type(copied_door), "entry_way")
 
         # The marked-field discovery still resolves the same part-whole relationship fields.
@@ -220,10 +220,10 @@ def test_part_whole_relationship_field_survives_deepcopy():
                 IsPartWholeRelationship
             )
         }
-        assert {"handle", "entry_way"} <= discovered
+        assert {"handles", "entry_way"} <= discovered
 
         # The field values themselves survived the round trip.
-        assert isinstance(copied_door.handle, Handle)
+        assert isinstance(copied_door.handles[0], Handle)
         assert isinstance(copied_door.entry_way, EntryWay)
 
 
@@ -279,7 +279,7 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
         door.add(handle)
 
     # The marker is present on the source class before persisting.
-    assert _is_part_whole_relationship(Door, "handle")
+    assert _is_part_whole_relationship(Door, "handles")
     assert _is_part_whole_relationship(Door, "entry_way")
 
     world_dao: WorldMappingDAO = to_dao(world)
@@ -291,7 +291,7 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
 
     # The reconstructed object is a real Door, so its fields still carry the marker.
     assert isinstance(reconstructed_door, Door)
-    assert _is_part_whole_relationship(type(reconstructed_door), "handle")
+    assert _is_part_whole_relationship(type(reconstructed_door), "handles")
     assert _is_part_whole_relationship(type(reconstructed_door), "entry_way")
 
     # The marked-field discovery still resolves the same part-whole relationship fields.
@@ -301,10 +301,10 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
             IsPartWholeRelationship
         )
     }
-    assert {"handle", "entry_way"} <= discovered
+    assert {"handles", "entry_way"} <= discovered
 
     # The field values themselves survived the round trip.
-    assert isinstance(reconstructed_door.handle, Handle)
+    assert isinstance(reconstructed_door.handles[0], Handle)
     assert isinstance(reconstructed_door.entry_way, EntryWay)
 
 

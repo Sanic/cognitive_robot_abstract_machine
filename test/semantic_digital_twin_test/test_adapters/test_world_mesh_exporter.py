@@ -1,4 +1,6 @@
-"""Tests for extracting stable per-body meshes from a world state."""
+"""
+Tests for extracting stable per-body meshes from a world state.
+"""
 
 from __future__ import annotations
 
@@ -28,7 +30,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def world_with_compound_body_and_handle() -> World:
-    """Build a world with visual, collision, compound, and empty bodies."""
+    """
+    Build a world with visual, collision, compound, and empty bodies.
+    """
     world = World.create_with_root_body("root")
     cabinet = Body(
         name=PrefixedName("cabinet"),
@@ -83,7 +87,7 @@ def world_with_compound_body_and_handle() -> World:
         drawer_annotation = Drawer(
             name=PrefixedName("cabinet_drawer_annotation"),
             root=cabinet,
-            handle=handle_annotation,
+            handles=[handle_annotation],
         )
         world.add_semantic_annotation_recursively(drawer_annotation)
     return world
@@ -93,7 +97,9 @@ def world_with_compound_body_and_handle() -> World:
 
 
 def test_extracts_one_mesh_per_body_without_descendant_geometry() -> None:
-    """A body's mesh should contain its own shapes but not its child's shapes."""
+    """
+    A body's mesh should contain its own shapes but not its child's shapes.
+    """
     world = world_with_compound_body_and_handle()
 
     snapshot = WorldMeshExtractor(geometry_source=GeometrySource.COLLISION).extract(
@@ -107,7 +113,9 @@ def test_extracts_one_mesh_per_body_without_descendant_geometry() -> None:
 
 
 def test_records_hierarchy_and_world_transform() -> None:
-    """Each extracted body should retain its parent and current world transform."""
+    """
+    Each extracted body should retain its parent and current world transform.
+    """
     world = world_with_compound_body_and_handle()
 
     snapshot = WorldMeshExtractor(geometry_source=GeometrySource.COLLISION).extract(
@@ -129,14 +137,15 @@ def test_records_hierarchy_and_world_transform() -> None:
 
 
 def test_records_direct_and_context_semantic_annotations() -> None:
-    """Bodies should distinguish their own annotations from containing ones."""
+    """
+    Bodies should distinguish their own annotations from containing ones.
+    """
     snapshot = WorldMeshExtractor(geometry_source=GeometrySource.COLLISION).extract(
         world_with_compound_body_and_handle()
     )
     bodies_by_name = {body.name: body for body in snapshot.body_meshes}
     annotations_by_type = {
-        annotation.type_name: annotation
-        for annotation in snapshot.semantic_annotations
+        annotation.type_name: annotation for annotation in snapshot.semantic_annotations
     }
 
     handle_annotation = annotations_by_type["Handle"]
@@ -164,7 +173,9 @@ def test_records_direct_and_context_semantic_annotations() -> None:
 
 
 def test_visual_geometry_falls_back_to_collision() -> None:
-    """Visual geometry should be preferred and collision used only when absent."""
+    """
+    Visual geometry should be preferred and collision used only when absent.
+    """
     world = world_with_compound_body_and_handle()
 
     snapshot = WorldMeshExtractor(
@@ -184,7 +195,9 @@ def test_visual_geometry_falls_back_to_collision() -> None:
 
 
 def test_exports_reloadable_glb_with_one_node_per_body(tmp_path: Path) -> None:
-    """The GLB should retain body nodes, hierarchy, transforms, and local meshes."""
+    """
+    The GLB should retain body nodes, hierarchy, transforms, and local meshes.
+    """
     snapshot = WorldMeshExtractor(geometry_source=GeometrySource.COLLISION).extract(
         world_with_compound_body_and_handle()
     )
@@ -207,7 +220,9 @@ def test_exports_reloadable_glb_with_one_node_per_body(tmp_path: Path) -> None:
 def test_exports_manifest_linking_body_names_nodes_and_meshes(
     tmp_path: Path,
 ) -> None:
-    """The manifest should explicitly connect labels to GLB nodes and geometry."""
+    """
+    The manifest should explicitly connect labels to GLB nodes and geometry.
+    """
     snapshot = WorldMeshExtractor(geometry_source=GeometrySource.COLLISION).extract(
         world_with_compound_body_and_handle()
     )
@@ -223,9 +238,9 @@ def test_exports_manifest_linking_body_names_nodes_and_meshes(
 
     assert manifest["schema_version"] == 2
     assert annotations_by_type["Drawer"]["name"] == "cabinet_drawer_annotation"
-    assert annotations_by_type["Drawer"]["root_body_id"] == bodies_by_name[
-        "cabinet"
-    ]["id"]
+    assert (
+        annotations_by_type["Drawer"]["root_body_id"] == bodies_by_name["cabinet"]["id"]
+    )
     assert annotations_by_type["Drawer"]["body_ids"] == [
         bodies_by_name["cabinet"]["id"],
         bodies_by_name["handle"]["id"],
@@ -253,7 +268,9 @@ def test_exports_manifest_linking_body_names_nodes_and_meshes(
 
 
 def test_exports_world_aligned_mesh_for_each_nonempty_body(tmp_path: Path) -> None:
-    """Each body's standalone PLY should use the common world coordinate frame."""
+    """
+    Each body's standalone PLY should use the common world coordinate frame.
+    """
     snapshot = WorldMeshExtractor(geometry_source=GeometrySource.COLLISION).extract(
         world_with_compound_body_and_handle()
     )
@@ -273,7 +290,9 @@ def test_exports_world_aligned_mesh_for_each_nonempty_body(tmp_path: Path) -> No
 
 
 def test_exports_combined_npz_with_body_labels(tmp_path: Path) -> None:
-    """The combined arrays should label every face and vertex by source body ID."""
+    """
+    The combined arrays should label every face and vertex by source body ID.
+    """
     snapshot = WorldMeshExtractor(geometry_source=GeometrySource.COLLISION).extract(
         world_with_compound_body_and_handle()
     )
@@ -299,14 +318,15 @@ def test_exports_combined_npz_with_body_labels(tmp_path: Path) -> None:
 
 
 def test_exports_npz_semantic_annotation_relations(tmp_path: Path) -> None:
-    """The NPZ should preserve direct and contextual body-annotation relations."""
+    """
+    The NPZ should preserve direct and contextual body-annotation relations.
+    """
     snapshot = WorldMeshExtractor(geometry_source=GeometrySource.COLLISION).extract(
         world_with_compound_body_and_handle()
     )
     bodies_by_name = {body.name: body for body in snapshot.body_meshes}
     annotations_by_type = {
-        annotation.type_name: annotation
-        for annotation in snapshot.semantic_annotations
+        annotation.type_name: annotation for annotation in snapshot.semantic_annotations
     }
 
     paths = WorldMeshExporter().export(snapshot, tmp_path)

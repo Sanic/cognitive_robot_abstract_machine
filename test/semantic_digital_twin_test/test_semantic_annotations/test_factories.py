@@ -44,7 +44,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Wall,
     Fridge,
-    BottleCap,
+    Cap,
     DoorWithType,
     Aperture,
     Table,
@@ -211,7 +211,7 @@ class TestFactories(unittest.TestCase):
         world = World.create_with_root_body("root")
         screw_pitch = 0.005
         with world.modify_world():
-            bottle_cap = BottleCap.create_with_new_body_in_world(
+            bottle_cap = Cap.create_with_new_body_in_world(
                 name="bottle_cap",
                 world=world,
                 scale=Scale(0.03, 0.03, 0.02),
@@ -244,7 +244,7 @@ class TestFactories(unittest.TestCase):
             door.add(handle)
 
         assert door.root == handle.root.parent_kinematic_structure_entity
-        assert door.handle == handle
+        assert door.handles == [handle]
 
     def test_case_factory(self):
         world = World.create_with_root_body("root")
@@ -1223,7 +1223,7 @@ def test_add_routes_handle_as_child():
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
         door.add(handle)
 
-    assert door.handle == handle
+    assert door.handles == [handle]
     assert door.root == handle.root.parent_kinematic_structure_entity
 
 
@@ -1434,7 +1434,7 @@ def test_containment_only_annotation_has_no_add():
     [
         (Drawer, Scale(0.4, 0.5, 0.6)),
         (Elevator, Scale(2, 2, 2)),
-        (BottleCap, Scale(0.02, 0.04, 0.04)),
+        (Cap, Scale(0.02, 0.04, 0.04)),
     ],
 )
 def test_movable_joint_of_a_part_that_slides_or_screws_sits_at_its_origin(

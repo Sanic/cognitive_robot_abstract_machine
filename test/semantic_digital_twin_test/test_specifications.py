@@ -1388,11 +1388,11 @@ def test_nested_handle_attaches_as_child(empty_world):
         ),
     )
     drawer = _spawn_with_parts(
-        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handle": handle_part}
+        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handles": [handle_part]}
     )
-    assert isinstance(drawer.handle, Handle)
-    assert drawer.handle.root.parent_connection.parent is drawer.root
-    assert isinstance(drawer.handle.root.parent_connection, FixedConnection)
+    assert isinstance(drawer.handles[0], Handle)
+    assert drawer.handles[0].root.parent_connection.parent is drawer.root
+    assert isinstance(drawer.handles[0].root.parent_connection, FixedConnection)
 
 
 def test_door_joint_survives_mounting_the_door_as_a_part(empty_world):
@@ -1505,25 +1505,20 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
 def test_list_value_on_singular_part_field_raises():
     # part_specifications are validated at construction.
     with pytest.raises(PartWholeCardinalityError):
-        Drawer.get_annotation_specification(
-            "drawer",
-            Drawer.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(0.4, 0.5, 0.6)
+        Door.get_annotation_specification(
+            "door",
+            Door.get_default_root_kinematic_structure_entity_specification(
+                scale=Door.default_scale
             ),
             part_specifications={
-                "handle": [
-                    Handle.get_annotation_specification(
-                        "h1",
-                        Handle.get_default_root_kinematic_structure_entity_specification(
-                            scale=Scale(0.1, 0.05, 0.05)
+                "entry_way": [
+                    EntryWay.get_annotation_specification(
+                        f"entry_way_{number}",
+                        EntryWay.get_default_root_kinematic_structure_entity_specification(
+                            scale=Door.default_scale
                         ),
-                    ),
-                    Handle.get_annotation_specification(
-                        "h2",
-                        Handle.get_default_root_kinematic_structure_entity_specification(
-                            scale=Scale(0.1, 0.05, 0.05)
-                        ),
-                    ),
+                    )
+                    for number in (1, 2)
                 ]
             },
         )
@@ -1540,10 +1535,10 @@ def test_nested_part_placement_is_relative_to_whole(empty_world):
         HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
     )
     drawer = _spawn_with_parts(
-        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handle": handle_part}
+        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handles": [handle_part]}
     )
     drawer_T_handle = empty_world.compute_forward_kinematics(
-        drawer.root, drawer.handle.root
+        drawer.root, drawer.handles[0].root
     )
     np.testing.assert_allclose(
         drawer_T_handle.position.to_np()[:3], [0, 0.5, 0], atol=1e-9
@@ -1582,7 +1577,7 @@ def test_inert_annotation_kwargs_reach_constructor(empty_world):
 
 
 def test_part_whole_field_in_annotation_kwargs_raises():
-    # A part-whole relationship field (Drawer.handle) must not be passed via annotation_kwargs;
+    # A part-whole relationship field (Drawer.handles) must not be passed via annotation_kwargs;
     # it belongs in part_specifications. This is rejected at spec construction.
     with pytest.raises(PartWholeFieldInAnnotationKwargs):
         Drawer.get_annotation_specification(
@@ -1591,7 +1586,7 @@ def test_part_whole_field_in_annotation_kwargs_raises():
                 scale=Scale(0.4, 0.5, 0.6)
             ),
             annotation_kwargs={
-                "handle": Handle.get_annotation_specification(
+                "handles": Handle.get_annotation_specification(
                     "handle",
                     Handle.get_default_root_kinematic_structure_entity_specification(
                         scale=Scale(0.1, 0.05, 0.05)
@@ -1649,7 +1644,7 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
             axis=Vector3.Z(), connection_T_child=_hinge_T_door()
         ),
         part_specifications={
-            "handle": Handle.get_annotation_specification(
+            "handles": Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(0.1, 0.05, 0.05)
@@ -1701,7 +1696,7 @@ def test_nested_composite_matches_manual_construction(empty_world):
             axis=Vector3.X()
         ),
         part_specifications={
-            "handle": Handle.get_annotation_specification(
+            "handles": Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=handle_scale
@@ -1710,9 +1705,9 @@ def test_nested_composite_matches_manual_construction(empty_world):
         },
     ).spawn(empty_world)
 
-    assert isinstance(drawer.handle, Handle)
+    assert isinstance(drawer.handles[0], Handle)
     assert isinstance(drawer.movable_joint, PrismaticConnection)
-    assert drawer.handle.root.parent_connection.parent is drawer.root
+    assert drawer.handles[0].root.parent_connection.parent is drawer.root
 
     manual_world = _fresh_world()
     with manual_world.modify_world():
@@ -1732,7 +1727,9 @@ def test_nested_composite_matches_manual_construction(empty_world):
         manual_drawer.add(manual_handle)
 
     _assert_same_geometry(drawer.root.collision, manual_drawer.root.collision)
-    _assert_same_geometry(drawer.handle.root.collision, manual_handle.root.collision)
+    _assert_same_geometry(
+        drawer.handles[0].root.collision, manual_handle.root.collision
+    )
 
 
 # %% factory defaults are not shared mutable state
@@ -1939,9 +1936,9 @@ def test_caller_supplied_parts_survive_entry_way_injection(empty_world):
     door = Door.get_annotation_specification(
         "door",
         Door.get_default_root_kinematic_structure_entity_specification(),
-        part_specifications={"handle": handle_part},
+        part_specifications={"handles": [handle_part]},
     ).spawn(empty_world)
-    assert isinstance(door.handle, Handle)
+    assert isinstance(door.handles[0], Handle)
     assert isinstance(door.entry_way, EntryWay)
 
 
@@ -1997,7 +1994,7 @@ def _drawer_specification_with_handle() -> SemanticAnnotationWithRootSpecificati
             scale=Scale(0.2, 0.3, 0.2)
         ),
         part_specifications={
-            "handle": Handle.get_annotation_specification(
+            "handles": Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(0.1, 0.05, 0.05)
@@ -2013,7 +2010,9 @@ def test_part_bindings_survive_orm_round_trip():
     reconstructed = to_dao(_drawer_specification_with_handle()).from_dao()
 
     assert reconstructed.semantic_annotation_type is Drawer
-    assert [binding.field_name for binding in reconstructed.part_bindings] == ["handle"]
+    assert [binding.field_name for binding in reconstructed.part_bindings] == [
+        "handles"
+    ]
 
 
 def test_annotation_specification_survives_orm_round_trip(empty_world):
@@ -2021,5 +2020,5 @@ def test_annotation_specification_survives_orm_round_trip(empty_world):
 
     drawer = reconstructed.spawn(empty_world)
     assert isinstance(drawer, Drawer)
-    assert isinstance(drawer.handle, Handle)
+    assert isinstance(drawer.handles[0], Handle)
     assert len(drawer.root.collision.shapes) > 0

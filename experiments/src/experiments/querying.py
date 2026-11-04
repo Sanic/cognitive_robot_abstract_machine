@@ -205,7 +205,7 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
         world.add_semantic_annotation_recursively(
             Drawer(
                 root=world.get_body_by_name("cabinet10_drawer_top"),
-                handle=Handle(root=world.get_body_by_name("handle_cab10_t")),
+                handles=[Handle(root=world.get_body_by_name("handle_cab10_t"))],
             )
         )
 

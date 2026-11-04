@@ -729,7 +729,9 @@ def _apartment_world_setup():
         apartment_world.add_semantic_annotation_recursively(
             Drawer(
                 root=apartment_world.get_body_by_name("cabinet10_drawer_top"),
-                handle=Handle(root=apartment_world.get_body_by_name("handle_cab10_t")),
+                handles=[
+                    Handle(root=apartment_world.get_body_by_name("handle_cab10_t"))
+                ],
             )
         )
 

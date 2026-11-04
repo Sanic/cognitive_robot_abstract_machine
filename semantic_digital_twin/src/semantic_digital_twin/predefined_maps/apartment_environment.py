@@ -30,6 +30,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 )
 from semantic_digital_twin.world_description.geometry import Scale
 
+
 @dataclass
 class ApartmentEnvironment:
     """
@@ -213,7 +214,7 @@ class ApartmentEnvironment:
                     ),
                 ),
                 part_specifications={
-                    "handle": Handle.get_annotation_specification(
+                    "handles": Handle.get_annotation_specification(
                         f"wardrobe_door_handle_{side}",
                         BodySpecification.mesh(
                             f"wardrobe_door_handle_{side}",

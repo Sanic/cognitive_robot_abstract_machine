@@ -191,7 +191,7 @@ class DrawerOpening(
         :return: The opening, from a standing pose tried together with it.
         """
         open_the_drawer = MoveAndOpenAction.from_handle_by_closest_grasps(
-            drawer.handle, arm, context
+            drawer.handles[0], arm, context
         )
         return [StatementNode(statement=open_the_drawer)]
 

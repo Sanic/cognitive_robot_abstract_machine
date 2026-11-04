@@ -14,7 +14,12 @@ from semantic_digital_twin.world_description.world_entity import SemanticAnnotat
 
 from experiments.warsaw.articulate3d.ground_truth import GroundTruthBuilder
 
-from .scenes import SceneName, kitchen_corner_parts, kitchen_corner_protocol
+from .scenes import (
+    SceneName,
+    WrittenDataset,
+    kitchen_corner_parts,
+    kitchen_corner_protocol,
+)
 
 # %% the ontology
 
@@ -47,3 +52,20 @@ def ground_truth(ontology):
     return GroundTruthBuilder(
         protocol=kitchen_corner_protocol(), ontology=ontology
     ).build(SceneName.KITCHEN_CORNER, kitchen_corner_parts())
+
+
+# %% datasets written to disk
+
+
+@pytest.fixture
+def dataset(tmp_path):
+    """
+    :return: An empty Articulate3D directory and ScanNet++ data directory.
+    """
+    written = WrittenDataset(
+        articulate3d_directory=tmp_path / "articulate3d",
+        scannetpp_directory=tmp_path / "scannetpp",
+    )
+    written.articulate3d_directory.mkdir()
+    written.scannetpp_directory.mkdir()
+    return written

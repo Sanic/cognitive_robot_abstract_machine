@@ -23,6 +23,8 @@ from semantic_digital_twin.reasoning.world_rdr.rules import (
     handles,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Door,
+    Drawer,
     SideTable,
     Spoon,
 )
@@ -272,7 +274,27 @@ def test_a_case_a_slider_pulls_out_is_a_drawer_with_its_grip(drawer_with_a_grip)
 
     [drawer] = drawers_with_a_handle(drawer_with_a_grip.world)
     assert drawer.root is drawer_with_a_grip.bodies["case"]
-    assert drawer.handle.root is drawer_with_a_grip.bodies["grip"]
+    assert drawer.handles[0].root is drawer_with_a_grip.bodies["grip"]
+
+
+def test_a_case_with_two_grips_is_one_drawer_holding_both_handles():
+    """
+    Every handle mounted on the case belongs to the one drawer the case is.
+    """
+    furniture = (
+        FurnitureUnderTest.build()
+        .add("cabinet", "root", FixedConnection)
+        .add("case", "cabinet", PrismaticConnection)
+        .add("left_grip", "case", FixedConnection)
+        .add("right_grip", "case", FixedConnection)
+        .apply(handles, drawers_with_a_handle)
+    )
+
+    [drawer] = furniture.world.get_semantic_annotations_by_type(Drawer)
+    assert {handle.root for handle in drawer.handles} == {
+        furniture.bodies["left_grip"],
+        furniture.bodies["right_grip"],
+    }
 
 
 def test_a_case_with_nothing_to_pull_it_by_is_still_a_drawer():
@@ -287,7 +309,7 @@ def test_a_case_with_nothing_to_pull_it_by_is_still_a_drawer():
 
     [drawer] = drawers_without_a_handle(furniture.world)
     assert drawer.root is furniture.bodies["case"]
-    assert drawer.handle is None
+    assert drawer.handles == []
 
 
 def test_a_drawer_offering_a_handle_is_claimed_by_only_one_rule(drawer_with_a_grip):
@@ -315,7 +337,27 @@ def test_a_leaf_a_hinge_swings_is_a_door_with_its_grip():
 
     [door] = doors_with_a_handle(furniture.world)
     assert door.root is furniture.bodies["leaf"]
-    assert door.handle.root is furniture.bodies["grip"]
+    assert door.handles[0].root is furniture.bodies["grip"]
+
+
+def test_a_leaf_with_two_grips_is_one_door_holding_both_handles():
+    """
+    Every handle mounted on the leaf belongs to the one door the leaf is.
+    """
+    furniture = (
+        FurnitureUnderTest.build()
+        .add("cabinet", "root", FixedConnection)
+        .add("leaf", "cabinet", RevoluteConnection)
+        .add("outer_grip", "leaf", FixedConnection)
+        .add("inner_grip", "leaf", FixedConnection)
+        .apply(handles, doors_with_a_handle)
+    )
+
+    [door] = furniture.world.get_semantic_annotations_by_type(Door)
+    assert {handle.root for handle in door.handles} == {
+        furniture.bodies["outer_grip"],
+        furniture.bodies["inner_grip"],
+    }
 
 
 def test_a_leaf_another_follows_is_opened_by_that_leafs_handle():

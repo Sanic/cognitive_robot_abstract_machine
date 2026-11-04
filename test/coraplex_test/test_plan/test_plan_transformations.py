@@ -861,7 +861,7 @@ def test_opening_a_drawer_tries_its_standing_pose_with_the_opening(
     )
 
     assert is_grounding(opening, MoveAndOpenAction)
-    assert handle_opened_by(opening.statement) is drawer.handle
+    assert handle_opened_by(opening.statement) is drawer.handles[0]
 
 
 def test_opening_a_drawer_stands_where_it_is_opened_from(pr2_apartment_context):
@@ -906,7 +906,7 @@ def test_opening_a_drawer_faces_the_handle_where_it_is_when_it_opens_it(
     ]:
         np.testing.assert_allclose(
             world.transform(target, world.root).position.to_np(),
-            drawer.handle.root.global_pose.position.to_np(),
+            drawer.handles[0].root.global_pose.position.to_np(),
         )
 
 
@@ -933,7 +933,7 @@ def test_the_drawer_is_opened_before_a_move_and_pick_up_rather_than_inside_it(
 
     [opening, moved_and_picked_up] = steps_of(plan)
     assert is_grounding(opening, MoveAndOpenAction)
-    assert handle_opened_by(opening.statement) is drawer.handle
+    assert handle_opened_by(opening.statement) is drawer.handles[0]
     assert moved_and_picked_up is move_and_pick_up
 
 
@@ -957,7 +957,7 @@ def test_the_drawer_the_object_lies_in_is_opened_before_the_pick_up(
 
     [opening, parking, drive_to_the_spoon, pick_up] = steps_of(plan)
     assert is_grounding(opening, MoveAndOpenAction)
-    assert handle_opened_by(opening.statement) is drawer.handle
+    assert handle_opened_by(opening.statement) is drawer.handles[0]
     assert isinstance(parking, ParkArmsAction)
     assert is_grounding(drive_to_the_spoon, NavigateAction)
     assert isinstance(pick_up, PickUpAction)
@@ -1066,7 +1066,7 @@ def test_the_opening_joins_the_sequence_a_grounded_pick_up_is_a_child_of(
     assert chosen is candidate
     assert isinstance(parking, ParkArmsAction)
     assert is_grounding(opening, MoveAndOpenAction)
-    assert handle_opened_by(opening.statement) is drawer.handle
+    assert handle_opened_by(opening.statement) is drawer.handles[0]
     assert isinstance(parking_again, ParkArmsAction)
     assert is_grounding(drive_to_the_spoon, NavigateAction)
 
@@ -1181,7 +1181,7 @@ def test_the_drawer_is_opened_once_in_front_of_a_move_and_pick_up_still_to_be_gr
 
     [opening, parking, still_to_be_grounded] = steps_of(plan)
     assert is_grounding(opening, MoveAndOpenAction)
-    assert handle_opened_by(opening.statement) is drawer.handle
+    assert handle_opened_by(opening.statement) is drawer.handles[0]
     assert arm_opening_with(opening.statement) is view.right_arm
     assert isinstance(parking, ParkArmsAction)
     assert still_to_be_grounded.statement is move_and_pick_up
@@ -1211,7 +1211,7 @@ def test_the_drawer_is_opened_in_front_of_a_transports_pick_up_before_it_is_grou
     opening = step_before(parking)
     assert isinstance(parking, ParkArmsAction)
     assert is_grounding(opening, MoveAndOpenAction)
-    assert handle_opened_by(opening.statement) is drawer.handle
+    assert handle_opened_by(opening.statement) is drawer.handles[0]
     assert arm_opening_with(opening.statement) is view.right_arm
 
 

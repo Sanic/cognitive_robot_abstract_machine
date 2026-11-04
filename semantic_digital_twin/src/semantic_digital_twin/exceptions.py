@@ -1195,6 +1195,61 @@ class MissingMovableJointError(UsageError):
 
 
 @dataclass
+class MovableJointKindError(UsageError):
+    """
+    Raised when a part is to be mounted on a joint of another kind than its class moves
+    on.
+    """
+
+    annotation_type: type[SemanticAnnotation]
+    """
+    The class of the part being mounted.
+    """
+
+    movable_joint_type: type[Connection]
+    """
+    The kind of joint the class moves on.
+    """
+
+    connection_type: type[Connection]
+    """
+    The kind of joint it was to be mounted on.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A {self.annotation_type.__name__} moves on a "
+            f"{self.movable_joint_type.__name__}, not on a "
+            f"{self.connection_type.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"mount it on a specification of a {self.movable_joint_type.__name__}."
+
+
+@dataclass
+class WholeWithoutParentError(UsageError):
+    """
+    Raised when a part is to carry a whole that hangs from nothing, so there is no place
+    for the part to take.
+    """
+
+    whole: SemanticAnnotation
+    """
+    The whole the part was to carry.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.whole).__name__} {self.whole.name} hangs from nothing, so no "
+            f"part can take its place and carry it."
+        )
+
+    def suggest_correction(self) -> str:
+        return "attach the whole to a parent before adding a part that carries it."
+
+
+@dataclass
 class MissingSemanticAnnotationError(UsageError):
     """
     Raised when a semantic annotation is required but missing.
