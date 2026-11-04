@@ -15,7 +15,7 @@ from semantic_digital_twin.part_finding.splitting import ShapePiece
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )

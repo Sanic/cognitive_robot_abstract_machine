@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import trimesh
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from typing_extensions import Dict, Iterable, Iterator, List, Optional
 
 from experiments.warsaw.bases import JsonRecord

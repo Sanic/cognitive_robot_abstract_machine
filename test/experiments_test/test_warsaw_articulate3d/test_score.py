@@ -23,7 +23,7 @@ from experiments.warsaw.articulate3d.score import (
     MountVerdict,
     SceneScore,
     ScoreFile,
-    ScoreSummary,
+    ScoreOverRuns,
     Share,
     main,
 )
@@ -381,7 +381,7 @@ def test_the_ontology_bounds_what_a_run_can_make(ground_truth, bodies, graph, li
 def test_a_summary_adds_every_count_up(ground_truth, bodies, graph, lineage):
     score = judged(ground_truth, bodies, graph, lineage)
 
-    summary = ScoreSummary.over([score, replace(score, run="other")])
+    summary = ScoreOverRuns.over([score, replace(score, run="other")])
 
     assert summary.parts == 2 * len(ground_truth.parts)
     assert summary.relations.recall == Share(
@@ -447,6 +447,6 @@ def test_the_command_writes_each_runs_score_and_the_summary(finished_run, tmp_pa
         json.loads((run.directory / ScoreFile.SCENE).read_text())
     )
     assert written == SceneScore.of(run, ground_truth_directory)
-    assert ScoreSummary.from_json(
+    assert ScoreOverRuns.from_json(
         json.loads((tmp_path / "summary.json").read_text())
-    ) == ScoreSummary.over([written])
+    ) == ScoreOverRuns.over([written])

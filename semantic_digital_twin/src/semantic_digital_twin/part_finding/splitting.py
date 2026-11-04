@@ -22,7 +22,7 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.part_finding.relationships import PartRelationshipInspector
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Mesh, Shape
 from semantic_digital_twin.world_description.inertial_properties import Inertial

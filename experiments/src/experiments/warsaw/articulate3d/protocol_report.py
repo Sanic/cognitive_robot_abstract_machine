@@ -88,7 +88,7 @@ class RuleUse:
 
 
 @dataclass(frozen=True)
-class PartNameUse:
+class RuledPartName:
     """
     One part name, what it is taken to mean, and how many parts carry it per split.
     """
@@ -297,7 +297,7 @@ class ProtocolReport:
         ]
 
     @property
-    def part_names(self) -> list[PartNameUse]:
+    def part_names(self) -> list[RuledPartName]:
         """
         Every part name the protocol rules on, by class and then by name.
         """
@@ -312,7 +312,7 @@ class ProtocolReport:
         }
         return sorted(
             (
-                PartNameUse(
+                RuledPartName(
                     part_name=meaning.part_name,
                     ruling=meaning.ruling,
                     semantic_class=meaning.semantic_class,

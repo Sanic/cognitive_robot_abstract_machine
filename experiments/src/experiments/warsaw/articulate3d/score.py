@@ -946,7 +946,7 @@ class SceneScore(JsonRecord):
 
 
 @dataclass(frozen=True)
-class ScoreSummary(JsonRecord):
+class ScoreOverRuns(JsonRecord):
     """
     Many runs judged together, every count added up over them.
     """
@@ -997,7 +997,7 @@ class ScoreSummary(JsonRecord):
     """
 
     @classmethod
-    def over(cls, scores: Sequence[SceneScore]) -> ScoreSummary:
+    def over(cls, scores: Sequence[SceneScore]) -> ScoreOverRuns:
         """
         :param scores: The runs to add up.
         :return: Their counts, added up.
@@ -1005,7 +1005,7 @@ class ScoreSummary(JsonRecord):
         summary = cls()
         for score in scores:
             matching = score.correspondence
-            summary = ScoreSummary(
+            summary = ScoreOverRuns(
                 runs=summary.runs + [score.run],
                 parts=summary.parts
                 + len(matching.matched)
@@ -1114,7 +1114,7 @@ def main(arguments: list[str] | None = None) -> int:
             json.dumps(score.to_json(), indent=2)
         )
         scores.append(score)
-    summary = ScoreSummary.over(scores)
+    summary = ScoreOverRuns.over(scores)
     for line in summary.lines():
         logger.info(line)
     if parsed.summary is not None:

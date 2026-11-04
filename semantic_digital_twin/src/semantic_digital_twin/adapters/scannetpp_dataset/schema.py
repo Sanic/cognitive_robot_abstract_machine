@@ -13,7 +13,7 @@ from semantic_digital_twin.part_finding.splitting import BodyCutter, ShapePiece
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection

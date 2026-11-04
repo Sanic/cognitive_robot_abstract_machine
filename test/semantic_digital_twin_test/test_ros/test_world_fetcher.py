@@ -24,7 +24,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Shelf,
     ShelfLayer,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Scale

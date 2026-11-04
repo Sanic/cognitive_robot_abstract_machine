@@ -27,7 +27,7 @@ from experiments.warsaw.segment_relations import claimant_groups
 from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     annotation_classes,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 

@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.code_generation.generator import CodeGenerator
 from semantic_digital_twin.world import World
@@ -253,7 +253,7 @@ class WorldGraph:
         :param value: What a field holds.
         :return: The things in it, if it is a collection, or the value itself.
         """
-        if isinstance(value, list_like_classes):
+        if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
             return list(value)
         return [value]
 

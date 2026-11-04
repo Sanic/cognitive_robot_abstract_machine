@@ -12,7 +12,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Blinds,
     Switch,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,

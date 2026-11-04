@@ -464,10 +464,10 @@ def world_from_provider(reference: str) -> World:
         raise WorldProviderNotFoundError(
             reference=reference, problem=f"{module_name} holds no {provider_name}"
         )
-    world = provider().get_world()
+    world = provider().create_world()
     if not isinstance(world, World):
         raise WorldProviderNotFoundError(
-            reference=reference, problem="get_world() did not return a World"
+            reference=reference, problem="create_world() did not return a World"
         )
     return world
 
@@ -487,7 +487,7 @@ def world_from_urdf(path: Path, *, infer_semantics: bool = True) -> World:
     resolved = path.expanduser().resolve()
     if not resolved.is_file():
         raise FileNotFoundError(f"URDF file does not exist: {resolved}")
-    world = URDFParser.from_file(str(resolved)).parse()
+    world = URDFParser.from_file(str(resolved)).create_world()
     if infer_semantics:
         WorldReasoner(world).infer_semantic_annotations()
     return world

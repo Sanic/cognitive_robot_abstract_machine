@@ -9,7 +9,7 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.part_finding.splitting import BodyCutter, ShapePiece
 from semantic_digital_twin.pipeline.body_splitting import SplitBodyIntoPieces
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -133,8 +133,8 @@ def test_a_body_cut_before_it_is_in_a_world_joins_it_with_its_pieces(box):
 
 def test_cutting_a_body_before_it_is_in_a_world_records_no_change_of_its_shapes(box):
     """
-    A change of a body's shapes is recorded as the whole body serialized before and after
-    it, which for a large mesh costs several times the mesh's memory.
+    A change of a body's shapes is recorded as the whole body serialized before and
+    after it, which for a large mesh costs several times the mesh's memory.
     """
     lid = ShapePiece(body=Body(name=PrefixedName("lid")), faces=np.array([0, 1]))
     cutter = BodyCutter()
