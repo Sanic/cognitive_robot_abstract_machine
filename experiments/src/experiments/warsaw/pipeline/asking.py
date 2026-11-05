@@ -103,6 +103,16 @@ class Prompt(StrEnum):
     What each body of a split scene is.
     """
 
+    CLASS_PROPOSAL = "class_proposal"
+    """
+    What new class a label means that no class of the ontology was found for.
+    """
+
+    CLASS_CHOICE = "class_choice"
+    """
+    Which of the classes its label was left open between each body of a split scene is.
+    """
+
     SUPERCLASS = "superclass"
     """
     What a class a run proposed is a kind of.
@@ -183,13 +193,20 @@ class Question(ABC, Generic[AnswerType]):
         return True
 
     @property
+    def prompt_variables(self) -> Dict[str, Any]:
+        """
+        :return: What the standing instruction is written for, by the name its template
+            reads it under.
+        """
+        return {"shows_pictures": self.shows_pictures}
+
+    @property
     def system_prompt(self) -> str:
         """
         :return: What the model is told it is doing.
         """
         return self.templates.render_document(
-            self.prompt_template(PromptHalf.SYSTEM),
-            shows_pictures=self.shows_pictures,
+            self.prompt_template(PromptHalf.SYSTEM), **self.prompt_variables
         )
 
     @abstractmethod

@@ -278,6 +278,8 @@ def settings_to_json(settings: PipelineSettings) -> dict[str, Any]:
         "viewpoint_choice": settings.viewpoint_choice.value,
         "kept_viewpoints": [viewpoint.value for viewpoint in settings.kept_viewpoints],
         "group_size": settings.group_size,
+        "settle_classes_by_label": settings.settle_classes_by_label,
+        "defer_new_classes": settings.defer_new_classes,
         "nearest": settings.nearest,
         "largest_gap_to_a_whole": settings.largest_gap_to_a_whole,
         "corrections": settings.corrections,

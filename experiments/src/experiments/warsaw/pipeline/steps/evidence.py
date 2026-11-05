@@ -785,6 +785,10 @@ class MeasureScene(PipelineStep):
         :attr:`~experiments.warsaw.pipeline.settings.PipelineSettings.largest_gap_to_a_whole`
         of it, since a scan leaves gaps between what is mounted together.
 
+        A question lists its candidates by the edges they touch the part along, most
+        first, then by the faces they share with it and by how close they are; the
+        colours they are painted in follow that order.
+
         :param relations: The pairs, as they were written out.
         :param labels: Per segment, the label it carries.
         :param classes: Per label, the class it was read as.
@@ -814,7 +818,15 @@ class MeasureScene(PipelineStep):
                 distance=round(pair.evidence.distance, 4),
             )
         candidates = {
-            part: meeting.get(part) or nearby[part]
+            part: sorted(
+                (meeting.get(part) or nearby[part]).values(),
+                key=lambda one: (
+                    -one.touching_edges,
+                    -one.shared_faces,
+                    one.distance,
+                    one.name,
+                ),
+            )
             for part in sorted(set(meeting) | set(nearby))
         }
 
@@ -822,24 +834,28 @@ class MeasureScene(PipelineStep):
             MembershipQuestion(
                 name=part,
                 part=part,
-                shown=[part] + sorted(wholes),
-                candidates=[wholes[name] for name in sorted(wholes)],
-                ontology=self.ontology_slice([part] + sorted(wholes), labels, classes),
-                measured=self.measured_of([part] + sorted(wholes), measured),
+                shown=[part] + [one.name for one in wholes],
+                candidates=wholes,
+                ontology=self.ontology_slice(
+                    [part] + [one.name for one in wholes], labels, classes
+                ),
+                measured=self.measured_of(
+                    [part] + [one.name for one in wholes], measured
+                ),
             )
-            for part, wholes in sorted(candidates.items())
+            for part, wholes in candidates.items()
             if len(wholes) > 1
         ]
         forced = [
             ForcedMembership(
                 part=part,
-                whole=next(iter(wholes)),
-                field_name=next(iter(wholes.values())).field_name,
-                shared_faces=next(iter(wholes.values())).shared_faces,
-                touching_edges=next(iter(wholes.values())).touching_edges,
-                distance=next(iter(wholes.values())).distance,
+                whole=wholes[0].name,
+                field_name=wholes[0].field_name,
+                shared_faces=wholes[0].shared_faces,
+                touching_edges=wholes[0].touching_edges,
+                distance=wholes[0].distance,
             )
-            for part, wholes in sorted(candidates.items())
+            for part, wholes in candidates.items()
             if len(wholes) == 1
         ]
         return Memberships(to_ask_about=to_ask_about, forced=forced)

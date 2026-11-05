@@ -47,7 +47,7 @@ from experiments.warsaw.articulate3d.exceptions import (
     SceneNotConvertedError,
 )
 from experiments.warsaw.articulate3d.protocol import EvaluationProtocol, ProtocolFile
-from experiments.warsaw.articulate3d.rules import AnnotatedScene
+from experiments.warsaw.articulate3d.rules import AnnotatedScene, AnnotationRules
 from experiments.warsaw.articulate3d.splits import ValidationLock
 from experiments.warsaw.bases import JsonRecord
 from experiments.warsaw.habitat.convert import label_property
@@ -86,6 +86,31 @@ class LabelDisclosure(StrEnum):
     """
     Names that only tell the parts of one annotated name from those of another.
     """
+
+
+class NameSpelling(StrEnum):
+    """
+    How the part names a converted scene is labelled with are spelled.
+    """
+
+    AS_WRITTEN = "as-written"
+    """
+    As the annotators wrote them, spelling mistakes included.
+    """
+
+    CORRECTED = "corrected"
+    """
+    As the protocol's corrections of spelling mistakes write them.
+    """
+
+    def rules(self, rules: AnnotationRules) -> AnnotationRules:
+        """
+        :param rules: The protocol's annotation rules.
+        :return: The rules a scene spelled this way is converted by.
+        """
+        if self is NameSpelling.AS_WRITTEN:
+            return rules.without_spelling_corrections()
+        return rules
 
 
 class LabelOverlap(StrEnum):
@@ -156,6 +181,11 @@ class ConvertedScene(JsonRecord):
     Which faces each part's label covers.
     """
 
+    spelling: NameSpelling
+    """
+    How the part names its labels carry are spelled.
+    """
+
     seed: int
     """
     What the random instance numbers and neutral names were drawn from.
@@ -212,6 +242,11 @@ class SceneConversion:
     Which faces each part's label covers.
     """
 
+    spelling: NameSpelling = NameSpelling.AS_WRITTEN
+    """
+    How the part names of the scenes it is given are spelled, which it records.
+    """
+
     seed: int = 0
     """
     What the random instance numbers and neutral names are drawn from.
@@ -261,6 +296,7 @@ class SceneConversion:
             scene_id=scene.scannetpp_scene.scene_id,
             disclosure=self.disclosure,
             overlap=self.overlap,
+            spelling=self.spelling,
             seed=self.seed,
             parts=[
                 ConvertedPart(
@@ -407,6 +443,13 @@ def argument_parser() -> argparse.ArgumentParser:
         help="Which faces each part's label covers",
     )
     parser.add_argument(
+        "--spelling",
+        type=NameSpelling,
+        default=NameSpelling.AS_WRITTEN,
+        choices=list(NameSpelling),
+        help="Whether the part names keep their annotators' spelling mistakes",
+    )
+    parser.add_argument(
         "--seed", type=int, default=0, help="What the random numbering is drawn from"
     )
     return parser
@@ -422,7 +465,16 @@ def main(arguments: list[str] | None = None) -> int:
     """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parsed = argument_parser().parse_args(arguments)
-    ruled = EvaluationProtocol.read(parsed.protocol).annotation_rules.apply(
+    conversion = SceneConversion(
+        disclosure=parsed.disclosure,
+        overlap=parsed.overlap,
+        spelling=parsed.spelling,
+        seed=parsed.seed,
+    )
+    rules = conversion.spelling.rules(
+        EvaluationProtocol.read(parsed.protocol).annotation_rules
+    )
+    ruled = rules.apply(
         AnnotatedScene.read(parsed.scene, parsed.dataset, parsed.scannetpp)
     )
     if ruled.excluded:
@@ -437,9 +489,7 @@ def main(arguments: list[str] | None = None) -> int:
         ).load(parsed.scene),
         parts=ruled.scene.parts,
     )
-    converted = SceneConversion(
-        disclosure=parsed.disclosure, overlap=parsed.overlap, seed=parsed.seed
-    ).write(scene, parsed.output)
+    converted = conversion.write(scene, parsed.output)
     logging.getLogger(__name__).info(
         "wrote %s parts of %s to %s, %s without faces left out",
         len(converted.parts),

@@ -117,12 +117,38 @@ class LabelQuestion(QuestionAboutTheOntology[LabelAnswer]):
     What the pictured object meets, as the scan measures it.
     """
 
+    proposes_classes: bool = True
+    """
+    Whether the label may be answered with a class the model proposes, rather than only
+    with a class the ontology holds or with none.
+    """
+
     @classproperty
     def prompt(cls) -> Prompt:
         """
         :return: The prompt this question is put with, both halves of it.
         """
         return Prompt.VOCABULARY
+
+    @property
+    def prompt_variables(self) -> Dict[str, Any]:
+        return {**super().prompt_variables, "proposes_classes": self.proposes_classes}
+
+    @property
+    def message_variables(self) -> Dict[str, Any]:
+        """
+        :return: What the question is written for, by the name its template reads it
+            under.
+        """
+        return {
+            "taxonomy": json.dumps(self.taxonomy),
+            "label": self.label.label,
+            "instances": self.label.instances,
+            "every_label": self.every_label,
+            "meets": self.meets,
+            "exemplar": self.label.exemplar,
+            "shows_pictures": self.shows_pictures,
+        }
 
     @property
     def key(self) -> str:
@@ -159,13 +185,7 @@ class LabelQuestion(QuestionAboutTheOntology[LabelAnswer]):
         content: List[MessagePart] = [
             TextPart(
                 self.templates.render_document(
-                    self.message_template,
-                    taxonomy=json.dumps(self.taxonomy),
-                    label=self.label.label,
-                    instances=self.label.instances,
-                    every_label=self.every_label,
-                    meets=self.meets,
-                    exemplar=self.label.exemplar,
+                    self.message_template, **self.message_variables
                 )
             )
         ]
@@ -183,6 +203,37 @@ class LabelQuestion(QuestionAboutTheOntology[LabelAnswer]):
     def refusal(self, refused: ModelRefusedError) -> LabelAnswer:
         return LabelAnswer(problems=[str(refused)])
 
+    def problems_with_alternatives(self, answer: LabelAnswer) -> List[str]:
+        """
+        :param answer: What the model said.
+        :return: One sentence per alternative that is not a class an object can be given,
+            and one for alternatives to a class being proposed.
+        """
+        if not answer.alternatives:
+            return []
+        if answer.is_new_class:
+            return [
+                "a class you propose has no alternatives; give alternatives only "
+                "between classes already in the taxonomy"
+            ]
+        problems = []
+        for alternative in answer.alternatives:
+            if alternative not in self.known:
+                problems.append(
+                    f"the alternative {alternative!r} is not in the taxonomy"
+                )
+            elif alternative in self.building_block_names:
+                problems.append(f"the alternative {alternative!r} is a mixin")
+            elif alternative == answer.class_name:
+                problems.append(f"the alternative {alternative!r} is the class itself")
+            else:
+                problems.extend(
+                    TaxonomyCategories(taxonomy=self.taxonomy).problems_with(
+                        alternative, False
+                    )
+                )
+        return problems
+
     def problems_with(self, answer: LabelAnswer) -> List[str]:
         """
         Say what is wrong with an answer, if anything.
@@ -198,7 +249,13 @@ class LabelQuestion(QuestionAboutTheOntology[LabelAnswer]):
         problems: List[str] = []
         if answer.class_name is None:
             return problems
+        if answer.is_new_class and not self.proposes_classes:
+            return [
+                "no class is proposed here; answer null where no class of the taxonomy "
+                "is what the objects are, and a class is proposed for it afterwards"
+            ]
 
+        problems.extend(self.problems_with_alternatives(answer))
         if answer.class_name in self.building_block_names:
             problems.append(
                 f"{answer.class_name} is a mixin, so it says what a class can hold "
@@ -243,6 +300,35 @@ class LabelQuestion(QuestionAboutTheOntology[LabelAnswer]):
             # answer to put back to it rather than a state the run should not have reached.
             problems.append(f"the composition cannot be built: {failure}")
         return problems
+
+
+@dataclass(kw_only=True)
+class ClassProposalQuestion(LabelQuestion):
+    """
+    What new class one label means, asked once no class of the ontology was found for
+    it, with what every other label of the scene was read as in view.
+    """
+
+    read_as: Dict[str, str] = field(default_factory=dict)
+    """
+    The class every other label of the scene was read as, by label.
+    """
+
+    @classproperty
+    def prompt(cls) -> Prompt:
+        return Prompt.CLASS_PROPOSAL
+
+    @property
+    def key(self) -> str:
+        return f"{self.label.label}__proposal"
+
+    @property
+    def message_variables(self) -> Dict[str, Any]:
+        """
+        :return: What :attr:`LabelQuestion.message_variables` holds, and what every other
+            label was read as.
+        """
+        return {**super().message_variables, "read_as": self.read_as}
 
 
 # %% mapping every label of the scene
@@ -297,6 +383,7 @@ class MapLabelVocabulary(PipelineStep):
                     known=known,
                     renders_directory=self.run.path(RunFile.EXEMPLARS),
                     meets=self.meetings(relations, entry.exemplar),
+                    proposes_classes=not self.settings.defer_new_classes,
                 )
             )
             answer = answered.answer
@@ -305,6 +392,40 @@ class MapLabelVocabulary(PipelineStep):
             answer.label = entry.label
             vocabulary.labels.append(answer)
             self.report_answer(entry.label, answer)
+
+        if self.settings.defer_new_classes:
+            entries = {entry.label: entry for entry in asked}
+            unread = [
+                one
+                for one in vocabulary.labels
+                if one.class_name is None and not one.problems
+            ]
+            self.logger.info(
+                "proposing classes for the %s labels no class was found for ...",
+                len(unread),
+            )
+            for answer in unread:
+                answered = questioner.answer(
+                    ClassProposalQuestion(
+                        label=entries[answer.label],
+                        every_label=request.label_names,
+                        taxonomy=taxonomy,
+                        known=known,
+                        renders_directory=self.run.path(RunFile.EXEMPLARS),
+                        meets=self.meetings(relations, answer.exemplar),
+                        read_as={
+                            one.label: one.class_name
+                            for one in vocabulary.labels
+                            if one.class_name and one.label != answer.label
+                        },
+                    )
+                )
+                proposed = answered.answer
+                proposed.problems = answered.problems
+                proposed.exemplar = answer.exemplar
+                proposed.label = answer.label
+                vocabulary.labels[vocabulary.labels.index(answer)] = proposed
+                self.report_answer(answer.label, proposed)
 
         self.run.write_record(RunFile.VOCABULARY, vocabulary)
         self.report(vocabulary)

@@ -14,6 +14,7 @@ from experiments.warsaw.articulate3d.convert import (
     ConvertedScene,
     LabelDisclosure,
     LabelOverlap,
+    NameSpelling,
     SceneConversion,
     main,
 )
@@ -168,9 +169,10 @@ def test_the_same_seed_writes_the_same_scene(scene, tmp_path):
 # %% converting by the protocol's rules
 
 
-def convert_kitchen_corner(dataset, tmp_path, rules):
+def convert_kitchen_corner(dataset, tmp_path, rules, *options):
     """
     :param rules: The annotation rules of the protocol the scene is converted by.
+    :param options: Further command-line options of the conversion.
     :return: The directory the scene is converted into.
     """
     protocol_path = tmp_path / "protocol.json"
@@ -188,6 +190,7 @@ def convert_kitchen_corner(dataset, tmp_path, rules):
             SceneName.KITCHEN_CORNER,
             "--output",
             str(output),
+            *options,
         ]
     )
     return output
@@ -202,12 +205,37 @@ def test_a_scene_is_converted_as_the_rules_correct_it(dataset, tmp_path):
     )
 
     output = convert_kitchen_corner(
-        dataset, tmp_path, AnnotationRules(corrections=[correction])
+        dataset,
+        tmp_path,
+        AnnotationRules(corrections=[correction]),
+        "--spelling",
+        NameSpelling.CORRECTED,
     )
 
     assert [
         one.label for one in ConvertedScene.beside(output).parts if one.part_id == 9
     ] == ["handle.3.1"]
+
+
+def test_a_name_keeps_its_spelling_mistake_unless_asked_otherwise(dataset, tmp_path):
+    """
+    The pipeline is to cope with names as its labels come; the ground truth is still
+    built from the corrected names.
+    """
+    dataset.write_scene(
+        SceneName.KITCHEN_CORNER, kitchen_corner_parts(), row_of_squares(8)
+    )
+    correction = PartNameCorrection(
+        written="unknown", meant="handle", mistake="a spelling mistake"
+    )
+
+    output = convert_kitchen_corner(
+        dataset, tmp_path, AnnotationRules(corrections=[correction])
+    )
+
+    converted = ConvertedScene.beside(output)
+    assert [one.label for one in converted.parts if one.part_id == 9] == ["unknown.3.1"]
+    assert converted.spelling is NameSpelling.AS_WRITTEN
 
 
 def test_a_scene_the_rules_leave_out_is_not_converted(dataset, tmp_path):

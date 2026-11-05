@@ -577,12 +577,28 @@ class LabelAnswer(ClassAnswer):
     The object that was pictured when it was asked.
     """
 
+    alternatives: List[str] = field(default_factory=list)
+    """
+    Further classes of the ontology the label may just as well mean, where the pictures
+    left it open which; empty where the label means its class alone.
+    """
+
     @property
     def is_usable(self) -> bool:
         """
         :return: Whether the answer names a class and nothing is wrong with it.
         """
         return bool(self.class_name) and not self.problems
+
+    @property
+    def candidates(self) -> List[str]:
+        """
+        :return: Every class the label may mean, its class first, or none where it was
+            answered as meaning nothing the ontology holds.
+        """
+        if not self.class_name:
+            return []
+        return [self.class_name] + self.alternatives
 
     @classmethod
     def of(cls, payload: Any) -> LabelAnswer:

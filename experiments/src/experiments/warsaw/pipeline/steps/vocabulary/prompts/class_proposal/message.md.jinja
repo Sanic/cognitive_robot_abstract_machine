@@ -1,0 +1,17 @@
+## The ontology
+{{ taxonomy }}
+
+## The label
+The label is "{{ label }}". The room carries {{ instances }} objects labelled with it.
+The room's labels are: {{ every_label | join(", ") }}.
+
+{{ meets }}
+
+{% if shows_pictures %}## The pictures
+They show one of them, "{{ exemplar }}", chosen as the one whose faces are least shared with other labels.
+{% endif %}
+
+## How the other labels of the room were read
+{% for label, class_name in read_as.items() %}
+{{ label }}: {{ class_name }}
+{% endfor %}

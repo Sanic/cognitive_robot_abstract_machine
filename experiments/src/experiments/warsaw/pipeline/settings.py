@@ -218,6 +218,24 @@ class PipelineSettings:
     How many bodies are painted and named at once in the classification step.
     """
 
+    defer_new_classes: bool = True
+    """
+    Whether a label is first read only as classes the ontology holds, and a new class is
+    proposed afterwards, once per label no class was found for, with every other label's
+    reading in view.
+
+    Off, a label or a body may be given a new class the moment it is asked about.
+    """
+
+    settle_classes_by_label: bool = True
+    """
+    Whether a body whose label was read as one class takes that class without being
+    asked, and a body whose label was left open between several classes is asked to
+    choose among them.
+
+    Off, every body is asked what it is, whatever its label means.
+    """
+
     nearest: int = 5
     """
     How many nearest neighbours each object's evidence reaches for.

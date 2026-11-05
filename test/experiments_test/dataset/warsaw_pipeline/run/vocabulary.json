@@ -21,7 +21,11 @@
           "__collection_type__": "builtins.list",
           "__items__": []
         },
-        "exemplar": "cabinet_5"
+        "exemplar": "cabinet_5",
+        "alternatives": {
+          "__collection_type__": "builtins.list",
+          "__items__": []
+        }
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.LabelAnswer",
@@ -39,7 +43,11 @@
           "__collection_type__": "builtins.list",
           "__items__": []
         },
-        "exemplar": "door_10"
+        "exemplar": "door_10",
+        "alternatives": {
+          "__collection_type__": "builtins.list",
+          "__items__": []
+        }
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.LabelAnswer",
@@ -57,7 +65,11 @@
           "__collection_type__": "builtins.list",
           "__items__": []
         },
-        "exemplar": "drawer_5"
+        "exemplar": "drawer_5",
+        "alternatives": {
+          "__collection_type__": "builtins.list",
+          "__items__": []
+        }
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.LabelAnswer",
@@ -75,7 +87,11 @@
           "__collection_type__": "builtins.list",
           "__items__": []
         },
-        "exemplar": "floor_1"
+        "exemplar": "floor_1",
+        "alternatives": {
+          "__collection_type__": "builtins.list",
+          "__items__": []
+        }
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.LabelAnswer",
@@ -93,7 +109,11 @@
           "__collection_type__": "builtins.list",
           "__items__": []
         },
-        "exemplar": "handle_13"
+        "exemplar": "handle_13",
+        "alternatives": {
+          "__collection_type__": "builtins.list",
+          "__items__": []
+        }
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.LabelAnswer",
@@ -114,7 +134,11 @@
             "HasSupportingSurface"
           ]
         },
-        "exemplar": "kitchen_island_1"
+        "exemplar": "kitchen_island_1",
+        "alternatives": {
+          "__collection_type__": "builtins.list",
+          "__items__": []
+        }
       }
     ]
   }

@@ -38,9 +38,11 @@ from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     in_base_order,
     names_a_category,
 )
+from semantic_digital_twin.semantic_annotations.part_whole import fields_accepting
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     HasRootRegion,
+    PartWholeRelationship,
 )
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -314,7 +316,7 @@ class MountAnnotations(HasLogger):
             parents=EvaluationGraph.parents_in(
                 world, {body.name for body in split.bodies}
             ),
-        ).with_fields_resolved(annotation_classes(SemanticAnnotation))
+        )
         self.run.write_record(RunFile.EVALUATION_GRAPH, graph)
 
         report = RunReport(run=self.run)
@@ -401,7 +403,9 @@ class MountAnnotations(HasLogger):
         pairings: List[Pairing],
     ) -> Mounted:
         """
-        Mount every pairing's part into its whole, in the field the pairing names.
+        Mount every pairing's part into its whole, in the field its class fits; the
+        field the pairing names decides only where several fields of the whole would
+        take it.
 
         :param world: The world the annotations are in.
         :param annotations: The annotation made for each body, by name.
@@ -422,8 +426,21 @@ class MountAnnotations(HasLogger):
                         )
                     )
                     continue
+                if not isinstance(whole, PartWholeRelationship):
+                    mounted.refused.append(
+                        RefusedMount(
+                            pairing=pairing,
+                            reason=f"the whole is a {type(whole).__name__}, which "
+                            "holds no parts",
+                        )
+                    )
+                    continue
+                fitting = fields_accepting(type(whole), type(part))
                 try:
-                    whole.add(part, field_name=pairing.field_name)
+                    whole.add(
+                        part,
+                        field_name=pairing.field_name if len(fitting) > 1 else "",
+                    )
                 except UsageError as refusal:
                     # The world refusing a mount is an answer about this pairing, not a
                     # state the run should not have reached: the class a body was given
@@ -551,7 +568,7 @@ class AnnotateAndMount(PipelineStep):
         mixins to compose it from, having been shown what objects of that label were
         measured to meet; the classification step answers which class each *object* is,
         from a picture, and its schema carries a superclass as well. Read from the
-        classification alone, a Faucet that the vocabulary had composed with HasHandle
+        classification alone, a Faucet that the vocabulary had composed with HasHandles
         comes out with no way to hold a handle at all, and the pairing measured for it
         cannot be mounted.
 

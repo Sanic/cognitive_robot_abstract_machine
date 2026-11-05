@@ -7,7 +7,7 @@ CounterTop(Furniture, HasSupportingSurface, HasSink, HasCooktops)
   part sink -> Sink
 
 ## The part
-Drawer(Furniture, HasCaseAsRootBody, IsGraspedAtHandle, HasMovableJoint, HasKnobs)
+Drawer(Furniture, HasCaseAsRootBody, HasHandles, HasMovableJoint, HasKnobs)
   part knobs -> Knob (many)
   part handles -> Handle (many)
 

@@ -14,6 +14,7 @@ from experiments.warsaw.articulate3d.convert import (
     ConvertedScene,
     LabelDisclosure,
     LabelOverlap,
+    NameSpelling,
     SceneConversion,
 )
 from experiments.warsaw.articulate3d.exceptions import ValidationSceneLockedError
@@ -152,6 +153,7 @@ def written_as(directory, scene_id):
         scene_id=scene_id,
         disclosure=LabelDisclosure.WORDS,
         overlap=LabelOverlap.DISJOINT,
+        spelling=NameSpelling.AS_WRITTEN,
         seed=0,
     ).write_beside(directory)
     return directory

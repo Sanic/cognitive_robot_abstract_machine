@@ -133,6 +133,26 @@ def test_a_label_question_with_pictures_still_carries_them(
     assert kinds.count("ImagePart") == 3
 
 
+def test_a_label_question_with_pictures_says_which_object_they_show(
+    label_question, three_renders
+) -> None:
+    """
+    The message names the object pictured, so the model knows which of the label's
+    objects it is looking at.
+    """
+    [text, *_] = label_question(three_renders).message()
+
+    assert '"chair_1"' in text.text
+
+
+def test_a_label_question_without_pictures_names_no_pictured_object(
+    label_question,
+) -> None:
+    [text] = label_question([]).message()
+
+    assert "pictures" not in text.text.lower()
+
+
 def test_a_label_question_without_pictures_is_not_told_to_read_any(
     label_question,
 ) -> None:

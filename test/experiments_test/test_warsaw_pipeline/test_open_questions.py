@@ -17,7 +17,11 @@ from experiments.warsaw.pipeline.records import PairRecord, Relations, RelationS
 from experiments.warsaw.pipeline.run import Run
 from experiments.warsaw.pipeline.settings import PipelineSettings
 from experiments.warsaw.pipeline.steps.evidence import MeasureScene
-from experiments.warsaw.segment_relations import PairEvidence, SegmentRelations
+from experiments.warsaw.segment_relations import (
+    PairEvidence,
+    SegmentDescriptor,
+    SegmentRelations,
+)
 
 
 @pytest.fixture
@@ -210,6 +214,48 @@ def blinds_and_rails(step, known, *meetings):
     labels = {"blinds_1": "blinds", **{rail: "rail" for rail, _, _ in meetings}}
     classes = {"rail": known["Rail"], "blinds": known["Blinds"]}
     return Relations(scene="a room", pairs=pairs), labels, classes
+
+
+def described(name: str, label: str) -> SegmentDescriptor:
+    """
+    :return: A segment measured to be a small square of scan.
+    """
+    return SegmentDescriptor(
+        name=name,
+        class_name=label,
+        instance=1,
+        faces=2,
+        exclusive_faces=2,
+        area=0.01,
+        exclusive_area=0.01,
+        centroid=(0.0, 0.0, 1.0),
+        minimum_corner=(0.0, 0.0, 1.0),
+        maximum_corner=(0.1, 0.1, 1.0),
+        components=1,
+        height=1.0,
+    )
+
+
+def test_the_whole_touched_along_the_most_edges_is_offered_first(step, known):
+    """
+    A model reads the candidates in the order they are listed and paints them in that
+    order, so the order follows the contact rather than the names.
+    """
+    relations, labels, classes = blinds_and_rails(
+        step, known, ("rail_1", 3, 0.0), ("rail_2", 12, 0.0), ("rail_3", 7, 0.0)
+    )
+    relations = Relations(
+        scene=relations.scene,
+        pairs=relations.pairs,
+        segments=[described(name, label) for name, label in labels.items()],
+    )
+
+    [question] = step.memberships(
+        relations, labels, classes, self_measured(relations)
+    ).to_ask_about
+
+    assert [one.name for one in question.candidates] == ["rail_2", "rail_3", "rail_1"]
+    assert question.shown == ["blinds_1", "rail_2", "rail_3", "rail_1"]
 
 
 def test_a_part_that_meets_no_whole_is_given_one_within_the_gap(step, known):

@@ -685,7 +685,7 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
     """
     Base for annotations that have structural *parts* (the part-whole relation).
 
-    Each part mixin (``HasHandle``, ``HasDoors``, ...) declares a typed part-whole relationship
+    Each part mixin (``HasHandles``, ``HasDoors``, ...) declares a typed part-whole relationship
     field. The unified :meth:`add` routes a part to the field whose element type matches it and lets
     the part mount itself (:meth:`HasRootKinematicStructureEntity._mount_strategy`).
     """
@@ -920,31 +920,6 @@ class HasDoors(PartWholeRelationship, Mixin):
 
 
 @dataclass(eq=False)
-class HasHandle(HasGraspCandidates, PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have a handle, and are grasped at it
-    when they have one.
-    """
-
-    handle: Handle | None = field(
-        default=None,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The handle of the semantic annotation.
-    """
-
-    def grasped_part(self) -> HasGraspCandidates:
-        """
-        :return: The handle; without a handle, the part the annotation is grasped at
-            otherwise.
-        """
-        if self.handle is None:
-            return super().grasped_part()
-        return self.handle
-
-
-@dataclass(eq=False)
 class HasPinchableWall(HasGraspCandidates, Mixin):
     """
     A mixin class for semantic annotations with a thin upright wall that a gripper
@@ -1092,7 +1067,7 @@ class HasRim(HasPinchableWall, PartWholeRelationship, Mixin):
 
 
 @dataclass(eq=False)
-class HasHandles(HasRootBody, PartWholeRelationship, Mixin):
+class HasHandles(HasGraspCandidates, PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that may have more than one handle.
     """
@@ -1107,18 +1082,10 @@ class HasHandles(HasRootBody, PartWholeRelationship, Mixin):
     The handles of the semantic annotation.
     """
 
-
-@dataclass(eq=False)
-class IsGraspedAtHandle(HasGraspCandidates, HasHandles, Mixin):
-    """
-    A mixin class for semantic annotations that have handles and are grasped at the
-    first of them.
-    """
-
     def grasped_part(self) -> HasGraspCandidates:
         """
-        :return: The first handle; without a handle, the part the annotation is grasped
-            at otherwise.
+        :return: The handle; without a handle, the part the annotation is grasped at
+            otherwise.
         """
         if not self.handles:
             return super().grasped_part()
