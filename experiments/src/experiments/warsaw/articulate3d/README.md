@@ -17,7 +17,11 @@ inference rules or from what a run produced.
 | The protocol: what every part name means, parts classified on sight, field choices | Decisions about a single scene that are not written into the protocol |
 | Prompts and pipeline settings, tuned on train scenes | Anything derived from a run's output |
 
-Freeze all of it with one git tag before running the evaluated scenes.
+Freeze all of it with one git tag before running the evaluated scenes. The validation
+scenes (`splits/val.txt`) are locked until then: converting, running or scoring one
+raises `ValidationSceneLockedError` unless the checkout has no local changes and its
+commit carries a tag starting with `articulate3d-frozen-`. Train scenes
+(`splits/train.txt`) are always open.
 
 ## Workflow
 
@@ -56,18 +60,25 @@ Freeze all of it with one git tag before running the evaluated scenes.
    ```bash
    python -m experiments.warsaw.articulate3d.convert --dataset <articulate3d> \
        --scannetpp <scannet++ data> --scene <scene id> --output <scene directory> \
-       [--disclosure words|neutral] [--overlap disjoint|subtree] [--seed N]
+       [--disclosure words|neutral] [--overlap disjoint|subtree] \
+       [--spelling as-written|corrected] [--seed N]
    ```
 
    - `--disclosure neutral` writes labels such as `label_03`, so the model learns nothing
      from the annotators' words. This tests what the pictures alone tell it.
    - `--overlap subtree` makes each part's label cover the parts below it as well. This
      recreates the overlapping labels a real scan produces, so the ownership step runs.
+   - `--spelling corrected` fixes the annotators' misspelt part names before they become
+     labels; the default keeps them as written. Spacing and instance numbers are tidied
+     either way.
 
    ScanNet++ meshes must be the v1 meshes the annotations were made on.
 
 5. **Run the pipeline** on each converted scene. Point
-   `PipelineSettings.scene_directory` at it, and run each scene several times.
+   `PipelineSettings.scene_directory` at it, and run each scene several times. Which
+   model is asked, whether it sees pictures and how it proposes classes are settings;
+   [the pipeline's README](../README.md#running-a-version-of-the-pipeline) says how to
+   run each version.
 
 6. **Score the runs**:
 
