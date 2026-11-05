@@ -8,13 +8,176 @@ import numpy as np
 import pytest
 from semantic_digital_twin.predefined_maps.kitchen_environment import (
     KitchenEnvironment,
+    WindowWallPart,
 )
+from semantic_digital_twin.adapters.world_mesh_exporter import WorldMeshExtractor
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Cabinet,
     Cooktop,
     CounterTop,
     KitchenIsland,
+    WallPanel,
 )
 from semantic_digital_twin.world import World
+
+# %% Countertop membership
+
+
+@pytest.fixture
+def kitchen_world() -> World:
+    """
+    Build the predefined kitchen with its modelled semantic relationships.
+    """
+    return KitchenEnvironment().create_world()
+
+
+@pytest.mark.parametrize(
+    "body_name",
+    [
+        "module_1_cabinet",
+        "module_1_face_plate",
+        "module_1_door",
+        "module_1_handle",
+        "dishwasher",
+        "dishwasher_door",
+        "dishwasher_handle",
+    ],
+)
+def test_countertop_context_includes_all_under_counter_parts(
+    kitchen_world: World, body_name: str
+) -> None:
+    """
+    All under-counter modules and their nested parts belong to the worktop context.
+    """
+    snapshot = WorldMeshExtractor().extract(kitchen_world)
+    countertop = next(
+        annotation
+        for annotation in snapshot.semantic_annotations
+        if annotation.name == "counter_top"
+    )
+    body = next(body for body in snapshot.body_meshes if body.name == body_name)
+
+    assert countertop.identifier in body.context_semantic_annotation_identifiers
+
+
+def test_module_1_face_plate_belongs_to_its_cabinet(kitchen_world: World) -> None:
+    """
+    The fixed panel shares the cabinet's context along with its door and handle.
+    """
+    cabinet = kitchen_world.get_semantic_annotation_by_name("module_1_cabinet")
+    panel = kitchen_world.get_semantic_annotation_by_name("module_1_face_plate")
+
+    assert panel.root.parent_kinematic_structure_entity is cabinet.root
+
+
+def test_oven_tower_is_a_cabinet(kitchen_world: World) -> None:
+    """
+    The housing for the oven and drawers carries the general cabinet class.
+    """
+    tower = kitchen_world.get_semantic_annotation_by_name("oven_tower")
+
+    assert type(tower) is Cabinet
+
+
+def test_oven_tower_contains_its_oven_and_drawers(kitchen_world: World) -> None:
+    """
+    The cabinet retains its mounted drawers and contained oven.
+    """
+    tower = kitchen_world.get_semantic_annotation_by_name("oven_tower")
+
+    assert tower.drawers == [
+        kitchen_world.get_semantic_annotation_by_name("oven_side_drawer_left"),
+        kitchen_world.get_semantic_annotation_by_name("oven_side_drawer_right"),
+        kitchen_world.get_semantic_annotation_by_name("oven_center_drawer"),
+    ]
+    assert tower.objects == [
+        kitchen_world.get_semantic_annotation_by_name(name)
+        for name in [
+            "oven_base_facing",
+            "oven_top_plate",
+            "oven_top_gap_facing",
+            "oven",
+        ]
+    ]
+
+
+# %% Wall-mounted strips
+
+
+@pytest.mark.parametrize(
+    "wall_part", [WindowWallPart.CHANNEL, WindowWallPart.LOWER_STRIP]
+)
+def test_wall_strips_are_attached_to_the_north_wall(
+    kitchen_world: World, wall_part: WindowWallPart
+) -> None:
+    """
+    Both fixed strips move with the wall they are mounted on.
+    """
+    wall = kitchen_world.get_semantic_annotation_by_name(WindowWallPart.WALL)
+    panel = kitchen_world.get_semantic_annotation_by_name(wall_part)
+
+    assert panel.root.parent_kinematic_structure_entity is wall.root
+
+
+@pytest.mark.parametrize(
+    "wall_part", [WindowWallPart.CHANNEL, WindowWallPart.LOWER_STRIP]
+)
+def test_wall_strips_export_wall_context_with_direct_panel_labels(
+    kitchen_world: World, wall_part: WindowWallPart
+) -> None:
+    """
+    Wall membership is contextual while each strip retains its own panel class.
+    """
+    snapshot = WorldMeshExtractor().extract(kitchen_world)
+    annotations = {
+        annotation.identifier: annotation
+        for annotation in snapshot.semantic_annotations
+    }
+    wall = next(
+        annotation
+        for annotation in annotations.values()
+        if annotation.name == WindowWallPart.WALL
+    )
+    panel = next(body for body in snapshot.body_meshes if body.name == wall_part)
+
+    assert panel.context_semantic_annotation_identifiers == (wall.identifier,)
+    assert [
+        annotations[identifier].type_name
+        for identifier in panel.direct_semantic_annotation_identifiers
+    ] == [WallPanel.__name__]
+
+
+# %% Cooking table cabinets
+
+
+@pytest.mark.parametrize("side", ["left", "right"])
+def test_cooking_table_modules_are_cabinets(kitchen_world: World, side: str) -> None:
+    """
+    Each drawer housing carries the general cabinet class.
+    """
+    cabinet = kitchen_world.get_semantic_annotation_by_name(f"cooking_mod_{side}")
+
+    assert type(cabinet) is Cabinet
+
+
+@pytest.mark.parametrize("side", ["left", "right"])
+def test_cooking_table_cabinets_keep_their_drawers(
+    kitchen_world: World, side: str
+) -> None:
+    """
+    The table contains each cabinet with its drawer and nested handle.
+    """
+    table = kitchen_world.get_semantic_annotation_by_name("cooking_table")
+    cabinet = kitchen_world.get_semantic_annotation_by_name(f"cooking_mod_{side}")
+    drawer = kitchen_world.get_semantic_annotation_by_name(f"cooking_drawer_{side}")
+    handle = kitchen_world.get_semantic_annotation_by_name(
+        f"cooking_drawer_handle_{side}"
+    )
+
+    assert cabinet.root.parent_kinematic_structure_entity is table.root
+    assert cabinet.drawers == [drawer]
+    assert drawer.handles == [handle]
+
 
 # %% mesh bounds
 

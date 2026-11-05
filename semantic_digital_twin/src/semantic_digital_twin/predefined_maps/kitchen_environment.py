@@ -380,13 +380,23 @@ class KitchenWindowWall:
         )
         for window in self.windows:
             window.add_to_wall(world, wall, self)
-        self.cable_channel.create_in_world(world, WindowWallPart.CHANNEL, self)
+        cable_channel = self.cable_channel.create_in_world(
+            world, WindowWallPart.CHANNEL, self
+        )
+        world.move_branch(
+            cable_channel.root, wall.root, enable_unsafe_inside_world_block=True
+        )
         lower_strip = WallStrip(
             front=self.lower_strip_front,
             top=self.cable_channel.bottom,
             bottom=WallProfile(0.0),
         )
-        lower_strip.create_in_world(world, WindowWallPart.LOWER_STRIP, self)
+        lower_strip_panel = lower_strip.create_in_world(
+            world, WindowWallPart.LOWER_STRIP, self
+        )
+        world.move_branch(
+            lower_strip_panel.root, wall.root, enable_unsafe_inside_world_block=True
+        )
         return wall
 
 
@@ -1318,6 +1328,7 @@ class KitchenEnvironment(WorldSource):
             ).spawn(world, parent_T_self=module_1_pose)
             for shape in module_1_cabinet.root.visual.shapes:
                 shape.color = Color.GRAY()
+            counter_top.add_object(module_1_cabinet)
 
             module_1_face_plate = WallPanel.create_with_new_body_in_world(
                 world=world,
@@ -1335,6 +1346,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in module_1_face_plate.root.visual.shapes:
                 shape.color = Color.WHITE()
+            module_1_cabinet.add_object(module_1_face_plate)
 
             module_1_hinge_world_pose = (
                 module_1_pose
@@ -1413,6 +1425,7 @@ class KitchenEnvironment(WorldSource):
             ).spawn(world, parent_T_self=module_2_pose)
             for shape in dishwasher.root.visual.shapes:
                 shape.color = Color.GRAY()
+            counter_top.add_object(dishwasher)
 
             module_2_hinge_world_pose = (
                 module_2_pose
@@ -1573,9 +1586,9 @@ class KitchenEnvironment(WorldSource):
                 z=oven_height / 2,
                 yaw=-np.pi / 2,
             )
-            tower = Cupboard.get_annotation_specification(
+            tower = Cabinet.get_annotation_specification(
                 "oven_tower",
-                Cupboard.get_default_root_kinematic_structure_entity_specification(
+                Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=oven_depth, y=oven_width, z=oven_height),
                     wall_thickness=0.02,
                 ),
@@ -2344,7 +2357,7 @@ class KitchenEnvironment(WorldSource):
                         yaw=1.5708,
                     )
                 )
-                mod = Cupboard.create_with_new_body_in_world(
+                mod = Cabinet.create_with_new_body_in_world(
                     name=f"cooking_mod_{side_name}",
                     world=world,
                     world_root_T_self=module_pose,
