@@ -47,16 +47,17 @@ Rules:
 - If your reason names a superclass and mixins to build from, then you are proposing a
   new class: give it its own name and set "is_new_class" to true.
 
-Answer with JSON and nothing else, in one of these three shapes.
+Answer with JSON and nothing else, in one of these three shapes. Write "reason" first:
+say in one sentence what the objects are, then name the class that is that.
 
 A class that is already in the taxonomy:
-{"class": "<a name from classes[]>", "is_new_class": false,
- "confidence": 0.0, "reason": "one sentence"}
+{"reason": "one sentence", "class": "<a name from classes[]>", "is_new_class": false,
+ "confidence": 0.0}
 
 A class you propose:
-{"class": "<the name you give it>", "is_new_class": true,
+{"reason": "one sentence", "class": "<the name you give it>", "is_new_class": true,
  "superclass": "<a name from classes[]>", "mixins": ["<names from part_whole_mixins[]>"],
- "confidence": 0.0, "reason": "one sentence"}
+ "confidence": 0.0}
 
 A label the ontology should hold nothing for:
-{"class": null, "is_new_class": false, "confidence": 0.0, "reason": "one sentence"}
+{"reason": "one sentence", "class": null, "is_new_class": false, "confidence": 0.0}

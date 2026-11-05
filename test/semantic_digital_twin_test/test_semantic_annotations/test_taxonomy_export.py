@@ -25,10 +25,14 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     CounterTop,
     Dishwasher,
     Drawer,
+    Door,
+    Frame,
     Furniture,
     Handle,
+    Hinge,
     KitchenIsland,
     Sink,
+    Window,
 )
 from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     annotation_classes,
@@ -240,6 +244,24 @@ def test_a_kitchen_island_can_be_built_and_mounted_into():
         island.add(counter_top)
 
     assert (island.cabinets, island.counter_top) == ([cabinet], counter_top)
+
+
+# %% where a hinge is held
+
+
+def test_a_hinge_is_held_by_the_fixed_object_a_door_swings_in():
+    """
+    Annotators put a hinge on the frame or the cabinet a door turns in, not on the door.
+    """
+    assert field_holding(Frame, Hinge) is not None
+    assert field_holding(Cabinet, Hinge) is not None
+
+
+def test_what_swings_holds_no_hinge():
+    """
+    A door or window able to hold one would be offered the hinges its own leaves sit on.
+    """
+    assert (field_holding(Door, Hinge), field_holding(Window, Hinge)) == (None, None)
 
 
 # %% the ontology's own classes against everything below its root

@@ -145,13 +145,15 @@ class OverlapDecision(Question[AnswerType], Generic[AnswerType, AskedType]):
         :return: What each color in the pictures stands for.
         """
         lines = [
-            f'{name} (labelled "{self.labels[name]}") is {self.asked.legend[name]}'
+            f'{name} (labelled "{self.labels[name]}") is painted in the colour '
+            f"{self.asked.legend[name]}"
             for name in self.asked.shown
             if name in self.asked.legend
         ]
         if "contested" in self.asked.legend:
             lines.append(
-                f"the faces all of them claim are {self.asked.legend['contested']}"
+                "the faces all of them claim are painted in the colour "
+                f"{self.asked.legend['contested']}"
             )
         return "\n".join(lines)
 

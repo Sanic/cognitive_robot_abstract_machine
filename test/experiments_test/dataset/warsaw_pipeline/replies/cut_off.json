@@ -1,0 +1,20 @@
+{
+  "id": "gen-cut-off",
+  "object": "chat.completion",
+  "model": "qwen/qwen3-vl-30b-a3b-instruct",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "length",
+      "message": {
+        "role": "assistant",
+        "content": "{\"class\": \"Handle\", \"is_new_class\": false, \"confidence\": 0.0, \"reason\": \"The object labeled 'handle_base' is a component that holds a handle. The object is a handle base, which is a part of a handle, and the handle is a part of the object. The object is a handle base, which is a part of a handle, and the handle is a part of the object. The object is a handle base, which is a part of a handle, and the handle is a part of the object. The object is a handle base, which is a part of a handle, and the handle is a part of the object. The object is a handle base, which is a part of a handle, and the handle is a part of the object. The object is a handle base, which is a part of a handle, and the handle is a part of the object."
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 16077,
+    "completion_tokens": 2048,
+    "total_tokens": 18125
+  }
+}

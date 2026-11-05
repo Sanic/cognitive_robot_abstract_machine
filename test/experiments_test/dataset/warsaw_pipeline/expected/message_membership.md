@@ -26,10 +26,10 @@ cabinet_20: shares 9 faces with it, touches it along 44 edges, 0.0 m between the
 cabinet_4: shares 3789 faces with it, touches it along 5626 edges, 0.0 m between their surfaces, and would hold it in its doors
 
 ## The picture
-door_10 (labelled "door") is tomato
-cabinet_20 (labelled "cabinet") is royalblue
-cabinet_4 (labelled "cabinet") is greenyellow
-the faces all of them claim are mediumorchid
+door_10 (labelled "door") is painted in the colour tomato
+cabinet_20 (labelled "cabinet") is painted in the colour royalblue
+cabinet_4 (labelled "cabinet") is painted in the colour greenyellow
+the faces all of them claim are painted in the colour mediumorchid
 
 Picture 1 -- the objects alone, with nothing in front of them.
 

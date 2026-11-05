@@ -98,7 +98,7 @@ class BodyGroupQuestion(Question[Dict[str, BodyAnswer]]):
             {
                 "name": f"{segment.name}",
                 "color": (
-                    self.rendered.colors[segment.name].closest_css3_name()
+                    self.rendered.colors[segment.name].word
                     if segment.name in self.rendered.colors
                     else None
                 ),

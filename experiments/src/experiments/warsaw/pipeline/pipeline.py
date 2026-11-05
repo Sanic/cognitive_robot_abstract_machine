@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 from typing_extensions import List
 
 from krrood.exceptions import DataclassException
+from experiments.warsaw.articulate3d.convert import ConvertedScene, ConvertedSceneFile
+from experiments.warsaw.articulate3d.splits import ValidationLock
 from experiments.warsaw.bases import HasLogger
 from experiments.warsaw.pipeline.records import StepDuration, StepDurations
 from experiments.warsaw.pipeline.run import Run, RunFile
@@ -105,7 +107,14 @@ class WarsawPipeline(HasLogger):
 
         :return: The run, once every step it depends on has finished.
         :raises SubprocessStepFailedError: If a step the run depends on fails.
+        :raises ValidationSceneLockedError: If the scene is an Articulate3D validation
+            scene and the checkout is not frozen.
         """
+        scene = self.settings.scene_directory
+        if (scene / ConvertedSceneFile.RECORD).is_file():
+            ValidationLock(repository=self.settings.repository).check(
+                ConvertedScene.beside(scene).scene_id
+            )
         run = Run.create(self.settings.runs_directory)
         record_run_provenance(
             settings=self.settings, run=run, repository=self.settings.repository

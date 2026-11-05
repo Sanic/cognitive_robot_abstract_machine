@@ -48,6 +48,7 @@ from experiments.warsaw.articulate3d.exceptions import (
 )
 from experiments.warsaw.articulate3d.protocol import EvaluationProtocol, ProtocolFile
 from experiments.warsaw.articulate3d.rules import AnnotatedScene
+from experiments.warsaw.articulate3d.splits import ValidationLock
 from experiments.warsaw.bases import JsonRecord
 from experiments.warsaw.habitat.convert import label_property
 from experiments.warsaw.world_loader.scene import SceneFrame, SourceFrame
@@ -216,6 +217,11 @@ class SceneConversion:
     What the random instance numbers and neutral names are drawn from.
     """
 
+    lock: ValidationLock = field(default_factory=ValidationLock)
+    """
+    What keeps the validation scenes closed until the code is frozen.
+    """
+
     def write(self, scene: Articulate3DScene, output: Path) -> ConvertedScene:
         """
         Write a scene into a directory the pipeline can be pointed at.
@@ -223,7 +229,10 @@ class SceneConversion:
         :param scene: The scene and its annotations.
         :param output: The directory to write it into.
         :return: What was written.
+        :raises ValidationSceneLockedError: If it is a validation scene and the checkout
+            is not frozen.
         """
+        self.lock.check(scene.scannetpp_scene.scene_id)
         random = np.random.default_rng(self.seed)
         drawn = [part for part in scene.parts if len(part.face_indices)]
         properties = self._properties(drawn, random)

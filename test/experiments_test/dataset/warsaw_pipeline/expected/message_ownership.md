@@ -19,10 +19,10 @@ Cabinet.drawers may hold a Drawer (part)
 KitchenIsland.drawers may hold a Drawer (part)
 
 ## The picture
-cabinet_8 (labelled "cabinet") is tomato
-drawer_5 (labelled "drawer") is royalblue
-kitchen_island_1 (labelled "kitchen_island") is greenyellow
-the faces all of them claim are mediumorchid
+cabinet_8 (labelled "cabinet") is painted in the colour tomato
+drawer_5 (labelled "drawer") is painted in the colour royalblue
+kitchen_island_1 (labelled "kitchen_island") is painted in the colour greenyellow
+the faces all of them claim are painted in the colour mediumorchid
 
 ## What was measured
 cabinet_8: 1589 faces, 1.43 m2, middle 0.87 m up, 1 piece(s)

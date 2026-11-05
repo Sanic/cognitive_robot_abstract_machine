@@ -27,9 +27,11 @@ from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     admissible_mounts,
     describe_class,
 )
-from semantic_digital_twin.world_description.geometry import Color
 from typing_extensions import Dict, List, Optional, Sequence, Tuple, Type
 
+from semantic_digital_twin.world_description.geometry import Color
+
+from experiments.warsaw.painting import PaintColor
 from experiments.warsaw.pipeline.camera_poses import CameraPoses
 from experiments.warsaw.pipeline.templates import PipelineTemplates
 from experiments.warsaw.pipeline.label_classes import VocabularyClasses
@@ -476,7 +478,7 @@ class MeasureScene(PipelineStep):
     @staticmethod
     def group_highlights(
         segments: Sequence[LabelSegment], contested: np.ndarray
-    ) -> Tuple[List[Tuple[Color, np.ndarray]], Dict[str, Color]]:
+    ) -> Tuple[List[Tuple[Color, np.ndarray]], Dict[str, PaintColor]]:
         """
         Color a set of objects so that what they disagree about can be seen.
 
@@ -488,12 +490,15 @@ class MeasureScene(PipelineStep):
         :param segments: The objects to color.
         :param contested: The faces they all claim.
         :return: What to paint, and what each color stands for.
+        :raises TooManyToPaintError: If there are more objects than colors to tell
+            them apart by.
         """
-        colors = Color.distinct_colors(len(segments) + 1)
+        colors = PaintColor.distinct(len(segments) + 1)
         highlights = [
-            (color, segment.face_indices) for color, segment in zip(colors, segments)
+            (color.color, segment.face_indices)
+            for color, segment in zip(colors, segments)
         ]
-        highlights.append((colors[-1], contested))
+        highlights.append((colors[-1].color, contested))
         legend = {str(segment.name): color for color, segment in zip(colors, segments)}
         legend["contested"] = colors[-1]
         return highlights, legend
@@ -545,11 +550,11 @@ class MeasureScene(PipelineStep):
         self.logger.info("rendering %s exemplars ...", len(request.labels))
         for entry in request.labels:
             segment = segments[entry.exemplar]
-            color = Color.distinct_colors(1)[0]
+            [color] = PaintColor.distinct(1)
             entry.images = self.write_images(
                 loader.render_region(
                     [segment],
-                    [(color, segment.face_indices)],
+                    [(color.color, segment.face_indices)],
                     viewpoints=self.viewpoints,
                     headless=self.settings.headless,
                     choose_viewpoint=self.chooses_viewpoint,
@@ -560,7 +565,7 @@ class MeasureScene(PipelineStep):
                 self.run.path(RunFile.EXEMPLARS),
                 entry.label,
             )
-            entry.color = color.closest_css3_name()
+            entry.color = color.word
             self.logger.info("  %s: %s", entry.label, entry.exemplar)
 
     def render_questions(
@@ -601,9 +606,7 @@ class MeasureScene(PipelineStep):
                 self.run.path(RunFile.QUESTION_RENDERS),
                 question.name,
             )
-            question.legend = {
-                name: color.closest_css3_name() for name, color in legend.items()
-            }
+            question.legend = {name: color.word for name, color in legend.items()}
             self.logger.info("  %s", question.name)
 
     # %% what is left to decide
@@ -777,10 +780,10 @@ class MeasureScene(PipelineStep):
         """
         Work out which parts have a whole to choose and which have only one.
 
-        A part is attached to the whole it belongs to, so a candidate has to share faces
-        with it or touch it along an edge. Everything else the measurement reached is
-        merely nearby, and offering it as an alternative is offering a wrong answer: it
-        trebles the questions and none of what it adds could be right.
+        A part that shares faces with a whole it could belong to, or touches one along an
+        edge, is offered only those. A part that meets none is offered the wholes within
+        :attr:`~experiments.warsaw.pipeline.settings.PipelineSettings.largest_gap_to_a_whole`
+        of it, since a scan leaves gaps between what is mounted together.
 
         :param relations: The pairs, as they were written out.
         :param labels: Per segment, the label it carries.
@@ -788,23 +791,32 @@ class MeasureScene(PipelineStep):
         :param measured: The measured scene.
         :return: The parts with a whole to choose, and the parts with only one.
         """
-        candidates: Dict[str, Dict[str, MembershipCandidate]] = defaultdict(dict)
+        meeting: Dict[str, Dict[str, MembershipCandidate]] = defaultdict(dict)
+        nearby: Dict[str, Dict[str, MembershipCandidate]] = defaultdict(dict)
         for pair in relations.pairs:
             if pair.status is not RelationStatus.RELATION_KNOWN:
                 continue
-            if not pair.evidence.shared_faces and not pair.evidence.touching_edges:
+            meets = pair.evidence.shared_faces or pair.evidence.touching_edges
+            if (
+                not meets
+                and pair.evidence.distance > self.settings.largest_gap_to_a_whole
+            ):
                 continue
             admitted = pair.view.mounts[0]
             whole, part = pair.evidence.one, pair.evidence.other
             if pair.classes.get(labels[whole]) != admitted.whole:
                 whole, part = part, whole
-            candidates[part][whole] = MembershipCandidate(
+            (meeting if meets else nearby)[part][whole] = MembershipCandidate(
                 name=whole,
                 field_name=admitted.field_name,
                 shared_faces=pair.evidence.shared_faces,
                 touching_edges=pair.evidence.touching_edges,
                 distance=round(pair.evidence.distance, 4),
             )
+        candidates = {
+            part: meeting.get(part) or nearby[part]
+            for part in sorted(set(meeting) | set(nearby))
+        }
 
         to_ask_about = [
             MembershipQuestion(

@@ -66,7 +66,7 @@ class ExemplarCaption(StrEnum):
     like, and then which faces are actually being asked about.
     """
 
-    CONTEXT = "Picture 1 -- where in the room it is, painted {color}."
+    CONTEXT = "Picture 1 -- where in the room it is, painted in the colour {color}."
     """
     The object in the room around it.
     """
@@ -77,8 +77,8 @@ class ExemplarCaption(StrEnum):
     """
 
     CLOSEUP = (
-        "Picture 3 -- the same object alone, painted {color}, which is exactly the "
-        "faces the label covers."
+        "Picture 3 -- the same object alone, painted in the colour {color}, which is "
+        "exactly the faces the label covers."
     )
     """
     The object alone, painted.

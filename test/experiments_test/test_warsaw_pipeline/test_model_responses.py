@@ -24,6 +24,7 @@ from semantic_digital_twin.adapters.vision_language_model.client import (
     VisionLanguageModel,
 )
 from semantic_digital_twin.adapters.vision_language_model.exceptions import (
+    AnswerCutOffError,
     ApiKeyMissingError,
     ModelRefusedError,
 )
@@ -135,6 +136,81 @@ def test_a_null_content_reads_as_empty_text(replies):
     A reply can carry a null content, and a caller reading it as text should get text.
     """
     assert response_from(replies, "null_content.json").text == ""
+
+
+# %% answers that ran on
+
+
+def test_an_answer_stopped_at_the_length_limit_is_refused_as_cut_off(replies):
+    """
+    A model repeating itself is stopped at the limit, and what it said by then may even
+    open like an answer.
+    """
+    with pytest.raises(AnswerCutOffError):
+        response_from(replies, "cut_off.json").parse_json()
+
+
+def test_a_correction_of_a_cut_off_answer_does_not_quote_it(replies):
+    """
+    Quoting what a model repeated back to it is how it is led to repeat it again.
+    """
+    cut_off = response_from(replies, "cut_off.json")
+
+    with pytest.raises(AnswerCutOffError) as refused:
+        cut_off.parse_json()
+
+    assert cut_off.text[: ModelRefusedError.shown] not in str(refused.value)
+
+
+@dataclass
+class RecordedPost:
+    """
+    Stands in for ``requests.post``, keeping what it was sent and answering once.
+    """
+
+    sent: List[Any]
+    """
+    The bodies it was sent, in order.
+    """
+
+    def __call__(self, **kwargs) -> Response:
+        """
+        :param kwargs: What the client sends.
+        :return: A successful response.
+        """
+        self.sent.append(json.loads(kwargs["data"]))
+        response = Response()
+        response.status_code = HTTPStatus.OK
+        response._content = json.dumps({"answered": True}).encode()
+        return response
+
+
+def test_a_question_allows_no_longer_an_answer_than_its_limit(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "a-key")
+    post = RecordedPost(sent=[])
+    monkeypatch.setattr(
+        "semantic_digital_twin.adapters.vision_language_model.client.requests.post",
+        post,
+    )
+    model = VisionLanguageModel(model="a-model", maximum_answer_tokens=512)
+
+    model.ask([TextPart("Which class is this?")], system="Name the class.")
+
+    assert [body["max_tokens"] for body in post.sent] == [model.maximum_answer_tokens]
+
+
+def test_a_question_is_sent_with_its_penalty_on_repeating_itself(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "a-key")
+    post = RecordedPost(sent=[])
+    monkeypatch.setattr(
+        "semantic_digital_twin.adapters.vision_language_model.client.requests.post",
+        post,
+    )
+    model = VisionLanguageModel(model="a-model", presence_penalty=1.5)
+
+    model.ask([TextPart("Which class is this?")], system="Name the class.")
+
+    assert [body["presence_penalty"] for body in post.sent] == [model.presence_penalty]
 
 
 # %% the message a question is sent as

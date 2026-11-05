@@ -3,5 +3,5 @@
 
 ## The objects to name
 {% for body in bodies %}
-{{ body.name }}: {% if body.color %}painted {{ body.color }}, {% endif %}labelled "{{ body.label }}" by the scan, which was read as {{ body.read_as }}
+{{ body.name }}: {% if body.color %}painted in the colour {{ body.color }}, {% endif %}labelled "{{ body.label }}" by the scan, which was read as {{ body.read_as }}
 {% endfor %}

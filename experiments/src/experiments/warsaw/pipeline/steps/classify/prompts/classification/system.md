@@ -29,6 +29,7 @@ Rules:
 - A class marked "abstract" cannot be given to an object. Name one of its subclasses,
   or propose a new class with it as the superclass.
 
-Answer with JSON and nothing else:
-{"objects": [{"name": "drawer_19", "class": "Drawer", "is_new_class": false,
-              "superclass": "Furniture", "confidence": 0.0, "reason": "one sentence"}]}
+Answer with JSON and nothing else. For each object write "reason" before "class": say in
+one sentence what the object is, then name the class that is that.
+{"objects": [{"name": "drawer_19", "reason": "one sentence", "class": "Drawer",
+              "is_new_class": false, "superclass": "Furniture", "confidence": 0.0}]}

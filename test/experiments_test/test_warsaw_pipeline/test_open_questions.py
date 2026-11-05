@@ -13,11 +13,11 @@ from __future__ import annotations
 import pytest
 
 
-from experiments.warsaw.pipeline.records import Relations, RelationStatus
+from experiments.warsaw.pipeline.records import PairRecord, Relations, RelationStatus
 from experiments.warsaw.pipeline.run import Run
 from experiments.warsaw.pipeline.settings import PipelineSettings
 from experiments.warsaw.pipeline.steps.evidence import MeasureScene
-from experiments.warsaw.segment_relations import SegmentRelations
+from experiments.warsaw.segment_relations import PairEvidence, SegmentRelations
 
 
 @pytest.fixture
@@ -144,13 +144,12 @@ def test_a_part_meeting_several_candidates_is_asked_about(step, relations, known
         assert question.shown[0] == question.part
 
 
-def test_something_merely_nearby_is_no_candidate(step, relations, known):
+def test_a_part_that_meets_a_whole_is_offered_only_wholes_it_meets(
+    step, relations, known
+):
     """
-    A part is attached to the whole it belongs to, so a candidate has to share faces
-    with it or touch it along an edge.
-
-    Offering what is merely nearby trebles the questions and none of what it adds could
-    be right.
+    A whole a part shares faces with or touches is where it is mounted, so what is
+    merely nearby is offered only to a part that meets none.
     """
     memberships = step.memberships(
         relations,
@@ -159,10 +158,8 @@ def test_something_merely_nearby_is_no_candidate(step, relations, known):
         self_measured(relations),
     )
     for one in memberships.to_ask_about:
-        for candidate in one.candidates:
-            assert candidate.shared_faces or candidate.touching_edges
-    for one in memberships.forced:
-        assert one.shared_faces or one.touching_edges
+        meets = [c for c in one.candidates if c.shared_faces or c.touching_edges]
+        assert meets == [] or meets == one.candidates
 
 
 def test_a_pair_the_ontology_leaves_open_names_no_membership(step, relations, known):
@@ -183,6 +180,73 @@ def test_a_pair_the_ontology_leaves_open_names_no_membership(step, relations, kn
     }
     for one in memberships.forced:
         assert tuple(sorted((one.part, one.whole))) in known_pairs
+
+
+# %% a part that meets no whole
+
+
+def blinds_and_rails(step, known, *meetings):
+    """
+    :param meetings: Per rail, how many edges the blinds touch it along and how far
+        apart the two are.
+    :return: The pairs between a pair of blinds and those rails, and every label.
+    """
+    pairs = [
+        PairRecord(
+            evidence=PairEvidence(
+                one=rail,
+                other="blinds_1",
+                shared_faces=0,
+                share_of_one=0.0,
+                share_of_other=0.0,
+                touching_edges=edges,
+                distance=distance,
+            ),
+            classes={"rail": "Rail", "blinds": "Blinds"},
+            view=step.ontology_view(known["Rail"], known["Blinds"]),
+        )
+        for rail, edges, distance in meetings
+    ]
+    labels = {"blinds_1": "blinds", **{rail: "rail" for rail, _, _ in meetings}}
+    classes = {"rail": known["Rail"], "blinds": known["Blinds"]}
+    return Relations(scene="a room", pairs=pairs), labels, classes
+
+
+def test_a_part_that_meets_no_whole_is_given_one_within_the_gap(step, known):
+    """
+    A scan leaves gaps between what is mounted together, as between blinds and the rail
+    they hang from.
+    """
+    gap = step.settings.largest_gap_to_a_whole
+    relations, labels, classes = blinds_and_rails(step, known, ("rail_1", 0, gap / 2))
+
+    memberships = step.memberships(relations, labels, classes, self_measured(relations))
+
+    assert [(one.part, one.whole) for one in memberships.forced] == [
+        ("blinds_1", "rail_1")
+    ]
+
+
+def test_a_whole_past_the_gap_is_not_offered(step, known):
+    gap = step.settings.largest_gap_to_a_whole
+    relations, labels, classes = blinds_and_rails(step, known, ("rail_1", 0, gap * 2))
+
+    memberships = step.memberships(relations, labels, classes, self_measured(relations))
+
+    assert (memberships.forced, memberships.to_ask_about) == ([], [])
+
+
+def test_a_part_that_meets_a_whole_is_not_offered_a_nearby_one(step, known):
+    gap = step.settings.largest_gap_to_a_whole
+    relations, labels, classes = blinds_and_rails(
+        step, known, ("rail_1", 12, 0.0), ("rail_2", 0, gap / 2)
+    )
+
+    memberships = step.memberships(relations, labels, classes, self_measured(relations))
+
+    assert [(one.part, one.whole) for one in memberships.forced] == [
+        ("blinds_1", "rail_1")
+    ]
 
 
 def self_classes(relations: Relations, known):

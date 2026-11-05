@@ -1,0 +1,69 @@
+"""
+Which service a model is asked at, and what asking it there takes.
+
+The model is the one switch: choosing the group's own model sends every question to the
+server on denver, with that server's credential and waiting times, and leaves room for
+the reasoning it does before it answers.
+"""
+
+from __future__ import annotations
+
+from experiments.warsaw.pipeline.run import Run, RunFile
+from experiments.warsaw.pipeline.settings import Model, ModelService, PipelineSettings
+from experiments.warsaw.pipeline.steps.classify.step import ClassifyBodies
+
+# %% the service each model is asked at
+
+
+def questioner_for(model, tmp_path):
+    """
+    :return: The client a step would put its questions to, for *model*.
+    """
+    settings = PipelineSettings(scene_directory=tmp_path, model=model)
+    step = ClassifyBodies(settings=settings, run=Run(directory=tmp_path / "run"))
+    return settings, step.questioner(RunFile.CLASSIFICATION_ANSWERS).model
+
+
+def test_a_model_on_openrouter_is_asked_there(tmp_path):
+    _, client = questioner_for(Model.QWEN3_VL_30B, tmp_path)
+
+    assert (client.url, client.api_key_variable) == (
+        ModelService.OPENROUTER.value,
+        ModelService.OPENROUTER.api_key_variable,
+    )
+
+
+def test_the_group_s_own_model_is_asked_on_denver_with_its_own_credential(tmp_path):
+    _, client = questioner_for(Model.QWEN3_8_27B_DENVER, tmp_path)
+
+    assert (client.url, client.api_key_variable) == (
+        ModelService.DENVER.value,
+        ModelService.DENVER.api_key_variable,
+    )
+
+
+def test_the_server_on_denver_is_waited_for_as_long_as_it_takes_to_answer(tmp_path):
+    """
+    It sends nothing until its whole answer is written, so the usual wait would give up
+    on every answer longer than a few hundred tokens.
+    """
+    _, client = questioner_for(Model.QWEN3_8_27B_DENVER, tmp_path)
+
+    assert (client.timeout, client.seconds_per_question) == (
+        ModelService.DENVER.seconds_per_attempt,
+        ModelService.DENVER.seconds_per_question,
+    )
+
+
+def test_a_model_that_reasons_first_is_given_room_for_its_reasoning(tmp_path):
+    settings, client = questioner_for(Model.QWEN3_8_27B_DENVER, tmp_path)
+
+    assert client.maximum_answer_tokens == (
+        settings.maximum_answer_tokens + Model.QWEN3_8_27B_DENVER.reasoning_tokens
+    )
+
+
+def test_a_model_that_answers_at_once_is_given_only_the_answer_limit(tmp_path):
+    settings, client = questioner_for(Model.QWEN3_VL_30B, tmp_path)
+
+    assert client.maximum_answer_tokens == settings.maximum_answer_tokens

@@ -633,3 +633,36 @@ class HabitatMeshesDisagreeError(DataclassException, ValueError):
             "Check that both were taken from the same release rather than mixed between "
             "versions."
         )
+
+
+# %% painting objects apart
+
+
+@dataclass
+class TooManyToPaintError(DataclassException, ValueError):
+    """
+    Raised when more objects are to be painted apart in one picture than there are
+    colours to tell them by.
+    """
+
+    wanted: int
+    """
+    How many objects were to be painted.
+    """
+
+    available: int
+    """
+    How many colours there are.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.wanted} objects were to be painted apart, and there are only "
+            f"{self.available} colours."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Show fewer objects in one picture, for example with a smaller group size, "
+            "or add a colour whose name is a plain colour word to PaintColor."
+        )

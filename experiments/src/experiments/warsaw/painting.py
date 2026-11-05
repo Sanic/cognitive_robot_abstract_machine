@@ -20,6 +20,8 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color
+
+from experiments.warsaw.exceptions import TooManyToPaintError
 from typing_extensions import Dict, List
 
 # %% colours that can be told apart
@@ -69,6 +71,94 @@ def spread_colours(count: int) -> List[Color]:
         )
         for index in range(count)
     ]
+
+
+# %% colours a model is told the names of
+
+
+class PaintColor(StrEnum):
+    """
+    A colour a body is painted in a picture a model is shown, and named in the question.
+
+    Every name is a plain colour word that names no object, so a model reading that
+    something is painted "tomato" or "olive" cannot take the paint for the thing. The
+    members are ordered so that the first few are the furthest apart.
+    """
+
+    RED = "#e6261f"
+    """
+    Red.
+    """
+
+    BLUE = "#2a63d6"
+    """
+    Blue.
+    """
+
+    GREEN = "#2fa84f"
+    """
+    Green.
+    """
+
+    YELLOW = "#f7d000"
+    """
+    Yellow.
+    """
+
+    PURPLE = "#8e3cc8"
+    """
+    Purple.
+    """
+
+    CYAN = "#14c8dc"
+    """
+    Cyan.
+    """
+
+    MAGENTA = "#e000c8"
+    """
+    Magenta.
+    """
+
+    BROWN = "#8c5014"
+    """
+    Brown.
+    """
+
+    PINK = "#ff8cb4"
+    """
+    Pink.
+    """
+
+    NAVY = "#001e6e"
+    """
+    Navy.
+    """
+
+    @classmethod
+    def distinct(cls, count: int) -> List[PaintColor]:
+        """
+        :param count: How many objects are to be painted apart.
+        :return: That many colours, each a different one.
+        :raises TooManyToPaintError: If there are more objects than colours.
+        """
+        if count > len(cls):
+            raise TooManyToPaintError(wanted=count, available=len(cls))
+        return list(cls)[:count]
+
+    @property
+    def color(self) -> Color:
+        """
+        :return: The colour, to paint with.
+        """
+        return Color.from_hex(self.value)
+
+    @property
+    def word(self) -> str:
+        """
+        :return: The colour's name, as a model is told it.
+        """
+        return self._name_.lower()
 
 
 # %% what the bodies are painted by

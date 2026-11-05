@@ -21,6 +21,8 @@ msg/_*.py
 # HM3D writes a scene's annotations as a '.semantic.txt' beside the mesh, so the
 # fixture the reader is tested against has to be one, and has to be checked in.
 !test/experiments_test/dataset/warsaw_habitat/*.semantic.txt
+# The Articulate3D splits decide which scenes stay locked until the freeze.
+!experiments/src/experiments/warsaw/articulate3d/splits/*.txt
 *.png
 *.lprof
 tmp_data/

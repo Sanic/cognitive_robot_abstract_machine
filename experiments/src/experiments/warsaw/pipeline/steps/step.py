@@ -97,8 +97,18 @@ class PipelineStep(HasLogger, ABC):
         :param answers: Where this step's replies are kept.
         :return: The model, ready to be asked this step's questions.
         """
+        model, service = self.settings.model, self.settings.model.service
         return Questioner(
-            model=VisionLanguageModel(model=self.settings.model.value),
+            model=VisionLanguageModel(
+                model=model.value,
+                url=service.value,
+                api_key_variable=service.api_key_variable,
+                timeout=service.seconds_per_attempt,
+                seconds_per_question=service.seconds_per_question,
+                presence_penalty=self.settings.presence_penalty,
+                maximum_answer_tokens=self.settings.maximum_answer_tokens
+                + model.reasoning_tokens,
+            ),
             answers_directory=self.run.path(answers),
             traces_directory=self.run.directory_for(RunFile.MODEL_CALLS)
             / answers.value,

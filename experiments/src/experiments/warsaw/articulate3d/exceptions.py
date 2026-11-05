@@ -220,3 +220,53 @@ class SceneExcludedError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Evaluate only scenes the protocol keeps."
+
+
+# %% a validation scene before the freeze
+
+
+@dataclass
+class ValidationSceneLockedError(DataclassException, PermissionError):
+    """
+    Raised when a validation scene is to be converted, run or scored from a checkout
+    that is not frozen.
+    """
+
+    scene_id: str
+    """
+    The validation scene.
+    """
+
+    commit: str | None
+    """
+    The commit checked out, or nothing where the checkout is no Git work tree.
+    """
+
+    local_changes: list[str]
+    """
+    The changes the checkout holds beyond its commit, as Git reports them.
+    """
+
+    tags: list[str]
+    """
+    The tags on the commit checked out.
+    """
+
+    tag_prefix: str
+    """
+    How the name of a tag freezing the code starts.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Scene {self.scene_id} is a validation scene, and the checkout at commit "
+            f"{self.commit} is not frozen: tags {self.tags}, "
+            f"{len(self.local_changes)} local changes."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Tune on train scenes only. Validation scenes open once the code, the "
+            "ontology and the protocol are frozen: commit everything, tag the commit "
+            f"'{self.tag_prefix}<name>', and run from that commit with no local changes."
+        )

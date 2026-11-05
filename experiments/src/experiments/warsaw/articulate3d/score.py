@@ -40,6 +40,7 @@ from typing_extensions import Any, Sequence
 
 from experiments.warsaw.articulate3d.convert import ConvertedScene
 from experiments.warsaw.articulate3d.exceptions import ClassNotInOntologyError
+from experiments.warsaw.articulate3d.splits import ValidationLock
 from experiments.warsaw.articulate3d.ground_truth import (
     GroundTruthFile,
     GroundTruthPart,
@@ -1000,16 +1001,24 @@ class SceneScore(JsonRecord):
 
     @classmethod
     def of(
-        cls, run: Run, ground_truth_directory: Path, minimum_overlap: float = 0.5
+        cls,
+        run: Run,
+        ground_truth_directory: Path,
+        minimum_overlap: float = 0.5,
+        lock: ValidationLock = ValidationLock(),
     ) -> SceneScore:
         """
         :param run: A finished run of a converted scene.
         :param ground_truth_directory: The directory holding every scene's ground truth.
         :param minimum_overlap: How much of their faces a part and a body must share to
             be paired.
+        :param lock: What keeps the validation scenes closed until the code is frozen.
         :return: The run, judged.
+        :raises ValidationSceneLockedError: If the run is of a validation scene and the
+            checkout is not frozen.
         """
         scene_id = ConvertedScene.beside(run.scene_directory).scene_id
+        lock.check(scene_id)
         faces = np.load(run.path(RunFile.SPLIT_FACES))
         return cls.between(
             run_name=run.directory.name,

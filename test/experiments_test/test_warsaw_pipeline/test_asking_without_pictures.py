@@ -358,7 +358,9 @@ def test_contested_faces_left_undrawn_are_still_adjudicated(
         }
     )
     monkeypatch.setattr(
-        pipeline_step, VisionLanguageModel.__name__, lambda model: scripted
+        pipeline_step,
+        VisionLanguageModel.__name__,
+        lambda **asked: scripted,
     )
 
     settings = PipelineSettings(

@@ -44,10 +44,17 @@ def get_full_class_name(cls):
     """
     Return the full name of a class, including the module name.
 
+    A class declared in a module run with ``python -m`` is named after that module, not
+    after ``__main__``, so the name can be imported again.
+
     :param cls: The class.
     :return: The full name of the class
     """
-    return cls.__module__ + "." + cls.__name__
+    module = cls.__module__
+    run = sys.modules[module].__spec__ if module == "__main__" else None
+    if run is not None:
+        module = run.name
+    return module + "." + cls.__name__
 
 
 def module_and_class_name(type_: type | _SpecialForm) -> str:

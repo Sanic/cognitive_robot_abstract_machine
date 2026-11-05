@@ -390,7 +390,6 @@ class Door(
     HasMovableJoint[ActiveConnection1DOF],
     HasControls,
     HasBackplates,
-    HasHinges,
     HasKnobs,
     HasLocks,
     HasWindows,
@@ -2176,7 +2175,6 @@ class Window(
     HasBlinds,
     HasHandles,
     HasBackplates,
-    HasHinges,
     HasKnobs,
 ):
     """
@@ -2188,6 +2186,9 @@ class Window(
 class Hinge(HasRootBody):
     """
     A joint of two plates that a door, window or lid swings on.
+
+    It is a part of the fixed object that what swings hangs in, such as a frame or a
+    cabinet, and never of what swings.
     """
 
 
