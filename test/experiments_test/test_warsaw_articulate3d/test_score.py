@@ -482,6 +482,26 @@ def test_a_run_directory_is_judged_against_its_scenes_ground_truth(
     )
 
 
+def test_a_scene_not_from_articulate3d_is_judged_against_the_ground_truth_of_its_name(
+    finished_run, ground_truth, tmp_path
+):
+    """
+    A scan of our own has no record of a conversion; what it is called is its
+    directory's name.
+    """
+    run, ground_truth_directory = finished_run
+    own_scene = tmp_path / "our_own_kitchen"
+    own_scene.mkdir()
+    run.write_json(
+        RunFile.PROVENANCE, {"settings": {"scene_directory": str(own_scene)}}
+    )
+    replace(ground_truth, scene_id=own_scene.name).write(
+        GroundTruthFile.SUFFIX.path(ground_truth_directory, own_scene.name)
+    )
+
+    assert SceneScore.of(run, ground_truth_directory).scene_id == own_scene.name
+
+
 def test_the_command_writes_each_runs_score_and_the_summary(finished_run, tmp_path):
     run, ground_truth_directory = finished_run
 

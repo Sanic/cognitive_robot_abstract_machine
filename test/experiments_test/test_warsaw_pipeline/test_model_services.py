@@ -8,6 +8,8 @@ the reasoning it does before it answers.
 
 from __future__ import annotations
 
+import pytest
+
 from experiments.warsaw.pipeline.run import Run, RunFile
 from experiments.warsaw.pipeline.settings import Model, ModelService, PipelineSettings
 from experiments.warsaw.pipeline.steps.classify.step import ClassifyBodies
@@ -67,3 +69,14 @@ def test_a_model_that_answers_at_once_is_given_only_the_answer_limit(tmp_path):
     settings, client = questioner_for(Model.QWEN3_VL_30B, tmp_path)
 
     assert client.maximum_answer_tokens == settings.maximum_answer_tokens
+
+
+# %% what a table calls a model
+
+
+@pytest.mark.parametrize("model", list(Model))
+def test_every_model_has_a_short_name_of_its_own(model):
+    others = [one.short_name for one in Model if one is not model]
+
+    assert model.short_name not in others
+    assert len(model.short_name) < 16

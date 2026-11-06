@@ -1,5 +1,6 @@
 """
-Judge finished runs of Articulate3D scenes against the scenes' ground truth.
+Judge finished runs against the ground truth of their scenes, which Articulate3D's
+annotation provides for its own scenes and a person writes for any other.
 
 A run cuts the scan into bodies, says what each body is, and mounts parts into wholes.
 Every judgement here rests on which body is which annotated part, and that is decided by
@@ -399,6 +400,13 @@ class FaceCorrespondence(JsonRecord):
         incidence.sum_duplicates()
         incidence.data[:] = 1.0
         return incidence
+
+    @property
+    def found_share(self) -> Share:
+        """
+        :return: The parts a body was paired with.
+        """
+        return Share(len(self.matched), len(self.matched) + len(self.unmatched_parts))
 
     @property
     def body_of_part(self) -> dict[int, str]:
@@ -1008,7 +1016,8 @@ class SceneScore(JsonRecord):
         lock: ValidationLock = ValidationLock(),
     ) -> SceneScore:
         """
-        :param run: A finished run of a converted scene.
+        :param run: A finished run, of a converted scene or of any other with a ground
+            truth of its name.
         :param ground_truth_directory: The directory holding every scene's ground truth.
         :param minimum_overlap: How much of their faces a part and a body must share to
             be paired.
@@ -1017,7 +1026,7 @@ class SceneScore(JsonRecord):
         :raises ValidationSceneLockedError: If the run is of a validation scene and the
             checkout is not frozen.
         """
-        scene_id = ConvertedScene.beside(run.scene_directory).scene_id
+        scene_id = ConvertedScene.scene_id_of(run.scene_directory)
         lock.check(scene_id)
         faces = np.load(run.path(RunFile.SPLIT_FACES))
         return cls.between(
