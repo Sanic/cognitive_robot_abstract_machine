@@ -136,6 +136,11 @@ class Model(StrEnum):
     composes a class differently from one run to the next.
     """
 
+    QWEN3_8_27B_OPENROUTER = "qwen/qwen3.8-27b"
+    """
+    The dense vision-language model served through OpenRouter, with room for reasoning.
+    """
+
     QWEN3_8_27B_DENVER = "qwen3.8:27b-q8_0"
     """
     Free, on the group's server on denver.
@@ -158,6 +163,7 @@ class Model(StrEnum):
             Model.CLAUDE_HAIKU_4_5: "Haiku 4.5",
             Model.GEMINI_2_5_PRO: "Gemini 2.5P",
             Model.CLAUDE_SONNET_4_5: "Sonnet 4.5",
+            Model.QWEN3_8_27B_OPENROUTER: "Qwen3.8-27B OR",
             Model.QWEN3_8_27B_DENVER: "Qwen3.8-27B",
         }[self]
 
@@ -176,7 +182,7 @@ class Model(StrEnum):
         :return: How many tokens the model may reason for before it answers, on top of the
             answer itself, since its reasoning is counted as part of what it answers.
         """
-        if self is Model.QWEN3_8_27B_DENVER:
+        if self in (Model.QWEN3_8_27B_DENVER, Model.QWEN3_8_27B_OPENROUTER):
             return 12288
         return 0
 

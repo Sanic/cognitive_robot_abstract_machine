@@ -8,6 +8,8 @@ the reasoning it does before it answers.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from experiments.warsaw.pipeline.run import Run, RunFile
@@ -69,6 +71,38 @@ def test_a_model_that_answers_at_once_is_given_only_the_answer_limit(tmp_path):
     settings, client = questioner_for(Model.QWEN3_VL_30B, tmp_path)
 
     assert client.maximum_answer_tokens == settings.maximum_answer_tokens
+
+
+# %% Qwen3.8 on OpenRouter
+
+
+def test_qwen3_8_on_openrouter_uses_its_model_identifier_and_service(
+    tmp_path: Path,
+) -> None:
+    """
+    Keep the hosted model distinct from the Denver deployment.
+    """
+    _, client = questioner_for(Model.QWEN3_8_27B_OPENROUTER, tmp_path)
+
+    assert client.model == Model.QWEN3_8_27B_OPENROUTER.value
+    assert client.url == ModelService.OPENROUTER.value
+    assert client.api_key_variable == ModelService.OPENROUTER.api_key_variable
+    assert client.timeout == ModelService.OPENROUTER.seconds_per_attempt
+    assert client.seconds_per_question == ModelService.OPENROUTER.seconds_per_question
+
+
+def test_qwen3_8_on_openrouter_has_room_for_reasoning(tmp_path: Path) -> None:
+    """
+    Reserve the same completion allowance for both deployments of Qwen3.8.
+    """
+    settings, client = questioner_for(Model.QWEN3_8_27B_OPENROUTER, tmp_path)
+
+    assert Model.QWEN3_8_27B_OPENROUTER.reasoning_tokens == (
+        Model.QWEN3_8_27B_DENVER.reasoning_tokens
+    )
+    assert client.maximum_answer_tokens == (
+        settings.maximum_answer_tokens + Model.QWEN3_8_27B_DENVER.reasoning_tokens
+    )
 
 
 # %% what a table calls a model

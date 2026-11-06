@@ -119,7 +119,12 @@ asked:
 | Model | Where | Needs |
 |---|---|---|
 | `Model.QWEN3_VL_30B` (the default), and every other member | OpenRouter | `OPENROUTER_API_KEY` |
+| `Model.QWEN3_8_27B_OPENROUTER` | OpenRouter (`qwen/qwen3.8-27b`) | `OPENROUTER_API_KEY` |
 | `Model.QWEN3_8_27B_DENVER` | the group's server on denver, at `localhost:8443` | `QWEN_API_KEY`, and an SSH tunnel open while the run lasts |
+
+Select `PipelineSettings(model=Model.QWEN3_8_27B_OPENROUTER)` to use the hosted 27B.
+Both 27B variants receive an additional 12,288 tokens on top of
+`maximum_answer_tokens` to leave room for reasoning.
 
 The tunnel to denver:
 
