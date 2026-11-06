@@ -145,6 +145,23 @@ class Model(StrEnum):
     """
 
     @property
+    def short_name(self) -> str:
+        """
+        :return: What a table of results calls the model.
+        """
+        return {
+            Model.QWEN3_VL_32B: "Qwen3-VL-32B",
+            Model.QWEN3_VL_30B: "Qwen3-VL-30B",
+            Model.GPT_5_6_LUNA: "GPT-5.6 Luna",
+            Model.QWEN3_VL_235B: "Qwen3-VL-235B",
+            Model.GEMINI_2_5_FLASH: "Gemini 2.5F",
+            Model.CLAUDE_HAIKU_4_5: "Haiku 4.5",
+            Model.GEMINI_2_5_PRO: "Gemini 2.5P",
+            Model.CLAUDE_SONNET_4_5: "Sonnet 4.5",
+            Model.QWEN3_8_27B_DENVER: "Qwen3.8-27B",
+        }[self]
+
+    @property
     def service(self) -> ModelService:
         """
         :return: Where the model is asked.

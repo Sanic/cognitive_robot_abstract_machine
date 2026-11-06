@@ -124,6 +124,26 @@ class ModelCallTrace:
     How long the response took to arrive.
     """
 
+    @classmethod
+    def from_json(cls, written: Dict[str, Any]) -> ModelCallTrace:
+        """
+        :param written: A trace as :meth:`to_json` wrote it.
+        :return: The trace.
+        """
+        return cls(
+            question=written["question"],
+            attempt=written["attempt"],
+            requested_model=written["requested_model"],
+            system_prompt=written["system_prompt"],
+            message_parts=[
+                ModelCallPart.from_json(part) for part in written["message_parts"]
+            ],
+            response=written["response"],
+            problems=written["problems"],
+            started_at=written["started_at"],
+            elapsed_seconds=written["elapsed_seconds"],
+        )
+
     def to_json(self) -> Dict[str, Any]:
         """
         Write the trace with the provider's response left exactly as it arrived.

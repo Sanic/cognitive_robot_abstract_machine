@@ -132,6 +132,65 @@ class GroundTruthRelation(JsonRecord):
     The field the whole holds the part through, where the ontology can hold it.
     """
 
+    @classmethod
+    def between(
+        cls,
+        whole: int,
+        part: int,
+        whole_class: str | None,
+        part_class: str | None,
+        ontology: dict[str, type],
+        chosen_field: str | None = None,
+    ) -> GroundTruthRelation:
+        """
+        :param whole: The part holding the other.
+        :param part: The part held.
+        :param whole_class: The class the whole is judged against, if any.
+        :param part_class: The class the part is judged against, if any.
+        :param ontology: The ontology's classes by name.
+        :param chosen_field: The field a person chose, where the ontology has several.
+        :return: The relation, with the field the ontology holds it through; for a
+            relation it holds the other way round, the field of the part's class.
+        :raises AmbiguousPartFieldError: If several fields could hold it and none was
+            chosen.
+        """
+        if whole_class is None or part_class is None:
+            return cls(
+                whole=whole, part=part, expressibility=Expressibility.UNDETERMINED
+            )
+        if chosen_field is not None:
+            return cls(
+                whole=whole,
+                part=part,
+                expressibility=Expressibility.EXPRESSIBLE,
+                field_name=chosen_field,
+            )
+        expressibility = Expressibility.EXPRESSIBLE
+        fields = fields_accepting(ontology[whole_class], ontology[part_class])
+        if not fields:
+            expressibility = Expressibility.CARRIED
+            fields = [
+                one
+                for one in fields_accepting(ontology[part_class], ontology[whole_class])
+                if one.part_carries_whole
+            ]
+        if not fields:
+            return cls(
+                whole=whole, part=part, expressibility=Expressibility.INEXPRESSIBLE
+            )
+        if len(fields) > 1:
+            raise AmbiguousPartFieldError(
+                whole_class=whole_class,
+                part_class=part_class,
+                fields=[one.field_name for one in fields],
+            )
+        return cls(
+            whole=whole,
+            part=part,
+            expressibility=expressibility,
+            field_name=fields[0].field_name,
+        )
+
 
 @dataclass(frozen=True)
 class SceneGroundTruth(JsonRecord):
@@ -198,8 +257,8 @@ class GroundTruthBuilder:
         Make the ground truth of one scene.
 
         A part without faces is left out, since no run can find it in a mesh, and so is
-        a part whose name the protocol ignores. A relation is kept only where both of its
-        ends are.
+        a part whose name the protocol ignores. A relation is kept only where both of
+        its ends are.
 
         :param scene_id: The scene.
         :param annotated: Its annotated parts.
@@ -238,63 +297,21 @@ class GroundTruthBuilder:
                     whole_labels=[whole.label for whole in wholes],
                 )
             if wholes:
+                whole_class = class_of[wholes[0].part_id]
+                part_class = class_of[part.part_id]
                 relations.append(
-                    self._relation(wholes[0].part_id, part.part_id, class_of)
+                    GroundTruthRelation.between(
+                        whole=wholes[0].part_id,
+                        part=part.part_id,
+                        whole_class=whole_class,
+                        part_class=part_class,
+                        ontology=self.ontology,
+                        chosen_field=self.protocol.field_choice(
+                            whole_class, part_class
+                        ),
+                    )
                 )
         return SceneGroundTruth(scene_id=scene_id, parts=parts, relations=relations)
-
-    def _relation(
-        self, whole: int, part: int, class_of: dict[int, str | None]
-    ) -> GroundTruthRelation:
-        """
-        :param whole: The part holding the other.
-        :param part: The part held.
-        :param class_of: The class each part is judged against.
-        :return: The relation, with the field the ontology holds it through; for a
-            relation it holds the other way round, the field of the part's class.
-        :raises AmbiguousPartFieldError: If several fields could hold it and the
-            protocol does not choose.
-        """
-        whole_class, part_class = class_of[whole], class_of[part]
-        if whole_class is None or part_class is None:
-            return GroundTruthRelation(
-                whole=whole, part=part, expressibility=Expressibility.UNDETERMINED
-            )
-        chosen = self.protocol.field_choice(whole_class, part_class)
-        if chosen is not None:
-            return GroundTruthRelation(
-                whole=whole,
-                part=part,
-                expressibility=Expressibility.EXPRESSIBLE,
-                field_name=chosen,
-            )
-        expressibility = Expressibility.EXPRESSIBLE
-        fields = fields_accepting(self.ontology[whole_class], self.ontology[part_class])
-        if not fields:
-            expressibility = Expressibility.CARRIED
-            fields = [
-                one
-                for one in fields_accepting(
-                    self.ontology[part_class], self.ontology[whole_class]
-                )
-                if one.part_carries_whole
-            ]
-        if not fields:
-            return GroundTruthRelation(
-                whole=whole, part=part, expressibility=Expressibility.INEXPRESSIBLE
-            )
-        if len(fields) > 1:
-            raise AmbiguousPartFieldError(
-                whole_class=whole_class,
-                part_class=part_class,
-                fields=[one.field_name for one in fields],
-            )
-        return GroundTruthRelation(
-            whole=whole,
-            part=part,
-            expressibility=expressibility,
-            field_name=fields[0].field_name,
-        )
 
 
 # %% command-line entry point

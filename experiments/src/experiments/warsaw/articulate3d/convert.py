@@ -214,6 +214,17 @@ class ConvertedScene(JsonRecord):
             raise SceneNotConvertedError(scene_directory=Path(directory))
         return cls.from_json(json.loads(path.read_text()))
 
+    @classmethod
+    def scene_id_of(cls, directory: Path) -> str:
+        """
+        :param directory: A directory a run read its scene from.
+        :return: The scene it holds: the one it was converted from, or, for a scene not
+            converted from Articulate3D, the directory's name.
+        """
+        if not (Path(directory) / ConvertedSceneFile.RECORD).is_file():
+            return Path(directory).name
+        return cls.beside(directory).scene_id
+
     def write_beside(self, directory: Path) -> None:
         """
         :param directory: The converted scene's directory.

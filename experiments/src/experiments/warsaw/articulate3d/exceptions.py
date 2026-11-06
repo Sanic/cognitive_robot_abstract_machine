@@ -100,11 +100,14 @@ class AmbiguousPartFieldError(DataclassException, LookupError):
     def error_message(self) -> str:
         return (
             f"A {self.whole_class} could hold a {self.part_class} through any of "
-            f"{self.fields}, and the protocol does not choose."
+            f"{self.fields}, and nothing chooses between them."
         )
 
     def suggest_correction(self) -> str:
-        return "Add a field choice for this pair of classes to the protocol."
+        return (
+            "Add a field choice for this pair of classes to the protocol, or, in a ground "
+            "truth draft, set the object's field_name."
+        )
 
 
 @dataclass

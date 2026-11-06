@@ -12,6 +12,8 @@ from __future__ import annotations
 import enum
 import json
 import pathlib
+import shutil
+import subprocess
 from dataclasses import dataclass
 
 import pytest
@@ -20,6 +22,7 @@ from experiments.experiment_definitions import (
     ExperimentResult,
     ExperimentsTable,
     IncompatibleUnitConversionError,
+    LatexRenderer,
     MeanAndStandardDeviation,
     PercentageBound,
     RowIsNotAnExperimentResult,
@@ -98,6 +101,32 @@ def row(
     return MeasurementRow(
         quality=quality, score=score, unestablished_score=unestablished_score
     )
+
+
+@pytest.fixture
+def two_rows() -> ExperimentsTable:
+    """
+    :return: A table of two rows, one of which established no second score.
+    """
+    return ExperimentsTable(
+        [
+            row(score=0.5, unestablished_score=None),
+            row(
+                quality=MeasuredQuality.NOT_ESTABLISHED,
+                score=1.25,
+                unestablished_score=2.0,
+            ),
+        ]
+    )
+
+
+def expected_markup(file_name: str) -> str:
+    """
+    :param file_name: The name of a file holding the markup a table is presented as.
+    :return: That markup, without the line break closing the file.
+    """
+    tables = pathlib.Path(__file__).parent / "dataset" / "experiment_tables"
+    return (tables / file_name).read_text().removesuffix("\n")
 
 
 # %% MeanAndStandardDeviation
@@ -255,6 +284,195 @@ def test_count_keeps_its_exact_value():
     A count is exact, so it is written as it is rather than as a rounded quantity.
     """
     assert "[7]" in rendered(NestedMeasurement(trials=7))
+
+
+# %% the whole of a Typst table
+
+
+def test_typst_table_says_what_it_always_said(two_rows):
+    assert TypstRenderer(two_rows).render_table() == expected_markup("table.typ")
+
+
+def test_typst_figure_says_what_it_always_said(two_rows):
+    figure = TypstRenderer(two_rows).render_figure("What the experiment measured.")
+
+    assert figure == expected_markup("figure.typ")
+
+
+def test_empty_typst_table_is_still_a_table():
+    assert TypstRenderer(ExperimentsTable([])).render_table() == "#table()"
+
+
+# %% columns a table leaves out
+
+
+@pytest.mark.parametrize("renderer_class", [LatexRenderer, TypstRenderer])
+def test_a_column_left_out_is_in_neither_the_titles_nor_the_rows(
+    two_rows, renderer_class
+):
+    table = renderer_class(
+        two_rows, left_out_columns=frozenset({"unestablished_score"})
+    ).render_table()
+
+    assert "Unestablished" not in table
+    assert "2.00" not in table
+    assert "1.25" in table
+
+
+def test_only_the_columns_showing_one_value_in_every_row_are_found():
+    table = ExperimentsTable(
+        [
+            row(score=0.5, unestablished_score=1.0),
+            row(score=0.75, unestablished_score=1.0),
+        ]
+    )
+
+    assert LatexRenderer(table).columns_showing_one_value() == {
+        "quality": "Fully Established",
+        "unestablished_score": "1.00",
+    }
+
+
+def test_values_a_reader_cannot_tell_apart_show_one_value():
+    table = ExperimentsTable(
+        [row(score=0.981, unestablished_score=1.0), row(score=0.984)]
+    )
+
+    assert "score" in LatexRenderer(table).columns_showing_one_value()
+
+
+# %% a LaTeX table
+
+
+def test_latex_table_presents_every_row(two_rows):
+    assert LatexRenderer(two_rows).render_table() == expected_markup("table.tex")
+
+
+def test_latex_figure_holds_the_table_and_its_caption(two_rows):
+    figure = LatexRenderer(two_rows).render_figure("What the experiment measured.")
+
+    assert figure == expected_markup("figure.tex")
+
+
+def test_latex_table_can_be_kept_from_running_past_the_margin(two_rows):
+    renderer = LatexRenderer(two_rows, fit_to_line_width=True)
+
+    assert renderer.render_table() == expected_markup("table_fitted.tex")
+
+
+def test_latex_figure_can_be_referred_to_by_its_label(two_rows):
+    figure = LatexRenderer(two_rows).render_figure("Measured.", label="tab:measured")
+
+    assert "\\caption{Measured.}\n\\label{tab:measured}\n" in figure
+
+
+def test_latex_quantity_is_written_at_the_precision_asked_for():
+    table = ExperimentsTable([row(score=0.123456)])
+
+    assert "0.1235" in LatexRenderer(table, reported_decimals=4).render_table()
+
+
+@pytest.mark.parametrize(
+    "text, markup",
+    [
+        ("50%", r"50\%"),
+        ("R&D", r"R\&D"),
+        ("door_frame", r"door\_frame"),
+        ("#3", r"\#3"),
+        ("$5", r"\$5"),
+        ("{a}", r"\{a\}"),
+        ("~", r"\textasciitilde{}"),
+        ("^", r"\textasciicircum{}"),
+        ("\\", r"\textbackslash{}"),
+        ("1 ± 2", r"1 $\pm$ 2"),
+    ],
+)
+def test_latex_cell_prints_what_latex_would_otherwise_read_as_a_command(text, markup):
+    assert LatexRenderer(ExperimentsTable([])).render_cell(text) == markup
+
+
+def test_latex_mean_and_spread_are_written_at_the_precision_of_the_table():
+    cell = LatexRenderer(ExperimentsTable([])).render_cell(
+        MeanAndStandardDeviation(0.7, 0.25, Unit.SECONDS)
+    )
+
+    assert cell == r"0.70 $\pm$ 0.25 s"
+
+
+def test_latex_row_starting_with_a_bracket_is_not_read_as_the_last_row_s_spacing():
+    """
+    LaTeX reads a ``[`` after the line break ending a row as a length that belongs to
+    that break, and a bound is written in brackets.
+    """
+    cell = LatexRenderer(ExperimentsTable([])).render_cell(VolumeBound(0.5, 1.5))
+
+    assert cell == "{[}0.5, 1.5{]}"
+
+
+def test_empty_latex_table_is_still_a_table():
+    table = LatexRenderer(ExperimentsTable([])).render_table()
+
+    assert table == "\\begin{tabular}{c}\n\\end{tabular}"
+
+
+@pytest.mark.skipif(
+    shutil.which("pdflatex") is None, reason="no LaTeX to compile the table with"
+)
+def test_latex_figure_compiles(tmp_path: pathlib.Path):
+    """
+    Bounds and every character LaTeX treats specially, in the rows after the first too,
+    since a row is read differently depending on how the one before it ended.
+    """
+
+    @dataclass
+    class BoundRow(ExperimentResult):
+        """
+        A row starting with a bound, and holding text LaTeX would read as commands.
+        """
+
+        volume: VolumeBound
+        """
+        The bound written first in the row.
+        """
+
+        name: str
+        """
+        Text full of special characters.
+        """
+
+        share: PercentageBound
+        """
+        A bound written with percent signs.
+        """
+
+        duration: MeanAndStandardDeviation
+        """
+        A measurement written with a plus-minus sign.
+        """
+
+    rows = [
+        BoundRow(
+            VolumeBound(0.5, 1.5),
+            "a_b & 50% #1 $2 {c} ~d ^e \\f",
+            PercentageBound(1.0, 2.0),
+            MeanAndStandardDeviation(1.5, 0.25, Unit.SECONDS),
+        )
+    ] * 2
+    (tmp_path / "figure.tex").write_text(
+        LatexRenderer(ExperimentsTable(rows), fit_to_line_width=True).render_figure(
+            "Everything."
+        )
+    )
+    (tmp_path / "document.tex").write_text(expected_markup("document.tex"))
+
+    compiled = subprocess.run(
+        ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", "document.tex"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+
+    assert compiled.returncode == 0, compiled.stdout
 
 
 # %% recording the results alongside the table

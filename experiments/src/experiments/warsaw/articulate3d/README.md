@@ -87,6 +87,9 @@ commit carries a tag starting with `articulate3d-frozen-`. Train scenes
        --ground-truth ground_truth/ --summary summary.json
    ```
 
+   [The evaluation's README](../evaluation/README.md#tables-of-results) says how to turn
+   the scored runs into tables for a document.
+
 ## What the score means
 
 Bodies are paired with annotated parts one to one, by the faces they share (at least half

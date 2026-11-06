@@ -204,6 +204,9 @@ Runs from before the setting existed can add the same line to their own `inspect
 Plus a database schema named for the same run. `RunSchema.drop` throws it away, beside
 deleting the directory.
 
+To report runs in a document, see
+[the evaluation's README](evaluation/README.md#tables-of-results).
+
 ## The steps, in order
 
 1. **Prepare** — put the ontology back as it is committed, rebuild the ORM, give the run

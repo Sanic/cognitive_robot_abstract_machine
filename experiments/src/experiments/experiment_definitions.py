@@ -4,6 +4,7 @@ import enum
 import json
 import pathlib
 import statistics
+from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import StrEnum
 
@@ -12,6 +13,7 @@ from typing_extensions import Any
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.exceptions import DataclassException
 from krrood.bounds import Bounds
+from krrood.ormatic.utils import classproperty
 
 
 from krrood.class_diagrams.attribute_introspector import (
@@ -335,10 +337,13 @@ class ExperimentsTable:
         return value
 
 
+# %% presenting a table in a document
+
+
 @dataclass
-class TypstRenderer:
+class TableRenderer(ABC):
     """
-    Represents a renderer for converting an ExperimentsTable into Typst markup.
+    Presents an :class:`ExperimentsTable` in the markup language of a document.
     """
 
     experiments_table: ExperimentsTable
@@ -356,6 +361,18 @@ class TypstRenderer:
     What is written where an experiment established no value.
     """
 
+    left_out_columns: frozenset[str] = frozenset()
+    """
+    The names of the columns not to present.
+    """
+
+    @abstractmethod
+    def escaped(self, text: str) -> str:
+        """
+        :param text: Text taken from a result.
+        :return: The markup a cell or a column title holds for that text.
+        """
+
     def render_cell(self, value: Any) -> str:
         """
         Renders a single value as a reader of the table should see it.
@@ -365,70 +382,216 @@ class TypstRenderer:
         experiment did not establish is marked absent rather than written as a number.
 
         :param value: One value of a row.
-        :return: The Typst cell content for it.
+        :return: The cell content for it.
         """
         if value is None:
             return self.absent_measurement
         if isinstance(value, enum.Enum):
-            return value.name.replace("_", " ").title()
+            return self.escaped(value.name.replace("_", " ").title())
         if isinstance(value, float):
             return f"{value:.{self.reported_decimals}f}"
-        return str(value)
+        return self.escaped(str(value))
 
+    def rendered_cells(self, row: ExperimentResult) -> list[str]:
+        """
+        :param row: One row of the table.
+        :return: The content of each of its cells, in the order of the columns.
+        """
+        return [
+            self.render_cell(value)
+            for name, value in zip(row.get_column_names(), row.get_column_values())
+            if name not in self.left_out_columns
+        ]
+
+    def column_titles(self, row_class: type[ExperimentResult]) -> list[str]:
+        """
+        :param row_class: The type of the table's rows.
+        :return: The title of each column, as a reader of the table should see it.
+        """
+        return [
+            self.escaped(name.replace("_", " ").title())
+            for name in row_class.get_column_names()
+            if name not in self.left_out_columns
+        ]
+
+    def columns_showing_one_value(self) -> dict[str, str]:
+        """
+        :return: Per column every row shows the same value in, as a reader sees it, that
+            value. Two values written alike count as one, however they differ underneath.
+        """
+        rows = self.experiments_table.experiments
+        if not rows:
+            return {}
+        values = zip(*(row.get_column_values() for row in rows))
+        cells = [{self.render_cell(value) for value in column} for column in values]
+        return {
+            name: next(iter(shown))
+            for name, shown in zip(rows[0].get_column_names(), cells)
+            if len(shown) == 1
+        }
+
+    @abstractmethod
     def render_row(self, row: ExperimentResult) -> str:
         """
-        Renders the cells of a single row in Typst format.
+        :param row: One row of the table.
+        :return: The markup of that row.
         """
-        return ", ".join(
-            [f"[{self.render_cell(value)}]" for value in row.get_column_values()]
-        )
 
+    @abstractmethod
     def render_table(self) -> str:
         """
-        Renders the entire ExperimentsTable into a valid Typst #table markup string.
+        :return: The markup of the entire table, which stays valid for a table without rows.
         """
-        row_class = self.experiments_table.row_class
 
-        # Handle empty table edge-case gracefully
-        if not row_class:
-            return "#table()"
-
-        # 1. Extract headers and setup column configuration
-        headers = row_class.get_column_names()
-        columns_count = len(headers)
-
-        # 2. Build the Typst header block
-        header_cells = ", ".join(
-            [f"[*{name.replace('_', ' ').title()}*]" for name in headers]
-        )
-
-        # 3. Build the rows content
-        rows_content = []
-        for row in self.experiments_table.experiments:
-            rows_content.append(self.render_row(row))
-
-        all_cells = header_cells
-        if rows_content:
-            all_cells += ",\n  " + ",\n  ".join(rows_content)
-
-        # 4. Construct complete Typst syntax block
-        typst_markup = (
-            f"#table(\n"
-            f"  columns: {columns_count},\n"
-            f"  align: center + horizon,\n"
-            f"  {all_cells}\n"
-            f")"
-        )
-        return typst_markup
-
+    @abstractmethod
     def render_figure(self, caption: str) -> str:
         """
-        Renders the table wrapped in a Typst #figure with a caption.
+        Renders the table with a caption.
 
         Use this instead of :meth:`render_table` whenever the table is presented to a
         reader, so every table in a document explains what it shows.
 
-        :param caption: Caption text describing what the table shows.
-        :return: Typst markup for a captioned figure.
+        :param caption: Caption text describing what the table shows, in the document's
+            markup language.
+        :return: The markup of the captioned table.
         """
+
+
+@dataclass
+class TypstRenderer(TableRenderer):
+    """
+    Renders an :class:`ExperimentsTable` into Typst markup.
+    """
+
+    def escaped(self, text: str) -> str:
+        return text
+
+    def render_row(self, row: ExperimentResult) -> str:
+        return ", ".join(f"[{cell}]" for cell in self.rendered_cells(row))
+
+    def render_table(self) -> str:
+        row_class = self.experiments_table.row_class
+        if not row_class:
+            return "#table()"
+
+        titles = self.column_titles(row_class)
+        lines = [", ".join(f"[*{title}*]" for title in titles)]
+        lines += [self.render_row(row) for row in self.experiments_table.experiments]
+        all_cells = ",\n  ".join(lines)
+        return (
+            f"#table(\n"
+            f"  columns: {len(titles)},\n"
+            f"  align: center + horizon,\n"
+            f"  {all_cells}\n"
+            f")"
+        )
+
+    def render_figure(self, caption: str) -> str:
         return f"#figure(\n{self.render_table()},\n  caption: [{caption}]\n)"
+
+
+@dataclass
+class LatexRenderer(TableRenderer):
+    """
+    Renders an :class:`ExperimentsTable` into LaTeX markup.
+
+    .. note:: The horizontal rules come from the ``booktabs`` package, so a document
+        holding these tables has to load it.
+    """
+
+    fit_to_line_width: bool = False
+    """
+    Whether a table wider than a line is shrunk to fit, which needs the ``adjustbox``
+    package in the document.
+
+    A narrower table keeps its size.
+    """
+
+    @classproperty
+    def markup_of_characters(cls) -> dict[int, str]:
+        """
+        :return: Per character LaTeX would not print as it is, the markup that prints it,
+            in the form :meth:`str.translate` reads. Brackets are protected because LaTeX
+            reads a ``[`` after the line break ending a row as a part of that break.
+        """
+        return str.maketrans(
+            {
+                "\\": r"\textbackslash{}",
+                "&": r"\&",
+                "%": r"\%",
+                "$": r"\$",
+                "#": r"\#",
+                "_": r"\_",
+                "{": r"\{",
+                "}": r"\}",
+                "~": r"\textasciitilde{}",
+                "^": r"\textasciicircum{}",
+                "[": "{[}",
+                "]": "{]}",
+                "±": r"$\pm$",
+            }
+        )
+
+    def escaped(self, text: str) -> str:
+        return text.translate(self.markup_of_characters)
+
+    def render_cell(self, value: Any) -> str:
+        """
+        :meth:`TableRenderer.render_cell`, with a mean and its spread written at the
+        table's precision, so that the numbers of a column line up.
+
+        :param value: One value of a row.
+        :return: The cell content for it.
+        """
+        if not isinstance(value, MeanAndStandardDeviation):
+            return super().render_cell(value)
+        unit = f" {value.unit.value}" if value.unit is not Unit.NONE else ""
+        decimals = self.reported_decimals
+        return (
+            f"{value.mean:.{decimals}f} $\\pm$ "
+            f"{value.standard_deviation:.{decimals}f}{unit}"
+        )
+
+    def render_row(self, row: ExperimentResult) -> str:
+        return " & ".join(self.rendered_cells(row)) + r" \\"
+
+    def render_table(self) -> str:
+        row_class = self.experiments_table.row_class
+        if not row_class:
+            return "\\begin{tabular}{c}\n\\end{tabular}"
+
+        titles = self.column_titles(row_class)
+        title_row = " & ".join(rf"\textbf{{{title}}}" for title in titles) + r" \\"
+        table = "\n".join(
+            [
+                rf"\begin{{tabular}}{{{'c' * len(titles)}}}",
+                r"\toprule",
+                title_row,
+                r"\midrule",
+                *[self.render_row(row) for row in self.experiments_table.experiments],
+                r"\bottomrule",
+                r"\end{tabular}",
+            ]
+        )
+        if not self.fit_to_line_width:
+            return table
+        return f"\\begin{{adjustbox}}{{max width=\\linewidth}}\n{table}\n\\end{{adjustbox}}"
+
+    def render_figure(self, caption: str, label: str | None = None) -> str:
+        """
+        :meth:`TableRenderer.render_figure`, in a floating ``table`` environment.
+
+        :param caption: Caption text describing what the table shows, in LaTeX.
+        :param label: What the document refers to the table by with ``\\ref``.
+        :return: The markup of the captioned table.
+        """
+        return "\n".join(
+            [
+                r"\begin{table}[htbp]",
+                r"\centering",
+                rf"\caption{{{caption}}}",
+                *([rf"\label{{{label}}}"] if label else []),
+                self.render_table(),
+                r"\end{table}",
+            ]
+        )
