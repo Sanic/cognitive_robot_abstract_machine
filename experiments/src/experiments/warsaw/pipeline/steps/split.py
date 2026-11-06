@@ -215,10 +215,6 @@ class SplitScene(PipelineStep):
             with only one candidate are recorded.
         :return: Every mount the run named, before the split drops any.
         """
-        fields = {
-            (forced.part, forced.whole): forced.field_name
-            for forced in relations.forced
-        }
         carried = [
             Pairing(whole=forced.whole, part=forced.part, field_name=forced.field_name)
             for forced in relations.forced
@@ -227,7 +223,7 @@ class SplitScene(PipelineStep):
             Pairing(
                 whole=answer.whole,
                 part=answer.part,
-                field_name=fields.get((answer.part, answer.whole), ""),
+                field_name=answer.field_name,
             )
             for answer in adjudications.membership
             if answer.whole

@@ -194,15 +194,15 @@ def test_an_answered_membership_is_mounted_into_the_field_it_was_measured_for(st
             model="",
             scene="",
             answered=[
-                MembershipAnswer(name="door_10", part="door_10", whole="cabinet_4")
+                MembershipAnswer(
+                    name="door_10",
+                    part="door_10",
+                    whole="cabinet_4",
+                    field_name="doors",
+                )
             ],
         ),
-        Relations(
-            scene="",
-            forced=[
-                ForcedMembership(part="door_10", whole="cabinet_4", field_name="doors")
-            ],
-        ),
+        Relations(scene=""),
     )
     answered = carried[-1]
     assert (answered.whole, answered.part, answered.field_name) == (

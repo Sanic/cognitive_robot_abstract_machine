@@ -247,6 +247,14 @@ class PipelineSettings:
     to, and still be offered as the whole it belongs to.
     """
 
+    confirm_wholes_within_the_gap: bool = False
+    """
+    Whether a part that meets no whole is asked about those within
+    :attr:`largest_gap_to_a_whole`, and may answer that it belongs to none of them.
+
+    Off, the only such whole is taken without asking, and one of several has to be chosen.
+    """
+
     corrections: int = 1
     """
     How often an unusable answer is put back to the model with what was wrong with it.

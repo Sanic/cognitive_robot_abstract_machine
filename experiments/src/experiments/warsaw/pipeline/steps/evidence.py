@@ -114,12 +114,12 @@ class Memberships:
 
     to_ask_about: List[MembershipQuestion] = field(default_factory=list)
     """
-    The parts that meet more than one candidate.
+    The parts with more than one candidate, and those to confirm a candidate for.
     """
 
     forced: List[ForcedMembership] = field(default_factory=list)
     """
-    The parts that meet exactly one, where there is nothing to choose between.
+    The parts with exactly one, where there is nothing to choose between or to confirm.
     """
 
 
@@ -829,6 +829,11 @@ class MeasureScene(PipelineStep):
             )
             for part in sorted(set(meeting) | set(nearby))
         }
+        to_confirm = (
+            set(nearby) - set(meeting)
+            if self.settings.confirm_wholes_within_the_gap
+            else set()
+        )
 
         to_ask_about = [
             MembershipQuestion(
@@ -836,6 +841,7 @@ class MeasureScene(PipelineStep):
                 part=part,
                 shown=[part] + [one.name for one in wholes],
                 candidates=wholes,
+                may_belong_to_none=part in to_confirm,
                 ontology=self.ontology_slice(
                     [part] + [one.name for one in wholes], labels, classes
                 ),
@@ -844,7 +850,7 @@ class MeasureScene(PipelineStep):
                 ),
             )
             for part, wholes in candidates.items()
-            if len(wholes) > 1
+            if len(wholes) > 1 or part in to_confirm
         ]
         forced = [
             ForcedMembership(
@@ -856,7 +862,7 @@ class MeasureScene(PipelineStep):
                 distance=wholes[0].distance,
             )
             for part, wholes in candidates.items()
-            if len(wholes) == 1
+            if len(wholes) == 1 and part not in to_confirm
         ]
         return Memberships(to_ask_about=to_ask_about, forced=forced)
 

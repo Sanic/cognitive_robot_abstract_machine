@@ -10,9 +10,11 @@ like the scene's fault rather than the answer's.
 from __future__ import annotations
 
 import inspect
+import json
 from dataclasses import replace
 
 import pytest
+from semantic_digital_twin.adapters.vision_language_model.client import ModelResponse
 from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     build_taxonomy,
     declares_itself_a_category,
@@ -428,6 +430,60 @@ def test_a_whole_that_was_not_offered_is_refused(membership_decision):
     )
     assert len(problems) == 1
     assert "cabinet_99" in problems[0]
+
+
+def test_a_part_that_has_to_belong_somewhere_is_not_answered_with_none(
+    membership_decision,
+):
+    assert (
+        len(
+            membership_decision.problems_with(
+                MembershipAnswer(name="door_10", part="door_10", whole=None)
+            )
+        )
+        == 1
+    )
+
+
+def test_a_part_that_may_belong_to_none_is_answered_with_none(membership_decision):
+    membership_decision.asked.may_belong_to_none = True
+
+    assert (
+        membership_decision.problems_with(
+            MembershipAnswer(name="door_10", part="door_10", whole=None)
+        )
+        == []
+    )
+
+
+def test_a_part_that_may_belong_to_none_is_still_not_given_another_whole(
+    membership_decision,
+):
+    membership_decision.asked.may_belong_to_none = True
+
+    assert (
+        len(
+            membership_decision.problems_with(
+                MembershipAnswer(name="door_10", part="door_10", whole="cabinet_99")
+            )
+        )
+        == 1
+    )
+
+
+def test_an_answer_carries_the_field_its_whole_would_hold_the_part_in(
+    membership_decision,
+):
+    """
+    A whole holding a part through several fields refuses a mount naming none of them.
+    """
+    answer = membership_decision.read(
+        ModelResponse.from_json(
+            {"choices": [{"message": {"content": json.dumps({"whole": "cabinet_20"})}}]}
+        )
+    )
+
+    assert answer.field_name == membership_decision.asked.candidates[1].field_name
 
 
 # %% what a group of bodies may be answered with

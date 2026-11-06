@@ -811,7 +811,8 @@ class MembershipCandidate(MeasuredMeeting):
 @dataclass(kw_only=True)
 class MembershipQuestion(OverlapQuestion):
     """
-    Which whole a part belongs to, asked only where it meets more than one candidate.
+    Which whole a part belongs to, asked where there is more than one candidate or
+    where the part may belong to none of them.
     """
 
     part: str
@@ -822,6 +823,11 @@ class MembershipQuestion(OverlapQuestion):
     candidates: List[MembershipCandidate] = field(default_factory=list)
     """
     The wholes it could belong to.
+    """
+
+    may_belong_to_none: bool = False
+    """
+    Whether the part may belong to none of the candidates, because it only lies near them.
     """
 
     @property
@@ -916,7 +922,13 @@ class MembershipAnswer(Adjudication):
 
     whole: Optional[str] = None
     """
-    The object it belongs to.
+    The object it belongs to, or nothing where it was answered to belong to none or was
+    not answered at all.
+    """
+
+    field_name: str = ""
+    """
+    The field of the whole that would hold it, as the candidate was measured.
     """
 
 

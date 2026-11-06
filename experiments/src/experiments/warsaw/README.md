@@ -142,6 +142,7 @@ OpenRouter. It reasons before answering, and its reasoning is allowed on top of
 | `defer_new_classes` | `True` | On, a label is first read only as a class the ontology already holds, or as none; a new class is proposed afterwards, once per label left without one, with how every other label was read in view, and naming a body never proposes one. Off, a new class may be proposed the moment a label or a body is asked about. |
 | `settle_classes_by_label` | `True` | On, a body whose label was read as one class takes that class without a question, and one whose label was left open between several classes (the label's `alternatives`) is asked to choose among them or say none fits. Off, every body is asked what it is. |
 | `largest_gap_to_a_whole` | `0.10` | How far, in metres, a whole may be from a part that touches none it could belong to, and still be offered as its whole. |
+| `confirm_wholes_within_the_gap` | `False` | On, a part that touches no whole it could belong to is asked about the wholes within that gap, and may answer that it belongs to none of them. A part touching a whole is never asked this. Off, the only such whole is taken without asking, and one of several has to be chosen. |
 | `ignore_amendments` | `False` | On, a run starts although the ontology's files carry uncommitted changes, for a run meant to use them. |
 | `headless` | `False` | See [below](#when-the-renders-come-back-blank). |
 

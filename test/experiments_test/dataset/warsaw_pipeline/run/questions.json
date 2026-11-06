@@ -294,7 +294,8 @@
               "name": "cabinet_4"
             }
           ]
-        }
+        },
+        "may_belong_to_none": false
       }
     ]
   }

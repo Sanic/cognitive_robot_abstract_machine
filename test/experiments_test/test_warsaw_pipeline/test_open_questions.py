@@ -295,6 +295,88 @@ def test_a_part_that_meets_a_whole_is_not_offered_a_nearby_one(step, known):
     ]
 
 
+# %% asking about a whole that was only found nearby
+
+
+@pytest.fixture
+def confirming_step(tmp_path):
+    """
+    :return: The measuring step of a run asking about the wholes it only found nearby.
+    """
+    return MeasureScene(
+        settings=PipelineSettings(confirm_wholes_within_the_gap=True),
+        run=Run(directory=tmp_path),
+    )
+
+
+def memberships_of(step, known, *meetings):
+    """
+    :param meetings: Per rail, how many edges the blinds touch it along and how far
+        apart the two are.
+    :return: What the step makes of a pair of blinds and those rails.
+    """
+    relations, labels, classes = blinds_and_rails(step, known, *meetings)
+    relations = Relations(
+        scene=relations.scene,
+        pairs=relations.pairs,
+        segments=[described(name, label) for name, label in labels.items()],
+    )
+    return step.memberships(relations, labels, classes, self_measured(relations))
+
+
+def test_the_one_whole_within_the_gap_is_asked_about(confirming_step, known):
+    gap = confirming_step.settings.largest_gap_to_a_whole
+
+    memberships = memberships_of(confirming_step, known, ("rail_1", 0, gap / 2))
+
+    assert memberships.forced == []
+    [question] = memberships.to_ask_about
+    assert question.candidate_names == ["rail_1"]
+    assert question.may_belong_to_none is True
+
+
+def test_several_wholes_within_the_gap_may_all_be_declined(confirming_step, known):
+    gap = confirming_step.settings.largest_gap_to_a_whole
+
+    [question] = memberships_of(
+        confirming_step, known, ("rail_1", 0, gap / 2), ("rail_2", 0, gap / 3)
+    ).to_ask_about
+
+    assert question.candidate_names == ["rail_2", "rail_1"]
+    assert question.may_belong_to_none is True
+
+
+def test_a_touched_whole_is_taken_without_asking(confirming_step, known):
+    gap = confirming_step.settings.largest_gap_to_a_whole
+
+    memberships = memberships_of(
+        confirming_step, known, ("rail_1", 12, 0.0), ("rail_2", 0, gap / 2)
+    )
+
+    assert memberships.to_ask_about == []
+    assert [one.whole for one in memberships.forced] == ["rail_1"]
+
+
+def test_a_part_touching_several_wholes_has_to_choose_one(confirming_step, known):
+    [question] = memberships_of(
+        confirming_step, known, ("rail_1", 12, 0.0), ("rail_2", 3, 0.0)
+    ).to_ask_about
+
+    assert question.may_belong_to_none is False
+
+
+def test_without_the_setting_several_wholes_within_the_gap_have_to_be_chosen_from(
+    step, known
+):
+    gap = step.settings.largest_gap_to_a_whole
+
+    [question] = memberships_of(
+        step, known, ("rail_1", 0, gap / 2), ("rail_2", 0, gap / 3)
+    ).to_ask_about
+
+    assert question.may_belong_to_none is False
+
+
 def self_classes(relations: Relations, known):
     """
     :param relations: What the measurement wrote.

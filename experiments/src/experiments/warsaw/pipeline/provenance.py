@@ -282,6 +282,7 @@ def settings_to_json(settings: PipelineSettings) -> dict[str, Any]:
         "defer_new_classes": settings.defer_new_classes,
         "nearest": settings.nearest,
         "largest_gap_to_a_whole": settings.largest_gap_to_a_whole,
+        "confirm_wholes_within_the_gap": settings.confirm_wholes_within_the_gap,
         "corrections": settings.corrections,
         "presence_penalty": settings.presence_penalty,
         "maximum_answer_tokens": settings.maximum_answer_tokens,
