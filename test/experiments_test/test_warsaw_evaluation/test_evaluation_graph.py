@@ -4,23 +4,12 @@ Portable graph snapshots of the SDT produced by a pipeline run.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.world_entity import Body
 
-from semantic_digital_twin.semantic_annotations.part_whole import field_holding
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Cabinet,
-    Drawer,
-)
-from semantic_digital_twin.semantic_annotations.taxonomy_export import (
-    annotation_classes,
-)
-from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
-
-from experiments.warsaw.evaluation.graph import (
-    EvaluationEdge,
-    EvaluationGraph,
-    EvaluationNode,
-)
+from experiments.warsaw.evaluation.graph import EvaluationGraph
 from experiments.warsaw.pipeline.records import (
     BodyAnswer,
     Classifications,
@@ -29,26 +18,23 @@ from experiments.warsaw.pipeline.records import (
     SplitRecord,
 )
 from experiments.warsaw.scene_split import Pairing
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
-# %% preserving nodes and relation outcomes
+# %% preserving the bodies and where they hang
 
 
-def test_graph_snapshot_keeps_accepted_and_refused_relations() -> None:
+def test_graph_snapshot_keeps_every_body_its_class_and_where_it_hangs() -> None:
     """
-    Evaluation can distinguish a proposed edge from one present in the final SDT.
+    Evaluation reads what each body was classified as and which body it hangs below.
     """
     accepted = Pairing(
         whole="cabinet_1",
         part="drawer_1",
         field_name="drawers",
-        kind=MountKind.PART,
     )
     refused = Pairing(
         whole="drawer_1",
         part="handle_1",
         field_name="handles",
-        kind=MountKind.PART,
     )
     split = SplitRecord(
         scene="apartment.glb",
@@ -76,6 +62,7 @@ def test_graph_snapshot_keeps_accepted_and_refused_relations() -> None:
         split=split,
         classifications=classifications,
         annotated_names={"cabinet_1", "drawer_1"},
+        parents={"cabinet_1": None, "drawer_1": "cabinet_1", "handle_1": None},
     )
 
     assert graph.source_world_id == 7
@@ -88,10 +75,7 @@ def test_graph_snapshot_keeps_accepted_and_refused_relations() -> None:
     assert graph.nodes[0].predicted_class == "Cabinet"
     assert graph.nodes[0].annotation_applied is True
     assert graph.nodes[2].annotation_applied is False
-    assert graph.edges[0].accepted is True
-    assert graph.edges[0].relation == "part"
-    assert graph.edges[1].accepted is False
-    assert graph.edges[1].refusal_reason == "class does not admit part"
+    assert [node.parent for node in graph.nodes] == [None, "cabinet_1", None]
     assert EvaluationGraph.from_json(graph.to_json()) == graph
 
 
@@ -108,89 +92,33 @@ def test_unclassified_body_remains_visible_in_snapshot() -> None:
         split=split,
         classifications=Classifications(scene="apartment.glb", model="scripted/model"),
         annotated_names=set(),
+        parents={"unknown_1": None},
     )
 
     assert graph.nodes[0].predicted_class is None
     assert graph.nodes[0].annotation_applied is False
 
 
-# %% naming the field a mount went through
+# %% where each body hangs
 
 
-def graph_with_an_unnamed_mount() -> EvaluationGraph:
+def test_a_body_hangs_from_the_nearest_body_of_the_split_above_it():
     """
-    Build a graph whose relation was mounted without naming a field, as a run's is.
+    What a mount puts between a part and its whole, such as a region, is not a body the
+    run judged, so it is passed over.
     """
-    return EvaluationGraph(
-        nodes=[
-            EvaluationNode(
-                name="cabinet_5",
-                input_label="cabinet",
-                predicted_class="Cabinet",
-                faces=100,
-                body_id=None,
-                annotation_applied=True,
-            ),
-            EvaluationNode(
-                name="drawer_2",
-                input_label="drawer",
-                predicted_class="Drawer",
-                faces=50,
-                body_id=None,
-                annotation_applied=True,
-            ),
-        ],
-        edges=[
-            EvaluationEdge(
-                whole="cabinet_5",
-                part="drawer_2",
-                relation="part",
-                field_name="",
-                accepted=True,
-            )
-        ],
+    world = World.create_with_root_body("root")
+    cabinet, between, drawer = (
+        Body(name=PrefixedName(name)) for name in ("cabinet_1", "region", "drawer_1")
     )
+    with world.modify_world():
+        for parent, child in (
+            (world.root, cabinet),
+            (cabinet, between),
+            (between, drawer),
+        ):
+            world.add_connection(FixedConnection(parent=parent, child=child))
 
+    parents = EvaluationGraph.parents_in(world, {"cabinet_1", "drawer_1"})
 
-def test_a_mount_carried_out_without_a_field_is_told_which_it_used():
-    """
-    ``add()`` routes a part by its type and records nothing, but the field it routes to
-    follows from the two classes, so it is recovered rather than lost.
-    """
-    resolved = graph_with_an_unnamed_mount().with_fields_resolved(
-        annotation_classes(SemanticAnnotation)
-    )
-
-    assert resolved.edges[0].field_name == field_holding(Cabinet, Drawer).field_name
-
-
-def test_a_field_the_run_did_record_is_left_alone():
-    """
-    What the run wrote is what the run did, and re-deriving it could only disagree.
-    """
-    graph = replace(
-        graph_with_an_unnamed_mount(),
-        edges=[
-            replace(graph_with_an_unnamed_mount().edges[0], field_name="a_named_field")
-        ],
-    )
-
-    resolved = graph.with_fields_resolved(annotation_classes(SemanticAnnotation))
-
-    assert resolved.edges[0].field_name == "a_named_field"
-
-
-def test_a_relation_whose_classes_cannot_say_keeps_having_no_field():
-    """
-    Guessing a field for a body the run never classified would invent a relation the run
-    did not build.
-    """
-    graph = graph_with_an_unnamed_mount()
-    graph = replace(
-        graph,
-        nodes=[replace(graph.nodes[0], predicted_class=None), graph.nodes[1]],
-    )
-
-    resolved = graph.with_fields_resolved(annotation_classes(SemanticAnnotation))
-
-    assert resolved.edges[0].field_name == ""
+    assert parents == {"cabinet_1": None, "drawer_1": "cabinet_1"}

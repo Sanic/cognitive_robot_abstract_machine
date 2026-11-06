@@ -1,6 +1,6 @@
 {
   "root_name": "SemanticAnnotation",
-  "note": "Relations say what a class can hold. 'part' is mounted with add(), 'contains' with add_object() for something merely inside or on it, 'supports' with add_supporting_surface(). A class marked 'abstract' cannot be given to an object; name one of its subclasses instead. A class marked 'mixin' exists to be built with rather than to name something in a room. A new class is composed by naming a superclass and any of the mixins below.",
+  "note": "Relations say what parts a class can hold. A class marked 'abstract' cannot be given to an object; name one of its subclasses instead. A class marked 'mixin' exists to be built with rather than to name something in a room. A new class is composed by naming a superclass and any of the mixins below.",
   "classes": [
     {
       "name": "HasRootKinematicStructureEntity",
@@ -41,32 +41,14 @@
       ],
       "relations": [
         {
-          "kind": "part",
           "field": "mechanical_joint",
           "target": "MechanicalJoint",
-          "many": false,
-          "mounted_by": "add"
+          "many": false
         },
         {
-          "kind": "part",
           "field": "handle",
           "target": "Handle",
-          "many": false,
-          "mounted_by": "add"
-        },
-        {
-          "kind": "contains",
-          "field": "objects",
-          "target": "HasRootBody",
-          "many": true,
-          "mounted_by": "add_object"
-        },
-        {
-          "kind": "supports",
-          "field": "supporting_surface",
-          "target": "Region",
-          "many": false,
-          "mounted_by": "add_supporting_surface"
+          "many": false
         }
       ]
     },
@@ -75,22 +57,6 @@
       "bases": [
         "Furniture",
         "HasSupportingSurface"
-      ],
-      "relations": [
-        {
-          "kind": "contains",
-          "field": "objects",
-          "target": "HasRootBody",
-          "many": true,
-          "mounted_by": "add_object"
-        },
-        {
-          "kind": "supports",
-          "field": "supporting_surface",
-          "target": "Region",
-          "many": false,
-          "mounted_by": "add_supporting_surface"
-        }
       ]
     },
     {
@@ -103,32 +69,14 @@
       ],
       "relations": [
         {
-          "kind": "part",
           "field": "drawers",
           "target": "Drawer",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         },
         {
-          "kind": "part",
           "field": "doors",
           "target": "Door",
-          "many": true,
-          "mounted_by": "add"
-        },
-        {
-          "kind": "contains",
-          "field": "objects",
-          "target": "HasRootBody",
-          "many": true,
-          "mounted_by": "add_object"
-        },
-        {
-          "kind": "supports",
-          "field": "supporting_surface",
-          "target": "Region",
-          "many": false,
-          "mounted_by": "add_supporting_surface"
+          "many": true
         }
       ]
     },
@@ -141,11 +89,9 @@
       "mixin": true,
       "relations": [
         {
-          "kind": "part",
           "field": "apertures",
           "target": "Aperture",
           "many": true,
-          "mounted_by": "add",
           "removes_geometry": true
         }
       ]
@@ -159,11 +105,9 @@
       "mixin": true,
       "relations": [
         {
-          "kind": "part",
           "field": "mechanical_joint",
           "target": "MechanicalJoint",
-          "many": false,
-          "mounted_by": "add"
+          "many": false
         }
       ]
     },
@@ -176,11 +120,9 @@
       "mixin": true,
       "relations": [
         {
-          "kind": "part",
           "field": "handle",
           "target": "Handle",
-          "many": false,
-          "mounted_by": "add"
+          "many": false
         }
       ]
     },
@@ -189,16 +131,7 @@
       "bases": [
         "HasRootBody"
       ],
-      "mixin": true,
-      "relations": [
-        {
-          "kind": "contains",
-          "field": "objects",
-          "target": "HasRootBody",
-          "many": true,
-          "mounted_by": "add_object"
-        }
-      ]
+      "mixin": true
     },
     {
       "name": "Handle",
@@ -215,11 +148,9 @@
       "mixin": true,
       "relations": [
         {
-          "kind": "part",
           "field": "drawers",
           "target": "Drawer",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         }
       ]
     },
@@ -232,11 +163,9 @@
       "mixin": true,
       "relations": [
         {
-          "kind": "part",
           "field": "shelf_layers",
           "target": "ShelfLayer",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         }
       ]
     },
@@ -249,11 +178,9 @@
       "mixin": true,
       "relations": [
         {
-          "kind": "part",
           "field": "doors",
           "target": "Door",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         }
       ]
     },
@@ -266,11 +193,9 @@
       "mixin": true,
       "relations": [
         {
-          "kind": "part",
           "field": "legs",
           "target": "Leg",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         }
       ]
     },
@@ -283,11 +208,9 @@
       "mixin": true,
       "relations": [
         {
-          "kind": "part",
           "field": "sink",
           "target": "Sink",
-          "many": false,
-          "mounted_by": "add"
+          "many": false
         }
       ]
     },
@@ -299,25 +222,19 @@
       ],
       "relations": [
         {
-          "kind": "part",
           "field": "mechanical_joint",
           "target": "MechanicalJoint",
-          "many": false,
-          "mounted_by": "add"
+          "many": false
         },
         {
-          "kind": "part",
           "field": "handle",
           "target": "Handle",
-          "many": false,
-          "mounted_by": "add"
+          "many": false
         },
         {
-          "kind": "part",
           "field": "entry_way",
           "target": "EntryWay",
-          "many": false,
-          "mounted_by": "add"
+          "many": false
         }
       ]
     },
@@ -326,67 +243,19 @@
       "bases": [
         "IsStorageSpace"
       ],
-      "mixin": true,
-      "relations": [
-        {
-          "kind": "contains",
-          "field": "objects",
-          "target": "HasRootBody",
-          "many": true,
-          "mounted_by": "add_object"
-        },
-        {
-          "kind": "supports",
-          "field": "supporting_surface",
-          "target": "Region",
-          "many": false,
-          "mounted_by": "add_supporting_surface"
-        }
-      ]
+      "mixin": true
     },
     {
       "name": "HasCaseAsRootBody",
       "bases": [
         "HasSupportingSurface"
       ],
-      "mixin": true,
-      "relations": [
-        {
-          "kind": "contains",
-          "field": "objects",
-          "target": "HasRootBody",
-          "many": true,
-          "mounted_by": "add_object"
-        },
-        {
-          "kind": "supports",
-          "field": "supporting_surface",
-          "target": "Region",
-          "many": false,
-          "mounted_by": "add_supporting_surface"
-        }
-      ]
+      "mixin": true
     },
     {
       "name": "Floor",
       "bases": [
         "HasSupportingSurface"
-      ],
-      "relations": [
-        {
-          "kind": "contains",
-          "field": "objects",
-          "target": "HasRootBody",
-          "many": true,
-          "mounted_by": "add_object"
-        },
-        {
-          "kind": "supports",
-          "field": "supporting_surface",
-          "target": "Region",
-          "many": false,
-          "mounted_by": "add_supporting_surface"
-        }
       ]
     }
   ],
@@ -395,11 +264,9 @@
       "name": "HasApertures",
       "introduces": [
         {
-          "kind": "part",
           "field": "apertures",
           "target": "Aperture",
           "many": true,
-          "mounted_by": "add",
           "removes_geometry": true
         }
       ]
@@ -408,11 +275,9 @@
       "name": "HasMechanicalJoint",
       "introduces": [
         {
-          "kind": "part",
           "field": "mechanical_joint",
           "target": "MechanicalJoint",
-          "many": false,
-          "mounted_by": "add"
+          "many": false
         }
       ]
     },
@@ -420,23 +285,9 @@
       "name": "HasHandle",
       "introduces": [
         {
-          "kind": "part",
           "field": "handle",
           "target": "Handle",
-          "many": false,
-          "mounted_by": "add"
-        }
-      ]
-    },
-    {
-      "name": "IsStorageSpace",
-      "introduces": [
-        {
-          "kind": "contains",
-          "field": "objects",
-          "target": "HasRootBody",
-          "many": true,
-          "mounted_by": "add_object"
+          "many": false
         }
       ]
     },
@@ -444,11 +295,9 @@
       "name": "HasDrawers",
       "introduces": [
         {
-          "kind": "part",
           "field": "drawers",
           "target": "Drawer",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         }
       ]
     },
@@ -456,11 +305,9 @@
       "name": "HasShelfLayers",
       "introduces": [
         {
-          "kind": "part",
           "field": "shelf_layers",
           "target": "ShelfLayer",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         }
       ]
     },
@@ -468,11 +315,9 @@
       "name": "HasDoors",
       "introduces": [
         {
-          "kind": "part",
           "field": "doors",
           "target": "Door",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         }
       ]
     },
@@ -480,11 +325,9 @@
       "name": "HasLegs",
       "introduces": [
         {
-          "kind": "part",
           "field": "legs",
           "target": "Leg",
-          "many": true,
-          "mounted_by": "add"
+          "many": true
         }
       ]
     },
@@ -492,23 +335,9 @@
       "name": "HasSink",
       "introduces": [
         {
-          "kind": "part",
           "field": "sink",
           "target": "Sink",
-          "many": false,
-          "mounted_by": "add"
-        }
-      ]
-    },
-    {
-      "name": "HasSupportingSurface",
-      "introduces": [
-        {
-          "kind": "supports",
-          "field": "supporting_surface",
-          "target": "Region",
-          "many": false,
-          "mounted_by": "add_supporting_surface"
+          "many": false
         }
       ]
     }

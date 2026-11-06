@@ -15,6 +15,7 @@ from experiments.warsaw.articulate3d.protocol import (
     EvaluationProtocol,
     PartNameMeaning,
     PartNameRuling,
+    ProtocolFile,
 )
 
 from .scenes import SceneName, kitchen_corner_protocol
@@ -122,3 +123,27 @@ def test_a_ruling_reads_back_as_its_enumeration_member(tmp_path):
     read = EvaluationProtocol.read(tmp_path / "protocol.json")
 
     assert read.meaning_of("unknown").ruling is PartNameRuling.IGNORED
+
+
+# %% the protocol kept with this package
+
+
+def test_the_kept_protocol_has_a_ruling_on_every_name_it_lists():
+    """
+    The ground truth cannot be built while a name is undecided.
+    """
+    protocol = EvaluationProtocol.read(ProtocolFile.ARTICULATE3D)
+
+    assert [
+        one.part_name
+        for one in protocol.part_names
+        if one.ruling is PartNameRuling.UNDECIDED
+    ] == []
+
+
+def test_the_kept_protocol_names_only_classes_the_ontology_holds(ontology):
+    """
+    A class renamed or removed from the ontology would otherwise surface only when the
+    ground truth is next built.
+    """
+    EvaluationProtocol.read(ProtocolFile.ARTICULATE3D).check_classes(set(ontology))

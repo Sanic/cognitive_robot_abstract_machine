@@ -25,28 +25,79 @@ from experiments.warsaw.world_loader.viewpoints import (
 # %% the models a run can be put to
 
 
+class ModelService(StrEnum):
+    """
+    Where a model is asked, by the address its questions are sent to.
+    """
+
+    OPENROUTER = "https://openrouter.ai/api/v1/chat/completions"
+    """
+    OpenRouter, which passes a question on to whichever provider serves the model.
+    """
+
+    DENVER = "http://localhost:8443/v1/chat/completions"
+    """
+    The group's own server on denver, reached through an SSH tunnel to port 8443.
+
+    It answers one question at a time, and the next waits until it is done.
+    """
+
+    @property
+    def api_key_variable(self) -> str:
+        """
+        :return: The environment variable a credential for the service is read from.
+        """
+        if self is ModelService.DENVER:
+            return "QWEN_API_KEY"
+        return "OPENROUTER_API_KEY"
+
+    @property
+    def seconds_per_attempt(self) -> int:
+        """
+        :return: How long one attempt may go without a byte coming back. The server on
+            denver sends nothing until its whole answer is written, after the questions
+            of whoever asked before.
+        """
+        if self is ModelService.DENVER:
+            return 1800
+        return 180
+
+    @property
+    def seconds_per_question(self) -> int:
+        """
+        :return: How long one question may take across every attempt made for it.
+        """
+        if self is ModelService.DENVER:
+            return 3600
+        return 900
+
+
 class Model(StrEnum):
     """
     A model to put the pipeline's questions to.
 
     Every question comes with pictures, so every model here reads images; a text-only
-    model would fail on the first call rather than answer worse. They are listed cheapest
-    first, with what a million prompt tokens costs, because a run is about a hundred calls
-    and the difference between the ends of this list is the difference between two cents
-    and a dollar.
+    model would fail on the first call rather than answer worse. They are listed
+    cheapest first, with what a million prompt tokens costs on OpenRouter, because a run
+    is about a hundred calls and the difference between the ends of this list is the
+    difference between two cents and a dollar.
 
-    The value is the identifier OpenRouter knows the model by.
+    The value is the identifier the model's service knows it by.
     """
 
     QWEN3_VL_32B = "qwen/qwen3-vl-32b-instruct"
     """
-    $0.10 per million prompt tokens. Dense 32B; the cheapest of these.
+    $0.10 per million prompt tokens.
+
+    Dense 32B; the cheapest of these.
     """
 
     QWEN3_VL_30B = "qwen/qwen3-vl-30b-a3b-instruct"
     """
-    $0.15. Mixture-of-experts, 3B active. What every run so far used, and what the
-    reported numbers come from.
+    $0.15.
+
+    Mixture-of-experts, 3B active. What every run so far used, and what the reported
+    numbers come from.
     """
 
     GPT_5_6_LUNA = "openai/gpt-5.6-luna"
@@ -56,8 +107,10 @@ class Model(StrEnum):
 
     QWEN3_VL_235B = "qwen/qwen3-vl-235b-a22b-instruct"
     """
-    $0.21, and $1.90 per million completion tokens. Mixture-of-experts, 22B active: the
-    same family as :attr:`QWEN3_VL_30B` with seven times its active parameters.
+    $0.21, and $1.90 per million completion tokens.
+
+    Mixture-of-experts, 22B active: the same family as :attr:`QWEN3_VL_30B` with seven
+    times its active parameters.
     """
 
     GEMINI_2_5_FLASH = "google/gemini-2.5-flash"
@@ -77,10 +130,38 @@ class Model(StrEnum):
 
     CLAUDE_SONNET_4_5 = "anthropic/claude-sonnet-4.5"
     """
-    $3.00. Worth trying on the steps that were unstable: the ownership answers vary
-    between runs on about six of the thirty-three patterns, and the vocabulary step
+    $3.00.
+
+    Worth trying on the steps that were unstable: the ownership answers vary between runs on about six of the thirty-three patterns, and the vocabulary step
     composes a class differently from one run to the next.
     """
+
+    QWEN3_8_27B_DENVER = "qwen3.8:27b-q8_0"
+    """
+    Free, on the group's server on denver.
+
+    Dense 27B, quantized to eight bits, reading images; it reasons before it answers, at
+    about 19 tokens a second, within 64K tokens of prompt and answer together.
+    """
+
+    @property
+    def service(self) -> ModelService:
+        """
+        :return: Where the model is asked.
+        """
+        if self is Model.QWEN3_8_27B_DENVER:
+            return ModelService.DENVER
+        return ModelService.OPENROUTER
+
+    @property
+    def reasoning_tokens(self) -> int:
+        """
+        :return: How many tokens the model may reason for before it answers, on top of the
+            answer itself, since its reasoning is counted as part of what it answers.
+        """
+        if self is Model.QWEN3_8_27B_DENVER:
+            return 12288
+        return 0
 
 
 # %% what a run is told to do
@@ -93,9 +174,11 @@ class PipelineSettings:
     """
 
     scene_directory: Path = field(
-        default_factory=lambda: Path(__file__).resolve().parents[1]
-        / "dataset"
-        / "kitchen2_meshes_out_20260910"
+        default_factory=lambda: (
+            Path(__file__).resolve().parents[1]
+            / "dataset"
+            / "kitchen2_meshes_out_20260910"
+        )
         # / "kitchen2_meshes_out_20260908_better_handles"
         # / "kitchenlab_new_mesh_agreement_dataset"
     )
@@ -135,9 +218,41 @@ class PipelineSettings:
     How many bodies are painted and named at once in the classification step.
     """
 
+    defer_new_classes: bool = True
+    """
+    Whether a label is first read only as classes the ontology holds, and a new class is
+    proposed afterwards, once per label no class was found for, with every other label's
+    reading in view.
+
+    Off, a label or a body may be given a new class the moment it is asked about.
+    """
+
+    settle_classes_by_label: bool = True
+    """
+    Whether a body whose label was read as one class takes that class without being
+    asked, and a body whose label was left open between several classes is asked to
+    choose among them.
+
+    Off, every body is asked what it is, whatever its label means.
+    """
+
     nearest: int = 5
     """
     How many nearest neighbours each object's evidence reaches for.
+    """
+
+    largest_gap_to_a_whole: float = 0.10
+    """
+    How far, in metres, a whole may lie from a part that meets no whole it could belong
+    to, and still be offered as the whole it belongs to.
+    """
+
+    confirm_wholes_within_the_gap: bool = False
+    """
+    Whether a part that meets no whole is asked about those within
+    :attr:`largest_gap_to_a_whole`, and may answer that it belongs to none of them.
+
+    Off, the only such whole is taken without asking, and one of several has to be chosen.
     """
 
     corrections: int = 1
@@ -145,40 +260,60 @@ class PipelineSettings:
     How often an unusable answer is put back to the model with what was wrong with it.
     """
 
+    presence_penalty: float = 1.0
+    """
+    How much less likely a token becomes once an answer has used it, so a model asked at
+    temperature zero does not fall into repeating one sentence until it is cut off.
+    """
+
+    maximum_answer_tokens: int = 4096
+    """
+    The longest answer a question allows, in tokens, so a model repeating itself is
+    stopped and asked again rather than left to run on.
+    """
+
     headless: bool = False
     """
-    Whether to render without opening a window. False shows the renders as they are made.
+    Whether to render without opening a window.
+
+    False shows the renders as they are made.
     """
 
     persist: bool = True
     """
-    Whether to write the worlds to the database. Without it the run stops at the split's
-    report, since everything after it reads a world back.
+    Whether to write the worlds to the database.
+
+    Without it the run stops at the split's report, since everything after it reads a
+    world back.
     """
 
     ask_about_the_ontology: bool = False
     """
-    Whether to ask whether the taxonomy itself is missing a relation -- that a countertop
-    can have drawers, say. Off by default: it proposes changes to the ontology every later
+    Whether to ask whether the taxonomy itself is missing a relation -- that a
+    countertop can have drawers, say.
+
+    Off by default: it proposes changes to the ontology every later
     scene would inherit.
     """
 
     amend_the_ontology: bool = False
     """
-    Whether to carry those out for the length of this run. The edits are put back when the
-    run ends; they are never committed. Needs :attr:`ask_about_the_ontology`.
+    Whether to carry those out for the length of this run.
+
+    The edits are put back when the run ends; they are never committed. Needs
+    :attr:`ask_about_the_ontology`.
     """
 
     ignore_amendments: bool = False
     """
-    Whether to start even though the ontology's own files are left amended, which is what
-    a run deliberately made against an amended ontology needs.
+    Whether to start even though the ontology's own files are left amended, which is
+    what a run deliberately made against an amended ontology needs.
     """
 
     describe_the_classes: bool = False
     """
-    Whether a class reaches the model with the first sentence of its docstring beside its
-    name, rather than with its name and its bases alone.
+    Whether a class reaches the model with the first sentence of its docstring beside
+    its name, rather than with its name and its bases alone.
 
     Off, because the runs already made were not asked that way. It is worth asking only
     once nearly every class carries a sentence: a taxonomy where some are described and
@@ -192,9 +327,10 @@ class PipelineSettings:
     a body, instead of letting the failure out of the step.
 
     Off, because a scan answers as it always has and its numbers stay comparable with
-    the ones already reported. On, a body whose class needs something a body is not --
-    a room is its floor, an aperture is rooted on a region -- costs that one body and is
-    reported, rather than costing the run its world, its report and its evaluation graph.
+    the ones already reported. On, a body whose class needs something a body is not -- a
+    room is its floor, an aperture is rooted on a region -- costs that one body and is
+    reported, rather than costing the run its world, its report and its evaluation
+    graph.
     """
 
     make_a_region_where_a_class_needs_one: bool = False
@@ -216,34 +352,34 @@ class PipelineSettings:
 
     show_the_pictures: bool = True
     """
-    Whether a run renders its objects and puts the pictures to the model, or asks from the
-    text alone.
+    Whether a run renders its objects and puts the pictures to the model, or asks from
+    the text alone.
 
-    On, which is what every run so far was asked with. Off, nothing is rendered and the two
-    questions that would have carried pictures are asked without them -- which measures
-    what the pictures add, since the label is still given either way. Rendering is most of
-    a run's time, 44 minutes of room 13's 55, and three pictures a label is most of its
-    bill.
+    On, which is what every run so far was asked with. Off, nothing is rendered and the
+    two questions that would have carried pictures are asked without them -- which
+    measures what the pictures add, since the label is still given either way. Rendering
+    is most of a run's time, 44 minutes of room 13's 55, and three pictures a label is
+    most of its bill.
     """
 
     show_the_contested_faces: bool = True
     """
-    Whether the faces two labels both claim are rendered and put to the model, which is a
-    different question from whether the objects are. Off, the same questions are still
+    Whether the faces two labels both claim are rendered and put to the model, which is
+    a different question from whether the objects are. Off, the same questions are still
     asked, from the ontology and the measurements alone.
 
-    Kept apart from :attr:`show_the_pictures` because the two answer different questions:
-    the other renders ask what an object *is*, and this one whose a surface is. On the
-    kitchenlab the text alone answered it as well, for a quarter of the run's time. A scan
-    contests faces constantly -- a drawer front is labelled both as the drawer and as the
-    cabinet holding it -- and a converted HM3D room never does, since those files give
-    every face to exactly one object.
+    Kept apart from :attr:`show_the_pictures` because the two answer different
+    questions: the other renders ask what an object *is*, and this one whose a surface
+    is. On the kitchenlab the text alone answered it as well, for a quarter of the run's
+    time. A scan contests faces constantly -- a drawer front is labelled both as the
+    drawer and as the cabinet holding it -- and a converted HM3D room never does, since
+    those files give every face to exactly one object.
     """
 
     settle_the_superclass: bool = False
     """
-    Whether what a proposed class is a kind of is asked as a question of its own, once per
-    class, after its name is settled and before it is written.
+    Whether what a proposed class is a kind of is asked as a question of its own, once
+    per class, after its name is settled and before it is written.
 
     Off, the step that names a class also chooses what to build it from, in the same
     answer. The names that come back are stable and the superclasses are not, and saying
@@ -277,14 +413,15 @@ class PipelineSettings:
         default_factory=lambda: Path(__file__).resolve().parents[1] / "pipeline_runs"
     )
     """
-    Where the run's directory is made. The runs live beside the scenes they read, and
-    neither is committed.
+    Where the run's directory is made.
+
+    The runs live beside the scenes they read, and neither is committed.
     """
 
     repository: Path = field(
-        default_factory=lambda: Path(semantic_digital_twin.__file__)
-        .resolve()
-        .parents[3]
+        default_factory=lambda: (
+            Path(semantic_digital_twin.__file__).resolve().parents[3]
+        )
     )
     """
     The checkout the pipeline and the ontology it amends are written in, which a run

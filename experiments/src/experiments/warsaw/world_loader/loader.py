@@ -41,6 +41,7 @@ from typing_extensions import (
     Union,
 )
 
+from experiments.warsaw.painting import PaintColor
 from experiments.warsaw.exceptions import (
     BlankRenderError,
     CameraHasNoDirectionError,
@@ -125,7 +126,7 @@ class RenderedSegmentGroup:
     The segments colored in the renders.
     """
 
-    colors: Dict[PrefixedName, Color]
+    colors: Dict[PrefixedName, PaintColor]
     """
     The color each of them was given.
     """
@@ -683,17 +684,22 @@ class WarsawWorldLoader:
 
     def _apply_highlight_to_segments(
         self, segments: Iterable[LabelSegment]
-    ) -> Dict[PrefixedName, Color]:
+    ) -> Dict[PrefixedName, PaintColor]:
         """
         Color a group of the scene's objects, dimming everything else.
 
         :param segments: The segments to color.
         :return: The color each of them was given.
+        :raises TooManyToPaintError: If there are more segments than colors to tell them
+            apart by.
         """
         segments = list(segments)
-        colors = Color.distinct_colors(len(segments))
+        colors = PaintColor.distinct(len(segments))
         self._apply_highlight_to_faces(
-            [(color, segment.face_indices) for segment, color in zip(segments, colors)]
+            [
+                (color.color, segment.face_indices)
+                for segment, color in zip(segments, colors)
+            ]
         )
         return {segment.name: color for segment, color in zip(segments, colors)}
 

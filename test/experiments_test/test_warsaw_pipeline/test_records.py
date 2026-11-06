@@ -28,7 +28,6 @@ from experiments.warsaw.pipeline.records import (
 from experiments.warsaw.world_loader.viewpoints import PictureKind
 from experiments.warsaw.pipeline.run import RunFile
 from experiments.warsaw.scene_split import Pairing
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
 READERS = {
     RunFile.RELATIONS: Relations,
@@ -153,23 +152,13 @@ def test_the_sets_the_ontology_settles_are_carried_to_the_split(relations):
 # %% the mounts carried past the split
 
 
-def test_a_pairing_round_trips_through_its_channel():
+def test_a_pairing_round_trips_through_its_file():
     """
-    Which channel mounts a part is written to the file and read back out of it, so the
-    two have to mean the same thing.
+    A pairing is written to the split's file and read back out of it by the step that
+    mounts it, so the two have to mean the same thing.
     """
-    pairing = Pairing(
-        whole="cabinet_5", part="door_11", field_name="doors", kind=MountKind.CONTAINS
-    )
+    pairing = Pairing(whole="cabinet_5", part="door_11", field_name="doors")
     assert Pairing.from_json(pairing.to_json()) == pairing
-
-
-def test_a_pairing_without_a_channel_is_a_structural_part():
-    """
-    Every pairing the adjudication names is a structural part unless it says otherwise.
-    """
-    read = Pairing.from_json({"whole": "a", "part": "b", "field_name": "doors"})
-    assert read.kind is MountKind.PART
 
 
 def test_the_split_s_pairings_name_bodies_it_built(split):

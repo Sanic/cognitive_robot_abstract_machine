@@ -6,7 +6,7 @@ to hold.
 from __future__ import annotations
 
 import pytest
-from semantic_digital_twin.semantic_annotations.mixins import HasDoors, HasHandle
+from semantic_digital_twin.semantic_annotations.mixins import HasDoors, HasHandles
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cabinet,
     Drawer,
@@ -30,7 +30,7 @@ def test_the_check_survives_the_crossing_into_its_interpreter(tmp_path):
     check = AmendedClassesCheck(
         pairs=[
             AmendedPair(whole=Cabinet.__name__, mixin=HasDoors.__name__),
-            AmendedPair(whole=Drawer.__name__, mixin=HasHandle.__name__),
+            AmendedPair(whole=Drawer.__name__, mixin=HasHandles.__name__),
         ]
     )
     assert AmendedClassesCheck.from_arguments(check.arguments()) == check

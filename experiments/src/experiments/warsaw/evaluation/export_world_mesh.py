@@ -8,9 +8,6 @@ hide it and see what is behind, and no ROS is involved at all.
 Each node is named ``<body> [<Class>]``, so a click says both what the run called the
 object and what it decided the object is. Only the exported scene is named that way; the
 world itself is read afresh and never written back.
-
-The same command writes the run's world and the modelled world it is compared against,
-so the two can be opened side by side.
 """
 
 from __future__ import annotations
@@ -29,10 +26,6 @@ from semantic_digital_twin.adapters.world_mesh_exporter import (
 from semantic_digital_twin.world import World
 from typing_extensions import List, Optional
 
-from experiments.warsaw.evaluation.ground_truth import (
-    world_from_provider,
-    world_from_urdf,
-)
 from experiments.warsaw.painting import Coloring, paint
 
 # %% naming a body by what it is
@@ -127,11 +120,8 @@ def argument_parser() -> argparse.ArgumentParser:
     Build the command-line interface for writing a world out as a scene.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--run", type=Path, help="A finished run's directory")
-    source.add_argument("--urdf", type=Path, help="A URDF file describing the world")
-    source.add_argument(
-        "--world-provider", help="What builds the world, as module.path:ClassName"
+    parser.add_argument(
+        "--run", type=Path, required=True, help="A finished run's directory"
     )
     parser.add_argument(
         "--output", type=Path, required=True, help="The directory to write into"
@@ -148,20 +138,14 @@ def argument_parser() -> argparse.ArgumentParser:
 
 def main(arguments: Optional[List[str]] = None) -> int:
     """
-    Write a world as a scene a modelling tool can open.
+    Write a finished run's world as a scene a modelling tool can open.
 
     :param arguments: Command-line arguments without the program name.
     :return: Zero after the scene is written.
     """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parsed = argument_parser().parse_args(arguments)
-    if parsed.run is not None:
-        world = world_of_run(parsed.run)
-    elif parsed.urdf is not None:
-        world = world_from_urdf(parsed.urdf)
-    else:
-        world = world_from_provider(parsed.world_provider)
-
+    world = world_of_run(parsed.run)
     written = write_world_mesh(world, parsed.output, parsed.coloring)
     logging.getLogger(__name__).info(
         "wrote %s bodies to %s -- open it with Blender's glTF 2.0 import",

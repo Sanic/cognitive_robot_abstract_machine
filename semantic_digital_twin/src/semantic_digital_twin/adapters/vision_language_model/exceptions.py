@@ -53,3 +53,23 @@ class ModelRefusedError(DataclassException, ValueError):
             "Put the question again saying what was wrong with the answer, or ask a "
             "model that holds to the shape it is asked for."
         )
+
+
+@dataclass
+class AnswerCutOffError(ModelRefusedError):
+    """
+    Raised when a reply stopped at the longest answer the question allowed, so whatever
+    it holds is unfinished.
+
+    A model that keeps repeating itself is stopped this way, and quoting what it
+    repeated back to it is how it is led to repeat it again.
+    """
+
+    def error_message(self) -> str:
+        return "The answer was cut off at the length limit before it was finished."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Answer with the JSON object alone, keep every reason to one sentence, and "
+            "do not repeat yourself."
+        )

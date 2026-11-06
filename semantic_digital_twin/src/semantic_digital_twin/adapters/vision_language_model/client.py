@@ -22,6 +22,7 @@ import requests
 from typing_extensions import Any, Dict, Optional, Sequence, Tuple
 
 from semantic_digital_twin.adapters.vision_language_model.exceptions import (
+    AnswerCutOffError,
     ApiKeyMissingError,
     ModelRefusedError,
 )
@@ -69,6 +70,17 @@ class ServiceFailure(IntEnum):
         :return: Every one of them, in an order and a shape a field can default to.
         """
         return tuple(cls)
+
+
+class FinishReason(StrEnum):
+    """
+    Why a model stopped answering, as the service reports it.
+    """
+
+    LENGTH = "length"
+    """
+    The answer reached the longest one the question allowed.
+    """
 
 
 class Role(StrEnum):
@@ -125,6 +137,13 @@ class ModelResponse:
         return self.payload["choices"][0]["message"].get("content") or ""
 
     @property
+    def cut_off(self) -> bool:
+        """
+        :return: Whether the answer stopped at the longest one the question allowed.
+        """
+        return self.payload["choices"][0].get("finish_reason") == FinishReason.LENGTH
+
+    @property
     def usage(self) -> Optional[Dict[str, Any]]:
         """
         :return: What the question cost, when the response says.
@@ -139,9 +158,12 @@ class ModelResponse:
         front of it, often enough that a reply is worth searching rather than only parsed.
 
         :return: The JSON object or array in it.
+        :raises AnswerCutOffError: If the answer stopped at the length limit.
         :raises ModelRefusedError: If there is none, an empty reply included.
         """
         answer = self.text
+        if self.cut_off:
+            raise AnswerCutOffError(answer=answer)
         if not answer.strip():
             raise ModelRefusedError(answer=answer)
 
@@ -227,6 +249,20 @@ class VisionLanguageModel:
     still move under us -- but it removes the variance that is ours to remove.
     """
 
+    presence_penalty: float = 0.0
+    """
+    How much less likely a token becomes once the answer has used it, which breaks a
+    model out of repeating itself without making its answers random.
+    """
+
+    maximum_answer_tokens: int = 4096
+    """
+    The longest answer a question allows, in tokens.
+
+    Without one, a model that starts repeating itself goes on until the service's own
+    limit.
+    """
+
     referer: str = "ai.uni-bremen.de"
     """
     Who the service is told is asking.
@@ -257,6 +293,8 @@ class VisionLanguageModel:
             {
                 "model": self.model,
                 "temperature": self.temperature,
+                "presence_penalty": self.presence_penalty,
+                "max_tokens": self.maximum_answer_tokens,
                 "messages": [
                     {"role": Role.SYSTEM.value, "content": system},
                     {

@@ -27,7 +27,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "experiments.warsaw" = ["templates/*.jinja"]
-"experiments.warsaw.articulate3d" = ["templates/*.jinja"]
+"experiments.warsaw.articulate3d" = ["templates/*.jinja", "protocol.json", "splits/*.txt"]
 "experiments.warsaw.pipeline" = [
   "templates/*.jinja",
   "templates/*.py",

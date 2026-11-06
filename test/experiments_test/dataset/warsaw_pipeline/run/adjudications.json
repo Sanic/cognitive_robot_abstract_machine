@@ -34,7 +34,8 @@
         },
         "name": "door_10",
         "part": "door_10",
-        "whole": "cabinet_4"
+        "whole": "cabinet_4",
+        "field_name": ""
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.MembershipAnswer",
@@ -46,7 +47,8 @@
         },
         "name": "drawer_4",
         "part": "drawer_4",
-        "whole": "kitchen_island_1"
+        "whole": "kitchen_island_1",
+        "field_name": ""
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.MembershipAnswer",
@@ -58,7 +60,8 @@
         },
         "name": "drawer_5",
         "part": "drawer_5",
-        "whole": "cabinet_8"
+        "whole": "cabinet_8",
+        "field_name": ""
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.MembershipAnswer",
@@ -70,7 +73,8 @@
         },
         "name": "drawer_6",
         "part": "drawer_6",
-        "whole": "kitchen_island_1"
+        "whole": "kitchen_island_1",
+        "field_name": ""
       },
       {
         "__json_type__": "experiments.warsaw.pipeline.records.MembershipAnswer",
@@ -82,7 +86,8 @@
         },
         "name": "drawer_7",
         "part": "drawer_7",
-        "whole": "kitchen_island_1"
+        "whole": "kitchen_island_1",
+        "field_name": ""
       }
     ]
   }

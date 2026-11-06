@@ -1,16 +1,7 @@
 """
-Export the semantic annotation taxonomy in the form a model has to read it.
-
-A model asked to classify an object into this taxonomy needs to know two things about
-every class: what it *is* (its place in the hierarchy) and what it can be *composed of*.
-The second is carried by fields that all have defaults, so an export built from required
-constructor parameters loses it entirely.
-
-The relations reported here are the ones the world can actually realize, each named by
-the method that realizes it, because a model shown only one of them will force that one
-onto everything: a mug resting on a countertop is mounted with
-:meth:`IsStorageSpace.add_object`, not with :meth:`PartWholeRelationship.add`, and a
-mount through the wrong channel raises rather than building the wrong world quietly.
+Export the semantic annotation taxonomy in the form a model has to read it: every class
+with its place in the hierarchy and the parts it can hold. Only part-whole relations are
+reported; what merely rests on or inside something is no part of it.
 """
 
 from __future__ import annotations
@@ -21,7 +12,6 @@ import inspect
 from abc import ABC
 import json
 from dataclasses import dataclass, fields as dataclass_fields, is_dataclass
-from enum import StrEnum
 from pathlib import Path
 from typing_extensions import (
     Any,
@@ -35,14 +25,8 @@ from typing_extensions import (
     Type,
 )
 
-from krrood.class_diagrams.class_diagram import WrappedClass
-
 from semantic_digital_twin.semantic_annotations.part_whole import (
     part_whole_fields,
-)
-from semantic_digital_twin.world_description.world_entity import (
-    SemanticAnnotation,
-    WorldEntity,
 )
 
 # %% the vocabulary a mount is described in
@@ -64,85 +48,10 @@ nothing that distinguishes one class from another.
 """
 
 
-class MountKind(StrEnum):
-    """
-    What one of a world's mounts means.
-    """
-
-    PART = "part"
-    """
-    The mounted thing is a structural part of what holds it.
-    """
-
-    CONTAINS = "contains"
-    """
-    The mounted thing is stored inside what holds it.
-    """
-
-    SUPPORTS = "supports"
-    """
-    The mounted thing rests on what holds it.
-    """
-
-
-@dataclass(frozen=True)
-class MountChannel:
-    """
-    One way a world mounts something into an annotation.
-    """
-
-    kind: MountKind
-    """
-    What the relation means.
-    """
-
-    field_name: str
-    """
-    The field holding it.
-    """
-
-    owner: str
-    """
-    The name of the class declaring that field.
-    """
-
-    mounted_by: str
-    """
-    The method realizing the relation.
-    """
-
-
-OCCUPANCY_CHANNELS: Tuple[MountChannel, ...] = (
-    MountChannel(
-        kind=MountKind.CONTAINS,
-        field_name="objects",
-        owner="IsStorageSpace",
-        mounted_by="add_object",
-    ),
-    MountChannel(
-        kind=MountKind.SUPPORTS,
-        field_name="supporting_surface",
-        owner="HasSupportingSurface",
-        mounted_by="add_supporting_surface",
-    ),
-)
-"""
-The relations that are not part-whole but are still mounted into the world.
-
-Part-whole relations are found through :class:`IsPartWholeRelationship` metadata rather
-than listed here, since they declare themselves.
-"""
-
-
 @dataclass
 class SemanticRelation:
     """
-    One relation an annotation class can stand in, as a model is told about it.
-    """
-
-    kind: MountKind
-    """
-    What the relation means.
+    One part an annotation class can hold, as a model is told about it.
     """
 
     field_name: str
@@ -160,9 +69,10 @@ class SemanticRelation:
     Whether the field holds several of them rather than one.
     """
 
-    mounted_by: str
+    target_class: Type
     """
-    The method that realizes the relation in the world.
+    The type the field accepts, so that what may be mounted into it can be asked rather
+    than compared by name. Left out of the exported form, which names it.
     """
 
     removes_geometry: bool = False
@@ -170,22 +80,14 @@ class SemanticRelation:
     Whether mounting here cuts the part's volume out of the whole's geometry.
     """
 
-    target_class: Optional[Type] = None
-    """
-    The type the field accepts, where it is one, so that what may be mounted into it can
-    be asked rather than compared by name. Left out of the exported form, which names it.
-    """
-
     def to_json(self) -> Dict[str, Any]:
         """
         :return: The relation as JSON-ready data.
         """
         rendered = {
-            "kind": self.kind,
             "field": self.field_name,
             "target": self.target,
             "many": self.holds_many,
-            "mounted_by": self.mounted_by,
         }
         if self.removes_geometry:
             rendered["removes_geometry"] = True
@@ -218,96 +120,18 @@ def relations_of(annotation_class: Type) -> List[SemanticRelation]:
     Report every relation an annotation class can stand in.
 
     :param annotation_class: The class to inspect.
-    :return: Its part, containment and support relations, part-whole first.
+    :return: Its part-whole relations.
     """
-    relations = [
+    return [
         SemanticRelation(
-            kind=MountKind.PART,
             field_name=part_whole_relationship_field.field_name,
             target=part_whole_relationship_field.part.__name__,
             holds_many=part_whole_relationship_field.holds_many,
-            mounted_by="add",
             removes_geometry=part_whole_relationship_field.removes_part_geometry_from_whole,
             target_class=part_whole_relationship_field.part,
         )
         for part_whole_relationship_field in part_whole_fields(annotation_class)
     ]
-
-    wrapped_fields = {
-        wrapped_field.field.name: wrapped_field
-        for wrapped_field in WrappedClass(annotation_class).fields
-    }
-    for channel in OCCUPANCY_CHANNELS:
-        wrapped_field = wrapped_fields.get(channel.field_name)
-        if wrapped_field is None:
-            continue
-        target = wrapped_field.type_endpoint
-        relations.append(
-            SemanticRelation(
-                kind=channel.kind,
-                field_name=channel.field_name,
-                target=target.__name__ if isinstance(target, type) else str(target),
-                holds_many=wrapped_field.is_many_to_many_relationship,
-                mounted_by=channel.mounted_by,
-                target_class=target if isinstance(target, type) else None,
-            )
-        )
-    return relations
-
-
-# %% what an annotation actually holds
-
-
-@dataclass(frozen=True)
-class MountedRelation:
-    """
-    One relation an annotation instance currently stands in.
-
-    Where :func:`relations_of` reports what a class *may* hold, this reports what one
-    annotation *does* hold, read through the same fields, so a world's semantics can be
-    written out without knowing which class declared which field.
-    """
-
-    kind: MountKind
-    """
-    What the relation means.
-    """
-
-    field_name: str
-    """
-    The field the related entity is held in.
-    """
-
-    target: WorldEntity
-    """
-    The entity at the other end of the relation.
-    """
-
-
-def mounted_relations_of(annotation: SemanticAnnotation) -> List[MountedRelation]:
-    """
-    Report the relations an annotation currently stands in.
-
-    A field holding a single entity and a field holding several are reported alike, and
-    an empty field is not reported at all.
-
-    :param annotation: The annotation instance to read.
-    :return: One entry per entity mounted into one of its relation fields.
-    """
-    mounted = []
-    for relation in relations_of(type(annotation)):
-        held = getattr(annotation, relation.field_name)
-        targets = held if relation.holds_many else [held]
-        mounted.extend(
-            MountedRelation(
-                kind=relation.kind,
-                field_name=relation.field_name,
-                target=target,
-            )
-            for target in targets
-            if target is not None
-        )
-    return mounted
 
 
 def describe_class(annotation_class: Type) -> str:
@@ -326,10 +150,7 @@ def describe_class(annotation_class: Type) -> str:
             if relation.removes_geometry
             else ""
         )
-        lines.append(
-            f"  {relation.kind} {relation.field_name} -> {relation.target}{many}"
-            f", mounted with {relation.mounted_by}(){cuts}"
-        )
+        lines.append(f"  part {relation.field_name} -> {relation.target}{many}{cuts}")
     return "\n".join(lines)
 
 
@@ -547,9 +368,8 @@ def build_taxonomy(
     return {
         "root_name": root_class.__name__,
         "note": (
-            "Relations say what a class can hold. 'part' is mounted with add(), "
-            "'contains' with add_object() for something merely inside or on it, "
-            "'supports' with add_supporting_surface(). A class marked 'abstract' "
+            "Relations say what parts a class can hold. "
+            "A class marked 'abstract' "
             "cannot be given to an object: it is a category, so name one of its "
             "subclasses, or compose a new subclass of it where none of them fits. A "
             "class marked 'mixin' exists "
@@ -646,16 +466,8 @@ def admissible_mounts(
     one_class: Type, other_class: Type
 ) -> List[Tuple[Type, SemanticRelation]]:
     """
-    Report every way two classes could be mounted into one another, in either direction.
-
-    A part-whole relation is one of three channels, and it is the narrow one: a mug on a
-    counter and a jar in a box are mounted with add_object, not with add, so
-    asking only about parts reports "no relation" for pairs that have a perfectly good
-    one. What comes back is what the world would accept, not what is the case.
-
-    ..note:: contains is admissible very widely -- IsStorageSpace.objects accepts
-        anything with a root body -- so its presence says much less about a pair than a
-        part-whole relation does.
+    Report every way one of two classes could hold the other as a part, in either
+    direction. What comes back is what the world would accept, not what is the case.
 
     :param one_class: One of the annotation classes.
     :param other_class: The other annotation class.
@@ -666,7 +478,5 @@ def admissible_mounts(
         (whole, relation)
         for whole, part in ((one_class, other_class), (other_class, one_class))
         for relation in relations_of(whole)
-        if isinstance(part, type)
-        and isinstance(relation.target_class, type)
-        and issubclass(part, relation.target_class)
+        if isinstance(part, type) and issubclass(part, relation.target_class)
     ]

@@ -1,0 +1,7 @@
+## The ontology
+{{ taxonomy }}
+
+## The objects to name
+{% for body in bodies %}
+{{ body.name }}: {% if body.color %}painted in the colour {{ body.color }}, {% endif %}labelled "{{ body.label }}" by the scan, which is one of: {{ body.choices | join(", ") }}
+{% endfor %}

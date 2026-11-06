@@ -631,6 +631,19 @@ class AnnotationRules(JsonRecord):
     The corrections, made in this order.
     """
 
+    def without_spelling_corrections(self) -> AnnotationRules:
+        """
+        :return: These rules, leaving every part name spelled as its annotator wrote it.
+        """
+        return replace(
+            self,
+            corrections=[
+                one
+                for one in self.corrections
+                if not isinstance(one, PartNameCorrection)
+            ],
+        )
+
     def apply(self, scene: AnnotatedScene) -> RuledScene:
         """
         :param scene: A scene as annotated.

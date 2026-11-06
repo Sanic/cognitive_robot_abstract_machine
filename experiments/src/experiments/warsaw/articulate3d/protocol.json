@@ -1,0 +1,1716 @@
+{
+  "__json_type__": "experiments.warsaw.articulate3d.protocol.EvaluationProtocol",
+  "part_names": {
+    "__collection_type__": "builtins.list",
+    "__items__": [
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "base switch",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "bathtub",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Bathtub"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "bed",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Bed"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "bin",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "TrashCan"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "bin lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "blanket",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "AMBIGUOUS"
+        },
+        "semantic_class": null
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "blender",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Blender"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "blinds",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Blinds"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "blinds control",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Control"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "blinds rail",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Rail"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "bottle",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Bottle"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "box",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "StorageBox"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "box lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "button",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Button"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "button base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "buttons",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Button"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "cabinet",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cabinet"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "cabinet door",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Door"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "can",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "CoffeeCan"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "cap",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cap"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "card",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "KeyCard"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "closet",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Wardrobe"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "clothes",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Clothing"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "coffee maker",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "CoffeeMachine"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "container",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Container"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "control",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Control"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "control base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "control panel",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ControlPanel"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "controls",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Control"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "cord",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cable"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "curtain",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Curtain"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "curtain rail",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Rail"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "curtains",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Curtain"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "desk",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Desk"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "detergent compartment",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Drawer"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "detergent drawer",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Drawer"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "dishwasher",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Dishwasher"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "dishwasher door",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Door"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "door",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Door"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "door frame",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Frame"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "door handle",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Handle"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "door handle base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "door part",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "DoorAttachment"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "door rail",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "AMBIGUOUS"
+        },
+        "semantic_class": null
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "door window",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Window"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "drawer",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Drawer"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "electrical panel",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ElectricalPanel"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "emergency cabinet",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cabinet"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "fan",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Fan"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "fan switch",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Switch"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "faucet",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Faucet"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "faucet base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "FaucetBody"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "faucet control",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Control"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "faucet handle",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Handle"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "faucet head",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "FaucetSpout"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "flush",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ToiletFlush"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "flush base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "fridge",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Fridge"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "fridge door",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Door"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "fryer",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Fryer"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "handle",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Handle"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "handle base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "head pump",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Pump"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "heater",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Heater"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "heater control",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Control"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "heater ventil",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "HeaterValve"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "hinge",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Hinge"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "hoodie",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Clothing"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "hose",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Hose"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "inbuilt kitchen panel",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "WallPanel"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "intercom",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Intercom"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "intercom base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "BaseStation"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "jug",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Jug"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "kettle",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Kettle"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "kitchen counter",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "CounterTop"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "kitchen panel",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "WallPanel"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "knob",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Knob"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "knob base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "laundry",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "WashingMachine"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "lid base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "LidFrame"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "light switch",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Switch"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "light switch base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "lock",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lock"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "lock base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "machine",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "AMBIGUOUS"
+        },
+        "semantic_class": null
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "mattress",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "AMBIGUOUS"
+        },
+        "semantic_class": null
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "media",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Projector"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "microwave",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Microwave"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "microwave door",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Door"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "multicooker",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Multicooker"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "night stand",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "SideTable"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "oven",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Oven"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "oven door",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Door"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "panel",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "WallPanel"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "panel lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "phone",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Telephone"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "phone base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "BaseStation"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "phone cable",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cable"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "pillow",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "AMBIGUOUS"
+        },
+        "semantic_class": null
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "pipe",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "DrainPipe"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "power socket",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "PowerSocket"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "power strip",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "PowerStrip"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "power switch",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Switch"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "power switch base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "printer",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Printer"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "pump",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Pump"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "pump head",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Pump"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "screw cap",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cap"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "seat",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ToiletSeat"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Shower"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower cabin",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Shower"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower control",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Control"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower control base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower faucet",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Faucet"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower head",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ShowerHead"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower head holder",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ShowerHeadHolder"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower holder",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ShowerHeadHolder"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower hose",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ShowerHose"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower pipe",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "AMBIGUOUS"
+        },
+        "semantic_class": null
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "shower valve",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ShowerValve"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "sink",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Sink"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "sink pipe",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "DrainPipe"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "soap",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "AMBIGUOUS"
+        },
+        "semantic_class": null
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "soap button",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Button"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "soap dispenser",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Dispenser"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "socket",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "PowerSocket"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "socket base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "stand",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "AMBIGUOUS"
+        },
+        "semantic_class": null
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "stove",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cooktop"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "stoves",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cooktop"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "suitcase",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Suitcase"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "suitcase lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "switch",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Switch"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "switch base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "switch body",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "table",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Table"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "tabletop",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Tabletop"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "thermometer",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Thermometer"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "thermostat",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Thermostat"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "thermostat base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "thermostat control",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Control"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "toaster",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Toaster"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "toilet",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Toilet"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "toilet flush",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ToiletFlush"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "toilet flush base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "toilet lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "toilet seat",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "ToiletSeat"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "towel",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Cloth"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "trash bin",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "TrashCan"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "trash bin cap",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "LidFrame"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "trash bin lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "trash can",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "TrashCan"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "trash can control",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Pedal"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "trash can head",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "LidFrame"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "trash can lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "trash lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "vacuum",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "VacuumCleaner"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "vacuum button",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Button"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "vacuum switch",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Switch"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "wardrobe",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Wardrobe"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "washing machine",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "WashingMachine"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "water heater",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "WaterHeater"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "water jug",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Jug"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "water kettle",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Kettle"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "water kettle lid",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Lid"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "wheel",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Wheel"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "window",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Window"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "window frame",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Frame"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "window handle",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Handle"
+      },
+      {
+        "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameMeaning",
+        "part_name": "window handle base",
+        "ruling": {
+          "__json_type__": "experiments.warsaw.articulate3d.protocol.PartNameRuling",
+          "name": "CLASS"
+        },
+        "semantic_class": "Backplate"
+      }
+    ]
+  },
+  "part_classes": {
+    "__collection_type__": "builtins.list",
+    "__items__": []
+  },
+  "field_choices": {
+    "__collection_type__": "builtins.list",
+    "__items__": []
+  },
+  "annotation_rules": {
+    "__json_type__": "experiments.warsaw.articulate3d.rules.AnnotationRules",
+    "exclusions": {
+      "__collection_type__": "builtins.list",
+      "__items__": [
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.MeshMissing"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.MeshChanged"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.FaceCountMisrecorded"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.ArticulationContradictsHierarchy"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.AmbiguousWhole"
+        }
+      ]
+    },
+    "corrections": {
+      "__collection_type__": "builtins.list",
+      "__items__": [
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.SpacingCorrection"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.InstanceNumberCorrection",
+          "instance_number": "_?\\d+$"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "hindge",
+          "meant": "hinge",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "lightswitch",
+          "meant": "light switch",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "lightsiwtch",
+          "meant": "light switch",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "lightswitch base",
+          "meant": "light switch base",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "light swtich base",
+          "meant": "light switch base",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "cabnet",
+          "meant": "cabinet",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "hande base",
+          "meant": "handle base",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "handler",
+          "meant": "handle",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "heater vetil",
+          "meant": "heater ventil",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "powers switch base",
+          "meant": "power switch base",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "trashcan lid",
+          "meant": "trash can lid",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "handle f",
+          "meant": "handle",
+          "mistake": "the suffix 'f', which marks a fixed part in one scene and is already recorded by the part having no articulation"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "handle m",
+          "meant": "handle",
+          "mistake": "the suffix 'm', which marks a movable part in one scene and is already recorded by the part's articulation"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "knob f",
+          "meant": "knob",
+          "mistake": "the suffix 'f', which marks a fixed part in one scene and is already recorded by the part having no articulation"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "box lid m",
+          "meant": "box lid",
+          "mistake": "the suffix 'm', which marks a movable part in one scene and is already recorded by the part's articulation"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "hande",
+          "meant": "handle",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "lightwswitch",
+          "meant": "light switch",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "soap dispencer",
+          "meant": "soap dispenser",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "certain",
+          "meant": "curtain",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "certain rail",
+          "meant": "curtain rail",
+          "mistake": "a spelling mistake"
+        },
+        {
+          "__json_type__": "experiments.warsaw.articulate3d.rules.PartNameCorrection",
+          "written": "curtains rail",
+          "meant": "curtain rail",
+          "mistake": "a spelling mistake"
+        }
+      ]
+    }
+  }
+}

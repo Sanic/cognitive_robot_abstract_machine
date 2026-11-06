@@ -68,9 +68,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootRegion,
     HasDrawers,
     HasDoors,
-    HasHandle,
     HasHandles,
-    IsGraspedAtHandle,
     HasCaseAsRootBody,
     HasMovableJoint,
     HasApertures,
@@ -386,11 +384,10 @@ class EntryWay(Aperture):
 
 @dataclass(eq=False)
 class Door(
-    IsGraspedAtHandle,
+    HasHandles,
     HasMovableJoint[ActiveConnection1DOF],
     HasControls,
     HasBackplates,
-    HasHinges,
     HasKnobs,
     HasLocks,
     HasWindows,
@@ -576,7 +573,7 @@ class DoubleDoor(SemanticAnnotation):
 class Drawer(
     Furniture,
     HasCaseAsRootBody,
-    IsGraspedAtHandle,
+    HasHandles,
     HasMovableJoint[ActiveConnection1DOF],
     HasKnobs,
 ):
@@ -1084,14 +1081,14 @@ class DrinkingContainer(Container, Tableware):
 
 
 @dataclass(eq=False)
-class Cup(HasHandle, HasRim, DrinkingContainer, IsPerceivable):
+class Cup(HasHandles, HasRim, DrinkingContainer, IsPerceivable):
     """
     A cup.
     """
 
 
 @dataclass(eq=False)
-class Mug(HasHandle, HasRim, DrinkingContainer):
+class Mug(HasHandles, HasRim, DrinkingContainer):
     """
     A mug, held by its handle.
     """
@@ -1609,7 +1606,7 @@ class SaltPepperShaker(SaltContainer):
 
 
 @dataclass(eq=False)
-class Cutlery(HasHandle, Tableware):
+class Cutlery(HasHandles, Tableware):
     """
     A piece of cutlery, lying flat, grasped from above and across its length.
     """
@@ -2006,7 +2003,7 @@ class Tool(HasGraspCandidates, ABC):
 
 
 @dataclass(eq=False)
-class ToolWithHandle(Tool, HasHandle, ABC):
+class ToolWithHandle(Tool, HasHandles, ABC):
     """
     A tool held by its handle, acting through a tip body located ahead of its root.
 
@@ -2176,7 +2173,6 @@ class Window(
     HasBlinds,
     HasHandles,
     HasBackplates,
-    HasHinges,
     HasKnobs,
 ):
     """
@@ -2188,6 +2184,9 @@ class Window(
 class Hinge(HasRootBody):
     """
     A joint of two plates that a door, window or lid swings on.
+
+    It is a part of the fixed object that what swings hangs in, such as a frame or a
+    cabinet, and never of what swings.
     """
 
 

@@ -488,132 +488,7 @@ class UnsupportedMessagePartError(DataclassException, TypeError):
         )
 
 
-# %% reading a world as ground truth
-
-
-@dataclass
-class RelationHasNoEntityError(DataclassException, TypeError):
-    """
-    Raised when a modelled world's relation reaches something no entity carries.
-
-    A ground-truth graph names both ends of a relation by the entity they occupy, since
-    that is what a reconstructed body can correspond to. Something occupying no entity
-    cannot be named, and dropping it would leave the world's semantics quietly
-    incomplete.
-    """
-
-    held_type: str
-    """
-    The class of what the relation reached.
-
-    The thing itself is deliberately not kept: an exception is a mapped dataclass here,
-    and a field typed loosely enough to hold any of them has no column the database
-    could store it in.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"A relation reaches a {self.held_type}, which occupies no body or region "
-            f"of the world."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Give that class a root entity, or decide how the evaluation should name it "
-            "and record that decision here rather than leaving the relation out."
-        )
-
-
-@dataclass
-class CorrectedEntityNotInGraphError(DataclassException, LookupError):
-    """
-    Raised when supplied ground truth names an entity the modelled world does not hold.
-
-    A name matching nothing is a typo or an overlay left behind by an older world.
-    Applying it quietly would leave the ground truth wrong in exactly the way the
-    overlay was written to put right.
-    """
-
-    scene: str
-    """
-    The scene the corrections were written for.
-    """
-
-    entities: List[str]
-    """
-    The names that match no entity of the graph.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Corrections for '{self.scene}' name entities the world does not hold: "
-            f"{', '.join(self.entities)}."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Check the names against the graph exported from the world. A world names "
-            "its entities as the source does, so a URDF's links keep their prefix."
-        )
-
-
-@dataclass
-class GroundTruthAlreadyCorrectedError(DataclassException, ValueError):
-    """
-    Raised when supplied ground truth is applied to a graph that already carries some.
-
-    A graph records the one overlay it was given, so applying a second would drop every
-    correction of the first from the record while quietly undoing them in the nodes. A
-    scene's corrections belong in one file, applied once.
-    """
-
-    scene: str
-    """
-    The scene of the graph being corrected.
-    """
-
-    already_applied: str
-    """
-    The scene of the corrections it already carries.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"The graph of '{self.scene}' already carries corrections written for "
-            f"'{self.already_applied}'."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Put every correction for a scene in its one overlay file and apply it to a "
-            "graph read freshly from the world."
-        )
-
-
-@dataclass
-class WorldProviderNotFoundError(DataclassException, ValueError):
-    """
-    Raised when nothing of the given name builds a world.
-    """
-
-    reference: str
-    """
-    What was asked for.
-    """
-
-    problem: str
-    """
-    What is wrong with it.
-    """
-
-    def error_message(self) -> str:
-        return f"'{self.reference}' does not build a world: {self.problem}."
-
-    def suggest_correction(self) -> str:
-        return (
-            "Name it as 'module.path:ClassName', where the class can be built with no "
-            "arguments and answers get_world(), as the predefined maps do."
-        )
+# %% rebuilding a run's ORM
 
 
 @dataclass
@@ -757,4 +632,37 @@ class HabitatMeshesDisagreeError(DataclassException, ValueError):
             "which only names the same face while the two files are the same triangles. "
             "Check that both were taken from the same release rather than mixed between "
             "versions."
+        )
+
+
+# %% painting objects apart
+
+
+@dataclass
+class TooManyToPaintError(DataclassException, ValueError):
+    """
+    Raised when more objects are to be painted apart in one picture than there are
+    colours to tell them by.
+    """
+
+    wanted: int
+    """
+    How many objects were to be painted.
+    """
+
+    available: int
+    """
+    How many colours there are.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.wanted} objects were to be painted apart, and there are only "
+            f"{self.available} colours."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Show fewer objects in one picture, for example with a smaller group size, "
+            "or add a colour whose name is a plain colour word to PaintColor."
         )

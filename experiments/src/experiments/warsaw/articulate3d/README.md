@@ -17,19 +17,25 @@ inference rules or from what a run produced.
 | The protocol: what every part name means, parts classified on sight, field choices | Decisions about a single scene that are not written into the protocol |
 | Prompts and pipeline settings, tuned on train scenes | Anything derived from a run's output |
 
-Freeze all of it with one git tag before running the evaluated scenes.
+Freeze all of it with one git tag before running the evaluated scenes. The validation
+scenes (`splits/val.txt`) are locked until then: converting, running or scoring one
+raises `ValidationSceneLockedError` unless the checkout has no local changes and its
+commit carries a tag starting with `articulate3d-frozen-`. Train scenes
+(`splits/train.txt`) are always open.
 
 ## Workflow
 
-1. **List the part names** the annotators used and start a protocol from them. Every
-   name is added as `undecided`:
+1. **List the part names** the annotators used and add them to the protocol, which is
+   kept with this package as `protocol.json`. Every new name is added as `undecided`:
 
    ```bash
    python -m experiments.warsaw.articulate3d.labels --dataset <articulate3d> \
-       --protocol protocol.json
+       --scannetpp <scannet++ data> \
+       --protocol experiments/src/experiments/warsaw/articulate3d/protocol.json
    ```
 
-2. **Rule on every name** in `protocol.json`:
+2. **Rule on every name** in `protocol.json`. The commands below read that file unless
+   `--protocol` names another:
    - `class`: the name means one class of the ontology (`semantic_class`);
    - `ambiguous`: the name covers different kinds of things, so these parts are judged as
      objects and as ends of relations, but not on their class;
@@ -45,7 +51,7 @@ Freeze all of it with one git tag before running the evaluated scenes.
 
    ```bash
    python -m experiments.warsaw.articulate3d.ground_truth --dataset <articulate3d> \
-       --protocol protocol.json --output ground_truth/
+       --scannetpp <scannet++ data> --output ground_truth/
    ```
 
 4. **Convert each scene** into the pipeline's input. The part hierarchy is stripped from
@@ -54,18 +60,25 @@ Freeze all of it with one git tag before running the evaluated scenes.
    ```bash
    python -m experiments.warsaw.articulate3d.convert --dataset <articulate3d> \
        --scannetpp <scannet++ data> --scene <scene id> --output <scene directory> \
-       [--disclosure words|neutral] [--overlap disjoint|subtree] [--seed N]
+       [--disclosure words|neutral] [--overlap disjoint|subtree] \
+       [--spelling as-written|corrected] [--seed N]
    ```
 
    - `--disclosure neutral` writes labels such as `label_03`, so the model learns nothing
      from the annotators' words. This tests what the pictures alone tell it.
    - `--overlap subtree` makes each part's label cover the parts below it as well. This
      recreates the overlapping labels a real scan produces, so the ownership step runs.
+   - `--spelling corrected` fixes the annotators' misspelt part names before they become
+     labels; the default keeps them as written. Spacing and instance numbers are tidied
+     either way.
 
    ScanNet++ meshes must be the v1 meshes the annotations were made on.
 
 5. **Run the pipeline** on each converted scene. Point
-   `PipelineSettings.scene_directory` at it, and run each scene several times.
+   `PipelineSettings.scene_directory` at it, and run each scene several times. Which
+   model is asked, whether it sees pictures and how it proposes classes are settings;
+   [the pipeline's README](../README.md#running-a-version-of-the-pipeline) says how to
+   run each version.
 
 6. **Score the runs**:
 
@@ -89,19 +102,24 @@ so a misclassified body is still found and counted as a misclassification.
 | classes recognised | the same, out of every part whose class is judged, found or not |
 | hierarchical precision / recall | partial credit for an answer on the right branch of the class hierarchy |
 | answers standing for no class | generated classes with no single class of the ontology as their base |
-| relation precision | the run's part-whole mounts that are relations of the part hierarchy |
-| relation recall | relations of the part hierarchy the run made |
-| expressible | relations the ontology can hold at all: the most any run can make |
-| through the same field | correct mounts made through the field the ontology holds them in |
+| link precision | parts the run hung from another part that hang from their annotated whole |
+| link recall | relations of the part hierarchy the run made |
+| links reachable | relations a field of either class can make: the most any run can make |
+| reachable recall | of those, the ones the run made |
+| ancestor precision / recall | partial credit for a part hung on the right branch, such as a handle hung from its door rather than from the plate on it |
+| triplet precision / recall | links made with both ends given exactly their class, out of the links whose ends' classes are judged |
 
-A class the run generated is judged as the one class of the ontology it derives from,
-with mixins left out. A share with nothing to divide by is reported as `n/a`, never as a
-perfect score.
+Links are read from the tree the run built. A part counts as hung from the nearest
+annotated part above it, past any body between that matches no part. A part the
+annotation hangs from nothing counts against precision when the run hangs it from a
+part. A class the run generated is judged as the one class of the ontology it derives
+from, with mixins left out. A share with nothing to divide by is reported as `n/a`,
+never as a perfect score.
 
 ## Not covered yet
 
-- **Joints.** The pipeline mounts every part with a fixed connection, so the annotated
-  axes, origins and ranges are not scored.
+- **Joints.** The pipeline mounts every part with a fixed connection, and the
+  annotated joints are not evaluated.
 - **Held-out ontology classes.** Testing class generation by hiding classes from the
   taxonomy the pipeline sees needs a change to the taxonomy export.
 - **Confidence intervals.** Spread over scenes and over repeated runs is not computed yet.

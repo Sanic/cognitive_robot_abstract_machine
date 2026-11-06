@@ -12,7 +12,8 @@ Both are asked as few times as they are actually open. Ownership is asked once p
 claimants rather than once per pair of them, never where the ontology already settled every
 relation inside the set, and once per *pattern* of classes rather than once per occurrence
 -- a door and a window sharing a pane is one question however many glazed doors the room
-has. Membership is asked only where a part meets more than one candidate.
+has. Membership is asked where a part has more than one candidate, and, where the run is
+told to, where it only lies near the wholes it could belong to.
 
 This decides nothing itself.
 """
@@ -145,13 +146,15 @@ class OverlapDecision(Question[AnswerType], Generic[AnswerType, AskedType]):
         :return: What each color in the pictures stands for.
         """
         lines = [
-            f'{name} (labelled "{self.labels[name]}") is {self.asked.legend[name]}'
+            f'{name} (labelled "{self.labels[name]}") is painted in the colour '
+            f"{self.asked.legend[name]}"
             for name in self.asked.shown
             if name in self.asked.legend
         ]
         if "contested" in self.asked.legend:
             lines.append(
-                f"the faces all of them claim are {self.asked.legend['contested']}"
+                "the faces all of them claim are painted in the colour "
+                f"{self.asked.legend['contested']}"
             )
         return "\n".join(lines)
 
@@ -253,7 +256,7 @@ class OwnershipDecision(OverlapDecision[OwnershipAnswer, OwnershipQuestion]):
 @dataclass(kw_only=True)
 class MembershipDecision(OverlapDecision[MembershipAnswer, MembershipQuestion]):
     """
-    Which of several candidates a part belongs to.
+    Which of its candidates a part belongs to, if one of them has to be it.
     """
 
     @classproperty
@@ -262,6 +265,13 @@ class MembershipDecision(OverlapDecision[MembershipAnswer, MembershipQuestion]):
         :return: The prompt this question is put with, both halves of it.
         """
         return Prompt.MEMBERSHIP
+
+    @property
+    def prompt_variables(self) -> Dict[str, Any]:
+        return {
+            **super().prompt_variables,
+            "may_belong_to_none": self.asked.may_belong_to_none,
+        }
 
     def message(self) -> List[MessagePart]:
         return [
@@ -281,10 +291,12 @@ class MembershipDecision(OverlapDecision[MembershipAnswer, MembershipQuestion]):
 
     def read(self, response: ModelResponse) -> MembershipAnswer:
         answered: Dict[str, Any] = response.parse_json()
+        fields = {one.name: one.field_name for one in self.asked.candidates}
         return MembershipAnswer(
             name=self.asked.name,
             part=self.asked.part,
             whole=answered.get("whole"),
+            field_name=fields.get(answered.get("whole"), ""),
             confidence=answered.get("confidence"),
             reason=answered.get("reason"),
         )
@@ -296,6 +308,8 @@ class MembershipDecision(OverlapDecision[MembershipAnswer, MembershipQuestion]):
 
     def problems_with(self, answer: MembershipAnswer) -> List[str]:
         if answer.whole in self.asked.candidate_names:
+            return []
+        if answer.whole is None and self.asked.may_belong_to_none:
             return []
         return [
             f"{answer.whole!r} is not one of the wholes to choose from: "

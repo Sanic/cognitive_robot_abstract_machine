@@ -20,12 +20,24 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Color, Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.semantic_annotations.taxonomy_export import (
+    annotation_classes,
+    load_annotation_modules,
+)
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    SemanticAnnotation,
+)
 
+import pytest
+
+from experiments.warsaw.exceptions import TooManyToPaintError
+from experiments.warsaw.pipeline.settings import PipelineSettings
 from experiments.warsaw.painting import (
     UNNAMED,
     UNNAMED_GREY,
     Coloring,
+    PaintColor,
     paint,
     spread_colours,
 )
@@ -174,3 +186,34 @@ def test_a_palette_of_nothing_is_empty_rather_than_an_error():
     A world with no bodies is a world with nothing to tell apart.
     """
     assert spread_colours(0) == []
+
+
+# %% colours a model is told the names of
+
+
+def test_no_colour_a_model_is_told_is_named_like_a_class_of_the_ontology():
+    """
+    A body said to be painted "tomato" was taken for a tomato.
+    """
+    load_annotation_modules()
+    class_names = {name.lower() for name in annotation_classes(SemanticAnnotation)}
+
+    assert [color.word for color in PaintColor if color.word in class_names] == []
+
+
+def test_the_colours_objects_are_painted_apart_in_all_differ():
+    colors = PaintColor.distinct(len(PaintColor))
+
+    assert len({color.color.to_rgb() for color in colors}) == len(colors)
+
+
+def test_more_objects_than_colours_are_not_painted_apart():
+    with pytest.raises(TooManyToPaintError):
+        PaintColor.distinct(len(PaintColor) + 1)
+
+
+def test_a_group_of_bodies_named_at_once_fits_in_the_colours():
+    """
+    Classifying names that many bodies in one picture, each in its own colour.
+    """
+    assert PipelineSettings().group_size <= len(PaintColor)

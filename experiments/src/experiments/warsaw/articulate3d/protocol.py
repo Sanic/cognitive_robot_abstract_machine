@@ -32,6 +32,7 @@ from experiments.warsaw.articulate3d.exceptions import (
 )
 from experiments.warsaw.articulate3d.rules import AnnotationRules
 from experiments.warsaw.bases import JsonRecord
+from krrood.patterns.path_enumeration import PathEnumeration
 
 # %% what one part name means
 
@@ -271,3 +272,17 @@ class EvaluationProtocol(JsonRecord):
         for class_name in named:
             if class_name is not None and class_name not in ontology:
                 raise ClassNotInOntologyError(class_name=class_name)
+
+
+# %% the protocol this evaluation is judged by
+
+
+class ProtocolFile(PathEnumeration):
+    """
+    The protocol files kept with the evaluation.
+    """
+
+    ARTICULATE3D = Path(__file__).resolve().parent / "protocol.json"
+    """
+    The protocol Articulate3D's ground truth is built from.
+    """

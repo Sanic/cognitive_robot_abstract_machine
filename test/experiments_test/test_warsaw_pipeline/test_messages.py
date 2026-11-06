@@ -24,6 +24,7 @@ from semantic_digital_twin.adapters.vision_language_model.message import (
 )
 from typing_extensions import List
 
+from experiments.warsaw.painting import PaintColor
 from experiments.warsaw.pipeline.records import AmendmentRecord
 from experiments.warsaw.pipeline.run import RunFile
 from experiments.warsaw.pipeline.steps.amend.step import MixinProposal
@@ -133,24 +134,6 @@ def test_the_membership_question_says_what_it_always_said(
 
 
 @dataclass
-class Painted:
-    """
-    Stands in for the colour a body was given, which only has to name itself.
-    """
-
-    name: str
-    """
-    The colour.
-    """
-
-    def closest_css3_name(self) -> str:
-        """
-        :return: The colour, as a model is told it.
-        """
-        return self.name
-
-
-@dataclass
 class Segment:
     """
     Stands in for one of the bodies painted into a group render.
@@ -182,7 +165,7 @@ def test_the_classification_question_says_what_it_always_said(
         rendered=RenderedSegmentGroup(
             index=0,
             segments=group,
-            colors={one.name: Painted("cornflowerblue") for one in group},
+            colors={one.name: PaintColor.BLUE for one in group},
             images={},
         ),
         taxonomy=taxonomy,
@@ -245,9 +228,9 @@ def test_every_question_is_put_with_both_halves_of_its_own_prompt():
             == pathlib.Path(sys.modules[question.__module__].__file__).resolve().parent
         ), f"{question.__name__} reads prompts from another step"
         for half in PromptHalf:
-            assert question.templates.render_document(
-                f"{prompt.value}/{half.value}"
-            ), f"{question.__name__} has no {half.value}"
+            assert question.templates.render_document(f"{prompt.value}/{half.value}"), (
+                f"{question.__name__} has no {half.value}"
+            )
 
 
 # %% what the model is told it is deciding, with the contested faces drawn

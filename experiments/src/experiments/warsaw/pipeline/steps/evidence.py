@@ -27,9 +27,11 @@ from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     admissible_mounts,
     describe_class,
 )
-from semantic_digital_twin.world_description.geometry import Color
 from typing_extensions import Dict, List, Optional, Sequence, Tuple, Type
 
+from semantic_digital_twin.world_description.geometry import Color
+
+from experiments.warsaw.painting import PaintColor
 from experiments.warsaw.pipeline.camera_poses import CameraPoses
 from experiments.warsaw.pipeline.templates import PipelineTemplates
 from experiments.warsaw.pipeline.label_classes import VocabularyClasses
@@ -112,12 +114,12 @@ class Memberships:
 
     to_ask_about: List[MembershipQuestion] = field(default_factory=list)
     """
-    The parts that meet more than one candidate.
+    The parts with more than one candidate, and those to confirm a candidate for.
     """
 
     forced: List[ForcedMembership] = field(default_factory=list)
     """
-    The parts that meet exactly one, where there is nothing to choose between.
+    The parts with exactly one, where there is nothing to choose between or to confirm.
     """
 
 
@@ -283,14 +285,7 @@ class MeasureScene(PipelineStep):
         self, one_class: Optional[Type], other_class: Optional[Type]
     ) -> OntologyView:
         """
-        Ask the ontology what two classes may be to one another.
-
-        The status is decided by the part-whole channel alone, because that is the one that
-        discriminates: ``contains`` is admissible between almost any two annotations, since
-        ``IsStorageSpace.objects`` accepts anything with a root body, so letting it decide
-        would report a relation for every pair in the room. The other channels are reported
-        beside it instead, since a mug on a counter and a jar in a box do stand in one, and
-        an adjudication told only about parts would force "part" onto them.
+        Ask the ontology which of two classes may hold the other as a part.
 
         :param one_class: The class of one segment, or None when its label maps to none.
         :param other_class: The class of the other segment.
@@ -303,20 +298,18 @@ class MeasureScene(PipelineStep):
             status=RelationStatus.NO_LEGAL_RELATION,
             mounts=[
                 AdmissibleMount(
-                    kind=relation.kind,
                     whole=whole.__name__,
                     field_name=relation.field_name,
                     target=relation.target,
                     holds_many=relation.holds_many,
-                    mounted_by=relation.mounted_by,
                     removes_geometry=relation.removes_geometry,
                 )
                 for whole, relation in admissible_mounts(one_class, other_class)
             ],
         )
-        if len(view.admissible) == 1:
+        if len(view.mounts) == 1:
             return replace(view, status=RelationStatus.RELATION_KNOWN)
-        if view.admissible:
+        if view.mounts:
             return replace(view, status=RelationStatus.RELATION_AMBIGUOUS)
         return view
 
@@ -485,7 +478,7 @@ class MeasureScene(PipelineStep):
     @staticmethod
     def group_highlights(
         segments: Sequence[LabelSegment], contested: np.ndarray
-    ) -> Tuple[List[Tuple[Color, np.ndarray]], Dict[str, Color]]:
+    ) -> Tuple[List[Tuple[Color, np.ndarray]], Dict[str, PaintColor]]:
         """
         Color a set of objects so that what they disagree about can be seen.
 
@@ -497,12 +490,15 @@ class MeasureScene(PipelineStep):
         :param segments: The objects to color.
         :param contested: The faces they all claim.
         :return: What to paint, and what each color stands for.
+        :raises TooManyToPaintError: If there are more objects than colors to tell
+            them apart by.
         """
-        colors = Color.distinct_colors(len(segments) + 1)
+        colors = PaintColor.distinct(len(segments) + 1)
         highlights = [
-            (color, segment.face_indices) for color, segment in zip(colors, segments)
+            (color.color, segment.face_indices)
+            for color, segment in zip(colors, segments)
         ]
-        highlights.append((colors[-1], contested))
+        highlights.append((colors[-1].color, contested))
         legend = {str(segment.name): color for color, segment in zip(colors, segments)}
         legend["contested"] = colors[-1]
         return highlights, legend
@@ -554,11 +550,11 @@ class MeasureScene(PipelineStep):
         self.logger.info("rendering %s exemplars ...", len(request.labels))
         for entry in request.labels:
             segment = segments[entry.exemplar]
-            color = Color.distinct_colors(1)[0]
+            [color] = PaintColor.distinct(1)
             entry.images = self.write_images(
                 loader.render_region(
                     [segment],
-                    [(color, segment.face_indices)],
+                    [(color.color, segment.face_indices)],
                     viewpoints=self.viewpoints,
                     headless=self.settings.headless,
                     choose_viewpoint=self.chooses_viewpoint,
@@ -569,7 +565,7 @@ class MeasureScene(PipelineStep):
                 self.run.path(RunFile.EXEMPLARS),
                 entry.label,
             )
-            entry.color = color.closest_css3_name()
+            entry.color = color.word
             self.logger.info("  %s: %s", entry.label, entry.exemplar)
 
     def render_questions(
@@ -610,9 +606,7 @@ class MeasureScene(PipelineStep):
                 self.run.path(RunFile.QUESTION_RENDERS),
                 question.name,
             )
-            question.legend = {
-                name: color.closest_css3_name() for name, color in legend.items()
-            }
+            question.legend = {name: color.word for name, color in legend.items()}
             self.logger.info("  %s", question.name)
 
     # %% what is left to decide
@@ -647,8 +641,7 @@ class MeasureScene(PipelineStep):
             for whole, relation in admissible_mounts(read_as[one], read_as[other]):
                 admits.append(
                     f"{whole.__name__}.{relation.field_name} may hold a "
-                    f"{relation.target} ({relation.kind}, mounted with "
-                    f"{relation.mounted_by}())"
+                    f"{relation.target} as a part"
                 )
         return OntologySlice(
             read_as={
@@ -787,10 +780,14 @@ class MeasureScene(PipelineStep):
         """
         Work out which parts have a whole to choose and which have only one.
 
-        A part is attached to the whole it belongs to, so a candidate has to share faces
-        with it or touch it along an edge. Everything else the measurement reached is
-        merely nearby, and offering it as an alternative is offering a wrong answer: it
-        trebles the questions and none of what it adds could be right.
+        A part that shares faces with a whole it could belong to, or touches one along an
+        edge, is offered only those. A part that meets none is offered the wholes within
+        :attr:`~experiments.warsaw.pipeline.settings.PipelineSettings.largest_gap_to_a_whole`
+        of it, since a scan leaves gaps between what is mounted together.
+
+        A question lists its candidates by the edges they touch the part along, most
+        first, then by the faces they share with it and by how close they are; the
+        colours they are painted in follow that order.
 
         :param relations: The pairs, as they were written out.
         :param labels: Per segment, the label it carries.
@@ -798,47 +795,74 @@ class MeasureScene(PipelineStep):
         :param measured: The measured scene.
         :return: The parts with a whole to choose, and the parts with only one.
         """
-        candidates: Dict[str, Dict[str, MembershipCandidate]] = defaultdict(dict)
+        meeting: Dict[str, Dict[str, MembershipCandidate]] = defaultdict(dict)
+        nearby: Dict[str, Dict[str, MembershipCandidate]] = defaultdict(dict)
         for pair in relations.pairs:
             if pair.status is not RelationStatus.RELATION_KNOWN:
                 continue
-            if not pair.evidence.shared_faces and not pair.evidence.touching_edges:
+            meets = pair.evidence.shared_faces or pair.evidence.touching_edges
+            if (
+                not meets
+                and pair.evidence.distance > self.settings.largest_gap_to_a_whole
+            ):
                 continue
-            admitted = pair.view.admissible[0]
+            admitted = pair.view.mounts[0]
             whole, part = pair.evidence.one, pair.evidence.other
             if pair.classes.get(labels[whole]) != admitted.whole:
                 whole, part = part, whole
-            candidates[part][whole] = MembershipCandidate(
+            (meeting if meets else nearby)[part][whole] = MembershipCandidate(
                 name=whole,
                 field_name=admitted.field_name,
                 shared_faces=pair.evidence.shared_faces,
                 touching_edges=pair.evidence.touching_edges,
                 distance=round(pair.evidence.distance, 4),
             )
+        candidates = {
+            part: sorted(
+                (meeting.get(part) or nearby[part]).values(),
+                key=lambda one: (
+                    -one.touching_edges,
+                    -one.shared_faces,
+                    one.distance,
+                    one.name,
+                ),
+            )
+            for part in sorted(set(meeting) | set(nearby))
+        }
+        to_confirm = (
+            set(nearby) - set(meeting)
+            if self.settings.confirm_wholes_within_the_gap
+            else set()
+        )
 
         to_ask_about = [
             MembershipQuestion(
                 name=part,
                 part=part,
-                shown=[part] + sorted(wholes),
-                candidates=[wholes[name] for name in sorted(wholes)],
-                ontology=self.ontology_slice([part] + sorted(wholes), labels, classes),
-                measured=self.measured_of([part] + sorted(wholes), measured),
+                shown=[part] + [one.name for one in wholes],
+                candidates=wholes,
+                may_belong_to_none=part in to_confirm,
+                ontology=self.ontology_slice(
+                    [part] + [one.name for one in wholes], labels, classes
+                ),
+                measured=self.measured_of(
+                    [part] + [one.name for one in wholes], measured
+                ),
             )
-            for part, wholes in sorted(candidates.items())
-            if len(wholes) > 1
+            for part, wholes in candidates.items()
+            if len(wholes) > 1 or part in to_confirm
         ]
         forced = [
             ForcedMembership(
                 part=part,
-                whole=next(iter(wholes)),
-                field_name=next(iter(wholes.values())).field_name,
-                shared_faces=next(iter(wholes.values())).shared_faces,
-                touching_edges=next(iter(wholes.values())).touching_edges,
-                distance=next(iter(wholes.values())).distance,
+                whole=wholes[0].name,
+                field_name=wholes[0].field_name,
+                shared_faces=wholes[0].shared_faces,
+                touching_edges=wholes[0].touching_edges,
+                distance=wholes[0].distance,
             )
-            for part, wholes in sorted(candidates.items())
-            if len(wholes) == 1
+            for part, wholes in candidates.items()
+            if len(wholes) == 1 and part not in to_confirm
         ]
         return Memberships(to_ask_about=to_ask_about, forced=forced)
 

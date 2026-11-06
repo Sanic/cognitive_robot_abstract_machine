@@ -31,7 +31,7 @@ from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasDoors,
     HasDrawers,
-    IsGraspedAtHandle,
+    HasHandles,
 )
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
@@ -739,7 +739,7 @@ class RoboCasaDatasetLoader:
 
             if (
                 "handle" in child_name
-                and isinstance(parent_annotation, IsGraspedAtHandle)
+                and isinstance(parent_annotation, HasHandles)
                 and not parent_annotation.handles
             ):
                 child_annotation = Handle(root=child_body)

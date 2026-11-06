@@ -22,7 +22,6 @@ adjudication; if any of those is wrong, this writes it faithfully into the world
 from __future__ import annotations
 
 import dataclasses
-import inspect
 import logging
 import sys
 from collections import Counter, defaultdict
@@ -35,14 +34,15 @@ from semantic_digital_twin.semantic_annotations.in_memory_builder import (
     SemanticAnnotationClassBuilder,
 )
 from semantic_digital_twin.semantic_annotations.taxonomy_export import (
-    MountKind,
     annotation_classes,
     in_base_order,
     names_a_category,
 )
+from semantic_digital_twin.semantic_annotations.part_whole import fields_accepting
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     HasRootRegion,
+    PartWholeRelationship,
 )
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -313,7 +313,10 @@ class MountAnnotations(HasLogger):
             split=split,
             classifications=classifications,
             annotated_names=set(annotations),
-        ).with_fields_resolved(annotation_classes(SemanticAnnotation))
+            parents=EvaluationGraph.parents_in(
+                world, {body.name for body in split.bodies}
+            ),
+        )
         self.run.write_record(RunFile.EVALUATION_GRAPH, graph)
 
         report = RunReport(run=self.run)
@@ -400,7 +403,9 @@ class MountAnnotations(HasLogger):
         pairings: List[Pairing],
     ) -> Mounted:
         """
-        Carry out every pairing, through the channel the ontology says mounts it.
+        Mount every pairing's part into its whole, in the field its class fits; the
+        field the pairing names decides only where several fields of the whole would
+        take it.
 
         :param world: The world the annotations are in.
         :param annotations: The annotation made for each body, by name.
@@ -421,8 +426,21 @@ class MountAnnotations(HasLogger):
                         )
                     )
                     continue
+                if not isinstance(whole, PartWholeRelationship):
+                    mounted.refused.append(
+                        RefusedMount(
+                            pairing=pairing,
+                            reason=f"the whole is a {type(whole).__name__}, which "
+                            "holds no parts",
+                        )
+                    )
+                    continue
+                fitting = fields_accepting(type(whole), type(part))
                 try:
-                    self.mount_one(whole, part, pairing)
+                    whole.add(
+                        part,
+                        field_name=pairing.field_name if len(fitting) > 1 else "",
+                    )
                 except UsageError as refusal:
                     # The world refusing a mount is an answer about this pairing, not a
                     # state the run should not have reached: the class a body was given
@@ -437,25 +455,6 @@ class MountAnnotations(HasLogger):
                 else:
                     mounted.carried_out += 1
         return mounted
-
-    @staticmethod
-    def mount_one(
-        whole: SemanticAnnotation, part: SemanticAnnotation, pairing: Pairing
-    ) -> None:
-        """
-        Mount one part into one whole, through the channel its kind names.
-
-        :param whole: The annotation that holds.
-        :param part: The annotation it holds.
-        :param pairing: The mount to carry out.
-        :raises UsageError: If the world will not hold the part that way.
-        """
-        if pairing.kind is MountKind.CONTAINS:
-            whole.add_object(part)
-        elif pairing.kind is MountKind.SUPPORTS:
-            whole.add_supporting_surface(part)
-        else:
-            whole.add(part, field_name=pairing.field_name)
 
 
 # %% generating the classes the scene needs
@@ -569,7 +568,7 @@ class AnnotateAndMount(PipelineStep):
         mixins to compose it from, having been shown what objects of that label were
         measured to meet; the classification step answers which class each *object* is,
         from a picture, and its schema carries a superclass as well. Read from the
-        classification alone, a Faucet that the vocabulary had composed with HasHandle
+        classification alone, a Faucet that the vocabulary had composed with HasHandles
         comes out with no way to hold a handle at all, and the pairing measured for it
         cannot be mounted.
 

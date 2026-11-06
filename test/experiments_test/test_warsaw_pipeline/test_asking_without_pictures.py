@@ -133,6 +133,26 @@ def test_a_label_question_with_pictures_still_carries_them(
     assert kinds.count("ImagePart") == 3
 
 
+def test_a_label_question_with_pictures_says_which_object_they_show(
+    label_question, three_renders
+) -> None:
+    """
+    The message names the object pictured, so the model knows which of the label's
+    objects it is looking at.
+    """
+    [text, *_] = label_question(three_renders).message()
+
+    assert '"chair_1"' in text.text
+
+
+def test_a_label_question_without_pictures_names_no_pictured_object(
+    label_question,
+) -> None:
+    [text] = label_question([]).message()
+
+    assert "pictures" not in text.text.lower()
+
+
 def test_a_label_question_without_pictures_is_not_told_to_read_any(
     label_question,
 ) -> None:
@@ -358,7 +378,9 @@ def test_contested_faces_left_undrawn_are_still_adjudicated(
         }
     )
     monkeypatch.setattr(
-        pipeline_step, VisionLanguageModel.__name__, lambda model: scripted
+        pipeline_step,
+        VisionLanguageModel.__name__,
+        lambda **asked: scripted,
     )
 
     settings = PipelineSettings(
@@ -369,6 +391,34 @@ def test_contested_faces_left_undrawn_are_still_adjudicated(
     adjudications = run.read_record(RunFile.ADJUDICATIONS, Adjudications)
     assert [one.owner for one in adjudications.ownership] == [owner]
     assert [one.whole for one in adjudications.membership] == [whole]
+
+
+def test_a_part_may_be_said_to_belong_to_none_of_the_wholes_found_nearby(
+    tmp_path, monkeypatch, undrawn_questions, relations, undrawn_membership
+) -> None:
+    """
+    A part left with no whole stays where the split put it, which is an answer here.
+    """
+    run = Run(directory=tmp_path)
+    undrawn_membership.asked.may_belong_to_none = True
+    run.write_record(
+        RunFile.QUESTIONS,
+        OpenQuestions(scene=relations.scene, asked=[undrawn_membership.asked]),
+    )
+    run.write_record(RunFile.RELATIONS, relations)
+    scripted = AnsweringBySystemPrompt(
+        answers={undrawn_membership.system_prompt: {"whole": None}}
+    )
+    monkeypatch.setattr(
+        pipeline_step, VisionLanguageModel.__name__, lambda **asked: scripted
+    )
+
+    AdjudicateOverlaps(
+        settings=PipelineSettings(scene_directory=tmp_path), run=run
+    ).carry_out()
+
+    [answer] = run.read_record(RunFile.ADJUDICATIONS, Adjudications).membership
+    assert (answer.whole, answer.problems) == (None, [])
 
 
 def test_an_undrawn_ownership_question_carries_no_image(undrawn_ownership) -> None:
@@ -389,6 +439,26 @@ def test_an_undrawn_ownership_question_mentions_no_picture_or_colour(
     """
     [text] = undrawn_ownership.message()
     said = (undrawn_ownership.system_prompt + text.text).lower()
+    assert "picture" not in said
+    assert "color" not in said
+
+
+def test_a_question_that_may_end_in_none_says_so(undrawn_membership) -> None:
+    must_choose = undrawn_membership.system_prompt
+    undrawn_membership.asked.may_belong_to_none = True
+
+    assert "null" not in must_choose
+    assert "null" in undrawn_membership.system_prompt
+
+
+def test_an_undrawn_question_that_may_end_in_none_mentions_no_picture_or_colour(
+    undrawn_membership,
+) -> None:
+    undrawn_membership.asked.may_belong_to_none = True
+
+    [text] = undrawn_membership.message()
+    said = (undrawn_membership.system_prompt + text.text).lower()
+
     assert "picture" not in said
     assert "color" not in said
 

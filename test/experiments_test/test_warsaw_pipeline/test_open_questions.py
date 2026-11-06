@@ -12,13 +12,16 @@ from __future__ import annotations
 
 import pytest
 
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 
-from experiments.warsaw.pipeline.records import Relations, RelationStatus
+from experiments.warsaw.pipeline.records import PairRecord, Relations, RelationStatus
 from experiments.warsaw.pipeline.run import Run
 from experiments.warsaw.pipeline.settings import PipelineSettings
 from experiments.warsaw.pipeline.steps.evidence import MeasureScene
-from experiments.warsaw.segment_relations import SegmentRelations
+from experiments.warsaw.segment_relations import (
+    PairEvidence,
+    SegmentDescriptor,
+    SegmentRelations,
+)
 
 
 @pytest.fixture
@@ -49,8 +52,8 @@ def test_a_cabinet_can_hold_a_drawer_and_only_one_way(step, known):
     """
     view = step.ontology_view(known["Cabinet"], known["Drawer"])
     assert view.status is RelationStatus.RELATION_KNOWN
-    assert view.admissible[0].field_name == "drawers"
-    assert view.admissible[0].whole == "Cabinet"
+    assert view.mounts[0].field_name == "drawers"
+    assert view.mounts[0].whole == "Cabinet"
 
 
 def test_two_classes_that_cannot_hold_one_another_leave_an_overlap_unexplained(
@@ -75,17 +78,13 @@ def test_an_unmapped_label_leaves_the_ontology_with_nothing_to_say(step, known):
     )
 
 
-def test_containment_is_reported_beside_the_parts_rather_than_as_one(step, known):
+def test_storing_one_in_the_other_is_not_admitted(step, known):
     """
-    ``contains`` is admissible between almost any two annotations, so letting it decide
-    the status would report a relation for every pair in the room -- but a mug on a
-    counter does stand in one, and an adjudication told only about parts would force
-    "part" onto it.
+    A drawer could be stored in a cabinet as well as be part of it, and only the part is
+    a relation the pipeline mounts.
     """
     view = step.ontology_view(known["Cabinet"], known["Drawer"])
-    assert view.status is RelationStatus.RELATION_KNOWN
-    assert [one.field_name for one in view.admissible] == ["drawers"]
-    assert {one.kind for one in view.mounts} == {MountKind.PART, MountKind.CONTAINS}
+    assert [one.field_name for one in view.mounts] == ["drawers"]
 
 
 # %% which object stands for a label
@@ -149,13 +148,12 @@ def test_a_part_meeting_several_candidates_is_asked_about(step, relations, known
         assert question.shown[0] == question.part
 
 
-def test_something_merely_nearby_is_no_candidate(step, relations, known):
+def test_a_part_that_meets_a_whole_is_offered_only_wholes_it_meets(
+    step, relations, known
+):
     """
-    A part is attached to the whole it belongs to, so a candidate has to share faces
-    with it or touch it along an edge.
-
-    Offering what is merely nearby trebles the questions and none of what it adds could
-    be right.
+    A whole a part shares faces with or touches is where it is mounted, so what is
+    merely nearby is offered only to a part that meets none.
     """
     memberships = step.memberships(
         relations,
@@ -164,10 +162,8 @@ def test_something_merely_nearby_is_no_candidate(step, relations, known):
         self_measured(relations),
     )
     for one in memberships.to_ask_about:
-        for candidate in one.candidates:
-            assert candidate.shared_faces or candidate.touching_edges
-    for one in memberships.forced:
-        assert one.shared_faces or one.touching_edges
+        meets = [c for c in one.candidates if c.shared_faces or c.touching_edges]
+        assert meets == [] or meets == one.candidates
 
 
 def test_a_pair_the_ontology_leaves_open_names_no_membership(step, relations, known):
@@ -188,6 +184,197 @@ def test_a_pair_the_ontology_leaves_open_names_no_membership(step, relations, kn
     }
     for one in memberships.forced:
         assert tuple(sorted((one.part, one.whole))) in known_pairs
+
+
+# %% a part that meets no whole
+
+
+def blinds_and_rails(step, known, *meetings):
+    """
+    :param meetings: Per rail, how many edges the blinds touch it along and how far
+        apart the two are.
+    :return: The pairs between a pair of blinds and those rails, and every label.
+    """
+    pairs = [
+        PairRecord(
+            evidence=PairEvidence(
+                one=rail,
+                other="blinds_1",
+                shared_faces=0,
+                share_of_one=0.0,
+                share_of_other=0.0,
+                touching_edges=edges,
+                distance=distance,
+            ),
+            classes={"rail": "Rail", "blinds": "Blinds"},
+            view=step.ontology_view(known["Rail"], known["Blinds"]),
+        )
+        for rail, edges, distance in meetings
+    ]
+    labels = {"blinds_1": "blinds", **{rail: "rail" for rail, _, _ in meetings}}
+    classes = {"rail": known["Rail"], "blinds": known["Blinds"]}
+    return Relations(scene="a room", pairs=pairs), labels, classes
+
+
+def described(name: str, label: str) -> SegmentDescriptor:
+    """
+    :return: A segment measured to be a small square of scan.
+    """
+    return SegmentDescriptor(
+        name=name,
+        class_name=label,
+        instance=1,
+        faces=2,
+        exclusive_faces=2,
+        area=0.01,
+        exclusive_area=0.01,
+        centroid=(0.0, 0.0, 1.0),
+        minimum_corner=(0.0, 0.0, 1.0),
+        maximum_corner=(0.1, 0.1, 1.0),
+        components=1,
+        height=1.0,
+    )
+
+
+def test_the_whole_touched_along_the_most_edges_is_offered_first(step, known):
+    """
+    A model reads the candidates in the order they are listed and paints them in that
+    order, so the order follows the contact rather than the names.
+    """
+    relations, labels, classes = blinds_and_rails(
+        step, known, ("rail_1", 3, 0.0), ("rail_2", 12, 0.0), ("rail_3", 7, 0.0)
+    )
+    relations = Relations(
+        scene=relations.scene,
+        pairs=relations.pairs,
+        segments=[described(name, label) for name, label in labels.items()],
+    )
+
+    [question] = step.memberships(
+        relations, labels, classes, self_measured(relations)
+    ).to_ask_about
+
+    assert [one.name for one in question.candidates] == ["rail_2", "rail_3", "rail_1"]
+    assert question.shown == ["blinds_1", "rail_2", "rail_3", "rail_1"]
+
+
+def test_a_part_that_meets_no_whole_is_given_one_within_the_gap(step, known):
+    """
+    A scan leaves gaps between what is mounted together, as between blinds and the rail
+    they hang from.
+    """
+    gap = step.settings.largest_gap_to_a_whole
+    relations, labels, classes = blinds_and_rails(step, known, ("rail_1", 0, gap / 2))
+
+    memberships = step.memberships(relations, labels, classes, self_measured(relations))
+
+    assert [(one.part, one.whole) for one in memberships.forced] == [
+        ("blinds_1", "rail_1")
+    ]
+
+
+def test_a_whole_past_the_gap_is_not_offered(step, known):
+    gap = step.settings.largest_gap_to_a_whole
+    relations, labels, classes = blinds_and_rails(step, known, ("rail_1", 0, gap * 2))
+
+    memberships = step.memberships(relations, labels, classes, self_measured(relations))
+
+    assert (memberships.forced, memberships.to_ask_about) == ([], [])
+
+
+def test_a_part_that_meets_a_whole_is_not_offered_a_nearby_one(step, known):
+    gap = step.settings.largest_gap_to_a_whole
+    relations, labels, classes = blinds_and_rails(
+        step, known, ("rail_1", 12, 0.0), ("rail_2", 0, gap / 2)
+    )
+
+    memberships = step.memberships(relations, labels, classes, self_measured(relations))
+
+    assert [(one.part, one.whole) for one in memberships.forced] == [
+        ("blinds_1", "rail_1")
+    ]
+
+
+# %% asking about a whole that was only found nearby
+
+
+@pytest.fixture
+def confirming_step(tmp_path):
+    """
+    :return: The measuring step of a run asking about the wholes it only found nearby.
+    """
+    return MeasureScene(
+        settings=PipelineSettings(confirm_wholes_within_the_gap=True),
+        run=Run(directory=tmp_path),
+    )
+
+
+def memberships_of(step, known, *meetings):
+    """
+    :param meetings: Per rail, how many edges the blinds touch it along and how far
+        apart the two are.
+    :return: What the step makes of a pair of blinds and those rails.
+    """
+    relations, labels, classes = blinds_and_rails(step, known, *meetings)
+    relations = Relations(
+        scene=relations.scene,
+        pairs=relations.pairs,
+        segments=[described(name, label) for name, label in labels.items()],
+    )
+    return step.memberships(relations, labels, classes, self_measured(relations))
+
+
+def test_the_one_whole_within_the_gap_is_asked_about(confirming_step, known):
+    gap = confirming_step.settings.largest_gap_to_a_whole
+
+    memberships = memberships_of(confirming_step, known, ("rail_1", 0, gap / 2))
+
+    assert memberships.forced == []
+    [question] = memberships.to_ask_about
+    assert question.candidate_names == ["rail_1"]
+    assert question.may_belong_to_none is True
+
+
+def test_several_wholes_within_the_gap_may_all_be_declined(confirming_step, known):
+    gap = confirming_step.settings.largest_gap_to_a_whole
+
+    [question] = memberships_of(
+        confirming_step, known, ("rail_1", 0, gap / 2), ("rail_2", 0, gap / 3)
+    ).to_ask_about
+
+    assert question.candidate_names == ["rail_2", "rail_1"]
+    assert question.may_belong_to_none is True
+
+
+def test_a_touched_whole_is_taken_without_asking(confirming_step, known):
+    gap = confirming_step.settings.largest_gap_to_a_whole
+
+    memberships = memberships_of(
+        confirming_step, known, ("rail_1", 12, 0.0), ("rail_2", 0, gap / 2)
+    )
+
+    assert memberships.to_ask_about == []
+    assert [one.whole for one in memberships.forced] == ["rail_1"]
+
+
+def test_a_part_touching_several_wholes_has_to_choose_one(confirming_step, known):
+    [question] = memberships_of(
+        confirming_step, known, ("rail_1", 12, 0.0), ("rail_2", 3, 0.0)
+    ).to_ask_about
+
+    assert question.may_belong_to_none is False
+
+
+def test_without_the_setting_several_wholes_within_the_gap_have_to_be_chosen_from(
+    step, known
+):
+    gap = step.settings.largest_gap_to_a_whole
+
+    [question] = memberships_of(
+        step, known, ("rail_1", 0, gap / 2), ("rail_2", 0, gap / 3)
+    ).to_ask_about
+
+    assert question.may_belong_to_none is False
 
 
 def self_classes(relations: Relations, known):

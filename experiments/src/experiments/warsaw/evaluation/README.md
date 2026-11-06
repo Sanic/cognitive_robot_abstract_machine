@@ -1,7 +1,19 @@
 # Warsaw SDT evaluation
 
-The evaluation treats a pipeline run as an immutable experimental unit. New runs keep
-the following files in their run directory:
+This package holds what a run is judged and looked at by:
+
+| Module | What it is |
+| --- | --- |
+| `graph.py` | `EvaluationGraph`: a run's bodies, their classes, and every mount it attempted, accepted or refused, independent of the database |
+| `size.py` | The size of a body, which the graph records |
+| `export_world_mesh.py` | A finished run's world as a GLB, one named node per body, for Blender |
+| `label_vocabulary.py` | Matching our class names to another dataset's label vocabulary (habitat comparison, lexical baselines) |
+
+The Articulate3D evaluation lives in `experiments.warsaw.articulate3d`. Its scoring
+(`articulate3d/score.py`) reads a run's `EvaluationGraph`.
+
+A run treats itself as an immutable experimental unit, and keeps these files in its
+directory:
 
 | Path | Purpose |
 | --- | --- |
@@ -11,65 +23,54 @@ the following files in their run directory:
 | `model_calls/<stage>/<question>/attempt_N.json` | Every prompt attempt, raw response, validation result, model, and latency |
 | `evaluation_graph.json` | Database-independent final nodes and accepted or refused semantic edges |
 
-The answer directories hold the latest answer per question; `model_calls` is the audit
-trail and does not overwrite a failed attempt when a correction succeeds.
+The answer directories hold the latest answer per question. `model_calls` is the audit
+trail, and a failed attempt stays in it when a later correction succeeds.
 
-## Coordinate alignment
+## The earlier evaluation against modelled worlds
 
-Camera poses are not required. Select corresponding physical points in the
-reconstruction and GT viewers and write them as:
-
-```json
-{
-  "schema_version": 1,
-  "reconstruction_frame": "pipeline_mesh",
-  "ground_truth_frame": "iai_apartment",
-  "estimate_scale": false,
-  "landmarks": [
-    {
-      "name": "northwest floor corner",
-      "reconstruction": [0.0, 0.0, 0.0],
-      "ground_truth": [1.0, 2.0, 0.0]
-    },
-    {
-      "name": "counter left corner",
-      "reconstruction": [1.0, 0.0, 0.9],
-      "ground_truth": [1.0, 3.0, 0.9]
-    },
-    {
-      "name": "counter right corner",
-      "reconstruction": [1.0, 2.0, 0.9],
-      "ground_truth": [-1.0, 3.0, 0.9]
-    }
-  ]
-}
-```
-
-Use at least six points spread over the scanned volume in practice. Avoid placing all
-points on one line or on one small object. Set `estimate_scale` to `true` only when the
-coordinate frames may use different units. Fit the transform with:
+Until commit `1490bff0bb`, this package also compared a run against a hand-modelled
+world, for example the IAI apartment kitchen. That comparison was removed once the
+Articulate3D evaluation replaced it. The code is still in that commit, and it can be
+restored with:
 
 ```bash
-python -m experiments.warsaw.evaluation.alignment landmarks.json \
-  --output alignment.json
+git checkout 1490bff0bb -- experiments/src/experiments/warsaw/evaluation test/experiments_test/test_warsaw_evaluation
 ```
 
-The output contains the reconstruction-to-GT homogeneous matrix, scale, RMSE, and the
-residual of every landmark. A large initial rotation or translation does not affect the
-closed-form fit. ICP can refine this result after the landmark residuals have been
-checked.
+It worked in five stages:
 
-## Evaluation scope
+1. **Ground truth.** It read a modelled world (from a URDF with inferred semantics, or
+   from a Python world provider) into a `GroundTruthGraph`: its entities, classes,
+   sizes, and every part, containment and support relation its annotations held.
+   Corrections a person made by hand were kept in `ground_truth_corrections/`, and the
+   written graphs in `ground_truth_graphs/`. Modules: `ground_truth.py`,
+   `export_ground_truth.py`, `publish_ground_truth.py`.
+2. **Alignment.** Corresponding points, picked by hand on the reconstruction and on the
+   modelled world and stored in `landmarks/`, gave a closed-form rigid (optionally
+   scaled) transform with its RMSE and per-landmark residuals. Modules: `alignment.py`,
+   `export_ground_truth_mesh.py`, `overlay.py`.
+3. **Scope.** Only fixed apartment structure was compared. Movable objects, people and
+   robot bodies were left out, and a modelled entity counted only when enough of its
+   surface lay near the aligned reconstruction. The scopes were in `scopes/`. Module:
+   `scope.py`.
+4. **Matching.** Reconstructed bodies were paired with modelled entities, by position
+   once aligned and by class and size without alignment, before any per-object measure.
+   Modules: `matching.py`, `placement.py`, `measure_run_bodies.py`.
+5. **Measures:**
+   - `label_metrics.py`: the earlier count-based HM3D label metric, kept for
+     compatibility. It ignored object identity.
+   - `composition.py`, `structure.py`: how much structure each graph had, per class and
+     per relation pattern, without pairing objects.
+   - `relation_correctness.py`: whether each relation a run asserted is one the modelled
+     world holds.
+   - `parenthood.py`, `siblings.py`: which whole each part ended up in, and why some
+     ended up in none.
+   - `ablations.py`: what each part of a run was worth, by leaving it out and scoring
+     again.
+   - `evaluate.py`: gathered all of these into one report.
+   - `overlap_case.py`: cut one overlap out of a scan for a figure.
 
-For the apartment experiments, only fixed apartment structure belongs in the primary
-comparison. Movable objects, people, and robot bodies are excluded before matching.
-Coverage is defined from the aligned reconstructed surface: a GT entity is eligible
-only when enough of its surface lies within a chosen distance of the reconstructed
-surface. Report the threshold and minimum covered fraction with every result, and report
-results at several reasonable thresholds as a sensitivity analysis.
-
-The count-based label metric in `label_metrics.py` reproduces the earlier HM3D metric.
-It deliberately ignores object identity and is therefore a compatibility result. The
-primary evaluator should first establish instance correspondences and then report
-instance detection, class correctness, geometry overlap, and typed hierarchy metrics on
-the same eligible set.
+Back then, the model was also offered containment (`add_object`) and support
+(`add_supporting_surface`) besides part-whole, and a relation's kind was carried through
+these records. The pipeline now offers and mounts only part-whole relations, so the kind
+is gone.

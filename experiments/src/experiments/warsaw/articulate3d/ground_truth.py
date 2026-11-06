@@ -33,7 +33,7 @@ from experiments.warsaw.articulate3d.exceptions import (
     AmbiguousPartFieldError,
     AmbiguousWholeError,
 )
-from experiments.warsaw.articulate3d.protocol import EvaluationProtocol
+from experiments.warsaw.articulate3d.protocol import EvaluationProtocol, ProtocolFile
 from experiments.warsaw.articulate3d.rules import RuleFindings
 from experiments.warsaw.bases import JsonRecord
 
@@ -66,6 +66,14 @@ class Expressibility(StrEnum):
     """
     The class of an end is not judged, so whether a field could hold it is not known.
     """
+
+    @property
+    def reachable(self) -> bool:
+        """
+        :return: Whether a run can hang the part from the whole as annotated, through a
+            field of either class.
+        """
+        return self in (Expressibility.EXPRESSIBLE, Expressibility.CARRIED)
 
 
 # %% the ground truth of one scene
@@ -335,7 +343,10 @@ def argument_parser() -> argparse.ArgumentParser:
         help="ScanNet++'s data directory, holding the meshes the annotations were made on",
     )
     parser.add_argument(
-        "--protocol", type=Path, required=True, help="The frozen protocol"
+        "--protocol",
+        type=Path,
+        default=ProtocolFile.ARTICULATE3D,
+        help="The frozen protocol; the one kept with this package by default",
     )
     parser.add_argument(
         "--output", type=Path, required=True, help="Where to write the ground truth"

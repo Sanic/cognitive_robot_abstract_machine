@@ -10,8 +10,11 @@ like the scene's fault rather than the answer's.
 from __future__ import annotations
 
 import inspect
+import json
+from dataclasses import replace
 
 import pytest
+from semantic_digital_twin.adapters.vision_language_model.client import ModelResponse
 from semantic_digital_twin.semantic_annotations.taxonomy_export import (
     build_taxonomy,
     declares_itself_a_category,
@@ -34,7 +37,10 @@ from experiments.warsaw.pipeline.steps.adjudicate.step import (
     MembershipDecision,
     OwnershipDecision,
 )
-from experiments.warsaw.pipeline.steps.classify.step import BodyGroupQuestion
+from experiments.warsaw.pipeline.steps.classify.step import (
+    BodyChoiceQuestion,
+    BodyGroupQuestion,
+)
 from experiments.warsaw.pipeline.steps.vocabulary.step import LabelQuestion
 from experiments.warsaw.world_loader.loader import RenderedSegmentGroup
 from experiments.warsaw.world_loader.scene import LabelSegment
@@ -124,9 +130,9 @@ def test_a_mixin_given_as_a_class_is_refused(label_question):
 
     This is the answer that left a real run's faucet unmapped.
     """
-    problems = label_question.problems_with(LabelAnswer(class_name="HasHandle"))
+    problems = label_question.problems_with(LabelAnswer(class_name="HasDoors"))
     assert len(problems) == 1
-    assert "HasHandle" in problems[0]
+    assert "HasDoors" in problems[0]
 
 
 def test_a_category_given_as_a_class_is_refused(
@@ -267,6 +273,67 @@ def test_a_class_the_ontology_already_has_is_not_proposed_as_new(label_question)
     assert any("already in the taxonomy" in one for one in problems)
 
 
+# %% alternatives a label may be answered with
+
+
+def test_alternatives_from_the_ontology_are_usable(label_question):
+    """
+    A label the pictures leave open between two classes names both.
+    """
+    answer = LabelAnswer(class_name="Cabinet", alternatives=["Drawer"])
+
+    assert label_question.problems_with(answer) == []
+
+
+def test_an_alternative_the_ontology_lacks_is_refused(label_question):
+    answer = LabelAnswer(class_name="Cabinet", alternatives=["Gizmo"])
+
+    assert len(label_question.problems_with(answer)) == 1
+
+
+def test_a_mixin_given_as_an_alternative_is_refused(label_question):
+    answer = LabelAnswer(class_name="Cabinet", alternatives=["HasDoors"])
+
+    assert len(label_question.problems_with(answer)) == 1
+
+
+def test_a_class_being_proposed_has_no_alternatives(label_question):
+    """
+    The choice among a label's classes is between classes the ontology already holds.
+    """
+    proposal = LabelAnswer(
+        class_name="Bookcase",
+        is_new_class=True,
+        superclass="Furniture",
+        alternatives=["Cabinet"],
+    )
+
+    assert len(label_question.problems_with(proposal)) == 1
+
+
+# %% a label asked about while new classes are deferred
+
+
+def test_a_label_asked_while_classes_are_deferred_is_not_given_a_new_one(
+    label_question,
+):
+    """
+    A class is proposed for it afterwards, once every label has been read.
+    """
+    deferring = replace(label_question, proposes_classes=False)
+    proposal = LabelAnswer(
+        class_name="Bookcase", is_new_class=True, superclass="Furniture"
+    )
+
+    assert len(deferring.problems_with(proposal)) == 1
+
+
+def test_a_label_asked_while_classes_are_deferred_may_be_given_none(label_question):
+    deferring = replace(label_question, proposes_classes=False)
+
+    assert deferring.problems_with(LabelAnswer(class_name=None)) == []
+
+
 # %% what an overlap may be answered with
 
 
@@ -363,6 +430,60 @@ def test_a_whole_that_was_not_offered_is_refused(membership_decision):
     )
     assert len(problems) == 1
     assert "cabinet_99" in problems[0]
+
+
+def test_a_part_that_has_to_belong_somewhere_is_not_answered_with_none(
+    membership_decision,
+):
+    assert (
+        len(
+            membership_decision.problems_with(
+                MembershipAnswer(name="door_10", part="door_10", whole=None)
+            )
+        )
+        == 1
+    )
+
+
+def test_a_part_that_may_belong_to_none_is_answered_with_none(membership_decision):
+    membership_decision.asked.may_belong_to_none = True
+
+    assert (
+        membership_decision.problems_with(
+            MembershipAnswer(name="door_10", part="door_10", whole=None)
+        )
+        == []
+    )
+
+
+def test_a_part_that_may_belong_to_none_is_still_not_given_another_whole(
+    membership_decision,
+):
+    membership_decision.asked.may_belong_to_none = True
+
+    assert (
+        len(
+            membership_decision.problems_with(
+                MembershipAnswer(name="door_10", part="door_10", whole="cabinet_99")
+            )
+        )
+        == 1
+    )
+
+
+def test_an_answer_carries_the_field_its_whole_would_hold_the_part_in(
+    membership_decision,
+):
+    """
+    A whole holding a part through several fields refuses a mount naming none of them.
+    """
+    answer = membership_decision.read(
+        ModelResponse.from_json(
+            {"choices": [{"message": {"content": json.dumps({"whole": "cabinet_20"})}}]}
+        )
+    )
+
+    assert answer.field_name == membership_decision.asked.candidates[1].field_name
 
 
 # %% what a group of bodies may be answered with
@@ -486,3 +607,104 @@ def test_a_body_given_a_new_class_of_a_category_is_usable(
         )
         == []
     )
+
+
+# %% choosing among the classes a label was left open between
+
+
+@pytest.fixture
+def choice_group(taxonomy):
+    """
+    :return: A question about a drawer and a handle whose labels were each left open
+        between two classes.
+    """
+    return BodyChoiceQuestion(
+        rendered=RenderedSegmentGroup(
+            index=0,
+            segments=[
+                LabelSegment(
+                    class_name="drawer", instance=19, face_indices=np.array([0, 1])
+                ),
+                LabelSegment(
+                    class_name="handle", instance=23, face_indices=np.array([2])
+                ),
+            ],
+            colors={},
+            images={},
+        ),
+        taxonomy=taxonomy,
+        vocabulary=Vocabulary(
+            model="",
+            scene="",
+            labels=[
+                LabelAnswer(
+                    label="drawer", class_name="Drawer", alternatives=["Cabinet"]
+                ),
+                LabelAnswer(label="handle", class_name="Handle", alternatives=["Knob"]),
+            ],
+        ),
+    )
+
+
+def test_a_body_given_one_of_its_classes_is_usable(choice_group):
+    answer = {
+        "drawer_19": BodyAnswer(class_name="Cabinet"),
+        "handle_23": BodyAnswer(class_name="Handle"),
+    }
+
+    assert choice_group.problems_with(answer) == []
+
+
+def test_a_body_given_none_of_its_classes_is_usable(choice_group):
+    """
+    That it is none of them sends it on to be asked without the list.
+    """
+    answer = {
+        "drawer_19": BodyAnswer(class_name=None),
+        "handle_23": BodyAnswer(class_name="Knob"),
+    }
+
+    assert choice_group.problems_with(answer) == []
+
+
+def test_a_body_given_a_class_outside_its_choices_is_refused(choice_group):
+    answer = {
+        "drawer_19": BodyAnswer(class_name="Door"),
+        "handle_23": BodyAnswer(class_name="Handle"),
+    }
+
+    problems = choice_group.problems_with(answer)
+
+    assert len(problems) == 1
+    assert "drawer_19" in problems[0]
+
+
+# %% a group of bodies asked about while new classes are deferred
+
+
+def test_a_body_given_a_class_of_its_own_is_refused_while_classes_are_deferred(
+    body_group,
+):
+    deferring = replace(body_group, proposes_classes=False)
+    answer = {
+        "drawer_19": BodyAnswer(class_name="Drawer"),
+        "handle_23": BodyAnswer(class_name="Knobby", is_new_class=True),
+    }
+
+    problems = deferring.problems_with(answer)
+
+    assert len(problems) == 1
+    assert "handle_23" in problems[0]
+
+
+def test_a_body_given_no_class_is_usable_while_classes_are_deferred(body_group):
+    """
+    None of the ontology's classes being what it is, it is left without one.
+    """
+    deferring = replace(body_group, proposes_classes=False)
+    answer = {
+        "drawer_19": BodyAnswer(class_name="Drawer"),
+        "handle_23": BodyAnswer(class_name=None),
+    }
+
+    assert deferring.problems_with(answer) == []

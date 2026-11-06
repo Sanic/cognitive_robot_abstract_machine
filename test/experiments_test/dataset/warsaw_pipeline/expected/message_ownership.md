@@ -7,31 +7,22 @@ drawer_5 was read as Drawer
 kitchen_island_1 was read as KitchenIsland
 
 Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers)
-  part drawers -> Drawer (many), mounted with add()
-  part doors -> Door (many), mounted with add()
-  contains objects -> HasRootBody (many), mounted with add_object()
-  supports supporting_surface -> Region, mounted with add_supporting_surface()
+  part drawers -> Drawer (many)
+  part doors -> Door (many)
 Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMechanicalJoint)
-  part mechanical_joint -> MechanicalJoint, mounted with add()
-  part handle -> Handle, mounted with add()
-  contains objects -> HasRootBody (many), mounted with add_object()
-  supports supporting_surface -> Region, mounted with add_supporting_surface()
+  part mechanical_joint -> MechanicalJoint
+  part handle -> Handle
 KitchenIsland(Table, HasDrawers, HasSupportingSurface)
-  part drawers -> Drawer (many), mounted with add()
-  contains objects -> HasRootBody (many), mounted with add_object()
-  supports supporting_surface -> Region, mounted with add_supporting_surface()
+  part drawers -> Drawer (many)
 
-Cabinet.drawers may hold a Drawer (part, mounted with add())
-Cabinet.objects may hold a HasRootBody (contains, mounted with add_object())
-Drawer.objects may hold a HasRootBody (contains, mounted with add_object())
-KitchenIsland.objects may hold a HasRootBody (contains, mounted with add_object())
-KitchenIsland.drawers may hold a Drawer (part, mounted with add())
+Cabinet.drawers may hold a Drawer (part)
+KitchenIsland.drawers may hold a Drawer (part)
 
 ## The picture
-cabinet_8 (labelled "cabinet") is tomato
-drawer_5 (labelled "drawer") is royalblue
-kitchen_island_1 (labelled "kitchen_island") is greenyellow
-the faces all of them claim are mediumorchid
+cabinet_8 (labelled "cabinet") is painted in the colour tomato
+drawer_5 (labelled "drawer") is painted in the colour royalblue
+kitchen_island_1 (labelled "kitchen_island") is painted in the colour greenyellow
+the faces all of them claim are painted in the colour mediumorchid
 
 ## What was measured
 cabinet_8: 1589 faces, 1.43 m2, middle 0.87 m up, 1 piece(s)

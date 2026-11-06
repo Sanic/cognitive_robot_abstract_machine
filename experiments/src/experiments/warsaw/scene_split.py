@@ -36,7 +36,6 @@ from krrood_spatial_math.spatial_types import (
     Point3,
 )
 from semantic_digital_twin.semantic_annotations.part_whole import admissible_relations
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -100,11 +99,6 @@ class Pairing(JsonRecord):
     field_name: str
     """
     The field it is held in.
-    """
-
-    kind: MountKind = MountKind.PART
-    """
-    Which channel mounts it.
     """
 
 

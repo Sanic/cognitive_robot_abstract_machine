@@ -14,8 +14,9 @@ What is judged, each over the whole ground truth so that nothing a run missed dr
   the bodies covering several parts counted beside;
 - **classes**: whether each found part was given its class, exactly and as a share of the
   class hierarchy, with a class the run generated read as the class it derives from;
-- **relations**: whether each mount the run made is a relation of the part hierarchy,
-  and how many of those relations it made.
+- **links**: whether each part hangs from its whole in the tree the run built, how far
+  up the hierarchy it is placed right where it is not, and whether link and classes are
+  right together.
 
 A share with nothing to divide by is reported as nothing, never as a perfect score.
 
@@ -35,20 +36,19 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.sparse import csr_matrix
-from semantic_digital_twin.semantic_annotations.taxonomy_export import MountKind
 from typing_extensions import Any, Sequence
 
 from experiments.warsaw.articulate3d.convert import ConvertedScene
 from experiments.warsaw.articulate3d.exceptions import ClassNotInOntologyError
+from experiments.warsaw.articulate3d.splits import ValidationLock
 from experiments.warsaw.articulate3d.ground_truth import (
-    Expressibility,
     GroundTruthFile,
     GroundTruthPart,
     GroundTruthRelation,
     SceneGroundTruth,
 )
 from experiments.warsaw.bases import JsonRecord
-from experiments.warsaw.evaluation.graph import EvaluationEdge, EvaluationGraph
+from experiments.warsaw.evaluation.graph import EvaluationGraph
 from experiments.warsaw.pipeline.run import Run, RunFile
 from experiments.warsaw.pipeline.run_classes import GeneratedClasses
 
@@ -634,204 +634,282 @@ class ClassAgreement(JsonRecord):
         ]
 
 
-# %% what each mount was
+# %% where each part hangs
 
 
-class MountVerdict(StrEnum):
+class ClassVerdict(StrEnum):
     """
-    What the ground truth makes of one mount a run made.
-    """
-
-    HELD = "the ground truth holds the part in that whole"
-    """
-    Both ends are found parts, and the part hierarchy holds the one directly in the other.
+    What the ground truth makes of the class a run gave one annotated part.
     """
 
-    NOT_HELD = "the ground truth does not hold the part in that whole"
+    RIGHT = "given exactly its class"
     """
-    Both ends are found parts, and the part hierarchy does not hold the one directly in
-    the other.
-    """
-
-    UNMATCHED_END = "an end is no annotated part"
-    """
-    An end lies on annotated faces but was paired with no part, so the mount cannot be a
-    relation of the part hierarchy.
+    The part was found and given exactly the class it is.
     """
 
-    OUTSIDE = "an end lies outside the annotation"
+    WRONG = "given another class, or none"
     """
-    An end lies on faces the ground truth does not cover, so the mount is not judged.
+    The part's class is judged, and the run did not give it that class, found or not.
+    """
+
+    NOT_JUDGED = "its class is not judged"
+    """
+    The protocol judges no class for the part.
     """
 
 
 @dataclass(frozen=True)
-class JudgedMount(JsonRecord):
+class JudgedAttachment(JsonRecord):
     """
-    One part-whole mount a run made, and what the ground truth makes of it.
+    Where one annotated part hangs in the part hierarchy, and where the run hung it.
+
+    A run hangs a part from the nearest body above it that is an annotated part, past
+    any body between that is none.
     """
 
-    whole: str
+    part_id: int
     """
-    The body the part was mounted into.
-    """
-
-    part: str
-    """
-    The body mounted.
+    The part.
     """
 
-    field_name: str
+    relation: GroundTruthRelation | None
     """
-    The field the run mounted it through.
-    """
-
-    verdict: MountVerdict
-    """
-    What the ground truth makes of it.
+    The relation of the part hierarchy holding the part, or nothing where no annotated
+    part holds it.
     """
 
-    truth: GroundTruthRelation | None = None
+    predicted_whole: int | None
     """
-    The relation of the part hierarchy it is, where it is one.
+    The annotated part the run hung it from, or nothing where it was not found or hangs
+    from no annotated part.
+    """
+
+    true_ancestors: list[int]
+    """
+    Every annotated part it lies below in the part hierarchy, nearest first.
+    """
+
+    predicted_ancestors: list[int]
+    """
+    Every annotated part the run hung it below, nearest first.
+    """
+
+    part_class: ClassVerdict
+    """
+    What the ground truth makes of the class the run gave the part.
+    """
+
+    true_whole_class: ClassVerdict | None
+    """
+    What it makes of the class the run gave the part's whole, where it has one.
+    """
+
+    predicted_whole_class: ClassVerdict | None
+    """
+    What it makes of the class the run gave the part it hung this one from, where it
+    hung it from one.
     """
 
     @property
-    def same_field(self) -> bool:
+    def correct(self) -> bool:
         """
-        :return: Whether it is a relation of the part hierarchy, mounted through the field
-            the ontology holds that relation in.
+        :return: Whether the run hung the part from exactly its whole.
         """
-        return self.truth is not None and self.truth.field_name == self.field_name
+        return self.relation is not None and self.predicted_whole == self.relation.whole
+
+    @property
+    def shared_ancestors(self) -> int:
+        """
+        :return: How many parts the run hung it below that it does lie below.
+        """
+        return len(set(self.true_ancestors) & set(self.predicted_ancestors))
+
+    @property
+    def classes_right(self) -> bool:
+        """
+        :return: Whether the run hung the part from exactly its whole and gave both
+            exactly their class.
+        """
+        return (
+            self.correct
+            and self.part_class is ClassVerdict.RIGHT
+            and self.true_whole_class is ClassVerdict.RIGHT
+        )
 
 
 @dataclass(frozen=True)
-class RelationAgreement(JsonRecord):
+class LinkAgreement(JsonRecord):
     """
-    How the part-whole mounts a run made agree with the part hierarchy.
-    """
-
-    mounts: list[JudgedMount] = field(default_factory=list)
-    """
-    Every part-whole mount the run made.
+    How the tree a run built agrees with the part hierarchy, link by link.
     """
 
-    true_relations: list[GroundTruthRelation] = field(default_factory=list)
+    attachments: list[JudgedAttachment] = field(default_factory=list)
     """
-    Every relation of the part hierarchy.
+    Every annotated part, and where the run hung it.
     """
 
     @classmethod
     def between(
         cls,
-        relations: Sequence[GroundTruthRelation],
+        ground_truth: SceneGroundTruth,
         correspondence: FaceCorrespondence,
-        edges: Sequence[EvaluationEdge],
-    ) -> RelationAgreement:
+        parents: dict[str, str | None],
+        classes: ClassAgreement,
+    ) -> LinkAgreement:
         """
-        :param relations: The relations of the part hierarchy.
+        :param ground_truth: The scene's ground truth.
         :param correspondence: Which body is which part.
-        :param edges: The relations the run tried to make.
-        :return: Every part-whole mount the run made, judged.
+        :param parents: The body each body of the run hangs below.
+        :param classes: How the classes the run gave agree with the ground truth.
+        :return: Every annotated part's place, judged.
         """
-        part_of = correspondence.part_of_body
-        outside = set(correspondence.outside_bodies)
-        truth = {(relation.whole, relation.part): relation for relation in relations}
-        mounts = []
-        for edge in edges:
-            if not edge.accepted or edge.relation != MountKind.PART:
-                continue
-            ends = (edge.whole, edge.part)
-            if outside & set(ends):
-                verdict, held = MountVerdict.OUTSIDE, None
-            elif not all(end in part_of for end in ends):
-                verdict, held = MountVerdict.UNMATCHED_END, None
-            else:
-                held = truth.get((part_of[edge.whole], part_of[edge.part]))
-                verdict = MountVerdict.NOT_HELD if held is None else MountVerdict.HELD
-            mounts.append(
-                JudgedMount(
-                    whole=edge.whole,
-                    part=edge.part,
-                    field_name=edge.field_name,
-                    verdict=verdict,
-                    truth=held,
+        part_of, body_of = correspondence.part_of_body, correspondence.body_of_part
+        holding = {relation.part: relation for relation in ground_truth.relations}
+        verdicts = {
+            part.part_id: ClassVerdict.NOT_JUDGED
+            if part.semantic_class is None
+            else ClassVerdict.WRONG
+            for part in ground_truth.parts
+        }
+        for one in classes.judged:
+            if one.correct:
+                verdicts[one.part_id] = ClassVerdict.RIGHT
+        attachments = []
+        for part in ground_truth.parts:
+            true_ancestors = []
+            holder = holding.get(part.part_id)
+            while holder is not None:
+                true_ancestors.append(holder.whole)
+                holder = holding.get(holder.whole)
+            predicted_ancestors = []
+            above = parents[body_of[part.part_id]] if part.part_id in body_of else None
+            while above is not None:
+                if above in part_of:
+                    predicted_ancestors.append(part_of[above])
+                above = parents[above]
+            relation = holding.get(part.part_id)
+            predicted_whole = predicted_ancestors[0] if predicted_ancestors else None
+            attachments.append(
+                JudgedAttachment(
+                    part_id=part.part_id,
+                    relation=relation,
+                    predicted_whole=predicted_whole,
+                    true_ancestors=true_ancestors,
+                    predicted_ancestors=predicted_ancestors,
+                    part_class=verdicts[part.part_id],
+                    true_whole_class=(
+                        None if relation is None else verdicts[relation.whole]
+                    ),
+                    predicted_whole_class=(
+                        None if predicted_whole is None else verdicts[predicted_whole]
+                    ),
                 )
             )
-        return cls(mounts=mounts, true_relations=list(relations))
+        return cls(attachments=attachments)
 
-    def combined_with(self, other: RelationAgreement) -> RelationAgreement:
+    def combined_with(self, other: LinkAgreement) -> LinkAgreement:
         """
         :param other: The agreement of other scenes or runs.
         :return: Both, as one.
         """
-        return RelationAgreement(
-            mounts=self.mounts + other.mounts,
-            true_relations=self.true_relations + other.true_relations,
-        )
-
-    @property
-    def held(self) -> list[JudgedMount]:
-        """
-        :return: The mounts that are relations of the part hierarchy.
-        """
-        return [one for one in self.mounts if one.verdict is MountVerdict.HELD]
+        return LinkAgreement(attachments=self.attachments + other.attachments)
 
     @property
     def precision(self) -> Share:
         """
-        :return: Of the mounts judged, those that are relations of the part hierarchy.
+        :return: Of the parts the run hung from another, those it hung from their whole.
         """
-        judged = [one for one in self.mounts if one.verdict is not MountVerdict.OUTSIDE]
-        return Share(len(self.held), len(judged))
+        return Share(
+            sum(one.correct for one in self.attachments),
+            sum(one.predicted_whole is not None for one in self.attachments),
+        )
 
     @property
     def recall(self) -> Share:
         """
         :return: Of the relations of the part hierarchy, those the run made.
         """
-        return Share(len(self.held), len(self.true_relations))
+        return Share(
+            sum(one.correct for one in self.attachments),
+            sum(one.relation is not None for one in self.attachments),
+        )
 
     @property
-    def expressible_recall(self) -> Share:
+    def reachable(self) -> Share:
         """
-        :return: Of the relations the ontology can hold, those the run made.
+        :return: Of the relations of the part hierarchy, those the ontology lets a run
+            make, which is the most of them any run can make.
         """
         return Share(
-            sum(
-                1
-                for one in self.held
-                if one.truth.expressibility is Expressibility.EXPRESSIBLE
-            ),
-            self._counted(Expressibility.EXPRESSIBLE),
+            len(self._reachable),
+            sum(one.relation is not None for one in self.attachments),
         )
 
     @property
-    def expressible(self) -> Share:
+    def reachable_recall(self) -> Share:
         """
-        :return: Of the relations of the part hierarchy, those the ontology can hold,
-            which is the most of them any run can make.
+        :return: Of the relations the ontology lets a run make, those the run made.
+        """
+        return Share(sum(one.correct for one in self._reachable), len(self._reachable))
+
+    @property
+    def ancestor_precision(self) -> Share:
+        """
+        :return: Of the parts the run hung each part below, those it does lie below.
         """
         return Share(
-            self._counted(Expressibility.EXPRESSIBLE), len(self.true_relations)
+            sum(one.shared_ancestors for one in self.attachments),
+            sum(len(one.predicted_ancestors) for one in self.attachments),
         )
 
     @property
-    def same_field(self) -> Share:
+    def ancestor_recall(self) -> Share:
         """
-        :return: Of the mounts that are relations of the part hierarchy, those made
-            through the field the ontology holds them in.
+        :return: Of the parts each part lies below, those the run hung it below.
         """
-        return Share(sum(one.same_field for one in self.held), len(self.held))
-
-    def _counted(self, expressibility: Expressibility) -> int:
-        """
-        :param expressibility: What the ontology makes of a relation.
-        :return: How many relations of the part hierarchy it makes that of.
-        """
-        return sum(
-            1 for one in self.true_relations if one.expressibility is expressibility
+        return Share(
+            sum(one.shared_ancestors for one in self.attachments),
+            sum(len(one.true_ancestors) for one in self.attachments),
         )
+
+    @property
+    def triplet_precision(self) -> Share:
+        """
+        :return: Of the parts the run hung from another, both classes judged, those hung
+            from their whole with both given exactly their class.
+        """
+        judged = [
+            one
+            for one in self.attachments
+            if one.part_class is not ClassVerdict.NOT_JUDGED
+            and one.predicted_whole_class not in (None, ClassVerdict.NOT_JUDGED)
+        ]
+        return Share(sum(one.classes_right for one in judged), len(judged))
+
+    @property
+    def triplet_recall(self) -> Share:
+        """
+        :return: Of the relations of the part hierarchy, both classes judged, those the
+            run made with both ends given exactly their class.
+        """
+        judged = [
+            one
+            for one in self.attachments
+            if one.part_class is not ClassVerdict.NOT_JUDGED
+            and one.true_whole_class not in (None, ClassVerdict.NOT_JUDGED)
+        ]
+        return Share(sum(one.classes_right for one in judged), len(judged))
+
+    @property
+    def _reachable(self) -> list[JudgedAttachment]:
+        """
+        :return: The parts held by a relation the ontology lets a run make.
+        """
+        return [
+            one
+            for one in self.attachments
+            if one.relation is not None and one.relation.expressibility.reachable
+        ]
 
 
 # %% one run, judged
@@ -874,9 +952,9 @@ class SceneScore(JsonRecord):
     How the classes it gave agree with the ground truth.
     """
 
-    relations: RelationAgreement
+    links: LinkAgreement
     """
-    How the mounts it made agree with the part hierarchy.
+    How the tree it built agrees with the part hierarchy.
     """
 
     @classmethod
@@ -893,7 +971,7 @@ class SceneScore(JsonRecord):
         :param run_name: The run judged.
         :param ground_truth: The scene's ground truth.
         :param bodies: The faces of each body the run made, by name.
-        :param graph: The classes and mounts the run decided on.
+        :param graph: The classes the run decided on, and where each body hangs.
         :param lineage: What each class the run could answer with derives from.
         :param minimum_overlap: How much of their faces a part and a body must share to
             be paired.
@@ -902,33 +980,45 @@ class SceneScore(JsonRecord):
         correspondence = FaceCorrespondence.between(
             ground_truth.parts, bodies, minimum_overlap
         )
+        classes = ClassAgreement.between(
+            ground_truth.parts,
+            correspondence,
+            {node.name: node.predicted_class for node in graph.nodes},
+            lineage,
+        )
         return cls(
             run=run_name,
             scene_id=ground_truth.scene_id,
             correspondence=correspondence,
-            classes=ClassAgreement.between(
-                ground_truth.parts,
+            classes=classes,
+            links=LinkAgreement.between(
+                ground_truth,
                 correspondence,
-                {node.name: node.predicted_class for node in graph.nodes},
-                lineage,
-            ),
-            relations=RelationAgreement.between(
-                ground_truth.relations, correspondence, graph.edges
+                {node.name: node.parent for node in graph.nodes},
+                classes,
             ),
         )
 
     @classmethod
     def of(
-        cls, run: Run, ground_truth_directory: Path, minimum_overlap: float = 0.5
+        cls,
+        run: Run,
+        ground_truth_directory: Path,
+        minimum_overlap: float = 0.5,
+        lock: ValidationLock = ValidationLock(),
     ) -> SceneScore:
         """
         :param run: A finished run of a converted scene.
         :param ground_truth_directory: The directory holding every scene's ground truth.
         :param minimum_overlap: How much of their faces a part and a body must share to
             be paired.
+        :param lock: What keeps the validation scenes closed until the code is frozen.
         :return: The run, judged.
+        :raises ValidationSceneLockedError: If the run is of a validation scene and the
+            checkout is not frozen.
         """
         scene_id = ConvertedScene.beside(run.scene_directory).scene_id
+        lock.check(scene_id)
         faces = np.load(run.path(RunFile.SPLIT_FACES))
         return cls.between(
             run_name=run.directory.name,
@@ -991,9 +1081,9 @@ class ScoreOverRuns(JsonRecord):
     How the classes agree, over every run.
     """
 
-    relations: RelationAgreement = field(default_factory=RelationAgreement)
+    links: LinkAgreement = field(default_factory=LinkAgreement)
     """
-    How the mounts agree, over every run.
+    How the trees agree with the part hierarchy, over every run.
     """
 
     @classmethod
@@ -1018,7 +1108,7 @@ class ScoreOverRuns(JsonRecord):
                 + len(matching.fragmented_parts),
                 merged_bodies=summary.merged_bodies + len(matching.merged_bodies),
                 classes=summary.classes.combined_with(score.classes),
-                relations=summary.relations.combined_with(score.relations),
+                links=summary.links.combined_with(score.links),
             )
         return summary
 
@@ -1040,7 +1130,9 @@ class ScoreOverRuns(JsonRecord):
         """
         :return: The headline numbers, one per line.
         """
-        classes, relations = self.classes, self.relations
+        classes, links = self.classes, self.links
+        link_f1 = links.precision.harmonic_mean_with(links.recall)
+        triplet_f1 = links.triplet_precision.harmonic_mean_with(links.triplet_recall)
         return [
             f"{len(self.runs)} runs, {self.parts} annotated parts",
             f"parts found          {self._shown(self.found)}",
@@ -1052,11 +1144,14 @@ class ScoreOverRuns(JsonRecord):
             f"hierarchical P / R   {self._shown(classes.hierarchical_precision)} / "
             f"{self._shown(classes.hierarchical_recall)}",
             f"answers standing for no class {classes.unprojectable}",
-            f"relation precision   {self._shown(relations.precision)}",
-            f"relation recall      {self._shown(relations.recall)}",
-            f"expressible recall   {self._shown(relations.expressible_recall)}",
-            f"expressible          {self._shown(relations.expressible)}",
-            f"through the same field {self._shown(relations.same_field)}",
+            f"link P / R           {self._shown(links.precision)} / "
+            f"{self._shown(links.recall)}, F1 {self._number(link_f1)}",
+            f"links reachable      {self._shown(links.reachable)}",
+            f"reachable recall     {self._shown(links.reachable_recall)}",
+            f"ancestor P / R       {self._shown(links.ancestor_precision)} / "
+            f"{self._shown(links.ancestor_recall)}",
+            f"triplet P / R        {self._shown(links.triplet_precision)} / "
+            f"{self._shown(links.triplet_recall)}, F1 {self._number(triplet_f1)}",
         ]
 
     @staticmethod
@@ -1065,8 +1160,15 @@ class ScoreOverRuns(JsonRecord):
         :param share: A share.
         :return: It as a number and the counts it is taken from.
         """
-        shown = "n/a" if share.value is None else f"{share.value:.3f}"
-        return f"{shown} ({share.count}/{share.total})"
+        return f"{ScoreOverRuns._number(share.value)} ({share.count}/{share.total})"
+
+    @staticmethod
+    def _number(value: float | None) -> str:
+        """
+        :param value: A score, or nothing where it is undefined.
+        :return: It as a number.
+        """
+        return "n/a" if value is None else f"{value:.3f}"
 
 
 # %% command-line entry point
