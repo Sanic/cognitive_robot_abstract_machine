@@ -27,6 +27,14 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "experiments.warsaw" = ["templates/*.jinja"]
+"experiments.warsaw.evaluation" = [
+  "world_mesh_viewer/*.html",
+  "world_mesh_viewer/*.css",
+  "world_mesh_viewer/*.js",
+  "world_mesh_viewer/vendor/*.js",
+  "world_mesh_viewer/vendor/LICENSE",
+  "world_mesh_viewer/vendor/utils/*.js",
+]
 "experiments.warsaw.articulate3d" = ["templates/*.jinja", "protocol.json", "splits/*.txt"]
 "experiments.warsaw.pipeline" = [
   "templates/*.jinja",

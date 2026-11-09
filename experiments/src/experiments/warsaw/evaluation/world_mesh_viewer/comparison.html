@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prediction and ground truth</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="comparison.css">
+</head>
+<body>
+  <header>
+    <div><span class="eyebrow">WARSAW EVALUATION</span><h1>Prediction ↔ Ground truth</h1></div>
+    <form id="open-comparison"><input id="comparison-url" placeholder="Saved comparison.json URL…" aria-label="Comparison table URL" required><button>Open comparison</button></form>
+    <a class="button" href="index.html">World inspector</a>
+  </header>
+  <main class="comparison-layout">
+    <aside>
+      <section>
+        <h2>Review objects <span id="review-count" class="muted"></span></h2>
+        <input id="review-search" type="search" placeholder="Object or class…" aria-label="Search compared objects">
+        <label class="field">Show <select id="review-filter">
+          <option value="all">All predictions</option>
+          <option value="unmatched-prediction">Unmatched predictions</option>
+          <option value="unmatched-ground-truth">GT without a prediction</option>
+          <option value="class">Class disagreements</option>
+          <option value="parent">Parent / part disagreements</option>
+          <option value="ties">Tied best candidates</option>
+          <option value="many-to-one">Several predictions → one GT</option>
+        </select></label>
+        <div id="review-objects"></div>
+      </section>
+      <section>
+        <h2>View controls</h2>
+        <label class="toggle"><input id="pair-isolate" type="checkbox">Isolate highlighted objects</label>
+        <label class="toggle">Surroundings <input id="pair-opacity" type="range" min="0" max="1" value="1" step="0.02" aria-label="Both worlds surroundings opacity"></label>
+        <div class="actions"><button id="fit-pair">Fit highlighted</button><button id="reset-pair">Whole worlds</button></div>
+      </section>
+      <section id="match-details"><p class="hint">Open a saved comparison to inspect matching objects.</p></section>
+      <section><h2>How to read this</h2><p class="hint">Geometric inspection candidates, not the official shared-face evaluation. Lower cost is better; it is not a probability. Classes do not affect ranking.</p><p class="hint">Unassigned GT includes rooms the scan never observed. Parent differences cannot be judged where the parent has no match.</p><details><summary>Input provenance</summary><div id="provenance" class="hint"></div></details></section>
+    </aside>
+    <div class="world-panes">
+      <section class="world-pane"><h2>Prediction</h2><iframe id="prediction-frame" title="Predicted world" src="about:blank"></iframe></section>
+      <section class="world-pane"><h2>Ground truth</h2><iframe id="ground-truth-frame" title="Ground-truth world" src="about:blank"></iframe></section>
+      <div id="comparison-status" role="status" aria-live="polite">No comparison loaded.</div>
+    </div>
+  </main>
+  <script type="module" src="comparison.js"></script>
+</body>
+</html>

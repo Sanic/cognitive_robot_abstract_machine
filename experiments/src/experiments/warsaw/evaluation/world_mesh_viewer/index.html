@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pipeline world inspector</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body>
+  <header>
+    <div><span class="eyebrow">WARSAW PIPELINE</span><h1>World inspector</h1></div>
+    <form id="open-run"><input id="run-url" aria-label="Run directory URL" placeholder="Run directory URL…" required><button>Open run</button></form>
+    <label class="button">Open folder<input id="folder" type="file" webkitdirectory multiple hidden></label>
+    <a class="button" href="comparison.html">Compare with GT</a>
+  </header>
+  <main>
+    <aside>
+      <section>
+        <h2>Explore objects <span id="object-count" class="muted"></span></h2>
+        <input id="search" type="search" placeholder="Find an object or class…" aria-label="Search objects">
+        <label class="field">Class <select id="classes"><option value="">All classes</option></select></label>
+        <div id="objects" aria-label="Objects"></div>
+      </section>
+      <section>
+        <h2>See inside</h2>
+        <label class="toggle"><input id="isolate" type="checkbox">Isolate selection and its parts</label>
+        <label class="toggle">Surroundings <input id="opacity" type="range" min="0" max="1" value="1" step="0.02" aria-label="Surroundings opacity"></label>
+        <div class="actions"><button id="fit">Fit selection</button><button id="reset">Show whole world</button></div>
+        <p class="hint">Select an object in the scene or list. Follow its parent and parts in the details panel.</p>
+      </section>
+    </aside>
+    <div id="viewport">
+      <div id="scene-heading"><strong id="selected-label">Open a pipeline world</strong><span id="scene-name">Choose a run folder or its world_mesh export</span></div>
+      <div id="legend"><span><i class="dot selected"></i> Selected</span><span><i class="dot related"></i> Parts</span><span><i class="dot parent"></i> Parent</span></div>
+      <div id="details" hidden></div>
+      <div id="status" role="status" aria-live="polite">No world loaded.</div>
+      <div id="controls-hint">Drag to orbit · Right drag to pan · Scroll to zoom · Click to inspect</div>
+    </div>
+  </main>
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>

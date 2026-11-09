@@ -185,6 +185,21 @@ stops the run before anything is asked. Two ways out of it:
 
 ## What a run leaves behind
 
+### Browse the generated world
+
+The [world inspector](evaluation/world_mesh_viewer/README.md) opens the finished run's
+`world_mesh` export in a browser. Click objects to inspect their classes, follow parents
+and parts, hide walls, or isolate an assembly. It reads the exported files without a
+database connection or another pipeline run.
+
+From the repository root, start `python -m http.server 8001 --bind 127.0.0.1`, then open:
+
+```text
+http://localhost:8001/experiments/src/experiments/warsaw/evaluation/world_mesh_viewer/?run=../../pipeline_runs/<run directory>/
+```
+
+### Files and database
+
 A directory under `pipeline_runs/`, named for when the run started, holding every
 question as it was put, every answer as it came back, the renders that went with them,
 the bodies' meshes, and at the end:

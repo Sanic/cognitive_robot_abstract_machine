@@ -180,6 +180,7 @@ CLAUDE.local.md
 # megabytes and a run's conclusions are a run's, not the project's.
 experiments/src/experiments/warsaw/dataset/
 experiments/src/experiments/warsaw/pipeline_runs/
+experiments/src/experiments/warsaw/evaluation/comparisons/
 # The self-collision matrix a collision test saves. It is written into whatever directory
 # the tests were started from, so it lands at the root of a checkout and gets swept into a
 # commit; the matrices the project keeps live in

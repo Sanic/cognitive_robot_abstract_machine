@@ -7,12 +7,51 @@ This package holds what a run is judged and looked at by:
 | `graph.py` | `EvaluationGraph`: a run's bodies, their classes, and every mount it attempted, accepted or refused, independent of the database |
 | `size.py` | The size of a body, which the graph records |
 | `export_world_mesh.py` | A finished run's world as a GLB, one named node per body, for Blender |
+| `world_mesh_viewer/` | A browser inspector for exported worlds: select objects and follow their parents and parts |
+| `export_comparison.py` | A portable spatial inspection bundle for a run and a separately modelled GT export |
+| `spatial_comparison.py` | Class-independent geometric candidate ranking with class and parent disagreements recorded afterwards |
 | `label_vocabulary.py` | Matching our class names to another dataset's label vocabulary (habitat comparison, lexical baselines) |
 | `results.py` | What finished runs come to, as LaTeX tables per condition and per run |
 | `own_ground_truth.py` | Writing the ground truth of a scene of our own, from its labelled mesh and a person's decisions |
 
 The Articulate3D evaluation lives in `experiments.warsaw.articulate3d`. Its scoring
 (`articulate3d/score.py`) reads a run's `EvaluationGraph`.
+
+## Which predicted object corresponds to which ground-truth object
+
+The current scorer uses `FaceCorrespondence.between`: ground-truth parts and predicted
+bodies refer to faces of the same source mesh. It computes intersection-over-union of
+their face sets, maximizes the total overlap through a one-to-one assignment, then keeps
+pairs meeting `minimum_overlap` (0.5 by default). Neither class nor position decides a
+match. `SceneScore.correspondence` records matches and their overlaps, unmatched objects,
+objects outside the annotated area, fragmentation and merging.
+
+This requires shared face identity. A separately modelled GT world, such as
+`KitchenEnvironment`, has different triangles and cannot use that correspondence.
+The earlier modelled-world evaluation aligned the reconstruction to GT with landmarks,
+then compared position, size and class. Its code and the accepted kitchen2 landmark fit
+are retained in commit `1490bff0bb`. The old matching cost included the predicted class,
+so those matches must not be presented as purely geometric evidence of class accuracy.
+
+A comparison viewer should display prediction and GT in two panes and use a saved match
+table to synchronize selection in both directions. Each pair should expose the matching
+method and score; unmatched and ambiguous objects should remain visible. A browser
+must not silently substitute its nearest object for a missing evaluation match.
+Export-local body IDs belong to one manifest only: join predicted evaluation nodes to
+their manifest through `EvaluationNode.body_id` and `body.source_id`, and retain an
+explicit association between GT part IDs and GT export bodies.
+
+For separately modelled GT, geometry must first share a frame and scale. The historical
+kitchen2 fit maps the *source scan file* into GT coordinates. The pipeline export has
+already applied `split.world_T_source`, so the transform of the exported prediction is
+`GT_T_source @ inverse(world_T_source)`. Applying the landmark fit directly to the
+export would interpret levelled coordinates as raw scan coordinates. The GT export version and alignment
+must be chosen before generating a spatial match table for a new comparison.
+
+The [linked comparison viewer](world_mesh_viewer/README.md#prediction-and-gt-comparison)
+implements this for separately modelled worlds using a saved provisional geometry table.
+It supports unmatched, class, parent, tied-candidate and many-to-one filters. These
+inspection candidates do not replace `FaceCorrespondence` or change official scores.
 
 A run treats itself as an immutable experimental unit, and keeps these files in its
 directory:

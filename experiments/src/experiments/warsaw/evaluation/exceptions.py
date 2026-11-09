@@ -111,3 +111,22 @@ class PartHierarchyCycleError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "A part hierarchy is a tree, so one of them has to have another whole."
+
+
+# %% spatial comparison inputs
+
+
+@dataclass
+class ComparisonGeometryMissingError(DataclassException, ValueError):
+    """
+    Raised when a geometric candidate is requested without measured geometry.
+    """
+
+    objects: list[str]
+    """The objects without bounds or dimensions."""
+
+    def error_message(self) -> str:
+        return f"No comparison geometry for {self.objects}."
+
+    def suggest_correction(self) -> str:
+        return "Leave objects without geometry unmatched or measure their parts first."

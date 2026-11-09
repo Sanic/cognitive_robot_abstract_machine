@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "scene": "scene.glb",
+  "bodies": [
+    {"id": 0, "name": "root", "source_id": "root", "parent_id": null, "face_count": 0, "direct_semantic_annotation_ids": [], "context_semantic_annotation_ids": []},
+    {"id": 1, "name": "cabinet", "source_id": "cabinet", "parent_id": 0, "face_count": 12, "direct_semantic_annotation_ids": [0], "context_semantic_annotation_ids": []},
+    {"id": 2, "name": "drawer", "source_id": "drawer", "parent_id": 1, "face_count": 12, "direct_semantic_annotation_ids": [1], "context_semantic_annotation_ids": [0]},
+    {"id": 3, "name": "handle", "source_id": "handle", "parent_id": 2, "face_count": 12, "direct_semantic_annotation_ids": [2], "context_semantic_annotation_ids": [0, 1]},
+    {"id": 4, "name": "empty", "source_id": "empty", "parent_id": 0, "face_count": 0, "direct_semantic_annotation_ids": [], "context_semantic_annotation_ids": []}
+  ],
+  "semantic_annotations": [
+    {"id": 0, "name": "cabinet annotation", "type_name": "Cabinet", "root_body_id": 1},
+    {"id": 1, "name": "drawer annotation", "type_name": "Drawer", "root_body_id": 2},
+    {"id": 2, "name": "handle annotation", "type_name": "Handle", "root_body_id": 3}
+  ]
+}
