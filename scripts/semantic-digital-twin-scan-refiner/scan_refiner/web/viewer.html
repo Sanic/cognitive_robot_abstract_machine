@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__PROJECT_TITLE__ · SemDT scan refiner</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px system-ui, sans-serif; color: #24323b; background: #f7f8fa; }
+    header { padding: 16px 24px; border-bottom: 1px solid #d7dfe5; }
+    h1 { font-size: 21px; margin: 0 0 8px; }
+    p { margin: 6px 0; max-width: 1000px; }
+    nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+    button, select { padding: 7px 10px; border: 1px solid #a4b4bf; border-radius: 5px; background: white; font: inherit; }
+    #scene { width: 100%; height: calc(100vh - 320px); min-height: 450px; }
+    #status { color: #415563; }
+    footer { padding: 8px 24px; font-size: 13px; }
+    .region { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+    .region input { width: 225px; padding: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>__PROJECT_TITLE__</h1>
+    <p id="status" role="status"></p>
+    <p>Upright alignment proposals. Check separated objects across the scene before accepting a placement.</p>
+    <nav aria-label="Inspection controls">
+      <label>Placement <select id="candidate" aria-label="Registration candidate"></select></label>
+      <label>Geometry <select id="geometry"><option value="visual">Visual</option><option value="collision">Collision</option><option value="both">Both</option><option value="none">Scan only</option></select></label>
+      <label>Scan <select id="scan"><option value="rgb">RGB</option><option value="heatmap">Distance heatmap</option><option value="none">Hidden</option></select></label>
+      <button data-camera="top">Top</button><button data-camera="front">Front</button><button data-camera="perspective">Perspective</button>
+      <button id="rotate-view" title="Rotate the view with a left-button drag">Rotate</button>
+      <label>Point size <input id="point-size" type="range" min="1" max="5" step="0.5" value="2"></label>
+      <label>Mesh opacity <input id="mesh-opacity" type="range" min="0.15" max="1" step="0.05" value="1"></label>
+      <label><input id="point-hover" type="checkbox"> Point hover</label>
+    </nav>
+    <div class="region">
+      <label>Scan lower XYZ <input id="region-lower" aria-label="Region lower scan coordinates" placeholder="x,y,z"></label>
+      <label>Scan upper XYZ <input id="region-upper" aria-label="Region upper scan coordinates" placeholder="x,y,z"></label>
+      <label>Points <select id="point-budget"><option value="10000">10,000</option><option value="50000" selected>50,000</option><option value="150000">150,000</option></select></label>
+      <button id="load-region" disabled>Load region</button><button id="load-overview" disabled>Overview</button>
+    </div>
+    <p id="region-status" role="status">Click a model body to select a region around it.</p>
+  </header>
+  <main>__FIGURE__</main>
+  <footer>Metres · Heatmap: unsigned scan-to-triangle distance to the registration geometry, capped at the colour-scale maximum.
+    This preview does not establish correspondence, coverage or measurement accuracy. Legend entries toggle individual bodies.
+    <span id="display-origin"></span></footer>
+  <script id="viewer-state" type="application/json">__VIEWER_STATE__</script>
+  <script>__CONTROLS__</script>
+</body>
+</html>
+
