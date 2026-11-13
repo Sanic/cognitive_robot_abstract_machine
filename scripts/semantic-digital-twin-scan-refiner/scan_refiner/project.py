@@ -84,7 +84,7 @@ class RefinementProject:
         Read the current project contract and reject unsupported schema revisions.
         """
         data = json.loads((self.directory / ProjectFile.RECORD).read_text())
-        record = DataclassJSONSerializer.from_json(data, ProjectRecord)
+        record = DataclassJSONSerializer.from_json(data=data, clazz=ProjectRecord)
         if record.schema_version != 1:
             raise InvalidEvidence(
                 f"Unsupported project schema {record.schema_version}."
@@ -98,7 +98,7 @@ class RefinementProject:
         destination = self.directory / ProjectFile.RECORD
         temporary = destination.with_suffix(".partial")
         temporary.write_text(
-            json.dumps(DataclassJSONSerializer.to_json(record), indent=2)
+            json.dumps(DataclassJSONSerializer.to_json(instance=record), indent=2)
         )
         temporary.replace(destination)
 
@@ -132,7 +132,7 @@ class RefinementProject:
         if not path.exists():
             return RegistrationResult()
         return DataclassJSONSerializer.from_json(
-            json.loads(path.read_text()), RegistrationResult
+            data=json.loads(path.read_text()), clazz=RegistrationResult
         )
 
     def align(
@@ -145,11 +145,13 @@ class RefinementProject:
         scan = self.scan
         indices = scan.sample_indices(search.cell_width / 3, 20000)
         candidates = search.search(self.snapshot.samples(role), scan.points[indices])
-        result = RegistrationResult(candidates, DataclassJSONSerializer.to_json(search))
+        result = RegistrationResult(
+            candidates, DataclassJSONSerializer.to_json(instance=search)
+        )
         destination = self.directory / ProjectFile.CANDIDATES
         temporary = destination.with_suffix(".partial")
         temporary.write_text(
-            json.dumps(DataclassJSONSerializer.to_json(result), indent=2)
+            json.dumps(DataclassJSONSerializer.to_json(instance=result), indent=2)
         )
         temporary.replace(destination)
         record = self.record

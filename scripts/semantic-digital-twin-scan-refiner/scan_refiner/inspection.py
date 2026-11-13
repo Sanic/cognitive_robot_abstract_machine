@@ -197,9 +197,9 @@ class InspectionViewer:
                 full_html=False, include_plotlyjs=True, div_id="scene"
             ),
         )
-        payload = json.dumps(DataclassJSONSerializer.to_json(scene.state)).replace(
-            "<", "\\u003c"
-        )
+        payload = json.dumps(
+            DataclassJSONSerializer.to_json(instance=scene.state)
+        ).replace("<", "\\u003c")
         page = page.replace("__VIEWER_STATE__", payload)
         page = page.replace(
             "__CONTROLS__", (Path(__file__).parent / "web" / "viewer.js").read_text()

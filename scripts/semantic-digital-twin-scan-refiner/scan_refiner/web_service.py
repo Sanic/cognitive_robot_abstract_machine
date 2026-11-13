@@ -140,7 +140,9 @@ class InspectionRequestHandler(SimpleHTTPRequestHandler):
                     for key, specification in layout.fields.items()
                 },
             )
-            payload = json.dumps(DataclassJSONSerializer.to_json(information)).encode()
+            payload = json.dumps(
+                DataclassJSONSerializer.to_json(instance=information)
+            ).encode()
             self.send_payload(payload, ResponseType.JSON)
             return
         request = RegionRequest.from_query(route.query)

@@ -130,7 +130,7 @@ class SpatialScanIndex:
         if not path.exists():
             raise InvalidEvidence("Spatial index is missing or incomplete.")
         record = DataclassJSONSerializer.from_json(
-            json.loads(path.read_text()), IndexRecord
+            data=json.loads(path.read_text()), clazz=IndexRecord
         )
         if record.schema_version != 1:
             raise InvalidEvidence(
@@ -229,7 +229,7 @@ class SpatialScanIndex:
         )
         temporary = (directory / IndexFile.RECORD).with_suffix(".partial")
         temporary.write_text(
-            json.dumps(DataclassJSONSerializer.to_json(record), indent=2)
+            json.dumps(DataclassJSONSerializer.to_json(instance=record), indent=2)
         )
         temporary.replace(directory / IndexFile.RECORD)
         return cls(directory)
