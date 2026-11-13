@@ -1,3 +1,8 @@
+"""
+The nodes of a statechart, the conditions of their transitions and the variables those
+conditions read.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -5,7 +10,8 @@ import logging
 import threading
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
-from dataclasses import MISSING, field, dataclass
+from dataclasses import MISSING, field, dataclass, fields
+from enum import StrEnum
 
 from typing_extensions import (
     Any,
@@ -24,8 +30,6 @@ from cramph.data_types import (
     ObservationReading,
     ObservationStateValues,
     TransitionKind,
-    TransitionConditionJSONKey,
-    NodeJSONKey,
 )
 from cramph.exceptions import (
     CancelledByNodeFailing,
@@ -68,6 +72,44 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
+
+# %% serialization keys
+
+
+class NodeJSONKey(StrEnum):
+    """
+    Keys a serialized node carries on top of its dataclass fields.
+    """
+
+    NODE_ID = "node_id"
+    """
+    Tells apart the nodes of one JSON document, so every place referring to the same node
+    deserializes to the same instance.
+    """
+
+
+class TransitionConditionJSONKey(StrEnum):
+    """
+    Keys a serialized transition condition carries.
+    """
+
+    KIND = "kind"
+    """
+    The kind of transition the condition controls.
+    """
+
+    EXPRESSION = "expression"
+    """
+    The rendered condition, naming every variable by the id of its node.
+    """
+
+    OWNER = "owner"
+    """
+    The id of the node the condition belongs to.
+    """
+
+
+# %% transition conditions
 
 
 @dataclass(eq=False, repr=False)
@@ -363,7 +405,7 @@ class TransitionCondition(SubclassJSONSerializer):
         )
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         Resolves the nodes the condition names through the
         :class:`DeserializedNodeTracker` in `kwargs`.
@@ -373,7 +415,7 @@ class TransitionCondition(SubclassJSONSerializer):
         :raises UnsupportedConditionSyntaxError: If the condition contains syntax that
             has no meaning as a condition.
         """
-        nodes = DeserializedNodeTracker.from_kwargs(kwargs)
+        nodes = DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         tree = ast.parse(data[TransitionConditionJSONKey.EXPRESSION], mode="eval")
         return cls(
             kind=TransitionKind[data[TransitionConditionJSONKey.KIND]],
@@ -383,7 +425,7 @@ class TransitionCondition(SubclassJSONSerializer):
                     variable_name
                 ).resolve(nodes),
             ),
-            owner=nodes.get(data[TransitionConditionJSONKey.OWNER]),
+            owner=nodes.get(key=data[TransitionConditionJSONKey.OWNER]),
         )
 
 
@@ -554,7 +596,36 @@ class DerivedConditionVariable(ConditionVariable, ABC):
             # A node may hand back one of these unwrapped, which cannot be substituted into.
             expression = Scalar(expression)
         return expression.substitute(
-            variables, [variable.expression() for variable in variables]
+            old_variables=variables,
+            new_variables=[variable.expression() for variable in variables],
+        )
+
+    @classmethod
+    def reading_counterparts(
+        cls,
+        condition: Scalar,
+        counterpart_of: Callable[[StatechartNode], StatechartNode | None],
+    ) -> Scalar:
+        """
+        :param condition: A transition condition.
+        :param counterpart_of: The node standing in for a node `condition` reads, or
+            None if no node does.
+        :return: `condition` reading the counterpart of every node it reads, and the
+            current value of every test on a node without one.
+        """
+        variables: list[DerivedConditionVariable] = condition.free_variables()
+        if not variables:
+            return condition
+        replacements = []
+        for variable in variables:
+            counterpart = counterpart_of(variable.statechart_node)
+            replacements.append(
+                Scalar(float(variable.resolve()))
+                if counterpart is None
+                else variable.for_node(counterpart)
+            )
+        return Scalar(condition).substitute(
+            old_variables=variables, new_variables=replacements
         )
 
 
@@ -685,7 +756,7 @@ class ConditionVariableReference:
         :return: The variable this reference names.
         :raises UnknownConditionVariableError: If the node offers no variable of that name.
         """
-        node = nodes.get(self.node_id)
+        node = nodes.get(key=self.node_id)
         for variable in node.condition_variables:
             if variable.predicate.attribute_name == self.attribute_name:
                 return variable
@@ -999,6 +1070,19 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             ancestor = ancestor.parent_node
         return ancestors
 
+    def find_upwards(
+        self, predicate: Callable[[StatechartNode], bool]
+    ) -> StatechartNode | None:
+        """
+        :param predicate: Whether a node is the one looked for.
+        :return: This node, or the closest node above it, for which `predicate` holds,
+            or None if it holds for none of them.
+        """
+        return next(
+            (node for node in [self, *self.path] if predicate(node)),
+            None,
+        )
+
     @property
     def depth(self) -> int:
         """
@@ -1072,23 +1156,23 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         return {
-            **DataclassJSONSerializer.to_json(self, **kwargs),
+            **DataclassJSONSerializer.to_json(instance=self, **kwargs),
             NodeJSONKey.NODE_ID: self._node_id,
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         Deserializes the node, or returns the instance already deserialized for the same
         node of the document, so that nodes referring to it share it.
         """
-        tracker = DeserializedNodeTracker.from_kwargs(kwargs)
+        tracker = DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         node_id = data[NodeJSONKey.NODE_ID]
-        if tracker.has(node_id):
-            return tracker.get(node_id)
-        node = DataclassJSONSerializer.from_json(data, clazz=cls, **kwargs)
+        if tracker.has(key=node_id):
+            return tracker.get(key=node_id)
+        node = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
         node._take_over_node_id(node_id)
-        tracker.add(node_id, node)
+        tracker.add(key=node_id, tracked_object=node)
         return node
 
     def _take_over_node_id(self, node_id: str) -> None:
@@ -1345,7 +1429,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         created with, so that another owner can wire it.
         """
         for transition_kind in TransitionKind.owner_wired_kinds():
-            self.set_condition(transition_kind, transition_kind.unwired_condition)
+            self.set_condition(transition_kind, transition_kind.default_condition)
 
     def _get_transition(self, transition_kind: TransitionKind) -> TransitionCondition:
         """
@@ -2007,11 +2091,86 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return f"{self.name}#{self.index}"
 
+    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+        """
+        :param rebuild: Builds the nodes this node holds anew and rebinds what it refers
+            to.
+        :return: A node of no statechart constructed like this one, holding every node
+            and every list of nodes among its constructor arguments built anew, or None
+            if `rebuild` leaves out such a node or every node of such a list.
+        """
+        arguments = {
+            # a field known only by its name can only be read with getattr
+            constructor_field.name: getattr(self, constructor_field.name)
+            for constructor_field in fields(self)
+            if constructor_field.init
+        }
+        held_nodes = {
+            name: rebuild.rebuilt(value)
+            for name, value in arguments.items()
+            if isinstance(value, StatechartNode)
+        }
+        held_node_lists = {
+            name: rebuild.rebuilt_children(self, value)
+            for name, value in arguments.items()
+            if isinstance(value, list)
+            and value
+            and all(isinstance(element, StatechartNode) for element in value)
+        }
+        if any(node is None for node in held_nodes.values()) or not all(
+            held_node_lists.values()
+        ):
+            return None
+        other_arguments = {
+            name: value
+            for name, value in arguments.items()
+            if name not in held_nodes and name not in held_node_lists
+        }
+        return type(self)(
+            **rebuild.rebound(other_arguments), **held_nodes, **held_node_lists
+        )
+
     def __repr__(self) -> str:
         return self.unique_name
 
 
 GenericStatechartNode = TypeVar("GenericStatechartNode", bound=StatechartNode)
+
+
+# %% building nodes anew
+
+
+@dataclass
+class NodeRebuild(ABC):
+    """
+    Builds nodes of a statechart anew, as nodes of no statechart, from the arguments
+    they were constructed with, see :meth:`StatechartNode.rebuilt_by`.
+    """
+
+    @abstractmethod
+    def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
+        """
+        :param node: A node a node being built anew holds or refers to.
+        :return: `node` built anew, the same node each time `node` is asked for, or
+            None if it is left out.
+        """
+
+    @abstractmethod
+    def rebuilt_children(
+        self, owner: StatechartNode, children: list[StatechartNode]
+    ) -> list[StatechartNode]:
+        """
+        :param owner: The node holding `children`.
+        :param children: The nodes `owner` holds, in their order.
+        :return: `children` built anew, without those left out.
+        """
+
+    @abstractmethod
+    def rebound(self, value: Any) -> Any:
+        """
+        :param value: A node of no statechart, or anything it was constructed with.
+        :return: `value` referring to what the nodes built anew refer to.
+        """
 
 
 # %% how a node ends
@@ -2093,10 +2252,10 @@ class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
         tracker._statechart = statechart
         return tracker
 
-    def _has_untracked(self, key: str) -> bool:
+    def _has_untracked(self, *, key: str) -> bool:
         return self._find_node_of_statechart(key) is not None
 
-    def _get_untracked(self, key: str, name: Any = None) -> StatechartNode:
+    def _get_untracked(self, *, key: str, name: Any = None) -> StatechartNode:
         node = self._find_node_of_statechart(key)
         if node is None:
             raise UntrackedObjectError(key=key, name=name)
@@ -2265,7 +2424,7 @@ class CompositeNode(StatechartNode):
         """
         for transition_kind in TransitionKind.owner_wired_kinds():
             condition = node.get_condition(transition_kind)
-            if str(condition) != str(transition_kind.unwired_condition):
+            if str(condition) != str(transition_kind.default_condition):
                 raise ChildTransitionAlreadyWiredError(
                     node=self, child=node, transition_kind=transition_kind
                 )
@@ -2608,6 +2767,22 @@ class CancelStatechart(TerminalNode):
 
     def on_start(self) -> None:
         self._pending_exception = self.create_exception()
+
+    @property
+    def has_pending_exception(self) -> bool:
+        """
+        :return: Whether this node started in the current tick, so its exception is
+            still to be raised.
+        """
+        return self._pending_exception is not None
+
+    @property
+    def pending_exception(self) -> Exception | None:
+        """
+        :return: The exception this node started with in the current tick and is still
+            to raise, None if there is none.
+        """
+        return self._pending_exception
 
     def raise_pending_exception(self) -> None:
         """

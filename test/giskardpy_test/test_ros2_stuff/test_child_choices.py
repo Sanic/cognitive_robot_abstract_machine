@@ -3,7 +3,7 @@ Tests for a running goal whose nodes choose their child on the client, see
 :mod:`giskardpy.middleware.ros2.child_choices`.
 """
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 
@@ -100,7 +100,7 @@ class ClientAnsweringFromTheControlLoop(InputSynchronizer):
         feedback = feedback_data(self.action_server.feedback_messages[-1])
         for message in self.client.answer(feedback):
             sent = ChildChoiceMessage.from_json(
-                json.loads(json.dumps(message.to_json()))
+                data=json.loads(json.dumps(message.to_json()))
             )
             self.sent_messages.append(sent)
             self.server_chooser.receive(sent)
