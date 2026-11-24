@@ -50,7 +50,7 @@ class StationField(StrEnum):
 
 
 # %% Isolated decoding
-@dataclass
+@dataclass(kw_only=True)
 class E57RecordReader:
     """
     Emit original station/record identities and transformed metric scan coordinates.
@@ -71,7 +71,7 @@ class E57RecordReader:
     Maximum records decoded at a time, independent of total scan size.
     """
 
-    def stream(self, parser: argparse.ArgumentParser) -> None:
+    def stream(self, *, parser: argparse.ArgumentParser) -> None:
         """
         Write length-prefixed batches on stdout and progress only on stderr.
         """
@@ -184,5 +184,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-capacity", type=int, default=250000)
     arguments = parser.parse_args()
     E57RecordReader(
-        arguments.source, arguments.metadata, arguments.batch_capacity
-    ).stream(parser)
+        source=arguments.source,
+        metadata=arguments.metadata,
+        batch_capacity=arguments.batch_capacity,
+    ).stream(parser=parser)

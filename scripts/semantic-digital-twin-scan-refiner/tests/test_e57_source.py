@@ -51,13 +51,20 @@ def test_e57_stream_preserves_station_poses_invalid_masks_and_source_ids(
     )
     directory = tmp_path / "index"
     reader = E57PointSource(
-        source, Path(interpreter), directory / IndexFile.STATIONS, batch_capacity=2
+        source=source,
+        interpreter=Path(interpreter),
+        metadata=directory / IndexFile.STATIONS,
+        batch_capacity=2,
     )
-    index = SpatialScanIndex.build(directory, reader.batches(), "fixture-e57")
+    index = SpatialScanIndex.build(
+        directory=directory, batches=reader.batches(), source_identity="fixture-e57"
+    )
     records = np.concatenate(
         [
             batch.records
-            for batch in index.batches(ScanRegion(np.full(3, -100), np.full(3, 100)))
+            for batch in index.batches(
+                region=ScanRegion(lower=np.full(3, -100), upper=np.full(3, 100))
+            )
         ]
     )
     records.sort(order=[PointField.STATION_INDICES, PointField.SOURCE_INDICES])
@@ -114,5 +121,5 @@ def test_command_line_preserves_reader_virtual_environment(
         check=True,
         env=environment,
     )
-    index = SpatialScanIndex(small_project.directory / ProjectFile.SCAN_INDEX)
+    index = SpatialScanIndex(directory=small_project.directory / ProjectFile.SCAN_INDEX)
     assert index.record.point_count == 6

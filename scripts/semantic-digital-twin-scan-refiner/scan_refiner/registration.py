@@ -17,14 +17,17 @@ from scan_refiner.records import RegistrationCandidate
 
 
 # %% Upright rigid placement
-@dataclass
+@dataclass(kw_only=True)
 class UprightPlacement:
     """
     Four permitted placement parameters when both inputs already share gravity.
     """
 
     yaw: float
-    """Rotation about the common vertical axis in radians."""
+    """
+    Rotation about the common vertical axis in radians.
+    """
+
     translation: np.ndarray
     """
     Root origin expressed in scan coordinates in metres.
@@ -41,14 +44,14 @@ class UprightPlacement:
         transform[:3, 3] = self.translation
         return transform
 
-    def transform(self, points: np.ndarray) -> np.ndarray:
+    def transform(self, *, points: np.ndarray) -> np.ndarray:
         """
         Express root-frame row-array points in scan coordinates.
         """
         return points @ self.scan_T_root[:3, :3].T + self.translation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OccupancyGrid:
     """
     Horizontal occupancy and its scan-frame cell origin.
@@ -66,7 +69,7 @@ class OccupancyGrid:
 
 
 # %% Registration search
-@dataclass
+@dataclass(kw_only=True)
 class RegistrationSearch:
     """
     Find yaw and translation candidates without requiring clicked landmarks.
@@ -128,7 +131,7 @@ class RegistrationSearch:
     """
 
     def search(
-        self, model_points: np.ndarray, scan_points: np.ndarray
+        self, *, model_points: np.ndarray, scan_points: np.ndarray
     ) -> list[RegistrationCandidate]:
         """
         Rank upright candidates; returned transforms remain unaccepted proposals.
@@ -136,13 +139,13 @@ class RegistrationSearch:
         for points in (model_points, scan_points):
             if points.ndim != 2 or points.shape[1] != 3 or len(points) < 4:
                 raise InvalidEvidence(
-                    "Registration requires at least four XYZ points per input."
+                    reason="Registration requires at least four XYZ points per input."
                 )
             if not np.isfinite(points).all():
-                raise InvalidEvidence("Registration evidence must be finite.")
+                raise InvalidEvidence(reason="Registration evidence must be finite.")
         if not 0 < self.yaw_step_degrees <= 180 or self.cell_width <= 0:
             raise InvalidEvidence(
-                "Use a positive cell width and yaw interval up to 180 degrees."
+                reason="Use a positive cell width and yaw interval up to 180 degrees."
             )
         if (
             min(
@@ -152,7 +155,7 @@ class RegistrationSearch:
             )
             <= 0
         ):
-            raise InvalidEvidence("Registration budgets must be positive.")
+            raise InvalidEvidence(reason="Registration budgets must be positive.")
         if (
             min(
                 self.correspondence_distance,
@@ -161,17 +164,22 @@ class RegistrationSearch:
             )
             <= 0
         ):
-            raise InvalidEvidence("Registration distance thresholds must be positive.")
-        initial = self.coarse_candidates(model_points, scan_points)
+            raise InvalidEvidence(
+                reason="Registration distance thresholds must be positive."
+            )
+        initial = self.coarse_candidates(
+            model_points=model_points, scan_points=scan_points
+        )
         tree = cKDTree(scan_points)
         candidates = [
-            self.refine(model_points, tree, placement) for placement in initial
+            self.refine(model_points=model_points, scan_tree=tree, placement=placement)
+            for placement in initial
         ]
         return sorted(
             candidates, key=lambda item: (-item.support_fraction, item.median_distance)
         )
 
-    def grid(self, points: np.ndarray) -> OccupancyGrid:
+    def grid(self, *, points: np.ndarray) -> OccupancyGrid:
         """
         Construct a bounded binary grid in the input's own coordinate frame.
         """
@@ -180,26 +188,28 @@ class RegistrationSearch:
         shape = cells.max(axis=0) + 1
         if np.prod(shape, dtype=np.float64) > self.maximum_grid_cells:
             raise InvalidEvidence(
-                "Occupancy grid budget exceeded; crop the inputs or increase cell width."
+                reason="Occupancy grid budget exceeded; crop the inputs or increase cell width."
             )
         values = np.zeros(shape, dtype=np.float64)
         values[cells[:, 0], cells[:, 1]] = 1
-        return OccupancyGrid(values, origin)
+        return OccupancyGrid(values=values, origin=origin)
 
     def coarse_candidates(
-        self, model_points: np.ndarray, scan_points: np.ndarray
+        self, *, model_points: np.ndarray, scan_points: np.ndarray
     ) -> list[UprightPlacement]:
         """
         Search horizontal translations across the complete yaw range.
         """
-        scan_grid = self.grid(scan_points)
+        scan_grid = self.grid(points=scan_points)
         vertical_translation = np.quantile(scan_points[:, 2], 0.01) - np.quantile(
             model_points[:, 2], 0.01
         )
         ranked = []
         for degrees in np.arange(0, 360, self.yaw_step_degrees):
-            placement = UprightPlacement(float(np.radians(degrees)), np.zeros(3))
-            model_grid = self.grid(placement.transform(model_points))
+            placement = UprightPlacement(
+                yaw=float(np.radians(degrees)), translation=np.zeros(3)
+            )
+            model_grid = self.grid(points=placement.transform(points=model_points))
             correlation = fftconvolve(
                 scan_grid.values, model_grid.values[::-1, ::-1], mode="full"
             )
@@ -235,16 +245,20 @@ class RegistrationSearch:
         return selected
 
     def refine(
-        self, model_points: np.ndarray, scan_tree: cKDTree, placement: UprightPlacement
+        self,
+        *,
+        model_points: np.ndarray,
+        scan_tree: cKDTree,
+        placement: UprightPlacement,
     ) -> RegistrationCandidate:
         """
         Robustly refine one hypothesis while preserving upright axes and metric scale.
         """
         parameters = np.r_[placement.yaw, placement.translation]
         for _ in range(self.refinement_iterations):
-            placed = UprightPlacement(parameters[0], parameters[1:]).transform(
-                model_points
-            )
+            placed = UprightPlacement(
+                yaw=parameters[0], translation=parameters[1:]
+            ).transform(points=model_points)
             distances, indices = scan_tree.query(placed, workers=1)
             keep = distances < self.correspondence_distance
             if keep.sum() < 4:
@@ -252,7 +266,10 @@ class RegistrationSearch:
             source, target = model_points[keep], scan_tree.data[indices[keep]]
             result = least_squares(
                 lambda values: (
-                    UprightPlacement(values[0], values[1:]).transform(source) - target
+                    UprightPlacement(yaw=values[0], translation=values[1:]).transform(
+                        points=source
+                    )
+                    - target
                 ).ravel(),
                 parameters,
                 loss="soft_l1",
@@ -263,10 +280,12 @@ class RegistrationSearch:
             parameters = result.x
             if movement < self.convergence_tolerance:
                 break
-        transform = UprightPlacement(parameters[0], parameters[1:])
-        distances, _ = scan_tree.query(transform.transform(model_points), workers=1)
+        transform = UprightPlacement(yaw=parameters[0], translation=parameters[1:])
+        distances, _ = scan_tree.query(
+            transform.transform(points=model_points), workers=1
+        )
         return RegistrationCandidate(
-            transform.scan_T_root.tolist(),
-            float(np.mean(distances < self.support_distance)),
-            float(np.median(distances)),
+            scan_T_root=transform.scan_T_root.tolist(),
+            support_fraction=float(np.mean(distances < self.support_distance)),
+            median_distance=float(np.median(distances)),
         )

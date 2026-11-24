@@ -5,6 +5,9 @@ Isolate scan-refiner tests from ORM generation and large scan inputs.
 from __future__ import annotations
 
 # %% Imports
+import os
+import shutil
+from enum import StrEnum
 import numpy as np
 import pytest
 import trimesh
@@ -18,6 +21,27 @@ from test.orm_interface_build import ORM_BUILD_OPTION, OrmBuild
 
 
 # %% Test configuration
+class BrowserTestEnvironment(StrEnum):
+    """
+    Optional existing JavaScript executable for testing browser controls.
+    """
+
+    NODE = "SCAN_REFINER_NODE"
+
+
+@pytest.fixture
+def javascript_runtime() -> Path:
+    """
+    Use an available Node runtime without installing browser-test dependencies.
+    """
+    executable = os.environ.get(BrowserTestEnvironment.NODE) or shutil.which("node")
+    if executable is None:
+        pytest.skip(
+            "An existing Node runtime is required for browser-control unit tests."
+        )
+    return Path(executable)
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
     """
     Accept the workspace's explicit no-build choice without loading world fixtures.
@@ -45,11 +69,18 @@ def small_project(tmp_path: Path) -> RefinementProject:
     Provide an isolated geometry baseline and byte-colour preview for inspection tests.
     """
     mesh = trimesh.creation.box()
-    snapshot = WorldSnapshot([BodyMesh("test/box", GeometryRole.VISUAL, mesh)])
+    snapshot = WorldSnapshot(
+        meshes=[BodyMesh(body_name="test/box", role=GeometryRole.VISUAL, mesh=mesh)]
+    )
     source = tmp_path / "scan.npz"
     np.savez(
         source,
         points=mesh.vertices,
         colors=np.full(mesh.vertices.shape, 128, dtype=np.uint8),
     )
-    return RefinementProject.create(tmp_path / "project", source, snapshot, "fixture")
+    return RefinementProject.create(
+        directory=tmp_path / "project",
+        scan_path=source,
+        snapshot=snapshot,
+        model_source="fixture",
+    )

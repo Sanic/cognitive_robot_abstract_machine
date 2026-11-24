@@ -14,6 +14,8 @@ class ProjectFile(PathEnumeration):
     """Durable artifacts relative to an individual project directory."""
 
     RECORD = "project.json"
+    HISTORY = "history.json"
+    JOBS = "jobs"
     SCAN = "scan.npz"
     WORLD = "world.npz"
     CANDIDATES = "candidates.json"
@@ -32,6 +34,8 @@ class ArrayField(StrEnum):
     VERTICES = "vertices"
     FACES = "faces"
     BODY_NAMES = "body_names"
+    ASSEMBLIES = "assemblies"
+    KINEMATIC_NODES = "kinematic_nodes"
     GEOMETRY_ROLES = "geometry_roles"
     VERTEX_OFFSETS = "vertex_offsets"
     FACE_OFFSETS = "face_offsets"
@@ -45,7 +49,7 @@ class GeometryRole(StrEnum):
 
 
 # %% Persistent records
-@dataclass
+@dataclass(kw_only=True)
 class ProjectRecord:
     """Input identities and explicit registration acceptance for one baseline."""
 
@@ -69,7 +73,7 @@ class ProjectRecord:
     """Geometry representation selected for candidate generation."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegistrationCandidate:
     """A proposed root-to-scan transform and sampled-surface diagnostics."""
 
@@ -81,7 +85,7 @@ class RegistrationCandidate:
     """Median model-sample to scan-sample distance in metres."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegistrationResult:
     """Candidate transforms and settings retained for reproducible review."""
 

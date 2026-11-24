@@ -29,7 +29,7 @@ def point_batches() -> list[PointBatch]:
     records[PointField.SOURCE_INDICES] = np.arange(100, 112)
     records[PointField.STATION_INDICES] = np.arange(12) % 2
     records[PointField.INTENSITY] = np.arange(12) / 3
-    return [PointBatch(records[:5]), PointBatch(records[5:])]
+    return [PointBatch(records=records[:5]), PointBatch(records=records[5:])]
 
 
 # %% Exact regional access
@@ -40,14 +40,19 @@ def test_index_query_preserves_boundary_records_and_original_attributes(
     Closed bounds retrieve exact coordinates, colour, intensity and station identities.
     """
     index = SpatialScanIndex.build(
-        tmp_path / "index", iter(point_batches), "fixture", cell_width=0.5
+        directory=tmp_path / "index",
+        batches=iter(point_batches),
+        source_identity="fixture",
+        cell_width=0.5,
     )
-    region = ScanRegion(np.array((-0.5, 0, 0)), np.array((0.5, 0, 0)))
-    retrieved = np.concatenate([batch.records for batch in index.batches(region)])
+    region = ScanRegion(lower=np.array((-0.5, 0, 0)), upper=np.array((0.5, 0, 0)))
+    retrieved = np.concatenate(
+        [batch.records for batch in index.batches(region=region)]
+    )
     retrieved.sort(order=PointField.SOURCE_INDICES)
     expected = np.concatenate([batch.records for batch in point_batches])[4:9]
     np.testing.assert_array_equal(retrieved, expected)
-    reopened = SpatialScanIndex(index.directory)
+    reopened = SpatialScanIndex(directory=index.directory)
     assert reopened.record.point_count == 12
     assert reopened.record.source_identity == "fixture"
 
@@ -59,10 +64,16 @@ def test_index_query_batches_respect_memory_budget(
     Even a large region is exposed as bounded batches rather than one combined cloud.
     """
     index = SpatialScanIndex.build(
-        tmp_path / "index", iter(point_batches), "fixture", cell_width=10
+        directory=tmp_path / "index",
+        batches=iter(point_batches),
+        source_identity="fixture",
+        cell_width=10,
     )
     batches = list(
-        index.batches(ScanRegion(np.full(3, -10), np.full(3, 10)), batch_capacity=2)
+        index.batches(
+            region=ScanRegion(lower=np.full(3, -10), upper=np.full(3, 10)),
+            batch_capacity=2,
+        )
     )
     assert sum(len(batch.records) for batch in batches) == 12
     assert max(len(batch.records) for batch in batches) == 2
@@ -74,10 +85,14 @@ def test_region_display_sample_is_reproducible_and_bounded(
     """
     A limited browser budget keeps original records with a repeatable selection.
     """
-    index = SpatialScanIndex.build(tmp_path / "index", iter(point_batches), "fixture")
-    region = ScanRegion(np.full(3, -10), np.full(3, 10))
-    sample = index.sample(region, maximum_count=4)
-    repeated = index.sample(region, maximum_count=4)
+    index = SpatialScanIndex.build(
+        directory=tmp_path / "index",
+        batches=iter(point_batches),
+        source_identity="fixture",
+    )
+    region = ScanRegion(lower=np.full(3, -10), upper=np.full(3, 10))
+    sample = index.sample(region=region, maximum_count=4)
+    repeated = index.sample(region=region, maximum_count=4)
     assert len(sample.records) == 4
     np.testing.assert_array_equal(sample.records, repeated.records)
     assert set(sample.records[PointField.SOURCE_INDICES]).issubset(set(range(100, 112)))
@@ -90,7 +105,9 @@ def test_index_initialization_preserves_existing_data(
     An existing index is never replaced by an import attempt.
     """
     with pytest.raises(ExistingProject):
-        SpatialScanIndex.build(tmp_path, iter(point_batches), "fixture")
+        SpatialScanIndex.build(
+            directory=tmp_path, batches=iter(point_batches), source_identity="fixture"
+        )
 
 
 def test_incomplete_index_is_not_queryable(tmp_path: Path) -> None:
@@ -98,7 +115,11 @@ def test_incomplete_index_is_not_queryable(tmp_path: Path) -> None:
     An interrupted import cannot appear to be a complete spatial index.
     """
     with pytest.raises(InvalidEvidence):
-        list(SpatialScanIndex(tmp_path).batches(ScanRegion(np.zeros(3), np.ones(3))))
+        list(
+            SpatialScanIndex(directory=tmp_path).batches(
+                region=ScanRegion(lower=np.zeros(3), upper=np.ones(3))
+            )
+        )
 
 
 def test_whole_scene_display_reads_cached_overview(
@@ -107,13 +128,19 @@ def test_whole_scene_display_reads_cached_overview(
     """
     An overview request must not rescan every dense spatial cell.
     """
-    index = SpatialScanIndex.build(tmp_path / "index", iter(point_batches), "fixture")
+    index = SpatialScanIndex.build(
+        directory=tmp_path / "index",
+        batches=iter(point_batches),
+        source_identity="fixture",
+    )
     monkeypatch.setattr(
         index,
         "batches",
         lambda region: pytest.fail("Dense cells were reopened for an overview."),
     )
-    sampled = index.sample(ScanRegion(np.full(3, -10), np.full(3, 10)), maximum_count=4)
+    sampled = index.sample(
+        region=ScanRegion(lower=np.full(3, -10), upper=np.full(3, 10)), maximum_count=4
+    )
     assert len(sampled.records) == 4
 
 
@@ -125,4 +152,4 @@ def test_region_rejects_invalid_bounds(lower: np.ndarray, upper: np.ndarray) -> 
     Region semantics require finite ordered bounds before index access.
     """
     with pytest.raises(InvalidEvidence):
-        ScanRegion(lower, upper)
+        ScanRegion(lower=lower, upper=upper)

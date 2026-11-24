@@ -29,7 +29,7 @@ class IndexFile(PathEnumeration):
     OVERVIEW = "overview.bin"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class GridCell:
     """Integer coordinates locating a physical cell in the scan frame."""
 
@@ -41,7 +41,7 @@ class GridCell:
     """Cell coordinate along scan Z."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScanRegion:
     """Inclusive axis-aligned selection in original scan coordinates and metres."""
 
@@ -53,18 +53,22 @@ class ScanRegion:
     def __post_init__(self) -> None:
         """Reject nonfinite, wrongly shaped or inverted regions before querying data."""
         if self.lower.shape != (3,) or self.upper.shape != (3,):
-            raise InvalidEvidence("Region bounds must each contain three coordinates.")
+            raise InvalidEvidence(
+                reason="Region bounds must each contain three coordinates."
+            )
         if not np.isfinite(self.lower).all() or not np.isfinite(self.upper).all():
-            raise InvalidEvidence("Region bounds must be finite.")
+            raise InvalidEvidence(reason="Region bounds must be finite.")
         if np.any(self.lower > self.upper):
-            raise InvalidEvidence("Region lower bounds must not exceed upper bounds.")
+            raise InvalidEvidence(
+                reason="Region lower bounds must not exceed upper bounds."
+            )
 
-    def contains(self, points: np.ndarray) -> np.ndarray:
+    def contains(self, *, points: np.ndarray) -> np.ndarray:
         """Select boundary points exactly after conservative spatial filtering."""
         return np.all((points >= self.lower) & (points <= self.upper), axis=1)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IndexRecord:
     """Completed spatial evidence identity and declared coordinate interpretation."""
 
@@ -84,7 +88,7 @@ class IndexRecord:
     """Original records cached for full-scene display without dense cell reads."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordSample:
     """A bounded, deterministic priority sample retaining complete original records."""
 
@@ -101,7 +105,7 @@ class RecordSample:
     )
     """Repeatable priority sequence, independent of total source size."""
 
-    def add(self, records: np.ndarray) -> None:
+    def add(self, *, records: np.ndarray) -> None:
         """Retain the smallest priorities using at most one input batch plus the budget."""
         combined = np.concatenate((self.records, records))
         priorities = np.concatenate(
@@ -116,7 +120,7 @@ class RecordSample:
 
 
 # %% Evidence indexing
-@dataclass
+@dataclass(kw_only=True)
 class SpatialScanIndex:
     """A persistent scan index whose queries never need to reopen the scan source."""
 
@@ -128,19 +132,20 @@ class SpatialScanIndex:
         """Require a completed supported index before exposing evidence."""
         path = self.directory / IndexFile.RECORD
         if not path.exists():
-            raise InvalidEvidence("Spatial index is missing or incomplete.")
+            raise InvalidEvidence(reason="Spatial index is missing or incomplete.")
         record = DataclassJSONSerializer.from_json(
             data=json.loads(path.read_text()), clazz=IndexRecord
         )
         if record.schema_version != 1:
             raise InvalidEvidence(
-                f"Unsupported spatial index schema {record.schema_version}."
+                reason=f"Unsupported spatial index schema {record.schema_version}."
             )
         return record
 
     @classmethod
     def build(
         cls,
+        *,
         directory: Path,
         batches: Iterator[PointBatch],
         source_identity: str,
@@ -151,33 +156,35 @@ class SpatialScanIndex:
     ) -> SpatialScanIndex:
         """Persist streamed records with bounded working memory and atomic completion."""
         if directory.exists():
-            raise ExistingProject(directory)
+            raise ExistingProject(directory=directory)
         if (
             not np.isfinite(cell_width)
             or cell_width <= 0
             or maximum_cells <= 0
             or overview_count <= 0
         ):
-            raise InvalidEvidence("Index cell width and cell budget must be positive.")
+            raise InvalidEvidence(
+                reason="Index cell width and cell budget must be positive."
+            )
         (directory / IndexFile.DATA).mkdir(parents=True)
         cells: dict[GridCell, int] = {}
         lower, upper = np.full(3, np.inf), np.full(3, -np.inf)
         count = 0
-        overview = RecordSample(overview_count)
+        overview = RecordSample(maximum_count=overview_count)
         started = last_progress = monotonic()
         for batch in batches:
             records = batch.records
             if records.dtype != PointRecordLayout().dtype:
                 raise InvalidEvidence(
-                    "Point batch layout does not match the spatial index schema."
+                    reason="Point batch layout does not match the spatial index schema."
                 )
             if not len(records):
                 continue
-            overview.add(records)
+            overview.add(records=records)
             points = records[PointField.POINTS]
             if not np.isfinite(points).all():
                 raise InvalidEvidence(
-                    "Invalid coordinates must be excluded explicitly by the source reader."
+                    reason="Invalid coordinates must be excluded explicitly by the source reader."
                 )
             lower = np.minimum(lower, points.min(axis=0))
             upper = np.maximum(upper, points.max(axis=0))
@@ -190,11 +197,12 @@ class SpatialScanIndex:
             order = np.argsort(inverse, kind="stable")
             start = 0
             for coordinate, retained_count in zip(coordinates, counts, strict=True):
-                cell = GridCell(*map(int, coordinate))
+                x, y, z = map(int, coordinate)
+                cell = GridCell(x=x, y=y, z=z)
                 if cell not in cells:
                     if len(cells) >= maximum_cells:
                         raise InvalidEvidence(
-                            "Spatial cell budget exceeded; use wider cells or a scoped source."
+                            reason="Spatial cell budget exceeded; use wider cells or a scoped source."
                         )
                     cells[cell] = len(cells)
                 with (directory / IndexFile.DATA / f"{cells[cell]:08d}.bin").open(
@@ -213,18 +221,20 @@ class SpatialScanIndex:
                 )
                 last_progress = now
         if not count:
-            raise InvalidEvidence("No valid scan records were supplied for indexing.")
+            raise InvalidEvidence(
+                reason="No valid scan records were supplied for indexing."
+            )
         coordinates = np.array(
             [[cell.x, cell.y, cell.z] for cell in cells], dtype=np.int64
         )
         np.savez_compressed(directory / IndexFile.CELLS, coordinates=coordinates)
         (directory / IndexFile.OVERVIEW).write_bytes(overview.records.tobytes())
         record = IndexRecord(
-            source_identity,
-            count,
-            cell_width,
-            lower.tolist(),
-            upper.tolist(),
+            source_identity=source_identity,
+            point_count=count,
+            cell_width=cell_width,
+            lower=lower.tolist(),
+            upper=upper.tolist(),
             overview_count=len(overview.records),
         )
         temporary = (directory / IndexFile.RECORD).with_suffix(".partial")
@@ -232,15 +242,15 @@ class SpatialScanIndex:
             json.dumps(DataclassJSONSerializer.to_json(instance=record), indent=2)
         )
         temporary.replace(directory / IndexFile.RECORD)
-        return cls(directory)
+        return cls(directory=directory)
 
     def batches(
-        self, region: ScanRegion, batch_capacity: int = 250000
+        self, *, region: ScanRegion, batch_capacity: int = 250000
     ) -> Iterator[PointBatch]:
         """Yield exact source records from intersecting cells in bounded batches."""
         record = self.record
         if batch_capacity <= 0:
-            raise InvalidEvidence("Regional read capacity must be positive.")
+            raise InvalidEvidence(reason="Regional read capacity must be positive.")
         with np.load(self.directory / IndexFile.CELLS, allow_pickle=False) as arrays:
             coordinates = arrays["coordinates"]
         centers = (coordinates + 0.5) * record.cell_width
@@ -261,16 +271,16 @@ class SpatialScanIndex:
             records = np.memmap(path, mode="r", dtype=PointRecordLayout().dtype)
             for start in range(0, len(records), batch_capacity):
                 chunk = records[start : start + batch_capacity]
-                selected = chunk[region.contains(chunk[PointField.POINTS])]
+                selected = chunk[region.contains(points=chunk[PointField.POINTS])]
                 if len(selected):
-                    yield PointBatch(selected)
+                    yield PointBatch(records=selected)
 
-    def sample(self, region: ScanRegion, maximum_count: int = 50000) -> PointBatch:
+    def sample(self, *, region: ScanRegion, maximum_count: int = 50000) -> PointBatch:
         """Choose a deterministic bounded sample while preserving original attributes."""
         if maximum_count <= 0:
-            raise InvalidEvidence("Display point budget must be positive.")
+            raise InvalidEvidence(reason="Display point budget must be positive.")
         record = self.record
-        sampled = RecordSample(maximum_count)
+        sampled = RecordSample(maximum_count=maximum_count)
         if (
             record.overview_count >= min(maximum_count, record.point_count)
             and np.all(region.lower <= record.lower)
@@ -281,8 +291,8 @@ class SpatialScanIndex:
                 mode="r",
                 dtype=PointRecordLayout().dtype,
             )
-            sampled.add(overview)
-            return PointBatch(sampled.records)
-        for batch in self.batches(region):
-            sampled.add(batch.records)
-        return PointBatch(sampled.records)
+            sampled.add(records=overview)
+            return PointBatch(records=sampled.records)
+        for batch in self.batches(region=region):
+            sampled.add(records=batch.records)
+        return PointBatch(records=sampled.records)

@@ -21,16 +21,16 @@ def test_snapshot_preserves_visual_origin_and_collision_size(tmp_path: Path) -> 
     """
     source = Path(__file__).parent / "dataset" / "offset_box.urdf"
     world = URDFParser.from_file(str(source)).create_world()
-    snapshot = WorldSnapshot.from_world(world)
-    [visual] = snapshot.select(GeometryRole.VISUAL)
-    [collision] = snapshot.select(GeometryRole.COLLISION)
+    snapshot = WorldSnapshot.from_world(world=world)
+    [visual] = snapshot.select(role=GeometryRole.VISUAL)
+    [collision] = snapshot.select(role=GeometryRole.COLLISION)
     np.testing.assert_allclose(visual.mesh.bounds, ((0.2, 1.5, 0.1), (2.2, 2.5, 0.5)))
     np.testing.assert_allclose(
         collision.mesh.bounds, ((0.2, 1.6, 0.2), (1.8, 2.4, 0.4))
     )
     path = tmp_path / "world.npz"
-    snapshot.save(path)
-    restored = WorldSnapshot.read(path)
+    snapshot.save(path=path)
+    restored = WorldSnapshot.read(path=path)
     assert [item.body_name for item in restored.meshes] == [
         item.body_name for item in snapshot.meshes
     ]

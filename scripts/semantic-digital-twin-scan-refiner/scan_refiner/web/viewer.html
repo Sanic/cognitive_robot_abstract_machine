@@ -1,53 +1,175 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>__PROJECT_TITLE__ · SemDT scan refiner</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font: 15px system-ui, sans-serif; color: #24323b; background: #f7f8fa; }
-    header { padding: 16px 24px; border-bottom: 1px solid #d7dfe5; }
-    h1 { font-size: 21px; margin: 0 0 8px; }
-    p { margin: 6px 0; max-width: 1000px; }
-    nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
-    button, select { padding: 7px 10px; border: 1px solid #a4b4bf; border-radius: 5px; background: white; font: inherit; }
-    #scene { width: 100%; height: calc(100vh - 320px); min-height: 450px; }
-    #status { color: #415563; }
-    footer { padding: 8px 24px; font-size: 13px; }
-    .region { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
-    .region input { width: 225px; padding: 6px; }
-  </style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__PROJECT_TITLE__ · World refiner</title>
+  <style>__STYLES__</style>
 </head>
-<body>
-  <header>
-    <h1>__PROJECT_TITLE__</h1>
-    <p id="status" role="status"></p>
-    <p>Upright alignment proposals. Check separated objects across the scene before accepting a placement.</p>
-    <nav aria-label="Inspection controls">
-      <label>Placement <select id="candidate" aria-label="Registration candidate"></select></label>
-      <label>Geometry <select id="geometry"><option value="visual">Visual</option><option value="collision">Collision</option><option value="both">Both</option><option value="none">Scan only</option></select></label>
-      <label>Scan <select id="scan"><option value="rgb">RGB</option><option value="heatmap">Distance heatmap</option><option value="none">Hidden</option></select></label>
-      <button data-camera="top">Top</button><button data-camera="front">Front</button><button data-camera="perspective">Perspective</button>
-      <button id="rotate-view" title="Rotate the view with a left-button drag">Rotate</button>
-      <label>Point size <input id="point-size" type="range" min="1" max="5" step="0.5" value="2"></label>
-      <label>Mesh opacity <input id="mesh-opacity" type="range" min="0.15" max="1" step="0.05" value="1"></label>
-      <label><input id="point-hover" type="checkbox"> Point hover</label>
-    </nav>
-    <div class="region">
-      <label>Scan lower XYZ <input id="region-lower" aria-label="Region lower scan coordinates" placeholder="x,y,z"></label>
-      <label>Scan upper XYZ <input id="region-upper" aria-label="Region upper scan coordinates" placeholder="x,y,z"></label>
-      <label>Points <select id="point-budget"><option value="10000">10,000</option><option value="50000" selected>50,000</option><option value="150000">150,000</option></select></label>
-      <button id="load-region" disabled>Load region</button><button id="load-overview" disabled>Overview</button>
-    </div>
-    <p id="region-status" role="status">Click a model body to select a region around it.</p>
+<body class="viewer-busy">
+  <header class="app-header">
+    <div class="identity"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3 28 10v13l-12 7L4 23V10Z M4 10l12 7 12-7 M16 17v13"/></svg></span><div><span class="brand-name">World refiner</span><span class="project-name">__PROJECT_TITLE__ <span class="local-label">LOCAL PROJECT</span></span></div></div>
+    <div class="global-actions" data-viewer-lock><span class="placement-badge" id="workspace-placement">Preparing viewer</span><button id="undo" class="quiet" disabled title="Undo the preceding project action">↶ Undo</button><button id="redo" class="quiet" disabled title="Redo the undone action">↷ Redo</button><button id="open-history" class="quiet">History</button><button id="open-jobs" class="job-toggle">Jobs <span id="job-count">0</span></button></div>
   </header>
-  <main>__FIGURE__</main>
-  <footer>Metres · Heatmap: unsigned scan-to-triangle distance to the registration geometry, capped at the colour-scale maximum.
-    This preview does not establish correspondence, coverage or measurement accuracy. Legend entries toggle individual bodies.
-    <span id="display-origin"></span></footer>
-  <script id="viewer-state" type="application/json">__VIEWER_STATE__</script>
-  <script>__CONTROLS__</script>
+  <nav class="stage-nav" data-viewer-lock aria-label="Refinement stages">
+    <button data-stage="prepare"><span>01</span> Prepare</button><button data-stage="align"><span>02</span> Align</button><button data-stage="inspect" class="active" aria-current="step"><span>03</span> Inspect</button>
+    <button data-stage="refine"><span>04</span> Refine</button><button disabled title="Proposal review and validation are planned"><span>05</span> Review <small>Planned</small></button><button disabled title="Dedicated export workspace is planned; validated source copies are available in Refine"><span>06</span> Export <small>Planned</small></button>
+  </nav>
+  <div class="workspace">
+    <aside class="object-sidebar" data-viewer-lock aria-label="World objects">
+      <div class="sidebar-heading"><span class="eyebrow">WORLD CONTENTS</span><span id="object-count" class="count">—</span></div>
+      <label class="search-field"><span aria-hidden="true">⌕</span><input id="object-search" placeholder="Find an object…" aria-label="Search world objects"></label>
+      <button id="world-overview" class="world-item active"><span class="object-icon">◇</span><span>World overview<small>All model bodies</small></span></button>
+      <nav id="body-list" class="body-list" aria-label="Assemblies and model bodies"></nav>
+      <div class="sidebar-note"><span class="status-dot"></span> Frozen scan & model baselines<p>Inspection decisions are saved separately.</p></div>
+    </aside>
+    <main class="main-workspace">
+      <section id="prepare-stage" class="prepare-stage" hidden>
+        <span class="eyebrow">PROJECT BASELINE</span><h1>Start with the evidence.</h1><p class="lead">Your world description and measured scan, preserved together in one local project.</p>
+        <div id="project-summary" class="project-cards"></div>
+        <div class="prepare-next"><div><h2>Establish the placement</h2><p>Find and review a shared coordinate system before comparing individual objects.</p></div><button class="primary" data-stage="align">Continue to alignment →</button></div>
+        <details class="source-details"><summary>Source identities and provenance</summary><pre id="project-provenance"></pre></details>
+      </section>
+      <section id="scene-stage" class="scene-stage">
+        <div class="scene-heading"><div><span class="eyebrow" id="workspace-step">INSPECTION WORKSPACE</span><h1 id="selection-name">World overview</h1></div><div class="selection-actions" data-viewer-lock><button id="focus-selection" class="quiet" title="Fit the view to the chosen region">Focus selection</button><button id="reset-focus" class="quiet">Show all</button></div></div>
+        <div class="viewport-toolbar" data-viewer-lock aria-label="Scene display controls">
+          <div class="layer-controls"><label>Geometry <select id="geometry" data-scene-control disabled><option value="visual">Visual</option><option value="collision">Collision</option><option value="both">Both</option><option value="none">Scan only</option></select></label><label>Scan <select id="scan" data-scene-control disabled><option value="rgb">RGB</option><option value="heatmap">Distance heatmap</option><option value="none">Hidden</option></select></label></div>
+          <div class="camera-controls"><button data-camera="top" data-scene-control disabled>Top</button><button data-camera="front" data-scene-control disabled>Front</button><button data-camera="perspective" data-scene-control disabled>3D</button><button id="rotate-view" title="Restore mouse-drag rotation" data-scene-control disabled>↻ Rotate</button></div>
+          <details class="display-popover"><summary>Display</summary><div><label>Point size<input id="point-size" type="range" min="1" max="5" step="0.5" value="2" data-scene-control disabled></label><label>Mesh opacity<input id="mesh-opacity" type="range" min="0.15" max="1" step="0.05" value="1" data-scene-control disabled></label><label class="check"><input id="point-hover" type="checkbox" data-scene-control disabled> Point identities on hover</label></div></details>
+        </div>
+        <div id="preview-banner" class="preview-banner" hidden></div><div id="viewport-stack" class="viewport-stack" aria-busy="true">
+          <div id="viewer-busy" class="viewer-busy-overlay" role="status" aria-live="polite" aria-atomic="true" data-state="loading">
+            <div class="viewer-busy-card"><span class="viewer-spinner" aria-hidden="true"></span><h2 data-activity-title>Preparing 3D view</h2><p data-activity-detail>Loading the model and scan preview…</p><span class="viewer-busy-help">The view will become interactive when this finishes.</span><button data-activity-retry hidden onclick="location.reload()">Reload viewer</button></div>
+          </div><div id="scene-container" class="scene-container"><template id="viewer-figure">__FIGURE__</template></div><div id="section-shell" class="section-shell" hidden><div class="section-heading"><span>COMPANION SECTION</span><button id="hide-section" class="quiet">Close ✕</button></div><div id="section-panel" hidden></div></div></div>
+        <div class="viewport-foot"><span id="frame-label">Scan axes · metres</span><span id="display-count">Preview evidence</span><span id="comparison-label"></span><span class="heatmap-key"><i></i> Close <span>→</span> Far <small id="heatmap-limit">0–__DISTANCE_LIMIT_MM__ mm</small></span></div>
+      </section>
+    </main>
+    <aside class="task-inspector" data-viewer-lock aria-label="Current task controls">
+      <section id="prepare-inspector" class="task-pane" hidden><span class="eyebrow">PREPARE</span><h2>One project, two inputs</h2><p>Inspect the imported baseline and scan index. The current importer accepts URDF files and trusted Python world providers through the CLI.</p><div class="info-note">Source files stay unchanged. New source loading is available through <code>refine.py init</code>.</div><h3>Next</h3><p>Check the input units and available geometry, then review an automatic placement in Align.</p></section>
+      <section id="align-inspector" class="task-pane" hidden>
+        <span class="eyebrow">ALIGNMENT</span><h2>Find the common frame</h2><p>Review separated parts of the scene before accepting a placement.</p>
+        <label class="field">Placement<select id="candidate" aria-label="Registration candidate" data-scene-control disabled></select></label><p id="status" class="hint" role="status"></p><button id="accept-placement" class="primary full">Accept this placement</button>
+        <hr><h3>Automatic registration</h3><label class="field">Fit geometry<select id="registration-role"><option value="visual">Visual surfaces</option><option value="collision">Collision surfaces</option></select></label>
+        <label class="check"><input id="upright-confirmed" type="checkbox"> Both inputs already have vertical Z</label><p class="hint">This search fits yaw and XYZ translation. Automatic gravity detection is a later step.</p>
+        <details><summary>Search settings</summary><label class="field">Grid cell (m)<input id="registration-cell" type="number" value="0.12" min="0.01" max="10" step="0.01"></label><label class="field">Yaw step (degrees)<input id="registration-yaw" type="number" value="10" min="1" max="180" step="1"></label></details>
+        <button id="start-registration" class="primary full" disabled>Find placements</button><p class="hint">Generated candidates stay separate until you choose “Review candidates” in Jobs. Replacement and acceptance are undoable.</p>
+      </section>
+      <section id="refine-inspector" class="task-pane" hidden>
+        <span class="eyebrow">REFINEMENT</span><h2>Review proposals</h2>
+        <section id="change-set-section" aria-label="Agent proposals">
+          <label class="field">Agent proposal<select id="change-set-picker" disabled><option value="">Choose a proposal</option></select></label>
+          <button id="refresh-change-sets" class="secondary full">Refresh proposals</button>
+          <p id="change-set-status" class="hint" role="status">Submitted change sets appear here.</p>
+          <div id="change-set-review" hidden>
+            <div id="change-set-reasoning" class="comparison-summary"></div>
+            <ul id="change-set-bodies" class="annotation-list"></ul>
+            <button id="load-change-set-evidence" class="secondary full" hidden>Load linked scan crop</button>
+            <button id="change-set-heatmaps" class="secondary full" hidden>Compute paired heatmaps</button>
+            <p id="change-set-heatmap-status" class="hint" role="status" hidden></p>
+            <div class="button-row" role="group" aria-label="Proposal geometry">
+              <button id="change-set-original" aria-pressed="false">Original</button>
+              <button id="change-set-proposed" aria-pressed="false">Proposed</button>
+            </div>
+            <div class="button-row">
+              <button id="accept-change-set" class="primary">Accept</button>
+              <button id="reject-change-set">Reject</button>
+              <button id="close-change-set" class="quiet">Close review</button>
+            </div>
+          </div>
+        </section>
+        <details id="single-body-refinement"><summary>Advanced single-body fitting</summary>
+        <p id="refine-body" class="refine-body">Select a body in the world contents</p>
+        <p class="hint">Use Inspect to choose a tight scan crop first. Choose translation or verified box dimensions. Rotation stays fixed; dimensions require verified box surfaces.</p>
+        <div class="info-note">Selected body only. Its visual and collision move together. Attached bodies stay fixed; assembly motion and joint semantics are not inferred.</div>
+        <label class="field">Proposal type<select id="refine-mode"><option value="translation">Translation</option><option value="dimensions">Box dimensions</option></select></label><label class="field">Fit surface<select id="refine-role"><option value="visual">Visual</option><option value="collision">Collision</option></select></label>
+        <div id="translation-settings"><label class="field">Unlock world translation axes</label><div class="axis-locks"><label><input id="refine-x" type="checkbox"> X</label><label><input id="refine-y" type="checkbox"> Y</label><label><input id="refine-z" type="checkbox"> Z</label></div>
+        <p class="hint">Locks use the model root axes, independent of view/crop yaw. Unchecked axes are locked exactly. A plane may constrain height while leaving sideways movement ambiguous.</p>
+        <label class="field">Per-axis translation limit (mm)<input id="refine-limit" type="number" value="50" min="1" step="1"></label></div>
+        <div id="dimension-settings" hidden><label class="field">Dimension axes<select id="dimension-frame"><option value="box" selected>Verified box axes</option><option value="root">Model root axes</option></select></label><div id="dimension-info" class="info-note">Select a body to check box eligibility.</div><p class="hint">Each present geometry role must be a box with compatible face directions. Box axes follow the actual surfaces and are labeled in the preview; they are recovered geometric axes, not source URDF axes. The same affine mapping resizes both roles; existing role-specific margins scale with the body.</p>
+          <div class="dimension-axes">
+            <label class="check"><input id="dimension-x" type="checkbox"> Unlock X extent</label><select id="dimension-anchor-x" aria-label="X dimension anchor"><option value="center">Keep center</option><option value="minimum">Fix minimum face</option><option value="maximum">Fix maximum face</option></select>
+            <label class="check"><input id="dimension-y" type="checkbox"> Unlock Y extent</label><select id="dimension-anchor-y" aria-label="Y dimension anchor"><option value="center">Keep center</option><option value="minimum">Fix minimum face</option><option value="maximum">Fix maximum face</option></select>
+            <label class="check"><input id="dimension-z" type="checkbox"> Unlock Z extent</label><select id="dimension-anchor-z" aria-label="Z dimension anchor"><option value="center">Keep center</option><option value="minimum">Fix minimum face</option><option value="maximum">Fix maximum face</option></select>
+          </div><label class="field">Maximum extent change (mm)<input id="dimension-limit" type="number" value="50" min="1" step="1"></label><p class="hint">Dimension axes are independent of crop yaw. Keeping the center requires returns on both opposing faces. Fixing a face requires returns on the moving opposite face; the fixed face is an assumption you declare.</p>
+        </div><label class="field">Associate within (mm)<input id="refine-association" type="number" value="100" min="1" step="1"></label>
+        <div class="field-row"><label class="field">Scan record limit<select id="refine-budget"><option value="10000">10,000</option><option value="50000" selected>50,000</option><option value="150000">150,000</option></select></label><label class="field">Tolerance (mm)<input id="refine-tolerance" type="number" value="20" min="1" step="1"></label></div>
+        <button id="start-refinement" class="primary full" disabled>Propose translation</button>
+        <p class="hint">Translation uses robust surface correspondences. Box dimensions use median face positions and declared anchors. Both check exact triangle-distance improvement on the same initially associated records; this is an in-sample fit, not independent accuracy.</p>
+        <hr><h3>Review before applying</h3><p id="refine-status" class="hint" role="status">Completed proposals appear in Jobs → Review translation.</p>
+        <div id="translation-report" class="comparison-summary" hidden></div>
+        <label class="field">Temporary geometry preview<select id="refine-preview" disabled><option value="current">Current pose</option><option value="proposal" selected>Proposed pose + current ghost</option></select></label>
+        <button id="clear-refinement-preview" class="text-button" disabled>Dismiss temporary preview</button>
+        <button id="apply-refinement" class="primary full" disabled>Apply snapshot override</button><p class="hint">Application creates an Undo revision and invalidates dependent results. It does not edit the URDF or mesh assets.</p>
+        <div id="body-override" class="info-note"></div>
+        </details>
+        <hr><h3>Review &amp; export source copy</h3><p class="hint">Turn accepted overrides into a separate, reloadable source copy. The original files and project baseline stay available. Undo geometry edits before generating a different copy.</p>
+        <button id="review-source" class="secondary full">Review source changes</button><div id="source-review" class="comparison-summary"></div>
+        <button id="publish-source" class="primary full" disabled>Write validated copy &amp; export</button>
+        <p id="source-status" class="hint" role="status">Reload checks cover geometry, frame identities, joint types/axes/limits and semantic membership. Moving hinges and inertial resizing need explicit policies.</p>
+        <a id="source-download" class="secondary full" download hidden>Download source &amp; world bundle</a>
+
+      </section>
+      <section id="inspect-inspector" class="task-pane">
+        <span class="eyebrow">INSPECT THE EVIDENCE</span><h2>Make the difference clear</h2>
+        <div class="inspector-tabs" role="tablist"><button data-inspector="region" class="active" role="tab" aria-selected="true">Region</button><button data-inspector="results" role="tab">Results</button><button data-inspector="section" role="tab">Section</button><button data-inspector="measure" role="tab">Measure</button><button data-inspector="views" role="tab">Views</button></div>
+        <div data-inspector-panel="region">
+          <label class="field">View & crop axes<select id="coordinate-frame"><option value="world">World axes</option><option value="scan">Original scan axes</option></select></label>
+          <div class="field-row"><label class="field">Additional yaw (°)<input id="frame-yaw" type="number" value="0" step="1" min="-180" max="180"></label><button id="apply-frame">Orient axes</button></div><p class="hint">Orient the scene, then draw a tight crop. Raw scan coordinates stay unchanged.</p>
+          <div class="button-row"><button id="draw-box" class="secondary">▱ Draw crop in plan</button><button id="use-object-region">Use selection bounds</button></div><div id="region-dimensions" class="region-dimensions">Pick an object or draw a region</div>
+          <details class="bounds-details"><summary>Edit XYZ bounds</summary><label class="field">Lower XYZ (m)<input id="region-lower" aria-label="Region lower inspection coordinates" placeholder="x,y,z"></label><label class="field">Upper XYZ (m)<input id="region-upper" aria-label="Region upper inspection coordinates" placeholder="x,y,z"></label></details>
+          <div class="field-row"><label class="field">Display point limit<select id="point-budget"><option value="10000">10,000</option><option value="50000" selected>50,000</option><option value="150000">150,000</option></select></label><button id="load-region" class="primary" disabled>Load region</button></div><button id="load-overview" class="text-button" disabled>Return to scan overview</button>
+          <p id="region-status" class="hint" role="status">Pick a body to select its surrounding scan.</p>
+          <button id="copy-investigation" class="secondary full" disabled>Copy investigation context</button>
+          <textarea id="investigation-context" class="investigation-context" rows="5" readonly hidden aria-label="Investigation context for manual copy"></textarea>
+          <details id="assembly-builder">
+            <summary>Save a named assembly</summary>
+            <label class="field">Assembly name<input id="assembly-name" maxlength="80" placeholder="Kitchen island"></label>
+            <label class="field">Find members<input id="assembly-search" type="search" placeholder="Find a model body"></label>
+            <div id="assembly-members" class="assembly-member-list" role="group" aria-label="Assembly members"></div>
+            <p id="assembly-member-count" class="hint" role="status"></p>
+            <button id="save-assembly" class="secondary full" disabled>Save assembly</button>
+            <button id="remove-assembly" class="text-button" hidden>Remove selected saved assembly</button>
+          </details>
+          <div class="clip-row"><label class="check"><input id="clip-scan" type="checkbox"> Clip displayed scan to this box</label><button id="apply-clip" class="small-button">Apply</button></div>
+          <hr><h3>Compare this region</h3><label class="field">Surface representation<select id="comparison-role"><option value="visual">Visual surfaces</option><option value="collision">Collision surfaces</option></select></label><label class="field">Model scope<select id="comparison-scope"><option value="world">Whole model</option><option value="body">Selected body</option></select></label>
+          <div class="field-row"><label class="field">Evaluation point limit<select id="comparison-budget"><option value="10000">10,000</option><option value="50000" selected>50,000</option><option value="150000">150,000</option></select></label><label class="field">Tolerance (mm)<input id="comparison-tolerance" type="number" min="1" max="1000" value="20" step="1"></label></div>
+          <label class="field">Model surface sample limit<select id="comparison-model-budget"><option value="5000">5,000</option><option value="20000" selected>20,000</option><option value="50000">50,000</option></select></label><p class="hint">Area-distributed within each body, then restricted to this crop. Small crops can retain few samples.</p><button id="start-comparison" class="primary full">Compute regional heatmap</button><p class="hint">A bounded job over indexed evidence. Display density and evaluation settings are independent.</p>
+        </div>
+        <div data-inspector-panel="results" hidden>
+          <h3>Fit and evidence support</h3>
+          <p id="report-empty" class="info-note">Compute a regional comparison, then choose Show heatmap in Jobs. Older jobs have scan residuals only; rerun for the reverse-direction report.</p>
+          <div id="comparison-summary" class="comparison-summary" hidden></div>
+          <div id="comparison-report" hidden>
+            <div id="report-overview" class="support-overview"></div>
+            <details class="report-method"><summary>How to read these results</summary><p>Scan → model measures unsigned distance to the nearest triangle and assigns the record to that body. It does not establish semantic correspondence.</p><p>Model → scan samples each body surface by area and checks for nearby evaluated scan records inside the same crop. The global percentage is weighted by represented area. Per-body percentages describe that body's sampled area.</p><p>No nearby evidence is unknown support: occlusion, sparse sampling, transparent or dark material, and absent geometry can all cause it. This is not visibility, free-space occupancy, confidence or proof of an error. Changing either sample budget can change the result.</p></details>
+            <label class="field">Find a body<input id="report-search" type="search" placeholder="Filter comparison results"></label>
+            <label class="field">Sort by<select id="report-sort"><option value="support">Least model support first</option><option value="residual">Largest scan P90 first</option><option value="name">Body name</option></select></label>
+            <label class="check"><input id="report-sampled-only" type="checkbox" checked> Only bodies with evaluated samples</label>
+            <div class="report-list-heading"><span id="report-count"></span><a id="report-download">Download report</a></div>
+            <div id="report-body-list"></div>
+          </div>
+        </div>
+        <div data-inspector-panel="section" hidden>
+          <h3>A straight, metric view</h3><p>Sections use the selected World/Scan axes and yaw. Both plot axes share the same metric scale.</p><label class="field">Section<select id="section-axis"><option value="3d">3D only</option><option value="xy">XY plan</option><option value="xz">XZ elevation</option><option value="yz">YZ elevation</option></select></label>
+          <label class="field">Position (inspection m)<input id="section-position" type="number" step="0.01" value="0"></label><label class="field">Scan slab thickness (m)<input id="section-thickness" type="number" min="0.001" step="0.01" value="0.02"></label><button id="centre-section" class="secondary full">Use box centre</button><button id="apply-section" class="primary full">Apply section</button><p class="hint">Scan points come from the slab. Model lines are exact intersections at its centre.</p>
+        </div>
+        <div data-inspector-panel="measure" hidden><h3>Measure between scan points</h3><p>Pick two endpoints in the 3D scene or the companion section. Endpoints stay in original scan coordinates.</p><label class="field">Label<input id="measurement-label" placeholder="e.g. Door width"></label><button id="measure" class="primary full">Measure two scan points</button><ul id="measurements" class="annotation-list"></ul><button id="clear-measurements" class="text-button">Clear measurements</button><p class="hint">Distances are straight-line 3D measurements; scanner accuracy and point selection still apply.</p></div>
+        <div data-inspector-panel="views" hidden><h3>Keep a useful observation</h3><label class="field">View name<input id="view-label" placeholder="e.g. Island rim"></label><label class="field">Observation<input id="view-note" placeholder="What should be checked?"></label><button id="save-view" class="primary full">Save annotated view</button><hr><label class="field">Saved views<select id="saved-views" aria-label="Saved views"></select></label><div class="button-row"><button id="restore-view" class="secondary">Restore view</button><button id="remove-view">Remove</button></div></div>
+      </section>
+    </aside>
+  </div>
+  <footer class="app-footer"><span id="history-status" role="status">Opening project history…</span><span id="display-origin"></span></footer>
+  <aside id="jobs-drawer" class="drawer" hidden aria-label="Analysis jobs"><div class="drawer-heading"><div><span class="eyebrow">BOUNDED ANALYSIS</span><h2>Jobs & results</h2></div><button id="close-jobs" class="quiet" aria-label="Close jobs">✕</button></div><div id="job-list"></div></aside>
+  <aside id="history-drawer" class="drawer" hidden aria-label="Action history"><div class="drawer-heading"><div><span class="eyebrow">PERSISTENT DECISIONS</span><h2>Project history</h2></div><button id="close-history" class="quiet" aria-label="Close history">✕</button></div><p class="hint">Undo and Redo restore project decisions. Scan and world baselines remain unchanged.</p><ol id="action-history" class="action-history"></ol></aside>
+  <div id="workspace-notice" class="toast" hidden role="status"></div>
+  <script>
+    globalThis.prepareViewerFigure=()=>{
+      const template=document.getElementById('viewer-figure'),container=template.parentElement;
+      const content=template.content.cloneNode(true),scripts=[...content.querySelectorAll('script')];
+      for(const script of scripts)script.remove();
+      container.append(content);template.remove();
+      for(const script of scripts){const active=document.createElement('script');active.textContent=script.textContent;container.append(active);}
+    };
+  </script>
+  <script id="viewer-state" type="application/json">__VIEWER_STATE__</script><script>__CONTROLS__</script>
 </body>
 </html>
-

@@ -41,6 +41,9 @@ class Command(StrEnum):
     DEMO = "demo"
     INDEX = "index"
     CROP = "crop"
+    UNDO = "undo"
+    REDO = "redo"
+    HISTORY = "history"
 
 
 class Option(StrEnum):
@@ -72,7 +75,7 @@ class Option(StrEnum):
 
 
 # %% Command dispatch
-@dataclass
+@dataclass(kw_only=True)
 class CommandLine:
     """
     User-invoked operations on one local scan-refinement project.
@@ -148,62 +151,82 @@ class CommandLine:
                     Option.MAXIMUM_COUNT, type=int, default=50000
                 )
         arguments = parser.parse_args()
-        cls().execute(arguments)
+        cls().execute(arguments=arguments)
 
-    def execute(self, arguments: argparse.Namespace) -> None:
+    def execute(self, *, arguments: argparse.Namespace) -> None:
         """
         Dispatch parsed commands without changing external model or scan sources.
         """
-        project = RefinementProject(arguments.project.resolve())
+        project = RefinementProject(directory=arguments.project.resolve())
         command = Command(arguments.command)
         if command == Command.INIT:
             if arguments.urdf is not None:
                 snapshot = WorldSnapshot.from_world(
-                    URDFParser.from_file(str(arguments.urdf.resolve())).create_world()
+                    world=URDFParser.from_file(
+                        str(arguments.urdf.resolve())
+                    ).create_world()
                 )
                 source = str(arguments.urdf.resolve())
             else:
-                snapshot = WorldSnapshot.from_provider(arguments.world_provider)
+                snapshot = WorldSnapshot.from_provider(
+                    identifier=arguments.world_provider
+                )
                 source = arguments.world_provider
             project = RefinementProject.create(
-                project.directory,
-                arguments.scan,
-                snapshot,
-                source,
-                arguments.scan_scale,
+                directory=project.directory,
+                scan_path=arguments.scan,
+                snapshot=snapshot,
+                model_source=source,
+                scan_scale=arguments.scan_scale,
             )
         elif command == Command.DEMO:
-            project = self.create_demo(project.directory)
-            project.align(RegistrationSearch())
+            project = self.create_demo(directory=project.directory)
+            project.align(search=RegistrationSearch())
         elif command == Command.ALIGN:
             result = project.align(
-                RegistrationSearch(
+                search=RegistrationSearch(
                     cell_width=arguments.cell_width, yaw_step_degrees=arguments.yaw_step
                 ),
-                GeometryRole(arguments.geometry),
+                role=GeometryRole(arguments.geometry),
             )
             for index, candidate in enumerate(result.candidates):
                 print(
                     f"{index}: support={candidate.support_fraction:.3f}, median={candidate.median_distance:.4f} m"
                 )
+        elif command == Command.UNDO:
+            project.undo()
+        elif command == Command.REDO:
+            project.redo()
+        elif command == Command.HISTORY:
+            history = project.history.load()
+            for revision in history.past:
+                print(revision.label)
+            print(
+                f"Current: {history.current.label}; {len(history.future)} redo actions"
+            )
+            return
         elif command == Command.ACCEPT:
-            project.accept(arguments.candidate)
+            project.accept(candidate_index=arguments.candidate)
         elif command == Command.VIEW:
             print(
-                InspectionViewer(project, display_count=arguments.display_count).write(
-                    arguments.candidate, arguments.heatmap
-                )
+                InspectionViewer(
+                    project=project, display_count=arguments.display_count
+                ).write(candidate_index=arguments.candidate, heatmap=arguments.heatmap)
             )
             return
         elif command == Command.INDEX:
-            self.index_scan(project, arguments)
+            self.index_scan(project=project, arguments=arguments)
             return
         elif command == Command.CROP:
-            index = SpatialScanIndex(project.directory / ProjectFile.SCAN_INDEX)
-            region = ScanRegion(np.array(arguments.lower), np.array(arguments.upper))
-            sampled = index.sample(region, arguments.maximum_count)
+            index = SpatialScanIndex(
+                directory=project.directory / ProjectFile.SCAN_INDEX
+            )
+            region = ScanRegion(
+                lower=np.array(arguments.lower), upper=np.array(arguments.upper)
+            )
+            sampled = index.sample(region=region, maximum_count=arguments.maximum_count)
             if arguments.output.exists():
-                raise ExistingProject(arguments.output)
+                raise ExistingProject(directory=arguments.output)
             arguments.output.parent.mkdir(parents=True, exist_ok=True)
             temporary = arguments.output.with_suffix(".partial")
             with temporary.open("wb") as stream:
@@ -216,52 +239,59 @@ class CommandLine:
             )
             return
         elif command == Command.SERVE:
-            with InspectionService(project).create_server(arguments.port) as server:
+            with InspectionService(project=project).create_server(
+                port=arguments.port
+            ) as server:
                 print(f"http://127.0.0.1:{server.server_port}/", flush=True)
                 server.serve_forever()
             return
-        print(InspectionViewer(project).write())
+        print(InspectionViewer(project=project).write())
 
     def index_scan(
-        self, project: RefinementProject, arguments: argparse.Namespace
+        self, *, project: RefinementProject, arguments: argparse.Namespace
     ) -> None:
         """
         Attach a new spatial index without replacing a completed or partial import.
         """
         directory = project.directory / ProjectFile.SCAN_INDEX
         if directory.exists():
-            raise ExistingProject(directory)
+            raise ExistingProject(directory=directory)
         if arguments.e57 is not None:
             if arguments.reader_python is None:
                 raise InvalidEvidence(
-                    "E57 indexing requires --reader-python pointing to an existing pye57 environment."
+                    reason="E57 indexing requires --reader-python pointing to an existing pye57 environment."
                 )
             source = E57PointSource(
-                arguments.e57.resolve(),
-                arguments.reader_python.absolute(),
-                directory / IndexFile.STATIONS,
-                arguments.batch_capacity,
+                source=arguments.e57.resolve(),
+                interpreter=arguments.reader_python.absolute(),
+                metadata=directory / IndexFile.STATIONS,
+                batch_capacity=arguments.batch_capacity,
             )
             identity = (
-                f"{arguments.e57.resolve()}#sha256={project.digest(arguments.e57)}"
+                f"{arguments.e57.resolve()}#sha256={project.digest(path=arguments.e57)}"
             )
         else:
-            source = PreviewPointSource(project.scan, arguments.batch_capacity)
+            source = PreviewPointSource(
+                preview=project.scan, batch_capacity=arguments.batch_capacity
+            )
             identity = f"preview#sha256={project.record.scan_sha256}#scale={project.record.scan_scale}"
         index = SpatialScanIndex.build(
-            directory, source.batches(), identity, arguments.cell_width
+            directory=directory,
+            batches=source.batches(),
+            source_identity=identity,
+            cell_width=arguments.cell_width,
         )
         print(
             f"Completed spatial index: {index.record.point_count:,} records at {directory}"
         )
 
-    def create_demo(self, directory: Path) -> RefinementProject:
+    def create_demo(self, *, directory: Path) -> RefinementProject:
         """
         Create synthetic scan evidence for a portable end-to-end smoke test.
         """
         from_scan = directory.parent / f"{directory.name}-synthetic-scan.npz"
         if directory.exists() or from_scan.exists():
-            raise ExistingProject(directory)
+            raise ExistingProject(directory=directory)
         directory.parent.mkdir(parents=True, exist_ok=True)
         meshes = []
         for index, (extents, translation) in enumerate(
@@ -274,16 +304,23 @@ class CommandLine:
             mesh = trimesh.creation.box(extents)
             mesh.apply_translation(translation)
             for role in GeometryRole:
-                meshes.append(BodyMesh(f"demo/object-{index}", role, mesh.copy()))
-        snapshot = WorldSnapshot(meshes)
+                meshes.append(
+                    BodyMesh(
+                        body_name=f"demo/object-{index}", role=role, mesh=mesh.copy()
+                    )
+                )
+        snapshot = WorldSnapshot(meshes=meshes)
         scan_T_root = trimesh.transformations.rotation_matrix(np.radians(37), (0, 0, 1))
         scan_T_root[:3, 3] = (3, -1.7, 0.4)
         points = trimesh.transform_points(
-            snapshot.samples(GeometryRole.VISUAL, 16000), scan_T_root
+            snapshot.samples(role=GeometryRole.VISUAL, count=16000), scan_T_root
         )
         points += np.random.default_rng(0).normal(0, 0.002, size=points.shape)
         colors = np.tile(np.array((110, 150, 175), dtype=np.uint8), (len(points), 1))
         np.savez_compressed(from_scan, points=points, colors=colors)
         return RefinementProject.create(
-            directory, from_scan, snapshot, "synthetic-demo"
+            directory=directory,
+            scan_path=from_scan,
+            snapshot=snapshot,
+            model_source="synthetic-demo",
         )

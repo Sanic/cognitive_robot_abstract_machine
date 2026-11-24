@@ -23,14 +23,21 @@ def test_project_reopens_with_original_geometry_and_scan(tmp_path: Path) -> None
     Project reopening uses saved inputs rather than a mutable external model.
     """
     mesh = trimesh.creation.box()
-    snapshot = WorldSnapshot([BodyMesh("room/box", GeometryRole.VISUAL, mesh)])
+    snapshot = WorldSnapshot(
+        meshes=[BodyMesh(body_name="room/box", role=GeometryRole.VISUAL, mesh=mesh)]
+    )
     source = tmp_path / "preview.npz"
     points = mesh.vertices.copy()
     np.savez(source, points=points, colors=np.full(points.shape, 128, dtype=np.uint8))
     directory = tmp_path / "project"
-    project = RefinementProject.create(directory, source, snapshot, "test-world")
+    project = RefinementProject.create(
+        directory=directory,
+        scan_path=source,
+        snapshot=snapshot,
+        model_source="test-world",
+    )
     mesh.apply_translation((10, 0, 0))
-    reopened = RefinementProject(directory)
+    reopened = RefinementProject(directory=directory)
     np.testing.assert_array_equal(reopened.scan.points, points)
     np.testing.assert_array_equal(reopened.snapshot.meshes[0].mesh.vertices, points)
     assert reopened.record.scan_sha256 == project.record.scan_sha256
@@ -44,7 +51,10 @@ def test_project_does_not_overwrite_an_existing_directory(tmp_path: Path) -> Non
     """
     with pytest.raises(ExistingProject):
         RefinementProject.create(
-            tmp_path, tmp_path / "unused", WorldSnapshot([]), "test"
+            directory=tmp_path,
+            scan_path=tmp_path / "unused",
+            snapshot=WorldSnapshot(meshes=[]),
+            model_source="test",
         )
 
 
@@ -56,10 +66,10 @@ def test_scan_rejects_non_metric_units_without_explicit_conversion(
     """
     with pytest.raises(InvalidEvidence):
         RefinementProject.create(
-            tmp_path / "project",
-            tmp_path / "unused",
-            WorldSnapshot([]),
-            "test",
+            directory=tmp_path / "project",
+            scan_path=tmp_path / "unused",
+            snapshot=WorldSnapshot(meshes=[]),
+            model_source="test",
             scan_scale=0,
         )
 
@@ -70,9 +80,18 @@ def test_acceptance_requires_a_current_candidate(tmp_path: Path) -> None:
     """
     source = tmp_path / "preview.npz"
     snapshot = WorldSnapshot(
-        [BodyMesh("box", GeometryRole.VISUAL, trimesh.creation.box())]
+        meshes=[
+            BodyMesh(
+                body_name="box", role=GeometryRole.VISUAL, mesh=trimesh.creation.box()
+            )
+        ]
     )
     np.savez(source, points=snapshot.meshes[0].mesh.vertices)
-    project = RefinementProject.create(tmp_path / "project", source, snapshot, "test")
+    project = RefinementProject.create(
+        directory=tmp_path / "project",
+        scan_path=source,
+        snapshot=snapshot,
+        model_source="test",
+    )
     with pytest.raises(InvalidEvidence):
-        project.accept(0)
+        project.accept(candidate_index=0)

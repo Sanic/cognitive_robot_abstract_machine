@@ -14,14 +14,16 @@ import pye57
 
 
 # %% Fixture construction
-@dataclass
+@dataclass(kw_only=True)
 class StationFixture:
     """
     Two station poses with overlapping local record indices and one invalid point.
     """
 
     destination: Path
-    """New fixture file owned by the invoking test."""
+    """
+    New fixture file owned by the invoking test.
+    """
 
     def write(self) -> None:
         """
@@ -54,4 +56,4 @@ class StationFixture:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("destination", type=Path)
-    StationFixture(parser.parse_args().destination).write()
+    StationFixture(destination=parser.parse_args().destination).write()

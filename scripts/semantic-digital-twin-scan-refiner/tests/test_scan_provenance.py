@@ -28,9 +28,9 @@ def test_preview_import_retains_existing_station_and_record_ids(tmp_path: Path) 
         station_indices=np.array((1, 2), dtype=np.uint32),
         intensity=np.array((0.2, 0.8)),
     )
-    preview = ScanPreview.read(path)
+    preview = ScanPreview.read(path=path)
     records = np.concatenate(
-        [batch.records for batch in PreviewPointSource(preview).batches()]
+        [batch.records for batch in PreviewPointSource(preview=preview).batches()]
     )
     np.testing.assert_array_equal(records[PointField.SOURCE_INDICES], (900, 900))
     np.testing.assert_array_equal(records[PointField.STATION_INDICES], (1, 2))

@@ -2,6 +2,15 @@
 
 Status: initial design, 2026-11-09. The user accepted the recommended direction.
 See README.md for implemented scope and ROADMAP.md for current priorities.
+See [UI_DESIGN.md](UI_DESIGN.md) for the proposed staged browser workspace.
+
+Direction update, 2026-11-20: the agent runs in the existing conversation or Codex
+CLI. The browser supports inspection, target selection and proposal review; it
+does not need its own chat or a growing manual refinement wizard. The agent uses
+shared deterministic tools to investigate and propose corrections. Explicit
+multi-object change sets come before a general assembly solver. The current
+priority section of ROADMAP.md supersedes the original implementation ordering
+and manual-workflow emphasis in this broader design.
 
 The goal is to make refining an existing, approximate semantic world against
 measured evidence repeatable. Python world construction and URDF imports should

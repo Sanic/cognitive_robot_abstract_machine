@@ -19,7 +19,7 @@ from scan_refiner.world import BodyMesh, WorldSnapshot
 
 
 # %% Browser dependencies
-@dataclass
+@dataclass(kw_only=True)
 class ScriptSources(HTMLParser):
     """
     Collect external script dependencies without matching bundled source strings.
@@ -56,7 +56,9 @@ def test_comparison_uses_triangle_surfaces_and_transform_direction() -> None:
     scan_T_root = np.eye(4)
     scan_T_root[:3, 3] = (4, -2, 1)
     scan_points = np.array([[4, -2, 1.7], [4.1, -2, 1.5]])
-    distances = SurfaceComparison().scan_to_model(scan_points, mesh, scan_T_root)
+    distances = SurfaceComparison().scan_to_model(
+        scan_points=scan_points, root_mesh=mesh, scan_T_root=scan_T_root
+    )
     np.testing.assert_allclose(distances, (0.2, 0.0), atol=1e-12)
 
 
@@ -71,12 +73,14 @@ def test_viewer_is_self_contained_and_marks_provisional_registration(
     source = tmp_path / "scan.npz"
     np.savez(source, points=mesh.vertices)
     project = RefinementProject.create(
-        tmp_path / "project",
-        source,
-        WorldSnapshot([BodyMesh("room/box", GeometryRole.VISUAL, mesh)]),
-        "test",
+        directory=tmp_path / "project",
+        scan_path=source,
+        snapshot=WorldSnapshot(
+            meshes=[BodyMesh(body_name="room/box", role=GeometryRole.VISUAL, mesh=mesh)]
+        ),
+        model_source="test",
     )
-    path = InspectionViewer(project).write()
+    path = InspectionViewer(project=project).write()
     html = path.read_text()
     scripts = ScriptSources()
     scripts.feed(html)
