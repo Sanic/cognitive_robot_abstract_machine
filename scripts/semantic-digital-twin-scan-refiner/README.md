@@ -18,7 +18,8 @@ authoritative roadmap. In **Inspect → Region**, select an object, assembly or 
 click **Copy investigation context**. Paste it into the Codex conversation with
 your request. Submitted grouped translations appear under **Refine → Agent
 proposal** for interactive Original/Proposed review and one reversible decision.
-The real apartment-handle acceptance case comes next.
+The [Cabinet 3 handle case](doc/APARTMENT_HANDLE_CASE.md) demonstrates this
+workflow from registration review through grouped Accept and Undo.
 
 In the left pane, **World tree** follows the SemDT joints, including frames
 without meshes. Expand a row to browse its children, click the branch name to

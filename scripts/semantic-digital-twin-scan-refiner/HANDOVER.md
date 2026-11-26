@@ -1,4 +1,14 @@
-# Current handoff — kinematic outliner (2026-11-23)
+# Current handoff — revised walkthrough on apartment handles (2026-11-26)
+
+The [Cabinet 3 case](doc/APARTMENT_HANDLE_CASE.md) begins with the whole apartment
+scan and model unaligned, then records the automatic placement search before
+dense crop, Codex proposal, paired 3D heatmaps, Accept and visible Undo.
+A real pair of door handles is proposed to move together
+by 20 mm along world +Y, with both heights and the fixed doors preserved.
+The pending local review is on port 8838. The working apartment source has
+not been edited.
+
+# Previous handoff — kinematic outliner (2026-11-23)
 
 The [apartment outliner demo](http://127.0.0.1:8831/) uses the existing accepted
 registration and dense scan index. Expand **Apartment Root → Kitchen Root** or

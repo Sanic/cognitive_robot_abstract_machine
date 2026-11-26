@@ -56,14 +56,13 @@ detailed controls available under Advanced rather than deleting useful tools.
    Review now lives in Refine, with Original/Proposed, linked regional evidence,
    Accept/Reject and Advanced single-body tools. A paired job calculates both
    residual arrays from identical scan records and applies a shared colour scale.
-4. **Prove the loop on real apartment handles.** Investigate sideways placement
-   using drawer geometry, original positions, scan quality and previous changes.
-   Preserve current heights unless instructed otherwise. Distinguish registration,
-   assembly placement and individual-handle errors. Test a coherent correction,
-   inspect neighbouring geometry for regressions and present one reviewable
-   proposal. This is the next end-to-end acceptance case. Add centring/shared-height
-   or attachment helpers only where justified; do not independently fit every noisy
-   handle patch or assume all handles have the same mounting relationship.
+4. **Prove the loop on real apartment handles (demonstrated).** The
+   [Cabinet 3 case](doc/APARTMENT_HANDLE_CASE.md) separates a noisy whole-apartment
+   registration from the remaining sideways handle error. One proposal translates
+   both handles along their shared lateral axis, with heights, depths and doors
+   fixed. It improves held-out rail evidence and can be reviewed in the live
+   3D viewer. The video demonstrates grouped Accept and Undo on a disposable
+   copy. Adoption in the working apartment is a separate review decision.
 5. **Package accepted results for sharing.** Reuse native source-copy export and
    reload validation. Add a concise change report and supporting comparison views
    tied to the accepted revision. Do not export unapplied previews or overwrite
@@ -81,7 +80,7 @@ detailed controls available under Advanced rather than deleting useful tools.
 - Keep changes inside `scripts/semantic-digital-twin-scan-refiner`. Follow the
   repository AGENTS.md, including configured Python, tests and dependency rules.
 - Read [HANDOVER.md](HANDOVER.md), [the agent interface](doc/AGENT_INTERFACE.md)
-  and the existing viewer/inspection-state code before starting the handle case.
+  and [the handle case](doc/APARTMENT_HANDLE_CASE.md) before extending the workflow.
   The typed service/client/CLI already exposes inspection, rendering, registration,
   fitting, comparison, decisions, history and source export. Reuse it; do not
   create a second project writer or duplicate worker ownership.

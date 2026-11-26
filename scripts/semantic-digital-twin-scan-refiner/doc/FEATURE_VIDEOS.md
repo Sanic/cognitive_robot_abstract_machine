@@ -1,5 +1,14 @@
 # Guided feature videos
 
+[From whole-apartment alignment to handle refinement (2:23)](http://127.0.0.1:8815/videos/apartment-handle-refinement-v6.mp4)
+starts with the entire scan and SemDT model apart, runs the automatic placement
+search, and previews the generated fit. It compares two placements using the
+same whole-apartment sample and accepts one before selecting the cabinet. The rest follows
+manual handle selection, the Codex handoff, paired 3D heatmaps, and both handles
+returning to their original positions after one Undo from a shallow angle.
+See [the measured handle case](APARTMENT_HANDLE_CASE.md) for the evidence and
+pending interactive review.
+
 [Select and inspect the kitchen island assembly (0:59)](http://127.0.0.1:8815/videos/assembly-selection.mp4)
 shows the 39-body assembly focus, 50,000 dense points in Scan only mode, drilling
 down to Cabinet9 and copying the complete context. The agent reopened the
