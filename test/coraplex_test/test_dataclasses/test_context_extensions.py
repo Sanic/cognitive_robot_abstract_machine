@@ -26,7 +26,10 @@ def test_debug_requires_a_ros_node(pr2_apartment_context) -> None:
 
     with pytest.raises(DebuggingWithoutRosNode):
         KinematicallySimulatedPlanExecutor(
-            StatechartContext.with_extensions(world, extensions), debug=True
+            context=StatechartContext.with_extensions(
+                world=world, extensions=extensions
+            ),
+            debug=True,
         )
 
 
@@ -43,7 +46,7 @@ def test_controlled_root_is_the_robot_when_the_base_stands_still(
     world, robot, _ = pr2_apartment_context
     robot.mobile_base.full_body_controlled = False
 
-    assert RobotAccess(robot).controlled_root is robot.root
+    assert RobotAccess(robot=robot).controlled_root is robot.root
 
 
 def test_controlled_root_is_the_world_when_the_base_may_drive(
@@ -58,7 +61,7 @@ def test_controlled_root_is_the_world_when_the_base_may_drive(
     robot.mobile_base.full_body_controlled = True
 
     try:
-        assert RobotAccess(robot).controlled_root is world.root
+        assert RobotAccess(robot=robot).controlled_root is world.root
     finally:
         robot.mobile_base.full_body_controlled = previous
 
@@ -73,12 +76,12 @@ def test_the_robot_of_a_copied_world_is_its_own_copy(pr2_apartment_context) -> N
     world, robot, _ = pr2_apartment_context
     copy = world.__deepcopy__({})
 
-    copied_access = copy.rebind_world_entities(RobotAccess(robot))
+    copied_access = copy.rebind_world_entities(RobotAccess(robot=robot))
 
     assert copied_access.robot is copy.get_semantic_annotation_by_id(robot.id)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationCountingItsApplications(PlanTransformation[MoveTorsoAction]):
     """
     Rewrites nothing, and counts how often it was applied.
@@ -89,10 +92,10 @@ class TransformationCountingItsApplications(PlanTransformation[MoveTorsoAction])
     How often it was applied.
     """
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return True
 
-    def apply(self, plan_node: MoveTorsoAction) -> None:
+    def apply(self, *, plan_node: MoveTorsoAction) -> None:
         self.applications += 1
 
 
@@ -108,9 +111,9 @@ def test_a_copied_plan_rewriting_offers_the_nodes_offered_already_again(
     rewriting = PlanRewriting(transformations=[counting])
     torso = MoveTorsoAction(torso_state=TorsoState.HIGH)
     statechart_of(simulated_executor(extensions), torso)
-    rewriting.rewrite(torso)
+    rewriting.rewrite(root=torso)
 
-    world.rebind_world_entities(rewriting).rewrite(torso)
+    world.rebind_world_entities(rewriting).rewrite(root=torso)
 
     assert counting.applications == 2
 

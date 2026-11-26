@@ -1,6 +1,12 @@
-import os
+"""
+Tests of the decomposers that split a mesh into convex parts.
+"""
 
+from __future__ import annotations
+
+import numpy as np
 import pytest
+import trimesh
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -8,23 +14,20 @@ from semantic_digital_twin.pipeline.mesh_decomposition.box_decomposer import (
     BoxDecomposer,
 )
 from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
+from semantic_digital_twin.pipeline.mesh_decomposition.exceptions import (
+    MeshWithoutConvexPartsError,
+)
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
 from semantic_digital_twin.pipeline.pipeline import Pipeline
-from semantic_digital_twin.world_description.geometry import Box
+from semantic_digital_twin.world_description.geometry import Box, Mesh
 
 
 @pytest.fixture(scope="function")
 def jeroen_cup_world_fixture():
-    stl_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "stl",
-    )
-    world = STLParser(os.path.join(stl_dir, "jeroen_cup.stl")).create_world()
+    """
+    :return: A world of the jeroen cup whose root is named ``root``.
+    """
+    world = STLParser("package://iai_objects/objects/jeroen_cup.stl").create_world()
     world.root.name = PrefixedName("root")
     return world
 
@@ -59,3 +62,38 @@ def test_box_decomposer(jeroen_cup_world_fixture):
 
     assert len(cup.collision.shapes) > old_collision_length
     assert all([isinstance(shape, Box) for shape in cup.collision.shapes])
+
+
+# %% flat mesh decomposition
+
+
+def test_vhacd_decomposes_flat_mesh_into_its_convex_hull(millimetre_wall_strip):
+    """
+    A mesh in which V-HACD finds no convex parts is decomposed into its convex hull.
+    """
+    [part] = VHACDMeshDecomposer().apply_to_mesh(
+        Mesh.from_trimesh(mesh=millimetre_wall_strip)
+    )
+
+    convex_hull = millimetre_wall_strip.convex_hull
+    assert np.allclose(part.mesh.vertices, convex_hull.vertices)
+    assert np.array_equal(part.mesh.faces, convex_hull.faces)
+
+
+@pytest.mark.parametrize(
+    "vertices",
+    [np.empty((0, 3)), np.zeros((4, 3))],
+    ids=["no vertices", "single point"],
+)
+def test_vhacd_raises_for_mesh_without_convex_parts(vertices: np.ndarray):
+    """
+    A mesh whose vertices span no plane has neither V-HACD parts nor a convex hull.
+    """
+    mesh = Mesh.from_trimesh(
+        mesh=trimesh.Trimesh(
+            vertices=vertices, faces=np.empty((0, 3), dtype=int), process=False
+        )
+    )
+
+    with pytest.raises(MeshWithoutConvexPartsError):
+        VHACDMeshDecomposer().apply_to_mesh(mesh)

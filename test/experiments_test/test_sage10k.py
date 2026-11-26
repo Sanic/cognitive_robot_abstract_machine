@@ -1,13 +1,17 @@
+"""
+The SAGE-10k door-opening demo.
+"""
+
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from copy import deepcopy
 
 import numpy as np
 import pytest
 
-import experiments.orm.ormatic_interface  # type: ignore
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
@@ -67,8 +71,8 @@ def wall_door_handle_world():
         door.add(handle)
 
     door.mount_on_movable_joint(
-        RevoluteConnectionSpecification(
-            axis=Vector3.Z(),
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             dof_limits=DegreeOfFreedomLimits(
                 lower=DerivativeMap(position=0.0, velocity=0.0),
                 upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
@@ -95,7 +99,7 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     run_plan(
         Sage10kOpenDoor(door=door),
         [
-            RobotAccess(robot),
+            RobotAccess(robot=robot),
             StatementGrounding(query_backend=ProbabilisticBackend()),
         ],
     )

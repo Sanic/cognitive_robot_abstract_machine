@@ -2,6 +2,8 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing_extensions import Any
 
+from krrood.patterns.called_positionally import called_positionally
+
 import numpy as np
 import pytest
 from control_msgs.msg import MultiDOFCommand
@@ -28,14 +30,14 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     DifferentialDrive,
     OmniDrive,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% test doubles
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingPublisher:
     """
     Stand-in for a ROS publisher that stores every published message.
@@ -58,11 +60,12 @@ class RecordingPublisher:
             return None
         return self.published_messages[-1]
 
+    @called_positionally
     def publish(self, message: Any) -> None:
         self.published_messages.append(deepcopy(message))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionSpec:
     """
     Describes a connection to be built for a publisher test.
@@ -83,11 +86,6 @@ class ConnectionSpec:
     Scaling between the world state value and the value of the connection.
     """
 
-    connection_type: type[ActiveConnection1DOF] = RevoluteConnection
-    """
-    The concrete connection class to instantiate.
-    """
-
 
 def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
     """
@@ -97,11 +95,13 @@ def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
     with world.modify_world():
         for index, spec in enumerate(specs):
             child = Body(name=PrefixedName(f"body_{index}"))
-            connection = spec.connection_type.create_with_dofs(
+            connection = ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=parent,
                 child=child,
-                axis=Vector3.Z(),
                 name=PrefixedName(spec.name),
                 multiplier=spec.multiplier,
             )
@@ -129,11 +129,11 @@ def add_removable_joint(world: World, parent: Body) -> ActiveConnection1DOF:
     degree of freedom that was added afterwards.
     """
     with world.modify_world():
-        connection = RevoluteConnection.create_with_dofs(
+        connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=parent,
             child=Body(name=PrefixedName("removable_body")),
-            axis=Vector3.Z(),
             name=PrefixedName("removable_joint"),
         )
         world.add_connection(connection)
@@ -183,7 +183,7 @@ def group_publisher_for(
         command_topic="test_cmd",
         connections=[world.get_connection_by_name(spec.name) for spec in specs],
         minimum_velocities=JointMinimumVelocities.from_magnitudes(
-            minimum_valid_velocity, minimum_velocity_overrides
+            default=minimum_valid_velocity, overrides=minimum_velocity_overrides
         ),
         command_format=command_format or Float64MultiArrayFormat(),
     )
@@ -259,58 +259,62 @@ def build_drive_world(
 
 
 def test_scalar_below_minimum_keeps_its_sign():
-    minimum_velocity = MinimumVelocity(0.03)
+    minimum_velocity = MinimumVelocity(magnitude=0.03)
 
-    assert minimum_velocity.enforce_on_scalar(0.01) == pytest.approx(0.03)
-    assert minimum_velocity.enforce_on_scalar(-0.01) == pytest.approx(-0.03)
+    assert minimum_velocity.enforce_on_scalar(velocity=0.01) == pytest.approx(0.03)
+    assert minimum_velocity.enforce_on_scalar(velocity=-0.01) == pytest.approx(-0.03)
 
 
 def test_scalar_at_zero_stays_zero():
-    assert MinimumVelocity(0.03).enforce_on_scalar(0.0) == pytest.approx(0.0)
+    assert MinimumVelocity(magnitude=0.03).enforce_on_scalar(
+        velocity=0.0
+    ) == pytest.approx(0.0)
 
 
 def test_scalar_above_minimum_is_unchanged():
-    assert MinimumVelocity(0.03).enforce_on_scalar(0.1) == pytest.approx(0.1)
+    assert MinimumVelocity(magnitude=0.03).enforce_on_scalar(
+        velocity=0.1
+    ) == pytest.approx(0.1)
 
 
 def test_zero_magnitude_disables_raising():
-    assert MinimumVelocity().enforce_on_scalar(0.001) == pytest.approx(0.001)
-    assert MinimumVelocity().enforce_on_vector([0.001, 0.001]) == pytest.approx(
-        [0.001, 0.001]
-    )
+    assert MinimumVelocity().enforce_on_scalar(velocity=0.001) == pytest.approx(0.001)
+    assert MinimumVelocity().enforce_on_vector(
+        velocities=[0.001, 0.001]
+    ) == pytest.approx([0.001, 0.001])
 
 
 def test_vector_below_minimum_is_scaled_to_the_minimum_norm():
-    raised = MinimumVelocity(0.05).enforce_on_vector([0.02, 0.02])
+    raised = MinimumVelocity(magnitude=0.05).enforce_on_vector(velocities=[0.02, 0.02])
 
     assert raised[0] == pytest.approx(raised[1])
     assert np.linalg.norm(raised) == pytest.approx(0.05)
 
 
 def test_vector_below_minimum_keeps_its_direction():
-    raised = MinimumVelocity(0.05).enforce_on_vector([0.03, -0.01])
+    raised = MinimumVelocity(magnitude=0.05).enforce_on_vector(velocities=[0.03, -0.01])
 
     assert raised[0] / raised[1] == pytest.approx(0.03 / -0.01)
 
 
 def test_single_element_vector_matches_the_scalar_case():
-    minimum_velocity = MinimumVelocity(0.05)
+    minimum_velocity = MinimumVelocity(magnitude=0.05)
 
-    assert minimum_velocity.enforce_on_vector([-0.01]) == pytest.approx(
-        [minimum_velocity.enforce_on_scalar(-0.01)]
+    assert minimum_velocity.enforce_on_vector(velocities=[-0.01]) == pytest.approx(
+        [minimum_velocity.enforce_on_scalar(velocity=-0.01)]
     )
 
 
 def test_vector_above_minimum_is_unchanged():
-    assert MinimumVelocity(0.05).enforce_on_vector([0.3, 0.4]) == pytest.approx(
-        [0.3, 0.4]
-    )
+    assert MinimumVelocity(magnitude=0.05).enforce_on_vector(
+        velocities=[0.3, 0.4]
+    ) == pytest.approx([0.3, 0.4])
 
 
 def test_zero_vector_stays_zero():
-    assert MinimumVelocity(0.05).enforce_on_vector([0.0, 0.0]) == pytest.approx(
-        [0.0, 0.0]
-    )
+    assert MinimumVelocity(magnitude=0.05).enforce_on_vector(
+        velocities=[0.0, 0.0]
+    ) == pytest.approx([0.0, 0.0])
 
 
 # %% joint group publisher
@@ -571,8 +575,8 @@ def build_drive_publisher(
         world=world,
         command_topic="/cmd_vel",
         connection=world.get_connection_by_name("brumbrum"),
-        minimum_linear_velocity=MinimumVelocity(minimum_linear_velocity),
-        minimum_angular_velocity=MinimumVelocity(minimum_angular_velocity),
+        minimum_linear_velocity=MinimumVelocity(magnitude=minimum_linear_velocity),
+        minimum_angular_velocity=MinimumVelocity(magnitude=minimum_angular_velocity),
         command_format=command_format or TwistFormat(),
     )
 

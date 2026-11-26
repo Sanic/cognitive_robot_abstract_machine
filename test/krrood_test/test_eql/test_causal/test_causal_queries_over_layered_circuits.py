@@ -13,13 +13,13 @@ import numpy as np
 import pytest
 from typing_extensions import Callable
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, cause
-from krrood.entity_query_language.operators.causal import ScoredIntervention
+from krrood.parametrization.causal_search import ScoredIntervention
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import LayeredLearning
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
@@ -39,7 +39,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-from ...dataset import ormatic_interface  # noqa: F401, registers the DAOs
 from ...dataset.example_classes import (
     KRROODOrientation,
     KRROODPosition,

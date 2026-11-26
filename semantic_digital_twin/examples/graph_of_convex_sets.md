@@ -66,7 +66,7 @@ search_space = BoundingBoxCollection([VolumetricBoundingBox(min_x=-1, max_x=1,
                            min_y=-1, max_y=1,
                            min_z=0.1, max_z=0.2, origin=HomogeneousTransformationMatrix(reference_frame=box_world.root))], box_world.root)
                            
-graph_of_bounding_boxes = VolumetricGraphOfBoundingBoxes.free_space_from_world(box_world, search_space=search_space)
+graph_of_bounding_boxes = VolumetricGraphOfBoundingBoxes.free_space_from_world(world=box_world, search_space=search_space)
 ```
 
 Let's have a look at the free space constructed. We can see that it is a rectangular catwalk around the obstacle.
@@ -101,13 +101,10 @@ print("A potential path is", [(point.x, point.y) for point in path])
 This minimal example demonstrates a concept that can be applied to the entire belief state of the robot. Let's load a more complex environment and look at the connectivity of it.
 
 ```{code-cell} ipython3
-import os
-from importlib.resources import files
-from pathlib import Path
 import semantic_digital_twin
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-apartment = os.path.realpath(os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "kitchen.urdf"))
+apartment = "package://iai_kitchen/urdf_obj/kitchen_with_walls.urdf"
 
 apartment_parser = URDFParser.from_file(apartment)
 world = apartment_parser.create_world()
@@ -115,7 +112,7 @@ world = apartment_parser.create_world()
 search_space = BoundingBoxCollection([VolumetricBoundingBox(min_x=-2, max_x=2,
                            min_y=-2, max_y=2,
                            min_z=0., max_z=2, origin=HomogeneousTransformationMatrix(reference_frame=world.root))], world.root)
-graph_of_bounding_boxes = VolumetricGraphOfBoundingBoxes.free_space_from_world(world, search_space=search_space)
+graph_of_bounding_boxes = VolumetricGraphOfBoundingBoxes.free_space_from_world(world=world, search_space=search_space)
 ```
 
 We can now see the algebraic representation of the occupied and free space. The free space is the complement of the occupied space.

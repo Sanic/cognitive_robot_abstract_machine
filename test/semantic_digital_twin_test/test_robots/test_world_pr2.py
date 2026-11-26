@@ -1,3 +1,9 @@
+"""
+Tests of the PR2's kinematics, control commands and semantic annotations.
+"""
+
+from __future__ import annotations
+
 from collections import defaultdict
 
 import numpy as np
@@ -9,7 +15,6 @@ from semantic_digital_twin.exceptions import (
     DuplicateRobotAssignmentsError,
     PartiallyAppliedWorldModificationError,
 )
-from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 from semantic_digital_twin.reasoning.predicates import LeftOf
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import (
@@ -29,21 +34,17 @@ from semantic_digital_twin.robots.pr2 import (
     PR2RightGripperRightFinger,
     PR2KinectV1,
 )
-from semantic_digital_twin.robots.robot_parts import KinematicChain
+from semantic_digital_twin.robots.robot_parts import RobotKinematicChain
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_computations.ik_solver import (
-    MaxIterationsException,
-    UnreachableException,
-)
 from semantic_digital_twin.world_description.derivatives import Derivatives
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     DifferentialDrive,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
 )
 
@@ -233,47 +234,6 @@ def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world_state_reset):
     )
 
 
-def test_compute_ik(pr2_world_state_reset):
-    bf = pr2_world_state_reset.root
-    eef = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
-    )
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
-    fk[0, 3] -= 0.2
-    joint_state = pr2_world_state_reset.compute_inverse_kinematics(
-        bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
-    )
-    for joint, state in joint_state.items():
-        pr2_world_state_reset.state[joint.id].position = state
-    pr2_world_state_reset.notify_state_change()
-    actual_fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
-    assert np.allclose(actual_fk, fk, atol=1e-3)
-
-
-def test_compute_ik_max_iter(pr2_world_state_reset):
-    bf = pr2_world_state_reset.root
-    eef = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
-    )
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
-    fk[2, 3] = 10
-    with pytest.raises(MaxIterationsException):
-        pr2_world_state_reset.compute_inverse_kinematics(
-            bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
-        )
-
-
-def test_compute_ik_unreachable(pr2_world_state_reset):
-    bf = pr2_world_state_reset.root
-    eef = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
-    fk[2, 3] = -1
-    with pytest.raises(UnreachableException):
-        pr2_world_state_reset.compute_inverse_kinematics(
-            bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
-        )
-
-
 def test_apply_control_commands_omni_drive_pr2(pr2_world_state_reset):
     omni_drive: OmniDrive = pr2_world_state_reset.get_connection_by_name(
         "odom_combined_T_base_footprint"
@@ -386,7 +346,13 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
         "base_footprint"
     )
 
-    connections = pr2_world_state_reset.get_connections_by_type(PrismaticConnection)
+    connections = [
+        connection
+        for connection in pr2_world_state_reset.get_connections_by_type(
+            ScrewAxisConnection
+        )
+        if connection.behaves_like_a_prismatic_connection
+    ]
     assert len(connections) == 5
     assert connections[0].name == PrefixedName(name=PR2Joint.TORSO_LIFT, prefix="pr2")
     assert connections[
@@ -424,7 +390,13 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
         "r_gripper_l_finger_tip_frame"
     )
 
-    connections = pr2_world_state_reset.get_connections_by_type(RevoluteConnection)
+    connections = [
+        connection
+        for connection in pr2_world_state_reset.get_connections_by_type(
+            ScrewAxisConnection
+        )
+        if connection.behaves_like_a_revolute_connection
+    ]
     assert len(connections) == 40
 
 
@@ -478,12 +450,26 @@ def test_an_arm_covers_the_chain_down_to_its_end_effector(pr2_world_state_reset)
 
 
 def test_kinematic_chains(pr2_world_state_reset):
-    semantic_kinematic_chain_annotation: list[KinematicChain] = (
-        pr2_world_state_reset.get_semantic_annotations_by_type(KinematicChain)
+    """
+    Every kinematic chain of the PR2 has a root and a tip.
+    """
+    semantic_kinematic_chain_annotation: list[RobotKinematicChain] = (
+        pr2_world_state_reset.get_semantic_annotations_by_type(RobotKinematicChain)
     )
     for chain in semantic_kinematic_chain_annotation:
         assert chain.root
         assert chain.tip
+
+
+def test_a_robot_kinematic_chain_is_a_kinematic_chain(pr2_world_state_reset):
+    """
+    An arm stands wherever a chain from a root to a tip is taken, and stays usable as a
+    key while doing so.
+    """
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    assert isinstance(pr2.left_arm, KinematicChain)
+    assert {pr2.left_arm, pr2.right_arm} == {pr2.right_arm, pr2.left_arm}
 
 
 def test_tracy_semantic_annotation(tracy_world):

@@ -1,3 +1,10 @@
+"""
+Tests of which world updates Giskard and its clients apply, when, and how they tell what
+the other side caught up with.
+"""
+
+from __future__ import annotations
+
 import json
 import time
 from dataclasses import dataclass, field
@@ -28,14 +35,14 @@ from cramph.monitors import CountSimulationTimeSeconds
 from cramph.statechart import Statechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -48,7 +55,7 @@ from cramph.executor import StatechartExecutor
 # %% mimics of the synchronizers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BufferingSynchronizerMimic:
     """
     Stands in for a synchronizer that buffers what it receives.
@@ -90,12 +97,17 @@ class BufferingSynchronizerMimic:
         self.applied_message_batches += 1
         self.buffered_model_modification = False
 
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
+        """
+        Remember the position it was asked about.
+
+        :return: The answer the mimic was configured with.
+        """
         self.asked_about_positions.append(position)
         return self.caught_up
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PublishingSynchronizerMimic:
     """
     Stands in for the synchronizer of a client: it publishes the changes of that world
@@ -107,8 +119,10 @@ class PublishingSynchronizerMimic:
     Position of the change this world published last.
     """
 
-    origin: MetaData = field(
-        default_factory=lambda: MetaData(node_name="client", process_id=0)
+    origin: MessageOrigin = field(
+        default_factory=lambda: MessageOrigin(
+            sender=Sender(node_name="client", process_id=0)
+        )
     )
     """
     The publisher the positions of this world belong to.
@@ -125,11 +139,15 @@ class PublishingSynchronizerMimic:
             origin=self.origin, sequence_number=self.published_sequence_number
         )
 
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
+        """
+        :return: Whether ``position`` is not after the position this world caught up with,
+            whatever its publisher.
+        """
         return self.applied_sequence_number >= position.sequence_number
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReloadingSynchronizerMimic:
     """
     Stands in for a synchronizer that remembers a request to replace the whole world.
@@ -222,23 +240,33 @@ class TestCatchingUp:
     """
 
     def test_the_position_to_catch_up_with_reaches_the_synchronizer(self):
+        """
+        The world updates ask the synchronizer that received the change.
+        """
         world_synchronizer = BufferingSynchronizerMimic(caught_up=True)
         world_updates = IncomingWorldUpdates(world_synchronizer=world_synchronizer)
         position = StreamPosition(
-            origin=MetaData(node_name="publisher", process_id=1), sequence_number=7
+            origin=MessageOrigin(sender=Sender(node_name="publisher", process_id=1)),
+            sequence_number=7,
         )
 
-        assert world_updates.has_applied(position)
+        assert world_updates.has_applied(position=position)
         assert world_synchronizer.asked_about_positions == [position]
 
     def test_a_position_that_was_not_reached_is_reported_as_such(self):
+        """
+        A change the synchronizer did not apply yet is not reported as applied.
+        """
         world_updates = IncomingWorldUpdates(
             world_synchronizer=BufferingSynchronizerMimic(caught_up=False)
         )
 
         assert not world_updates.has_applied(
-            StreamPosition(
-                origin=MetaData(node_name="publisher", process_id=1), sequence_number=7
+            position=StreamPosition(
+                origin=MessageOrigin(
+                    sender=Sender(node_name="publisher", process_id=1)
+                ),
+                sequence_number=7,
             )
         )
 
@@ -272,9 +300,13 @@ class TestClientWorldUpdates:
             world_synchronizer=PublishingSynchronizerMimic(), timeout=timedelta(0)
         )
 
-        world_updates.wait_for_the_changes_of_a_goal({})
+        world_updates.wait_for_the_changes_of_a_goal(result={})
 
     def test_the_changes_of_a_goal_are_waited_for(self):
+        """
+        Waiting for the changes of a goal ends once the position its result reports was
+        applied.
+        """
         synchronizer = PublishingSynchronizerMimic(applied_sequence_number=9)
         world_updates = ClientWorldUpdates(
             world_synchronizer=synchronizer,
@@ -283,10 +315,12 @@ class TestClientWorldUpdates:
         )
 
         world_updates.wait_for_the_changes_of_a_goal(
-            {
+            result={
                 "published_position": to_json(
                     StreamPosition(
-                        origin=MetaData(node_name="giskard", process_id=1),
+                        origin=MessageOrigin(
+                            sender=Sender(node_name="giskard", process_id=1)
+                        ),
                         sequence_number=9,
                     )
                 )
@@ -294,6 +328,10 @@ class TestClientWorldUpdates:
         )
 
     def test_changes_that_never_arrive_are_reported(self):
+        """
+        A reported change that is not applied within the timeout is raised, naming the
+        position that was awaited.
+        """
         world_updates = ClientWorldUpdates(
             world_synchronizer=PublishingSynchronizerMimic(applied_sequence_number=8),
             timeout=timedelta(seconds=0.05),
@@ -302,10 +340,12 @@ class TestClientWorldUpdates:
 
         with pytest.raises(GiskardWorldUpdateNotReceivedError) as raised:
             world_updates.wait_for_the_changes_of_a_goal(
-                {
+                result={
                     "published_position": to_json(
                         StreamPosition(
-                            origin=MetaData(node_name="giskard", process_id=1),
+                            origin=MessageOrigin(
+                                sender=Sender(node_name="giskard", process_id=1)
+                            ),
                             sequence_number=9,
                         )
                     )
@@ -318,7 +358,7 @@ class TestClientWorldUpdates:
 # %% against a real synchronizer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GoalQueueStub:
     """
     Stands in for the action server of a control loop that is never canceled.
@@ -342,11 +382,11 @@ class GoalQueueStub:
     def is_cancel_requested(self) -> bool:
         return False
 
-    def send_feedback(self, message: Any) -> None:
+    def send_feedback(self, *, message: Any) -> None:
         self.feedback_messages.append(message)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControlLoopFixture:
     """
     A control loop running on a world that a second process publishes updates to.
@@ -360,13 +400,19 @@ class ControlLoopFixture:
     world_updates: IncomingWorldUpdates
 
     @property
-    def moving_connection(self) -> PrismaticConnection:
+    def moving_connection(self) -> ScrewAxisConnection:
         """
         The connection whose position both worlds share.
         """
-        return self.controlled_world.get_connections_by_type(PrismaticConnection)[0]
+        return [
+            connection
+            for connection in self.controlled_world.get_connections_by_type(
+                ScrewAxisConnection
+            )
+            if connection.behaves_like_a_prismatic_connection
+        ][0]
 
-    def wait_until_buffered(self, count: int) -> bool:
+    def wait_until_buffered(self, *, count: int) -> bool:
         deadline = time.time() + 5.0
         while time.time() < deadline:
             if len(self.controlled_synchronizer.missed_messages) >= count:
@@ -392,11 +438,13 @@ def add_moving_connection(world: World) -> None:
         world.add_body(parent_body)
         world.add_body(child_body)
         world.add_connection(
-            PrismaticConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=world,
                 parent=parent_body,
                 child=child_body,
-                axis=Vector3.X(),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=-1.0, upper_position=1.0, maximum_speed=1.0
                 ),
@@ -438,10 +486,12 @@ def control_loop(init_background_node) -> ControlLoopFixture:
         ],
     )
     motion_statechart = Statechart(context=StatechartContext(world=controlled_world))
-    motion_statechart.add_node(counter := CountSimulationTimeSeconds(seconds=1000.0))
-    motion_statechart.add_node(EndMotion.when_true(counter))
+    motion_statechart.add_node(
+        node=(counter := CountSimulationTimeSeconds(seconds=1000.0))
+    )
+    motion_statechart.add_node(node=EndMotion.when_true(node=counter))
     executor.compile(
-        Statechart.from_json(
+        statechart=Statechart.from_json(
             data=json.loads(json.dumps(motion_statechart.to_json())),
             context=executor.context,
         )
@@ -483,14 +533,18 @@ class TestRealWorldUpdatesDuringAMotion:
     """
 
     def test_a_state_update_reaches_the_running_motion(
-        self, control_loop: ControlLoopFixture
+        self, *, control_loop: ControlLoopFixture
     ):
-        remote_connection = control_loop.remote_world.get_connections_by_type(
-            PrismaticConnection
-        )[0]
+        remote_connection = [
+            connection
+            for connection in control_loop.remote_world.get_connections_by_type(
+                ScrewAxisConnection
+            )
+            if connection.behaves_like_a_prismatic_connection
+        ][0]
         control_loop.remote_world.state[remote_connection.dof.id].position = 0.42
         control_loop.remote_world.notify_state_change()
-        assert control_loop.wait_until_buffered(1)
+        assert control_loop.wait_until_buffered(count=1)
 
         control_loop.control_loop.run_cycle()
 
@@ -499,7 +553,7 @@ class TestRealWorldUpdatesDuringAMotion:
         ), "the state of the other process never reached the running motion"
 
     def test_a_world_that_is_being_modified_terminates_the_motion(
-        self, control_loop: ControlLoopFixture
+        self, *, control_loop: ControlLoopFixture
     ):
         """
         An open modification is a model change that already started, so the motion has
@@ -510,7 +564,7 @@ class TestRealWorldUpdatesDuringAMotion:
                 control_loop.control_loop.run_cycle()
 
     def test_a_model_modification_terminates_the_motion_before_it_is_applied(
-        self, control_loop: ControlLoopFixture
+        self, *, control_loop: ControlLoopFixture
     ):
         """
         The modification must still be unapplied when the motion ends: the motion
@@ -522,7 +576,7 @@ class TestRealWorldUpdatesDuringAMotion:
             control_loop.remote_world.add_connection(
                 FixedConnection(parent=control_loop.remote_world.root, child=late_body)
             )
-        assert control_loop.wait_until_buffered(1)
+        assert control_loop.wait_until_buffered(count=1)
         entities_before = len(
             control_loop.controlled_world.kinematic_structure_entities
         )
@@ -546,7 +600,7 @@ class TestRealWorldUpdatesDuringAMotion:
 # %% a model change the motion makes itself
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CommandPublisherRecordingCalls(CommandPublisher):
     """
     Stands in for a publisher to the robot, recording which of its methods ran, in
@@ -582,9 +636,11 @@ def local_control_loop(init_background_node) -> ControlLoop:
         ],
     )
     motion_statechart = Statechart(context=executor.context)
-    motion_statechart.add_node(counter := CountSimulationTimeSeconds(seconds=1000.0))
-    motion_statechart.add_node(EndMotion.when_true(counter))
-    executor.compile(motion_statechart)
+    motion_statechart.add_node(
+        node=(counter := CountSimulationTimeSeconds(seconds=1000.0))
+    )
+    motion_statechart.add_node(node=EndMotion.when_true(node=counter))
+    executor.compile(statechart=motion_statechart)
     action_server = GoalQueueStub()
     return ControlLoop(
         executor=executor,
@@ -609,7 +665,7 @@ def local_control_loop(init_background_node) -> ControlLoop:
 
 class TestModelChangesOfTheMotionItself:
     def test_commands_keep_being_published_while_the_motion_is_built_again(
-        self, local_control_loop: ControlLoop
+        self, *, local_control_loop: ControlLoop
     ) -> None:
         """
         The controller slows the robot down while the motion statechart is built again

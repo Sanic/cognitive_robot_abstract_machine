@@ -1,3 +1,10 @@
+"""
+Collision detection with Bullet, including the conversion of shapes into Bullet
+collision objects.
+"""
+
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
@@ -12,7 +19,6 @@ from uuid import UUID
 import giskardpy_bullet_bindings as bullet
 import numpy as np
 import trimesh
-from giskardpy.utils.utils import create_path
 from krrood.patterns.caching import memoize, clear_memoization_cache
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
@@ -94,6 +100,7 @@ def _geometry_cache_key(geometry: Shape) -> Any:
                 round(geometry.scale.x, 6),
                 round(geometry.scale.y, 6),
                 round(geometry.scale.z, 6),
+                tuple(np.round(geometry.file_T_mesh.to_np(), 6).flatten()),
             )
         case _:
             raise NotImplementedError()
@@ -279,7 +286,10 @@ def load_convex_mesh_shape(
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(
             mesh=mesh, mesh_decomposer=mesh_decomposer
         )
-    elif mesh.local_file.suffix.removeprefix(".").lower() in BulletMeshFileFormat:
+    elif (
+        np.allclose(mesh.file_T_mesh.to_np(), np.eye(4))
+        and mesh.local_file.suffix.removeprefix(".").lower() in BulletMeshFileFormat
+    ):
         obj_pkg_filename = str(mesh.local_file)
     else:
         obj_pkg_filename = convert_to_obj_and_save_in_tmp(mesh=mesh)
@@ -336,8 +346,8 @@ def convert_to_decomposed_obj_and_save_in_tmp(
 
 def convert_to_obj_and_save_in_tmp(mesh: Mesh, cache_dir: Path = CACHE_DIR) -> str:
     """
-    Saves the geometry of a mesh, before its scale is applied, as an .obj file in the
-    cache, for a mesh whose file Bullet cannot read.
+    Saves the geometry of a mesh, in its own frame and before its scale is applied, as
+    an .obj file in the cache, for a mesh whose file Bullet cannot read as it is.
 
     The file is named apart from the mesh's convex decomposition, so neither is read in
     place of the other.
@@ -372,7 +382,7 @@ def save_in_cache(obj_file_name: str, write: Callable[[str], None]) -> str:
         logging.debug(f'Cache hit, loaded "{obj_file_name}".')
         return obj_file_name
 
-    create_path(obj_file_name)
+    Path(obj_file_name).parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         dir=os.path.dirname(obj_file_name), suffix=".obj", delete=False
     ) as unfinished_file:

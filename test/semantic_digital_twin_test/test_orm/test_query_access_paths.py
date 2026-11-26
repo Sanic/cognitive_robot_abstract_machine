@@ -14,21 +14,20 @@ import pytest
 from random_events.interval import open
 from random_events.product_algebra import SimpleEvent
 
-import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     a,
     an,
     entity,
-    probability_of,
     variable,
 )
+from krrood.entity_query_language.factories import probability_of
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import ConditionParameters
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,

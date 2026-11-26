@@ -1,7 +1,11 @@
+"""
+The camera configuration of the HSR's hand camera.
+"""
+
 from __future__ import annotations
 
 # %% Imports
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from dataclasses import dataclass
 
 
@@ -17,7 +21,7 @@ from robokudo.descriptors.camera_configs.components import (
 
 
 # %% Hand camera configuration
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class HsrHandCameraConfig(
     BaseCameraConfig,
     ColorComponent,

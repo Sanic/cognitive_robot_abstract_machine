@@ -7,10 +7,13 @@ number of the wrong things fails. Every name is checked against the world itself
 missing annotation.
 """
 
+from copy import deepcopy
 from enum import StrEnum
 
 import pytest
 
+from krrood.class_diagrams.class_diagram import ClassDiagram
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -34,10 +37,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wardrobe,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
-)
 
 # %% the bodies each annotation is expected on
 
@@ -310,13 +309,28 @@ The drawer the apartment fixture annotates by hand before any reasoning runs.
 """
 
 
+@pytest.fixture(scope="module")
+def _reasoned_apartment_setup(
+    _apartment_world_setup: World, _session_class_diagram: ClassDiagram
+) -> World:
+    """
+    The apartment with everything the reasoner can infer about it already inferred,
+    reasoned once for the module and only ever copied.
+    """
+    SymbolGraph.clear_instance()
+    SymbolGraph(_class_diagram=_session_class_diagram)
+    apartment = deepcopy(_apartment_world_setup)
+    WorldReasoner(apartment).infer_semantic_annotations()
+    return apartment
+
+
 @pytest.fixture
-def reasoned_apartment(apartment_world_copy) -> World:
+def reasoned_apartment(_reasoned_apartment_setup: World) -> World:
     """
-    The apartment with everything the reasoner can infer about it already inferred.
+    A copy of the reasoned apartment whose annotations are in the symbol graph of the
+    test that uses it.
     """
-    WorldReasoner(apartment_world_copy).infer_semantic_annotations()
-    return apartment_world_copy
+    return deepcopy(_reasoned_apartment_setup)
 
 
 @pytest.mark.parametrize(
@@ -476,7 +490,7 @@ def test_an_annotation_the_world_already_held_keeps_hanging_on_its_own_joint(
     ]
 
     [drawer] = drawers
-    assert isinstance(drawer.movable_joint, PrismaticConnection)
+    assert drawer.movable_joint.behaves_like_a_prismatic_connection
 
 
 def test_every_openable_part_hangs_on_the_joint_that_moves_it(
@@ -491,11 +505,20 @@ def test_every_openable_part_hangs_on_the_joint_that_moves_it(
     assert drawers and doors
 
     for drawer in drawers:
-        assert isinstance(drawer.movable_joint, PrismaticConnection)
+        assert drawer.movable_joint.behaves_like_a_prismatic_connection
     for door in doors:
-        assert isinstance(door.movable_joint, RevoluteConnection)
+        assert door.movable_joint.behaves_like_a_revolute_connection
 
     assert reasoned_apartment.validate()
+
+
+def test_the_inferred_annotations_are_in_the_symbol_graph(reasoned_apartment: World):
+    """
+    Queries over the symbol graph find the annotations the reasoner inferred.
+    """
+    drawers = set(reasoned_apartment.get_semantic_annotations_by_type(Drawer))
+    assert drawers
+    assert drawers <= set(SymbolGraph().get_instances_of_type(type_=Drawer))
 
 
 # %% what the reasoner leaves alone

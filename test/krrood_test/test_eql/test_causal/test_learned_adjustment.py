@@ -30,8 +30,10 @@ from probabilistic_model.causal_structure.learning import (
     LearnedCausalStructure,
     RelationalCausalStructureLearner,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
@@ -43,13 +45,13 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.product_algebra import Event
 from random_events.variable import Integer
 
-from krrood.class_diagrams.causal_relation import (
+from krrood.parametrization.causal_relation import (
     AttributeEndpoint,
     CausalRelation,
     CausalRelationsOfClass,
 )
 from krrood.class_diagrams.class_diagram import ClassDiagram
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.exceptions import (
     EffectNotIdentified,
     NoCauseVariablesForRanking,
@@ -388,8 +390,8 @@ class FixedEdgesLearner(CausalStructureLearner):
     ) -> CausalGraph:
         by_name = {node.name: node for node in nodes}
         return CausalGraph.from_edges(
-            nodes,
-            [
+            nodes=nodes,
+            edges=[
                 GraphEdge.directed_edge(by_name[parent], by_name[child])
                 for child, parents in self.parent_names.items()
                 if child in by_name

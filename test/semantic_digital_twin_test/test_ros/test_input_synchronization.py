@@ -32,14 +32,17 @@ from semantic_digital_twin.exceptions import (
     ConnectionCannotBeTrackedByTfFrameError,
     UnboundMessageTypeError,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     Connection6DoF,
     FixedConnection,
     OmniDrive,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -161,11 +164,17 @@ def world_with_two_connections() -> tuple[
         root = Body(name=PrefixedName("root"))
         part_body = Body(name=PrefixedName("part_body"))
         other_body = Body(name=PrefixedName("other_body"))
-        part_connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=part_body, axis=Vector3.Z()
+        part_connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=root,
+            child=part_body,
         )
-        other_connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=other_body, axis=Vector3.Z()
+        other_connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=root,
+            child=other_body,
         )
         world.add_connection(part_connection)
         world.add_connection(other_connection)
@@ -203,9 +212,44 @@ def tracked_connection(world_with_two_bodies):
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
     return world, connection
+
+
+@pytest.fixture()
+def world_with_mimic_joint() -> tuple[
+    World, ActiveConnection1DOF, ActiveConnection1DOF
+]:
+    """
+    A world whose root drives a joint and a mimic joint that moves twice as far, shifted
+    by 0.1, both driven by the degree of freedom of the first.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        driving_body = Body(name=PrefixedName("driving_body"))
+        mimicking_body = Body(name=PrefixedName("mimicking_body"))
+        driving_connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=root,
+            child=driving_body,
+        )
+        mimic_connection = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            name=PrefixedName("mimic_connection"),
+            parent=root,
+            child=mimicking_body,
+            multiplier=2.0,
+            offset=0.1,
+            raw_dof=driving_connection.raw_dof,
+        )
+        world.add_connection(driving_connection)
+        world.add_connection(mimic_connection)
+    return world, driving_connection, mimic_connection
 
 
 # %% message type resolution
@@ -276,6 +320,23 @@ def test_latest_joint_state_synchronizer_rewrites_its_message_every_cycle(
     mini_world.state[connection.raw_dof.id].position = 1.0
     assert synchronizer.apply() is True
     assert mini_world.state[connection.raw_dof.id].position == 0.42
+
+
+def test_a_mimic_joint_reported_with_its_driving_joint_leaves_it_where_reported(
+    rclpy_node, world_with_mimic_joint
+):
+    world, driving_connection, mimic_connection = world_with_mimic_joint
+    synchronizer = PendingJointStateSynchronizer(
+        world=world, node=rclpy_node, topic_name="joint_states"
+    )
+    message = JointState()
+    message.name = [driving_connection.name.name, mimic_connection.name.name]
+    message.position = [0.2, 0.5]
+    synchronizer.latest_message = message
+
+    assert synchronizer.apply() is True
+    assert driving_connection.position == pytest.approx(0.2)
+    assert mimic_connection.position == pytest.approx(0.5)
 
 
 def test_synchronizer_writes_nothing_without_a_message(rclpy_node, mini_world: World):

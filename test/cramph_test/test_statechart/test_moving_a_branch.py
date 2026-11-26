@@ -6,7 +6,7 @@ import pytest
 
 from cramph.node import EndedByOwner
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import EndStatechart, NodeArtifacts, StatechartNode
 from cramph.statechart import Statechart
@@ -16,14 +16,14 @@ from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% the world whose structure changes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SlidingWorld:
     """
     A world with a box resting at the origin and a slider that moves along x, so that
@@ -45,7 +45,7 @@ class SlidingWorld:
     The body fixed to the root, which is moved below :attr:`slider`.
     """
 
-    slider_connection: PrismaticConnection
+    slider_connection: ScrewAxisConnection
     """
     The joint moving :attr:`slider` along x.
     """
@@ -59,8 +59,13 @@ def sliding_world() -> SlidingWorld:
     box = Body(name=PrefixedName("box"))
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
-        slider_connection = PrismaticConnection.create_with_dofs(
-            world=world, parent=root, child=slider, axis=Vector3.X()
+        slider_connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
+            world=world,
+            parent=root,
+            child=slider,
         )
         world.add_connection(slider_connection)
         world.add_connection(FixedConnection(parent=root, child=box))
@@ -145,7 +150,7 @@ class NodeObservingABodyPastAPosition(EndedByOwner, StatechartNode):
         return NodeArtifacts(observation=root_T_body.position.x >= self.position)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionRecordingCompiles(TickingExecutorExtension):
     """
     An executor extension that records in which order it was told about compiling.
@@ -156,11 +161,11 @@ class ExtensionRecordingCompiles(TickingExecutorExtension):
     The hooks that ran, in order, each by its method name.
     """
 
-    def before_recompile(self, executor: StatechartExecutor) -> bool:
+    def before_recompile(self, *, executor: StatechartExecutor) -> bool:
         self.events.append(self.before_recompile.__name__)
         return True
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.events.append(self.after_compile.__name__)
 
 
@@ -170,8 +175,8 @@ def _compile(executor: StatechartExecutor, *nodes: StatechartNode) -> Statechart
     """
     statechart = Statechart(context=executor.context)
     for node in nodes:
-        statechart.add_node(node)
-    executor.compile(statechart)
+        statechart.add_node(node=node)
+    executor.compile(statechart=statechart)
     return statechart
 
 
@@ -182,12 +187,12 @@ def test_moving_a_branch_puts_the_body_below_its_new_parent(
     sliding_world: SlidingWorld, sliding_executor: StatechartExecutor
 ) -> None:
     move = MoveBranch(branch_root=sliding_world.box, new_parent=sliding_world.slider)
-    _compile(sliding_executor, move, EndStatechart.when_true(move))
+    _compile(sliding_executor, move, EndStatechart.when_true(node=move))
 
     sliding_executor.tick_until_end(timeout=10)
 
     assert sliding_world.box.parent_connection.parent is sliding_world.slider
-    assert move.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert move.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_node_moving_a_branch_has_the_chart_rebuilt_on_the_next_tick(
@@ -218,7 +223,7 @@ def test_a_node_reading_a_moved_body_reads_it_below_its_new_parent(
     sliding_world.slider_connection.position = 1.0
     sliding_executor.tick()
 
-    assert observer.observation_state == ObservationStateValues.TRUE
+    assert observer.observation_state == ObservationStateValue.TRUE
 
 
 def test_every_node_is_built_again_once_the_world_structure_changed(
@@ -257,7 +262,7 @@ def test_a_running_node_keeps_running_and_the_history_goes_on_across_a_rebuild(
     sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
     sliding_executor.tick()
 
-    assert counting.life_cycle_state == LifeCycleValues.RUNNING
+    assert counting.life_cycle_state == LifeCycleValue.RUNNING
     assert sliding_executor.tick_count == ticks_before + 1
     assert statechart.state_history.items[: len(history_before)] == history_before
 
@@ -298,6 +303,6 @@ def test_nodes_joining_after_the_world_structure_changed_have_every_node_built_a
 
     sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
     with statechart.modify():
-        statechart.add_node(NodeCountingItsBuilds(name="joining"))
+        statechart.add_node(node=NodeCountingItsBuilds(name="joining"))
 
     assert counting.build_count == 2

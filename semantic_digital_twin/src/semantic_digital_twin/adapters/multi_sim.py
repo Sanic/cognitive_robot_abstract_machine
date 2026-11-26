@@ -1,3 +1,8 @@
+"""
+Conversion of worlds into MultiSim simulations, with their cameras, lights and MuJoCo
+properties.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -29,10 +34,12 @@ from physics_simulators.base_simulator import (
     SimulatorCallbackResult,
     SimulatorConstraints,
 )
+from krrood.adapters.json_field import JSONField
+from krrood.adapters.json_serializer import ExternalClassJSONSerializer
 from krrood.exceptions import UnboundGenericParameter
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.utils import recursive_subclasses
+from krrood.utils import get_full_class_name, recursive_subclasses
 from scipy.spatial.transform import Rotation
 from trimesh.visual import TextureVisuals
 
@@ -49,6 +56,7 @@ from semantic_digital_twin.exceptions import (
     SimulationNotStartedError,
     SnapshotDoesNotFitSimulationError,
 )
+from semantic_digital_twin.adapters.exceptions import ScrewJointUnsupportedByMujocoError
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -56,10 +64,10 @@ from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     Vector3,
 )
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
     FixedConnection,
     Connection6DoF,
@@ -78,7 +86,10 @@ from semantic_digital_twin.world_description.geometry import (
     MeshFileFormat,
     Color,
 )
-from semantic_digital_twin.world_description.contact import ContactParameters
+from semantic_digital_twin.world_description.contact import (
+    ContactFriction,
+    ContactParameters,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Region,
     Body,
@@ -165,6 +176,70 @@ class MujocoActuatorProperty(StrEnum):
     """
 
 
+class MujocoContactDimensionality(IntEnum):
+    """
+    The dimensions MuJoCo resolves a contact in, its ``condim``, which decide which
+    friction coefficients of the contact act. MuJoCo resolves a contact in
+    :attr:`SLIDING` unless told otherwise, and in the more dimensions of its two geoms.
+
+    For more information, see:
+    https://mujoco.readthedocs.io/en/stable/modeling.html#contact
+    """
+
+    FRICTIONLESS = 1
+    """
+    Only the push along the contact normal; no friction acts.
+    """
+
+    SLIDING = 3
+    """
+    Sliding friction acts; the bodies are free to turn against each other.
+    """
+
+    SLIDING_AND_TORSIONAL = 4
+    """
+    Sliding and torsional friction act, so the bodies also resist turning around the
+    contact normal.
+    """
+
+    SLIDING_TORSIONAL_AND_ROLLING = 6
+    """
+    Sliding, torsional and rolling friction act, so the bodies also resist rolling over
+    each other.
+    """
+
+    @classmethod
+    def from_friction(cls, *, friction: ContactFriction) -> MujocoContactDimensionality:
+        """
+        :param friction: The friction a geom offers.
+        :return: The fewest dimensions in which every coefficient of `friction` that is
+            not zero acts.
+        """
+        if friction.rolling != 0:
+            return cls.SLIDING_TORSIONAL_AND_ROLLING
+        if friction.torsional != 0:
+            return cls.SLIDING_AND_TORSIONAL
+        if friction.sliding != 0:
+            return cls.SLIDING
+        return cls.FRICTIONLESS
+
+    def acting_friction(self, *, friction: ContactFriction) -> ContactFriction:
+        """
+        :param friction: The coefficients a geom declares.
+        :return: The coefficients of `friction` that act in these dimensions, the others
+            zero.
+        """
+        return ContactFriction(
+            sliding=friction.sliding if self >= self.SLIDING else 0.0,
+            torsional=(
+                friction.torsional if self >= self.SLIDING_AND_TORSIONAL else 0.0
+            ),
+            rolling=(
+                friction.rolling if self >= self.SLIDING_TORSIONAL_AND_ROLLING else 0.0
+            ),
+        )
+
+
 class GeomVisibilityAndCollisionType(IntEnum):
     """
     Enumeration of geometric visibility and collision attributes.
@@ -220,9 +295,9 @@ class MultiSimCamera(SimulatorAdditionalProperty):
     The name of the camera.
     """
 
-    body: Any = None
+    body: Body | None = None
     """
-    The body that the camera is attached to. This can be set to the name of the body or a reference to the body object itself.
+    The body the camera is attached to.
     """
 
 
@@ -329,11 +404,13 @@ class EntityConverter(ABC):
                 and not inspect.isabstract(subclass.entity_type)
                 and type(entity) is subclass.entity_type
             ):
-                entity_props = subclass()._convert(entity, **kwargs)
-                return subclass()._post_convert(entity, entity_props, **kwargs)
+                entity_props = subclass()._convert(entity=entity, **kwargs)
+                return subclass()._post_convert(
+                    entity=entity, entity_props=entity_props, **kwargs
+                )
         raise NotImplementedError(f"No converter found for entity type {type(entity)}.")
 
-    def _convert(self, entity: entity_type, **kwargs) -> dict[str, Any]:  # type: ignore
+    def _convert(self, *, entity: entity_type, **kwargs: Any) -> dict[str, Any]:  # type: ignore
         """
         The actual conversion method to be implemented by subclasses.
 
@@ -353,9 +430,10 @@ class EntityConverter(ABC):
     @abstractmethod
     def _post_convert(
         self,
+        *,
         entity: entity_type,
         entity_props: dict[str, Any],
-        **kwargs,  # type: ignore
+        **kwargs: Any,  # type: ignore
     ) -> dict[str, Any]:
         """
         Post-processes the converted entity properties. This method can be overridden by subclasses to update the properties after conversion.
@@ -380,7 +458,7 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
     pos_str: str = "pos"
     quat_str: str = "quat"
 
-    def _convert(self, entity: entity_type, **kwargs) -> dict[str, Any]:
+    def _convert(self, *, entity: entity_type, **kwargs: Any) -> dict[str, Any]:
         """
         Converts a KinematicStructureEntity object to a dictionary of body properties for Multiverse simulator.
 
@@ -388,7 +466,7 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
         :return: A dictionary of body properties, by default containing position and quaternion.
         """
 
-        kinematic_structure_entity_props = EntityConverter._convert(self, entity)
+        kinematic_structure_entity_props = EntityConverter._convert(self, entity=entity)
         # The simulator joint supplies the variable part, so the static frame must
         # exclude it (see Connection.reference_origin_expression).
         [
@@ -446,14 +524,14 @@ class BodyConverter(KinematicStructureEntityConverter, ABC):
     The key for the diagonal inertia tensor property in the output dictionary.
     """
 
-    def _convert(self, entity: Body, **kwargs) -> dict[str, Any]:
+    def _convert(self, *, entity: Body, **kwargs: Any) -> dict[str, Any]:
         """
         Converts a Body object to a dictionary of body properties for Multiverse simulator.
 
         :param entity: The Body object to convert.
         :return: A dictionary of body properties, including additional mass and inertia properties.
         """
-        body_props = KinematicStructureEntityConverter._convert(self, entity)
+        body_props = KinematicStructureEntityConverter._convert(self, entity=entity)
         inertial = entity.inertial
         if inertial is not None:
             mass = inertial.mass
@@ -517,14 +595,14 @@ class ShapeConverter(EntityConverter, ABC):
     The key for the shape RGBA color property in the output dictionary.
     """
 
-    def _convert(self, entity: Shape, **kwargs) -> dict[str, Any]:
+    def _convert(self, *, entity: Shape, **kwargs: Any) -> dict[str, Any]:
         """
         Converts a Shape object to a dictionary of shape properties for Multiverse simulator.
 
         :param entity: The Shape object to convert.
         :return: A dictionary of shape properties, by default containing position, quaternion, and RGBA color.
         """
-        geom_props = EntityConverter._convert(self, entity, **kwargs)
+        geom_props = EntityConverter._convert(self, entity=entity, **kwargs)
         px, py, pz, qw, qx, qy, qz = cas_pose_to_list(entity.origin)
         geom_pos = [px, py, pz]
         geom_quat = [qw, qx, qy, qz]
@@ -596,14 +674,14 @@ class ConnectionConverter(EntityConverter, ABC):
     The type of the entity to convert.
     """
 
-    def _convert(self, entity: Connection, **kwargs) -> dict[str, Any]:
+    def _convert(self, *, entity: Connection, **kwargs: Any) -> dict[str, Any]:
         """
         Converts a Connection object to a dictionary of joint properties for Multiverse simulator.
 
         :param entity: The Connection object to convert.
         :return: A dictionary of joint properties.
         """
-        return EntityConverter._convert(self, entity)
+        return EntityConverter._convert(self, entity=entity)
 
 
 @dataclass
@@ -652,21 +730,19 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
     The key for the joint damping property in the output dictionary.
     """
 
-    def _convert(self, entity: ActiveConnection1DOF, **kwargs) -> dict[str, Any]:
+    def _convert(
+        self, *, entity: ActiveConnection1DOF, **kwargs: Any
+    ) -> dict[str, Any]:
         """
         Converts an ActiveConnection1DOF object to a dictionary of joint properties for Multiverse simulator.
 
         :param entity: The ActiveConnection1DOF object to convert.
-        :return: A dictionary of joint properties, including additional axis, range, position, quaternion, armature, dry friction, and damping properties.
+        :return: A dictionary of joint properties, including additional range, armature, dry friction, and damping properties.
         """
-        joint_props = ConnectionConverter._convert(self, entity)
+        joint_props = ConnectionConverter._convert(self, entity=entity)
         dofs = list(entity.dofs)
         assert len(dofs) == 1, "ActiveConnection1DOF must have exactly one DOF."
         dof = dofs[0]
-        child_T_connection_transform = entity.connection_T_child_expression.inverse()
-        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(child_T_connection_transform)
-        joint_pos = [px, py, pz]
-        joint_quat = [qw, qx, qy, qz]
         # entity.dof, not the raw dof: it applies this connection's own multiplier and
         # sign, which a negative-multiplier mimic (a gripper's second finger) needs to
         # get its own displayed range rather than the shared raw dof's.
@@ -676,9 +752,6 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
             joint_range = [0, 0]
         joint_props.update(
             {
-                self.pos_str: joint_pos,
-                self.quat_str: joint_quat,
-                self.axis_str: entity.axis.to_np().tolist()[:3],
                 self.range_str: joint_range,
                 self.armature_str: entity.dynamics.armature,
                 self.dry_friction_str: entity.dynamics.dry_friction,
@@ -688,33 +761,46 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
         if dof.name.name != joint_props["name"] and dof.name.name != "dof":
             joint_props["equality_joint"] = {
                 "joint": dof.name.name,
-                "data": [entity.offset, entity.multiplier, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                "polynomial_coefficients": [entity.offset, entity.multiplier, 0, 0, 0],
             }
         return joint_props
 
 
 @dataclass
-class ConnectionRevoluteConverter(Connection1DOFConverter, ABC):
+class ConnectionScrewAxisConverter(Connection1DOFConverter, ABC):
     """
-    Converts a RevoluteConnection object to a dictionary of revolute joint properties for Multiverse simulator.
+    Converts a ScrewAxisConnection object to a dictionary of joint properties for
+    Multiverse simulator.
     """
 
-    entity_type: ClassVar[type[RevoluteConnection]] = RevoluteConnection
+    entity_type: ClassVar[type[ScrewAxisConnection]] = ScrewAxisConnection
     """
     The type of the entity to convert.
     """
 
-
-@dataclass
-class ConnectionPrismaticConverter(Connection1DOFConverter, ABC):
-    """
-    Converts a PrismaticConnection object to a dictionary of prismatic joint properties for Multiverse simulator.
-    """
-
-    entity_type: ClassVar[type[PrismaticConnection]] = PrismaticConnection
-    """
-    The type of the entity to convert.
-    """
+    def _convert(self, *, entity: ScrewAxisConnection, **kwargs: Any) -> dict[str, Any]:
+        """
+        :param entity: The screw axis connection to convert.
+        :return: The joint properties of :class:`Connection1DOFConverter`, and the
+            joint's position, orientation and axis in the child's frame.
+        """
+        joint_props = super()._convert(entity=entity, **kwargs)
+        # MuJoCo turns a hinge about the line through the joint's position, so the joint
+        # sits on the screw axis, which need not pass through the connection frame's
+        # origin.
+        child_T_frame_on_axis = (
+            entity.connection_T_child_expression.inverse()
+            @ entity.connection_T_frame_on_axis
+        )
+        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(child_T_frame_on_axis)
+        joint_props.update(
+            {
+                self.pos_str: [px, py, pz],
+                self.quat_str: [qw, qx, qy, qz],
+                self.axis_str: entity.screw_axis.unit_direction.to_np().tolist()[:3],
+            }
+        )
+        return joint_props
 
 
 @dataclass
@@ -728,14 +814,14 @@ class Connection6DOFConverter(ConnectionConverter, ABC):
     The type of the entity to convert.
     """
 
-    def _convert(self, entity: Connection6DoF, **kwargs) -> dict[str, Any]:
+    def _convert(self, *, entity: Connection6DoF, **kwargs: Any) -> dict[str, Any]:
         """
         Converts a Connection6DoF object to a dictionary of joint properties for Multiverse simulator.
 
         :param entity: The Connection6DoF object to convert.
         :return: A dictionary of joint properties.
         """
-        joint_props = ConnectionConverter._convert(self, entity)
+        joint_props = ConnectionConverter._convert(self, entity=entity)
         assert len(entity.dofs) == 7, "Connection6DoF must have exactly six DOFs."
         return joint_props
 
@@ -751,14 +837,14 @@ class ActuatorConverter(EntityConverter, ABC):
     The type of the entity to convert.
     """
 
-    def _convert(self, entity: Actuator, **kwargs) -> dict[str, Any]:
+    def _convert(self, *, entity: Actuator, **kwargs: Any) -> dict[str, Any]:
         """
         Converts an Actuator object to a dictionary of joint properties for Multiverse simulator.
 
         :param entity: The Actuator object to convert.
         :return: A dictionary of actuator properties, by default containing list of DOF names.
         """
-        actuator_props = EntityConverter._convert(self, entity)
+        actuator_props = EntityConverter._convert(self, entity=entity)
         actuator_props["dof_names"] = [dof.name.name for dof in entity.dofs]
         return actuator_props
 
@@ -774,14 +860,14 @@ class CameraConverter(EntityConverter, ABC):
     The type of the entity to convert.
     """
 
-    def _convert(self, entity: MultiSimCamera, **kwargs) -> dict[str, Any]:
+    def _convert(self, *, entity: MultiSimCamera, **kwargs: Any) -> dict[str, Any]:
         """
         Converts a Camera object to a dictionary of camera properties for Multiverse simulator.
 
         :param entity: The Camera object to convert.
         :return: A dictionary of camer properties, by default containing list of DOF names.
         """
-        camera_props = EntityConverter._convert(self, entity)
+        camera_props = EntityConverter._convert(self, entity=entity)
         camera_props["body"] = entity.body.name.name
         return camera_props
 
@@ -797,14 +883,14 @@ class LightConverter(EntityConverter, ABC):
     The type of the entity to convert.
     """
 
-    def _convert(self, entity: MultiSimLight, **kwargs) -> dict[str, Any]:
+    def _convert(self, *, entity: MultiSimLight, **kwargs: Any) -> dict[str, Any]:
         """
         Converts a Light object to a dictionary of light properties for Multiverse simulator.
 
         :param entity: The Light object to convert.
         :return: A dictionary of light properties, by default containing the parent body's name.
         """
-        light_props = EntityConverter._convert(self, entity)
+        light_props = EntityConverter._convert(self, entity=entity)
         light_props["body"] = entity.body.name.name
         return light_props
 
@@ -1192,6 +1278,46 @@ class MujocoLight(MultiSimLight):
     """
 
 
+# %% json of MuJoCo's enums
+
+
+class MujocoEnumJSONKey(StrEnum):
+    """
+    The keys of a serialized MuJoCo enum member besides its type.
+    """
+
+    VALUE = "value"
+    """
+    The integer MuJoCo gives the member.
+    """
+
+
+@dataclass
+class MujocoEnumJSONSerializer(ExternalClassJSONSerializer[None]):
+    """
+    Json serializer for the enums MuJoCo defines, such as :class:`mujoco.mjtLimited`,
+    so that the simulator properties carrying them can be synchronized.
+
+    The enums are bound from C and share no Python base class, which is why T is set to
+    None and they are recognized by the module that defines them.
+    """
+
+    @classmethod
+    def to_json(cls, *, instance: Any, **kwargs) -> dict[str, Any]:
+        return {
+            JSONField.TYPE: get_full_class_name(instance.__class__),
+            MujocoEnumJSONKey.VALUE: int(instance),
+        }
+
+    @classmethod
+    def from_json(cls, *, data: dict[str, Any], clazz: type, **kwargs: Any) -> Any:
+        return clazz(data[MujocoEnumJSONKey.VALUE])
+
+    @classmethod
+    def matches_generic_type(cls, *, clazz: type) -> bool:
+        return clazz.__module__ == mujoco.mjtLimited.__module__
+
+
 @dataclass
 class MujocoEquality(SimulatorAdditionalProperty):
     """
@@ -1436,36 +1562,49 @@ class MujocoKinematicStructureEntityConverter(
 
 @dataclass
 class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter):
+    """
+    Converts a body to the properties of a MuJoCo body.
+    """
+
     mass_str: str = "mass"
     inertia_pos_str: str = "ipos"
     inertia_quat_str: str = "iquat"
     diagonal_inertia_str: str = "inertia"
 
     def _post_convert(
-        self, entity: Body, body_props: dict[str, Any], **kwargs
+        self, *, entity: Body, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        return body_props
+        return entity_props
 
 
 @dataclass
 class MujocoRegionConverter(MujocoKinematicStructureEntityConverter, RegionConverter):
+    """
+    Converts a region to the properties of a MuJoCo body.
+    """
+
     def _post_convert(
-        self, entity: Region, region_props: dict[str, Any], **kwargs
+        self, *, entity: Region, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        return region_props
+        return entity_props
 
 
 @dataclass
 class MujocoGeomConverter(MujocoConverter, ShapeConverter, ABC):
+    """
+    Converts a shape to the properties of a MuJoCo geom, visible and collidable
+    as the conversion asks.
+    """
+
     pos_str: str = "pos"
     quat_str: str = "quat"
     rgba_str: str = "rgba"
     type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_SPHERE
 
     def _post_convert(
-        self, entity: Shape, shape_props: dict[str, Any], **kwargs
+        self, *, entity: Shape, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        shape_props.update(
+        entity_props.update(
             {
                 "type": self.type,
             }
@@ -1473,73 +1612,112 @@ class MujocoGeomConverter(MujocoConverter, ShapeConverter, ABC):
         is_visible = kwargs.get("visible", True)
         is_collidable = kwargs.get("collidable", True)
         if is_visible and is_collidable:
-            shape_props["group"] = (
+            entity_props["group"] = (
                 GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1
             )
         elif is_visible and not is_collidable:
-            shape_props["contype"] = 0
-            shape_props["conaffinity"] = 0
-            shape_props["group"] = GeomVisibilityAndCollisionType.ONLY_VISIBLE
+            entity_props["contype"] = 0
+            entity_props["conaffinity"] = 0
+            entity_props["group"] = GeomVisibilityAndCollisionType.ONLY_VISIBLE
         elif not is_visible and is_collidable:
-            shape_props["group"] = GeomVisibilityAndCollisionType.ONLY_COLLIDABLE
-        return shape_props
+            entity_props["group"] = GeomVisibilityAndCollisionType.ONLY_COLLIDABLE
+        return entity_props
 
 
 @dataclass
 class MujocoBoxConverter(MujocoGeomConverter, BoxConverter):
+    """
+    Converts a box to the properties of a MuJoCo box geom.
+    """
+
     type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_BOX
 
     def _post_convert(
-        self, entity: Box, shape_props: dict[str, Any], **kwargs
+        self, *, entity: Box, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        shape_props.update(
-            MujocoGeomConverter._post_convert(self, entity, shape_props, **kwargs)
+        """
+        :return: The geom's properties, with the half extents of the box as its size.
+        """
+        entity_props.update(
+            MujocoGeomConverter._post_convert(
+                self, entity=entity, entity_props=entity_props, **kwargs
+            )
         )
-        shape_props.update(
+        entity_props.update(
             {"size": [entity.scale.x / 2, entity.scale.y / 2, entity.scale.z / 2]}
         )
-        return shape_props
+        return entity_props
 
 
 @dataclass
 class MujocoSphereConverter(MujocoGeomConverter, SphereConverter):
+    """
+    Converts a sphere to the properties of a MuJoCo sphere geom.
+    """
+
     type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_SPHERE
 
     def _post_convert(
-        self, entity: Sphere, shape_props: dict[str, Any], **kwargs
+        self, *, entity: Sphere, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        shape_props.update(
-            MujocoGeomConverter._post_convert(self, entity, shape_props, **kwargs)
+        """
+        :return: The geom's properties, with the radius of the sphere as its size.
+        """
+        entity_props.update(
+            MujocoGeomConverter._post_convert(
+                self, entity=entity, entity_props=entity_props, **kwargs
+            )
         )
-        shape_props.update({"size": [entity.radius, entity.radius, entity.radius]})
-        return shape_props
+        entity_props.update({"size": [entity.radius, entity.radius, entity.radius]})
+        return entity_props
 
 
 @dataclass
 class MujocoCylinderConverter(MujocoGeomConverter, CylinderConverter):
+    """
+    Converts a cylinder to the properties of a MuJoCo cylinder geom.
+    """
+
     type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_CYLINDER
 
     def _post_convert(
-        self, entity: Cylinder, shape_props: dict[str, Any], **kwargs
+        self, *, entity: Cylinder, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        shape_props.update(
-            MujocoGeomConverter._post_convert(self, entity, shape_props, **kwargs)
+        """
+        :return: The geom's properties, with the radius and half the height of the
+            cylinder as its size.
+        """
+        entity_props.update(
+            MujocoGeomConverter._post_convert(
+                self, entity=entity, entity_props=entity_props, **kwargs
+            )
         )
-        shape_props.update({"size": [entity.radius, entity.height / 2, 0.0]})
-        return shape_props
+        entity_props.update({"size": [entity.radius, entity.height / 2, 0.0]})
+        return entity_props
 
 
 @dataclass
 class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
+    """
+    Converts a mesh to the properties of a MuJoCo mesh geom, with its texture file
+    if it has one.
+    """
+
     type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_MESH
 
     def _post_convert(
-        self, entity: Mesh, shape_props: dict[str, Any], **kwargs
+        self, *, entity: Mesh, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        shape_props.update(
-            MujocoGeomConverter._post_convert(self, entity, shape_props, **kwargs)
+        """
+        :return: The geom's properties, with the mesh and the file of its texture, if
+            it has one.
+        """
+        entity_props.update(
+            MujocoGeomConverter._post_convert(
+                self, entity=entity, entity_props=entity_props, **kwargs
+            )
         )
-        shape_props.update({"mesh": entity})
+        entity_props.update({"mesh": entity})
         if isinstance(entity.mesh.visual, TextureVisuals) and isinstance(
             entity.mesh.visual.material.name, str
         ):
@@ -1547,8 +1725,8 @@ class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
                 entity.mesh.visual.material, str(entity.local_file.parent)
             )
             if texture_file_path is not None:
-                shape_props["texture_file_path"] = texture_file_path
-        return shape_props
+                entity_props["texture_file_path"] = texture_file_path
+        return entity_props
 
     @staticmethod
     def _resolve_texture_file_path(material: Any, mesh_directory: str) -> str | None:
@@ -1582,6 +1760,10 @@ class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
 
 @dataclass
 class MujocoJointConverter(ConnectionConverter, ABC):
+    """
+    Converts a connection to the properties of a MuJoCo joint of :attr:`type`.
+    """
+
     pos_str: str = "pos"
     quat_str: str = "quat"
     type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_HINGE
@@ -1590,10 +1772,10 @@ class MujocoJointConverter(ConnectionConverter, ABC):
     damping_str: str = "damping"
 
     def _post_convert(
-        self, entity: Connection, joint_props: dict[str, Any], **kwargs
+        self, *, entity: Connection, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        joint_props["type"] = self.type
-        return joint_props
+        entity_props["type"] = self.type
+        return entity_props
 
 
 @dataclass
@@ -1601,39 +1783,45 @@ class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter):
     axis_str: str = "axis"
     range_str: str = "range"
 
-    def _post_convert(
-        self, entity: ActiveConnection1DOF, joint_props: dict[str, Any], **kwargs
-    ) -> dict[str, Any]:
-        joint_props = MujocoJointConverter._post_convert(self, entity, joint_props)
-        if not numpy.allclose(joint_props["quat"], [1.0, 0.0, 0.0, 0.0]):
-            joint_axis = numpy.array(joint_props["axis"])
-            R_joint = Rotation.from_quat(quat=joint_props["quat"], scalar_first=True)  # type: ignore
-            joint_props["axis"] = R_joint.apply(joint_axis).tolist()
-        del joint_props["quat"]
-        return joint_props
 
-
-@dataclass
-class MujocoRevoluteJointConverter(
-    Mujoco1DOFJointConverter, ConnectionRevoluteConverter
+@dataclass(kw_only=True)
+class MujocoScrewAxisJointConverter(
+    Mujoco1DOFJointConverter, ConnectionScrewAxisConverter
 ):
-    type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_HINGE
+    """
+    Converts a screw axis connection to a MuJoCo hinge or slide joint, after how its
+    screw axis behaves.
+    """
 
     def _post_convert(
-        self, entity: ActiveConnection1DOF, joint_props: dict[str, Any], **kwargs
+        self,
+        *,
+        entity: ScrewAxisConnection,
+        entity_props: dict[str, Any],
+        **kwargs: Any,
     ) -> dict[str, Any]:
-        joint_props = super()._post_convert(entity, joint_props, **kwargs)
-        joint_range = joint_props.pop("range")
+        """
+        :raises ScrewJointUnsupportedByMujocoError: if the connection rotates and
+            translates at once.
+        """
+        if entity.behaves_like_a_helical_connection:
+            raise ScrewJointUnsupportedByMujocoError(connection_name=entity.name)
+        entity_props = MujocoJointConverter._post_convert(
+            self, entity=entity, entity_props=entity_props
+        )
+        # MuJoCo has no joint orientation, so the axis is turned into the child's frame.
+        if not numpy.allclose(entity_props["quat"], [1.0, 0.0, 0.0, 0.0]):
+            joint_axis = numpy.array(entity_props["axis"])
+            R_joint = Rotation.from_quat(quat=entity_props["quat"], scalar_first=True)  # type: ignore
+            entity_props["axis"] = R_joint.apply(joint_axis).tolist()
+        del entity_props["quat"]
+        if entity.behaves_like_a_prismatic_connection:
+            entity_props["type"] = mujoco.mjtJoint.mjJNT_SLIDE
+            return entity_props
+        joint_range = entity_props.pop("range")
         if not any(limit is None for limit in joint_range):
-            joint_props["range"] = joint_range
-        return joint_props
-
-
-@dataclass
-class MujocoPrismaticJointConverter(
-    Mujoco1DOFJointConverter, ConnectionPrismaticConverter
-):
-    type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_SLIDE
+            entity_props["range"] = joint_range
+        return entity_props
 
 
 @dataclass
@@ -1840,7 +2028,10 @@ class MujocoSingleJoint(MujocoConnectionJoints[ConnectionType]):
             equality.objtype = mujoco.mjtObj.mjOBJ_JOINT
             equality.name1 = joint_name
             equality.name2 = self._mimicked_joint_name()
-            equality.data = equality_joint["data"]
+            coefficients = equality_joint["polynomial_coefficients"]
+            data = numpy.array(equality.data)
+            data[: len(coefficients)] = coefficients
+            equality.data = data
         mujoco_joint = self.connection.get_simulator_property_of_type(MujocoJoint)
         if mujoco_joint is not None:
             joint_props["stiffness"] = (
@@ -1991,6 +2182,9 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
     ``odom`` frame: the servos push its base across the floor at the commanded
     velocity, and the positions the joints reach are the drive's odometry. Otherwise it
     is built as no joint at all and its base stays where it is built.
+
+    The joints hold the base at its height, so no floor can carry it; the bodies the
+    drive carries do not collide with any :class:`Floor`, which would only drag them.
     """
 
     @classproperty
@@ -2015,14 +2209,45 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         :return: Whether servos drive every degree of freedom the drive is commanded
             with.
         """
-        actuated = {
+        return {
+            degree_of_freedom.id for degree_of_freedom in self.connection.active_dofs
+        } <= self._actuated_degree_of_freedom_ids
+
+    @property
+    def _actuated_degree_of_freedom_ids(self) -> set[UUID]:
+        """
+        :return: The id of every degree of freedom of the world a servo drives.
+        """
+        return {
             degree_of_freedom.id
             for actuator in self.world.actuators
             for degree_of_freedom in actuator.dofs
         }
-        return {
-            degree_of_freedom.id for degree_of_freedom in self.connection.active_dofs
-        } <= actuated
+
+    @property
+    def carried_bodies(self) -> list[Body]:
+        """
+        :return: The colliding bodies the drive holds at its base's height: the base
+            and every body hanging from it through joints no servo drives, such as its
+            wheels and casters.
+        """
+        actuated = self._actuated_degree_of_freedom_ids
+        carried = []
+        unvisited = [self.connection.child]
+        while unvisited:
+            entity = unvisited.pop()
+            if isinstance(entity, Body) and entity.collision:
+                carried.append(entity)
+            unvisited += [
+                child
+                for child in entity.child_kinematic_structure_entities
+                if not {
+                    degree_of_freedom.id
+                    for degree_of_freedom in child.parent_connection.dofs
+                }
+                & actuated
+            ]
+        return carried
 
     @property
     def axes(self) -> list[DriveAxis]:
@@ -2047,6 +2272,10 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
                 axis=(child_T_connection[:3, :3] @ axis.direction).tolist(),
                 pos=child_T_connection[:3, 3].tolist(),
             )
+        carried_bodies = self.carried_bodies
+        for floor in self.world.get_semantic_annotations_by_type(Floor):
+            for body in carried_bodies:
+                builder.exclude_contact(body, floor.root)
 
     def home_joint_positions(self) -> list[float]:
         return [self.world.state[axis.measured.id].position for axis in self.axes]
@@ -2260,13 +2489,18 @@ class MujocoActuatorConverter(ActuatorConverter, ABC):
 
 @dataclass
 class MujocoGeneralActuatorConverter(MujocoActuatorConverter, ActuatorConverter):
+    """
+    Converts an actuator to the properties of the MuJoCo actuator its
+    :class:`MujocoActuator` simulator property describes.
+    """
+
     def _post_convert(
-        self, entity: Actuator, actuator_props: dict[str, Any], **kwargs
+        self, *, entity: Actuator, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
         mujoco_actuator = entity.get_simulator_property_of_type(MujocoActuator)
         if mujoco_actuator is not None:
-            actuator_props.update(mujoco_actuator.to_dict())
-        return actuator_props
+            entity_props.update(mujoco_actuator.to_dict())
+        return entity_props
 
 
 @dataclass
@@ -2279,10 +2513,10 @@ class MujocoPositionServoConverter(MujocoActuatorConverter):
     entity_type: ClassVar[type[PositionServo]] = PositionServo
 
     def _post_convert(
-        self, entity: PositionServo, actuator_props: dict[str, Any], **kwargs
+        self, *, entity: PositionServo, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        actuator_props.update(MujocoActuator.create_servo(entity).to_dict())
-        return actuator_props
+        entity_props.update(MujocoActuator.create_servo(entity).to_dict())
+        return entity_props
 
 
 @dataclass
@@ -2295,66 +2529,74 @@ class MujocoVelocityServoConverter(MujocoActuatorConverter):
     entity_type: ClassVar[type[VelocityServo]] = VelocityServo
 
     def _post_convert(
-        self, entity: VelocityServo, actuator_props: dict[str, Any], **kwargs
+        self, *, entity: VelocityServo, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        actuator_props.update(MujocoActuator.create_velocity_servo(entity).to_dict())
-        return actuator_props
+        entity_props.update(MujocoActuator.create_velocity_servo(entity).to_dict())
+        return entity_props
 
 
 @dataclass
 class MujocoCameraConverter(CameraConverter, ABC):
+    """
+    Converts a camera to the properties of a MuJoCo camera.
+    """
+
     entity_type: ClassVar[type[MujocoCamera]] = MujocoCamera
 
     def _post_convert(
-        self, entity: MujocoCamera, camera_props: dict[str, Any], **kwargs
+        self, *, entity: MujocoCamera, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        camera_props["mode"] = entity.mode
+        entity_props["mode"] = entity.mode
         if mujoco.mj_version() >= 3005000:
-            camera_props["proj"] = (
+            entity_props["proj"] = (
                 mujoco.mjtProjection.mjPROJ_ORTHOGRAPHIC
                 if entity.orthographic
                 else mujoco.mjtProjection.mjPROJ_PERSPECTIVE
             )
         else:
-            camera_props["orthographic"] = entity.orthographic
-        camera_props["fovy"] = entity.fovy
-        camera_props["resolution"] = entity.resolution
-        camera_props["focal_length"] = entity.focal_length
-        camera_props["focal_pixel"] = entity.focal_pixel
-        camera_props["principal_length"] = entity.principal_length
-        camera_props["principal_pixel"] = entity.principal_pixel
-        camera_props["sensor_size"] = entity.sensor_size
-        camera_props["ipd"] = entity.inter_pupilary_distance
-        camera_props["pos"] = entity.position
-        camera_props["quat"] = entity.quaternion
-        return camera_props
+            entity_props["orthographic"] = entity.orthographic
+        entity_props["fovy"] = entity.fovy
+        entity_props["resolution"] = entity.resolution
+        entity_props["focal_length"] = entity.focal_length
+        entity_props["focal_pixel"] = entity.focal_pixel
+        entity_props["principal_length"] = entity.principal_length
+        entity_props["principal_pixel"] = entity.principal_pixel
+        entity_props["sensor_size"] = entity.sensor_size
+        entity_props["ipd"] = entity.inter_pupilary_distance
+        entity_props["pos"] = entity.position
+        entity_props["quat"] = entity.quaternion
+        return entity_props
 
 
 @dataclass
 class MujocoLightConverter(LightConverter, ABC):
+    """
+    Converts a light to the properties of a MuJoCo light.
+    """
+
     entity_type: ClassVar[type[MujocoLight]] = MujocoLight
 
     def _post_convert(
-        self, entity: MujocoLight, light_props: dict[str, Any], **kwargs
+        self, *, entity: MujocoLight, entity_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
-        light_props["mode"] = entity.mode
-        light_props["type"] = (
+        entity_props["mode"] = entity.mode
+        entity_props["type"] = (
             mujoco.mjtLightType.mjLIGHT_DIRECTIONAL
             if entity.directional
             else mujoco.mjtLightType.mjLIGHT_SPOT
         )
-        light_props["active"] = entity.active
-        light_props["castshadow"] = entity.cast_shadow
-        light_props["pos"] = entity.position
-        light_props["dir"] = entity.direction
-        light_props["ambient"] = entity.ambient
-        light_props["diffuse"] = entity.diffuse
-        light_props["specular"] = entity.specular
-        light_props["attenuation"] = entity.attenuation
-        light_props["cutoff"] = entity.cutoff
-        light_props["exponent"] = entity.exponent
-        light_props["bulbradius"] = entity.bulb_radius
-        return light_props
+        entity_props["active"] = entity.active
+        entity_props["castshadow"] = entity.cast_shadow
+        entity_props["pos"] = entity.position
+        entity_props["dir"] = entity.direction
+        entity_props["ambient"] = entity.ambient
+        entity_props["diffuse"] = entity.diffuse
+        entity_props["specular"] = entity.specular
+        entity_props["attenuation"] = entity.attenuation
+        entity_props["cutoff"] = entity.cutoff
+        entity_props["exponent"] = entity.exponent
+        entity_props["bulbradius"] = entity.bulb_radius
+        return entity_props
 
 
 @dataclass
@@ -2665,7 +2907,10 @@ class MujocoBuilder(MultiSimBuilder):
             body_spec = self.spec.bodies[body_id + 1]
             if numpy.isclose(body_spec.mass, 0.0):
                 continue
-            inertial_element = ET.SubElement(body_element, "inertial")
+            inertial_element = body_element.find("inertial")
+            if inertial_element is None:
+                inertial_element = ET.SubElement(body_element, "inertial")
+            inertial_element.attrib.clear()
             inertial_element.set("mass", f"{body_spec.mass}")
             inertial_element.set(
                 "diaginertia", " ".join(map(str, body_spec.inertia.tolist()))
@@ -2733,6 +2978,9 @@ class MujocoBuilder(MultiSimBuilder):
         contact = shape.get_simulator_property_of_type(ContactParameters)
         if contact is not None:
             geom_props["friction"] = contact.friction.to_list()
+            geom_props["condim"] = MujocoContactDimensionality.from_friction(
+                friction=contact.friction
+            )
             if contact.stiffness is not None:
                 geom_props["solref"] = contact.stiffness.to_list()
             if contact.impedance is not None:
@@ -2825,17 +3073,34 @@ class MujocoBuilder(MultiSimBuilder):
         os.makedirs(os.path.dirname(asset_file_path), exist_ok=True)
         return asset_file_path
 
-    def _mesh_name_for(self, mesh_file_path: str, mesh_scale: list[float]) -> str:
+    def _mesh_name_for(
+        self,
+        *,
+        mesh_file_path: str,
+        mesh_scale: list[float],
+        file_T_mesh: HomogeneousTransformationMatrix,
+    ) -> str:
         """
-        The name of the mesh asset for a mesh file at a scale, adding the asset to the
-        spec if no geom used this file at this scale yet.
+        The name of the mesh asset for a mesh file at a scale and in a frame of its
+        file, adding the asset to the spec if no geom used this file so yet.
 
         :param mesh_file_path: The mesh file MuJoCo loads.
         :param mesh_scale: The scale along x, y and z.
-        :return: The name, unique to this file and scale.
+        :param file_T_mesh: The mesh's own frame in its file, see
+            :attr:`~semantic_digital_twin.world_description.geometry.Mesh.file_T_mesh`.
+        :return: The name, unique to this file, scale and frame.
         """
+        file_T_mesh_matrix = file_T_mesh.to_np()
+        reference_position = file_T_mesh_matrix[:3, 3]
+        reference_orientation = numpy.zeros(4)
+        mujoco.mju_mat2Quat(reference_orientation, file_T_mesh_matrix[:3, :3].flatten())
         for mesh in self.spec.meshes:
-            if mesh.file == mesh_file_path and numpy.allclose(mesh.scale, mesh_scale):
+            if (
+                mesh.file == mesh_file_path
+                and numpy.allclose(mesh.scale, mesh_scale)
+                and numpy.allclose(mesh.refpos, reference_position)
+                and numpy.allclose(mesh.refquat, reference_orientation)
+            ):
                 return mesh.name
         mesh_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
         if not numpy.allclose(mesh_scale, [1.0, 1.0, 1.0]):
@@ -2845,6 +3110,8 @@ class MujocoBuilder(MultiSimBuilder):
         mesh = self.spec.add_mesh(name=mesh_name)
         mesh.file = mesh_file_path
         mesh.scale = mesh_scale
+        mesh.refpos = reference_position
+        mesh.refquat = reference_orientation
         return mesh_name
 
     def _thicken_if_near_planar(self, mesh_file_path: str) -> str:
@@ -2946,7 +3213,11 @@ class MujocoBuilder(MultiSimBuilder):
         mesh_file_path = self._thicken_if_near_planar(mesh_file_path)
 
         mesh_scale = [mesh_entity.scale.x, mesh_entity.scale.y, mesh_entity.scale.z]
-        geom_props["meshname"] = self._mesh_name_for(mesh_file_path, mesh_scale)
+        geom_props["meshname"] = self._mesh_name_for(
+            mesh_file_path=mesh_file_path,
+            mesh_scale=mesh_scale,
+            file_T_mesh=mesh_entity.file_T_mesh,
+        )
         if isinstance(texture_file_path, str):
             geom_props["material"] = self._register_texture_material(
                 texture_file_path=texture_file_path
@@ -3216,6 +3487,16 @@ class MujocoBuilder(MultiSimBuilder):
         if pair in excluded:
             return
         excluded.add(pair)
+        self.exclude_contact(body_a, body_b)
+
+    def exclude_contact(self, body_a: Body, body_b: Body) -> None:
+        """
+        Tell MuJoCo never to check the two bodies for contact with each other.
+
+        :param body_a: One of the two bodies.
+        :param body_b: The other.
+        """
+        pair = sorted((self.body_spec_of(body_a).name, self.body_spec_of(body_b).name))
         self.spec.add_exclude(name="_".join(pair), bodyname1=pair[0], bodyname2=pair[1])
 
     def _build_equalities(self):
@@ -3545,24 +3826,12 @@ class Connection1DOFSpawner(ConnectionSpawner, ABC):
 
 
 @dataclass
-class ConnectionPrismaticSpawner(ConnectionSpawner, ABC):
+class ConnectionScrewAxisSpawner(ConnectionSpawner, ABC):
     """
-    A spawner to spawn a PrismaticConnection object in the simulator.
-    """
-
-    entity_type: ClassVar[type[Connection]] = PrismaticConnection
-    """
-    The type of the entity to spawn.
+    A spawner to spawn a ScrewAxisConnection object in the simulator.
     """
 
-
-@dataclass
-class ConnectionRevoluteSpawner(ConnectionSpawner, ABC):
-    """
-    A spawner to spawn a RevoluteConnection object in the simulator.
-    """
-
-    entity_type: ClassVar[type[Connection]] = RevoluteConnection
+    entity_type: ClassVar[type[Connection]] = ScrewAxisConnection
     """
     The type of the entity to spawn.
     """
@@ -3752,25 +4021,17 @@ class MujocoFixedConnectionSpawner(MujocoEntitySpawner, FixedConnectionSpawner):
 
 
 @dataclass
-class MujocoPrismaticJointSpawner(MujocoConnectionSpawner, ConnectionPrismaticSpawner):
+class MujocoScrewAxisJointSpawner(MujocoConnectionSpawner, ConnectionScrewAxisSpawner):
     """
-    A spawner to spawn a PrismaticConnection object in the MuJoCo simulator.
-    """
-
-    mujoco_joint_converter: ClassVar[type[MujocoJointConverter]] = (
-        MujocoPrismaticJointConverter
-    )
-
-
-@dataclass
-class MujocoRevoluteJointSpawner(MujocoConnectionSpawner, ConnectionRevoluteSpawner):
-    """
-    A spawner to spawn a RevoluteConnection object in the MuJoCo simulator.
+    A spawner to spawn a ScrewAxisConnection object in the MuJoCo simulator.
     """
 
     mujoco_joint_converter: ClassVar[type[MujocoJointConverter]] = (
-        MujocoRevoluteJointConverter
+        MujocoScrewAxisJointConverter
     )
+    """
+    The converter that turns the connection into a MuJoCo joint.
+    """
 
 
 @dataclass

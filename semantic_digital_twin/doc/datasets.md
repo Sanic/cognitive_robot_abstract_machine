@@ -81,8 +81,8 @@ obj.world  # one Body per rigid link
 ```
 
 Objects are USD stages parsed by `semantic_digital_twin.adapters.usd.parser.USDParser` (the USD counterpart to
-`URDFParser`/`MJCFParser`): `RevoluteConnection`/`PrismaticConnection` per USD Physics joint of the
-matching type, `FixedConnection` otherwise. The catalog is 450 objects across the 9 `ArtVipCategory`
+`URDFParser`/`MJCFParser`): a `ScrewAxisConnection` with a revolute or prismatic `screw_axis` per USD Physics
+joint of the matching type, `FixedConnection` otherwise. The catalog is 450 objects across the 9 `ArtVipCategory`
 values; `available_objects` returns each object's path relative to its category, occasionally nested a
 subcategory deeper (e.g. `major_appliances/refrigerator/fridge/fridge_01`).
 
@@ -92,6 +92,16 @@ stage with several unconnected top-level prims and no physics joints between the
 with a separate Body per prim, so a multi-object USD scene composed outside ArtVIP (e.g. authored by
 hand or exported from a DCC tool) loads the same way, just without `ArtVipDatasetLoader`'s
 category/name bookkeeping.
+
+A scene that places its objects as prims of kind `component` deeper in the hierarchy, as
+architectural exports do, is parsed by `semantic_digital_twin.adapters.usd.parser.USDComponentParser`
+instead: each component becomes its own `Body`, attached to the root with a `Connection6DoF` at its
+authored pose, and named after its path below the root prim (e.g. `Meshes/Assets/Chair/Actor_0003`).
+The physics joints inside a component connect its links to the component's body the way `USDParser`
+connects an asset's links to its root. A stage is rejected if it has physics joints outside every
+component, a joint that moves its own component or connects a link outside it, or a joint whose
+links are scaled. Components placed as instances of instanceable prims are read through their instance
+proxies.
 
 The dataset is public (Apache 2.0), no gated access. Requires the `usd-core` library (`pxr`).
 

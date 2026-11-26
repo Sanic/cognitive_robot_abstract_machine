@@ -1,7 +1,11 @@
+"""
+The camera configuration that plays back recorded data from MongoDB.
+"""
+
 from __future__ import annotations
 
 # %% Imports
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -26,7 +30,7 @@ class MongoReplayMode(StrEnum):
     """
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class MongoCameraConfig(BaseCameraConfig, WorldDescriptorComponent):
     """
     Configuration class for MongoDB-based camera data playback.

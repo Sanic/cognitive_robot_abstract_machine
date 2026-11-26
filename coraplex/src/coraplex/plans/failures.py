@@ -1,24 +1,31 @@
+"""
+The failures a plan reports when it cannot go on, or when an attempt did not work.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
 
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Self
 
 from giskardpy.motion_statechart.exceptions import (
     CollisionViolatedError,
     NoProgressError,
 )
 from cramph.exceptions import ExecutionFailure
+from giskardpy.qp.exceptions import InfeasibleException
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     from cramph.node import StatechartNode
+    from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanFailure(ExecutionFailure):
     """
     Base class for all exceptions that are related to plan errors.
@@ -36,7 +43,7 @@ class PlanFailure(ExecutionFailure):
 # %% what a plan can recover from
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionMadeNoProgress(PlanFailure):
     """
     Raised when a motion stopped approaching its goal.
@@ -60,7 +67,7 @@ class MotionMadeNoProgress(PlanFailure):
         return self.no_progress.suggest_correction()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionExceededSimulationTimeLimit(PlanFailure):
     """
     Raised when a simulated plan ran for longer than the actions it started are allowed
@@ -90,7 +97,7 @@ class MotionExceededSimulationTimeLimit(PlanFailure):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionViolatedCollisionAvoidance(PlanFailure):
     """
     Raised when a motion brought bodies closer to each other than collision avoidance
@@ -106,6 +113,40 @@ class MotionViolatedCollisionAvoidance(PlanFailure):
     The violation the motion reported, which names the body pairs that came too close.
     """
 
+    degrees_of_freedom_moving_colliding_bodies: frozenset[DegreeOfFreedom] = frozenset()
+    """
+    The degrees of freedom that moved one of the bodies that came too close relative to
+    the root of the world, when the violation was reported; empty if not known.
+    """
+
+    @classmethod
+    def from_violation_in_world(
+        cls, *, violation: CollisionViolatedError, world: World
+    ) -> Self:
+        """
+        :param violation: The violation a motion in `world` reported.
+        :param world: The world the motion ran in.
+        :return: The failure, with the degrees of freedom that move the bodies that came
+            too close in `world` as it is now.
+        """
+        bodies = {
+            body
+            for collision in violation.violated_collisions
+            for body in (
+                collision.closest_points.body_a,
+                collision.closest_points.body_b,
+            )
+        }
+        return cls(
+            violation=violation,
+            degrees_of_freedom_moving_colliding_bodies=frozenset(
+                degree_of_freedom
+                for body in bodies
+                for connection in world.compute_chain_of_connections(world.root, body)
+                for degree_of_freedom in connection.dofs
+            ),
+        )
+
     def error_message(self) -> str:
         return self.violation.error_message()
 
@@ -113,7 +154,30 @@ class MotionViolatedCollisionAvoidance(PlanFailure):
         return self.violation.suggest_correction()
 
 
-@dataclass
+@dataclass(kw_only=True)
+class MotionWasInfeasible(PlanFailure):
+    """
+    Raised when the motion controller found no motion that satisfies every constraint at
+    once, such as when a motion starts closer to something than collision avoidance
+    allows.
+
+    Like :class:`MotionMadeNoProgress`, this says the attempt did not work from where it
+    started rather than that the plan cannot go on.
+    """
+
+    infeasibility: InfeasibleException
+    """
+    The infeasibility the solver reported.
+    """
+
+    def error_message(self) -> str:
+        return self.infeasibility.error_message()
+
+    def suggest_correction(self) -> str:
+        return self.infeasibility.suggest_correction()
+
+
+@dataclass(kw_only=True)
 class EmptyUnderspecified(PlanFailure):
     """
     Raised when an underspecified statement yields no action that succeeds.
@@ -131,7 +195,7 @@ class EmptyUnderspecified(PlanFailure):
         return "Widen the domains of the statement, or check why its actions fail."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CandidateLimitReached(EmptyUnderspecified):
     """
     Raised when an underspecified step has tried as many candidates as it may without
@@ -156,7 +220,7 @@ class CandidateLimitReached(EmptyUnderspecified):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotInCollision(PlanFailure):
     """
     Thrown when the robot is in collision with the environment.
@@ -169,7 +233,7 @@ class RobotInCollision(PlanFailure):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NavigationGoalNotReachedError(PlanFailure):
     """
     Thrown when the navigation goal is not reached.
@@ -179,6 +243,7 @@ class NavigationGoalNotReachedError(PlanFailure):
     """
     The current pose of the robot.
     """
+
     goal_pose: Pose
     """
     The goal pose of the robot.
@@ -191,7 +256,7 @@ class NavigationGoalNotReachedError(PlanFailure):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyUnfetchable(PlanFailure):
     """
     Raised when a body cannot be fetched from an arm.
@@ -214,7 +279,7 @@ class BodyUnfetchable(PlanFailure):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EndEffectorDidNotReachTarget(PlanFailure):
     """
     Raised when an end effector did not reach its target during a motion.

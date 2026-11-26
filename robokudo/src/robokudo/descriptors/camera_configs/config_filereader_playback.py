@@ -1,7 +1,11 @@
+"""
+The camera configuration that plays back recorded images read from files.
+"""
+
 from __future__ import annotations
 
 # %% Imports
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from dataclasses import dataclass, field
 
 
@@ -12,7 +16,7 @@ from robokudo.descriptors.camera_configs.components import (
 from robokudo.types.cv import ColorToDepthRatio
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     """
     Configuration class for file-based camera data playback.

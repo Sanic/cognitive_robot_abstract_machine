@@ -1,3 +1,7 @@
+"""
+Tests of learning the causal structure of a class from tables of its instances.
+"""
+
 import itertools
 from dataclasses import dataclass, field
 
@@ -5,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from krrood.class_diagrams.causal_relation import (
+from krrood.parametrization.causal_relation import (
     AttributeEndpoint,
     CausalRelationsOfClass,
     StatisticEndpoint,
@@ -86,8 +90,8 @@ class EveryPairJoinedLearner(CausalStructureLearner):
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         return CausalGraph.from_edges(
-            nodes,
-            [
+            nodes=nodes,
+            edges=[
                 GraphEdge.undirected_edge(first, second)
                 for first, second in itertools.combinations(nodes, 2)
             ],

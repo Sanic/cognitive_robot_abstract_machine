@@ -34,11 +34,11 @@ class StatechartPayloadKey(StrEnum):
     The structure of the statechart, sent once per goal.
     """
 
-    JOINED_NODES = "joined_nodes"
+    CHANGE_BLOCKS = "change_blocks"
     """
-    The structure of the nodes that joined the statechart since the structure of the
-    nodes before them was sent, as
-    :meth:`~cramph.statechart.Statechart.nodes_from_to_json` writes them.
+    The structure copies of the change blocks the statechart closed since its structure
+    or the change blocks before were sent, oldest first, see
+    :meth:`~cramph.statechart_changes.StatechartChangeBlock.create_structure_copy`.
     """
 
     LIFE_CYCLE_STATE = "life_cycle_state"
@@ -65,7 +65,7 @@ class StatechartPayloadKey(StrEnum):
 # %% following the payloads
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReportedStatechart:
     """
     A copy of the statechart a server reports on, holding the structure and the states
@@ -77,9 +77,9 @@ class ReportedStatechart:
     The copy, None until a payload carried the structure of a statechart.
     """
 
-    def take_over(self, payload: dict[str, Any]) -> None:
+    def take_over(self, *, payload: dict[str, Any]) -> None:
         """
-        Take over the structure, the joined nodes and the states `payload` reports.
+        Take over the structure, the changes to it and the states `payload` reports.
 
         A payload arriving before any structure is ignored, since its states belong to
         nodes this copy does not know.
@@ -93,10 +93,8 @@ class ReportedStatechart:
             )
         if self.statechart is None:
             return
-        if StatechartPayloadKey.JOINED_NODES in payload:
-            self.statechart.add_nodes_from_json(
-                payload[StatechartPayloadKey.JOINED_NODES]
-            )
+        for change_block in payload.get(StatechartPayloadKey.CHANGE_BLOCKS, []):
+            self.statechart.apply_change_block_from_json(data=change_block)
         self.statechart.compiler.add_transitions()
         self.statechart.life_cycle_state.data = LifeCycleState.from_json(
             data=payload[StatechartPayloadKey.LIFE_CYCLE_STATE],
