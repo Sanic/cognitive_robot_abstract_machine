@@ -1,6 +1,6 @@
 # Guided feature videos
 
-[From whole-apartment alignment to handle refinement (2:23)](http://127.0.0.1:8815/videos/apartment-handle-refinement-v6.mp4)
+[From whole-apartment alignment to handle refinement (2:23)](http://127.0.0.1:8815/videos/apartment-handle-refinement-v7.mp4)
 starts with the entire scan and SemDT model apart, runs the automatic placement
 search, and previews the generated fit. It compares two placements using the
 same whole-apartment sample and accepts one before selecting the cabinet. The rest follows

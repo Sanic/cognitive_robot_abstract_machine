@@ -1,6 +1,6 @@
 # Apartment walkthrough — refine two Cabinet 3 handles
 
-The [walkthrough (2:23)](http://127.0.0.1:8815/videos/apartment-handle-refinement-v6.mp4)
+The [walkthrough (2:23)](http://127.0.0.1:8815/videos/apartment-handle-refinement-v7.mp4)
 opens on the entire laser scan and SemDT apartment model in different
 horizontal coordinates. The recording starts with a rough height match, runs
 the refiner's upright placement search, and previews the whole-world fit in
@@ -71,12 +71,18 @@ Cabinet 3 handles as changed.
 
 ## Review and reproduction
 
+At 1:33, the recording shows the selected proposal at the top of the Refine
+panel before scrolling to the heatmap controls. The 3D view stays fixed
+through both steps.
+
 Open [the pending review](http://127.0.0.1:8838/), go to **Refine**, and choose the
 Cabinet 3 change set under **Agent proposal**. Select **Show paired heatmaps** and
 toggle **Original / Proposed**. The recorded Accept and Undo use a separate copy.
 The original apartment URDF and accepted source are preserved.
 
-The ignored `projects/apartment-handles-walkthrough-v6/` directory retains the
+The ignored `projects/apartment-handles-walkthrough-v7/` directory retains the
+proposal selection and sidebar scroll capture.
+The `projects/apartment-handles-walkthrough-v6/` directory retains the
 whole-apartment scores and single placement acceptance take.
 The `projects/apartment-handles-walkthrough-v4/`
 directory retains the oblique Undo footage. The `projects/apartment-handles-walkthrough-v3/`
